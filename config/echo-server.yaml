@@ -1,0 +1,9 @@
+service:
+  name: "echo-server"
+  domain: "example.org"
+  
+spiffe:
+  socket_path: "/tmp/spire-agent/public/api.sock"
+  
+authorized_clients:
+  - "echo-client"

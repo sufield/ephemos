@@ -1,0 +1,13 @@
+service:
+  name: "ephemos-service"
+  domain: "example.org"
+  
+# Optional - sensible defaults if not specified
+spiffe:
+  socket_path: "/tmp/spire-agent/public/api.sock"
+  
+# For server: which clients can connect
+authorized_clients: []
+  
+# For client: which servers to trust (optional)  
+trusted_servers: []
