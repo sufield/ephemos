@@ -14,7 +14,8 @@ all: proto build examples
 # Build library and CLI
 build:
 	@echo "Building Ephemos CLI..."
-	@go build -o $(CLI_BINARY) cmd/ephemos/main.go
+	@mkdir -p bin
+	@go build -o bin/$(CLI_BINARY) cmd/ephemos-cli/main.go
 	@echo "Build completed!"
 
 # Generate protobuf code
@@ -29,8 +30,9 @@ proto:
 # Build example applications
 examples:
 	@echo "Building example applications..."
-	@go build -o $(SERVER_BINARY) examples/echo-server/main.go
-	@go build -o $(CLIENT_BINARY) examples/echo-client/main.go
+	@mkdir -p bin
+	@go build -o bin/$(SERVER_BINARY) examples/echo-server/main.go
+	@go build -o bin/$(CLIENT_BINARY) examples/echo-client/main.go
 	@echo "Examples built!"
 
 # Run tests
@@ -61,7 +63,7 @@ demo: proto build examples
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	@rm -f $(CLI_BINARY) $(SERVER_BINARY) $(CLIENT_BINARY)
+	@rm -rf bin/
 	@rm -f $(GO_OUT)/*.pb.go
 	@echo "Clean completed!"
 

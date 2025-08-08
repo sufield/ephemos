@@ -1,16 +1,30 @@
-// ephemos-cli is the command-line interface for the Ephemos identity-based authentication library.
+// Package main provides the Ephemos CLI tool for production SPIFFE/SPIRE service management
+// and identity-based authentication administration.
 //
-// This CLI provides utilities for managing SPIFFE/SPIRE service registrations, identities,
-// and authentication policies. It simplifies common operations like:
-//   - Registering services with SPIRE server
-//   - Managing service selectors and SPIFFE IDs
-//   - Configuring trust domains and authentication policies
+// The ephemos CLI tool is a production utility for system administrators,
+// DevOps engineers, and developers managing Ephemos-based services in
+// development and production environments.
+//
+// Core functionality includes:
+//   - Service registration with SPIRE server
+//   - Configuration validation and management
+//   - Identity verification and diagnostics
+//   - SPIRE infrastructure health checks
+//   - Certificate and trust bundle inspection
+//   - Service selector management
 //
 // Usage:
-//   ephemos-cli register <service-name> [flags]
-//   ephemos-cli --help
+//   ephemos register --config config.yaml --selector unix:user:1000
+//   ephemos validate --config config.yaml
+//   ephemos health --config config.yaml --verbose
 //
-// For more information, see the Ephemos documentation.
+// The tool integrates with SPIRE infrastructure to provide streamlined
+// service identity management for microservices and distributed systems.
+// It abstracts SPIFFE/SPIRE complexity while providing full administrative
+// control over identity policies and service registration.
+//
+// This is a production CLI binary built from cmd/ephemos-cli according to
+// Go project layout conventions for production command-line tools.
 package main
 
 import (

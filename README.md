@@ -5,9 +5,9 @@ Ephemos is a Go library that provides identity-based authentication for backend 
 ## Features
 
 - **Simple API**: One-line setup for both servers and clients
-- **Complete Abstraction**: No SPIFFE/SPIRE terminology exposed to developers
+- **Abstraction**: No SPIFFE/SPIRE terminology exposed to developers
 - **Automatic Certificate Rotation**: Transparent handling of certificate lifecycle
-- **Clean Architecture**: Hexagonal architecture with proper separation of concerns
+- **Elegant Architecture**: Hexagonal architecture with proper separation of concerns
 - **Ubuntu 24 Optimized**: Scripts and configurations optimized for Ubuntu 24
 
 ## Quick Start
@@ -98,7 +98,7 @@ The `config/` folder contains example configurations:
 
 ## Architecture
 
-Ephemos follows a clean hexagonal architecture:
+Ephemos follows the hexagonal architecture:
 
 ```
 ephemos/
@@ -182,11 +182,6 @@ make clean
 **Ubuntu/Debian:**
 ```bash
 sudo apt update && sudo apt install -y protobuf-compiler
-```
-
-**macOS:**
-```bash
-brew install protobuf
 ```
 
 **Manual Installation (Linux):**

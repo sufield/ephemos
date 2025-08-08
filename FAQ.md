@@ -123,7 +123,6 @@ ephemos/
 └── pkg/ephemos/          # Public API
 ```
 
-**Key principles:**
 - Domain core has zero external dependencies
 - Dependencies flow: adapters → ports → domain
 - Clean interfaces (ports) define boundaries

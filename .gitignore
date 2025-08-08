@@ -17,12 +17,16 @@
 # Go workspace file
 go.work
 
-# Built binaries
-/bin/
+# Built binaries and build artifacts
+bin/
 /build/
+*.exe
+*.test
+*.out
 echo-server
 echo-client
 ephemos
+ephemos-cli
 
 # IDE and editor files
 .vscode/
