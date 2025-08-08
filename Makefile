@@ -13,33 +13,33 @@ all: proto build examples
 
 # Build library and CLI
 build:
-	@echo "Building Ephemos CLI..."
-	@mkdir -p bin
-	@go build -o bin/$(CLI_BINARY) cmd/ephemos-cli/main.go
-	@echo "Build completed!"
+	echo "Building Ephemos CLI..."
+	mkdir -p bin
+	go build -v -o bin/$(CLI_BINARY) cmd/ephemos-cli/main.go
+	echo "Build completed!"
 
 # Generate protobuf code
 proto:
-	@echo "Generating protobuf code..."
-	@mkdir -p $(GO_OUT)
-	@$(PROTOC) --go_out=$(GO_OUT) --go_opt=paths=source_relative \
+	echo "Generating protobuf code..."
+	mkdir -p $(GO_OUT)
+	$(PROTOC) --go_out=$(GO_OUT) --go_opt=paths=source_relative \
 		--go-grpc_out=$(GO_OUT) --go-grpc_opt=paths=source_relative \
 		-I $(PROTO_DIR) $(PROTO_DIR)/echo.proto
-	@echo "Protobuf generation completed!"
+	echo "Protobuf generation completed!"
 
 # Build example applications
 examples:
-	@echo "Building example applications..."
-	@mkdir -p bin
-	@go build -o bin/$(SERVER_BINARY) examples/echo-server/main.go
-	@go build -o bin/$(CLIENT_BINARY) examples/echo-client/main.go
-	@echo "Examples built!"
+	echo "Building example applications..."
+	mkdir -p bin
+	go build -v -o bin/$(SERVER_BINARY) examples/echo-server/main.go
+	go build -v -o bin/$(CLIENT_BINARY) examples/echo-client/main.go
+	echo "Examples built!"
 
 # Run tests
 test:
-	@echo "Running tests..."
-	@go test -v ./...
-	@echo "Tests completed!"
+	echo "Running tests..."
+	go test -v ./...
+	echo "Tests completed!"
 
 # Run complete demo
 demo: proto build examples
@@ -62,10 +62,10 @@ demo: proto build examples
 
 # Clean build artifacts
 clean:
-	@echo "Cleaning build artifacts..."
-	@rm -rf bin/
-	@rm -f $(GO_OUT)/*.pb.go
-	@echo "Clean completed!"
+	echo "Cleaning build artifacts..."
+	rm -rf bin/
+	rm -f $(GO_OUT)/*.pb.go
+	echo "Clean completed!"
 
 # Install all prerequisites for Ubuntu 24
 install-tools:
@@ -234,22 +234,22 @@ check-requirements:
 
 # Get dependencies
 deps:
-	@echo "Getting dependencies..."
-	@go mod download
-	@go mod tidy
-	@echo "Dependencies updated!"
+	echo "Getting dependencies..."
+	go mod download
+	go mod tidy
+	echo "Dependencies updated!"
 
 # Format code
 fmt:
-	@echo "Formatting code..."
-	@go fmt ./...
-	@echo "Code formatted!"
+	echo "Formatting code..."
+	go fmt ./...
+	echo "Code formatted!"
 
 # Lint code
 lint:
-	@echo "Linting code..."
-	@golangci-lint run || echo "Install golangci-lint: https://golangci-lint.run/usage/install/"
-	@echo "Linting completed!"
+	echo "Linting code..."
+	golangci-lint run || echo "Install golangci-lint: https://golangci-lint.run/usage/install/"
+	echo "Linting completed!"
 
 # Help target
 help:

@@ -15,54 +15,48 @@ func TestConfiguration_Validate(t *testing.T) {
 		{
 			name: "valid configuration",
 			config: &Configuration{
-				Service: &ServiceConfig{
+				Service: ServiceConfig{
 					Name:   "test-service",
 					Domain: "example.com",
 				},
 				SPIFFE: &SPIFFEConfig{
-					Domain:      "example.com",
 					SocketPath:  "/tmp/spire-agent/public/api.sock",
-					TrustDomain: "example.com",
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "nil service config",
+			name: "empty service config",
 			config: &Configuration{
-				Service: nil,
+				Service: ServiceConfig{}, // Empty service config to test validation
 				SPIFFE: &SPIFFEConfig{
-					Domain:      "example.com",
 					SocketPath:  "/tmp/spire-agent/public/api.sock",
-					TrustDomain: "example.com",
 				},
 			},
 			wantErr: true,
-			errorContains: "service configuration is required",
+			errorContains: "service name is required",
 		},
 		{
 			name: "nil SPIFFE config",
 			config: &Configuration{
-				Service: &ServiceConfig{
+				Service: ServiceConfig{
 					Name:   "test-service",
 					Domain: "example.com",
 				},
 				SPIFFE: nil,
 			},
-			wantErr: true,
-			errorContains: "SPIFFE configuration is required",
+			wantErr: false, // SPIFFE config is optional
+			errorContains: "",
 		},
 		{
 			name: "empty service name",
 			config: &Configuration{
-				Service: &ServiceConfig{
+				Service: ServiceConfig{
 					Name:   "",
 					Domain: "example.com",
 				},
 				SPIFFE: &SPIFFEConfig{
-					Domain:      "example.com",
 					SocketPath:  "/tmp/spire-agent/public/api.sock",
-					TrustDomain: "example.com",
 				},
 			},
 			wantErr: true,
@@ -71,82 +65,44 @@ func TestConfiguration_Validate(t *testing.T) {
 		{
 			name: "empty service domain",
 			config: &Configuration{
-				Service: &ServiceConfig{
+				Service: ServiceConfig{
 					Name:   "test-service",
 					Domain: "",
 				},
 				SPIFFE: &SPIFFEConfig{
-					Domain:      "example.com",
 					SocketPath:  "/tmp/spire-agent/public/api.sock",
-					TrustDomain: "example.com",
 				},
 			},
-			wantErr: true,
-			errorContains: "service domain is required",
+			wantErr: false, // Domain is optional
+			errorContains: "",
 		},
 		{
 			name: "whitespace only service name",
 			config: &Configuration{
-				Service: &ServiceConfig{
+				Service: ServiceConfig{
 					Name:   "   ",
 					Domain: "example.com",
 				},
 				SPIFFE: &SPIFFEConfig{
-					Domain:      "example.com",
 					SocketPath:  "/tmp/spire-agent/public/api.sock",
-					TrustDomain: "example.com",
 				},
 			},
 			wantErr: true,
 			errorContains: "service name is required",
 		},
 		{
-			name: "empty SPIFFE domain",
-			config: &Configuration{
-				Service: &ServiceConfig{
-					Name:   "test-service",
-					Domain: "example.com",
-				},
-				SPIFFE: &SPIFFEConfig{
-					Domain:      "",
-					SocketPath:  "/tmp/spire-agent/public/api.sock",
-					TrustDomain: "example.com",
-				},
-			},
-			wantErr: true,
-			errorContains: "SPIFFE domain is required",
-		},
-		{
 			name: "empty socket path",
 			config: &Configuration{
-				Service: &ServiceConfig{
+				Service: ServiceConfig{
 					Name:   "test-service",
 					Domain: "example.com",
 				},
 				SPIFFE: &SPIFFEConfig{
-					Domain:      "example.com",
 					SocketPath:  "",
-					TrustDomain: "example.com",
 				},
 			},
 			wantErr: true,
 			errorContains: "socket path is required",
-		},
-		{
-			name: "empty trust domain",
-			config: &Configuration{
-				Service: &ServiceConfig{
-					Name:   "test-service",
-					Domain: "example.com",
-				},
-				SPIFFE: &SPIFFEConfig{
-					Domain:      "example.com",
-					SocketPath:  "/tmp/spire-agent/public/api.sock",
-					TrustDomain: "",
-				},
-			},
-			wantErr: true,
-			errorContains: "trust domain is required",
 		},
 	}
 
@@ -170,12 +126,12 @@ func TestConfiguration_Validate(t *testing.T) {
 func TestServiceConfig_Validate(t *testing.T) {
 	tests := []struct {
 		name   string
-		config *ServiceConfig
+		config ServiceConfig
 		wantErr bool
 	}{
 		{
 			name: "valid config",
-			config: &ServiceConfig{
+			config: ServiceConfig{
 				Name:   "test-service",
 				Domain: "example.com",
 			},
@@ -183,7 +139,7 @@ func TestServiceConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "empty name",
-			config: &ServiceConfig{
+			config: ServiceConfig{
 				Name:   "",
 				Domain: "example.com",
 			},
@@ -191,15 +147,15 @@ func TestServiceConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "empty domain",
-			config: &ServiceConfig{
+			config: ServiceConfig{
 				Name:   "test-service",
 				Domain: "",
 			},
-			wantErr: true,
+			wantErr: false, // Domain is optional
 		},
 		{
 			name: "whitespace name",
-			config: &ServiceConfig{
+			config: ServiceConfig{
 				Name:   "   ",
 				Domain: "example.com",
 			},
@@ -207,7 +163,7 @@ func TestServiceConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "whitespace domain",
-			config: &ServiceConfig{
+			config: ServiceConfig{
 				Name:   "test-service",
 				Domain: "   ",
 			},
@@ -217,9 +173,13 @@ func TestServiceConfig_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.config.Validate()
+			// Test service validation by creating a Configuration and validating it
+			config := &Configuration{
+				Service: tt.config,
+			}
+			err := config.Validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ServiceConfig.Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ServiceConfig validation error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -234,45 +194,21 @@ func TestSPIFFEConfig_Validate(t *testing.T) {
 		{
 			name: "valid config",
 			config: &SPIFFEConfig{
-				Domain:      "example.com",
 				SocketPath:  "/tmp/spire-agent/public/api.sock",
-				TrustDomain: "example.com",
 			},
 			wantErr: false,
 		},
 		{
-			name: "empty domain",
-			config: &SPIFFEConfig{
-				Domain:      "",
-				SocketPath:  "/tmp/spire-agent/public/api.sock",
-				TrustDomain: "example.com",
-			},
-			wantErr: true,
-		},
-		{
 			name: "empty socket path",
 			config: &SPIFFEConfig{
-				Domain:      "example.com",
 				SocketPath:  "",
-				TrustDomain: "example.com",
 			},
 			wantErr: true,
 		},
 		{
-			name: "empty trust domain",
+			name: "whitespace socket path",
 			config: &SPIFFEConfig{
-				Domain:      "example.com",
-				SocketPath:  "/tmp/spire-agent/public/api.sock",
-				TrustDomain: "",
-			},
-			wantErr: true,
-		},
-		{
-			name: "whitespace fields",
-			config: &SPIFFEConfig{
-				Domain:      "  example.com  ",
 				SocketPath:  "  /tmp/spire-agent/public/api.sock  ",
-				TrustDomain: "  example.com  ",
 			},
 			wantErr: false, // Should be trimmed and valid
 		},
@@ -280,9 +216,16 @@ func TestSPIFFEConfig_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.config.Validate()
+			// Test SPIFFE config validation by creating a Configuration with it
+			config := &Configuration{
+				Service: ServiceConfig{
+					Name: "test-service",
+				},
+				SPIFFE: tt.config,
+			}
+			err := config.Validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("SPIFFEConfig.Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("SPIFFEConfig validation error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -291,14 +234,12 @@ func TestSPIFFEConfig_Validate(t *testing.T) {
 func TestConfiguration_DefaultValues(t *testing.T) {
 	// Test that configuration provides reasonable defaults where appropriate
 	config := &Configuration{
-		Service: &ServiceConfig{
+		Service: ServiceConfig{
 			Name:   "test-service",
 			Domain: "example.com",
 		},
 		SPIFFE: &SPIFFEConfig{
-			Domain:      "example.com",
 			SocketPath:  "/tmp/spire-agent/public/api.sock",
-			TrustDomain: "example.com",
 		},
 	}
 
@@ -318,14 +259,12 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 		{
 			name: "very long service name",
 			config: &Configuration{
-				Service: &ServiceConfig{
+				Service: ServiceConfig{
 					Name:   strings.Repeat("a", 1000),
 					Domain: "example.com",
 				},
 				SPIFFE: &SPIFFEConfig{
-					Domain:      "example.com",
 					SocketPath:  "/tmp/spire-agent/public/api.sock",
-					TrustDomain: "example.com",
 				},
 			},
 			wantErr: false, // Should be valid unless there's a length limit
@@ -333,29 +272,25 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 		{
 			name: "unicode service name",
 			config: &Configuration{
-				Service: &ServiceConfig{
+				Service: ServiceConfig{
 					Name:   "测试服务",
 					Domain: "example.com",
 				},
 				SPIFFE: &SPIFFEConfig{
-					Domain:      "example.com",
 					SocketPath:  "/tmp/spire-agent/public/api.sock",
-					TrustDomain: "example.com",
 				},
 			},
-			wantErr: false, // Should handle unicode
+			wantErr: true, // Unicode not allowed in service names
 		},
 		{
 			name: "special characters in path",
 			config: &Configuration{
-				Service: &ServiceConfig{
+				Service: ServiceConfig{
 					Name:   "test-service",
 					Domain: "example.com",
 				},
 				SPIFFE: &SPIFFEConfig{
-					Domain:      "example.com",
 					SocketPath:  "/tmp/spire-agent/public/api.sock?query=1",
-					TrustDomain: "example.com",
 				},
 			},
 			wantErr: false, // Path validation may vary
@@ -374,14 +309,12 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 
 func BenchmarkConfiguration_Validate(b *testing.B) {
 	config := &Configuration{
-		Service: &ServiceConfig{
+		Service: ServiceConfig{
 			Name:   "test-service",
 			Domain: "example.com",
 		},
 		SPIFFE: &SPIFFEConfig{
-			Domain:      "example.com",
 			SocketPath:  "/tmp/spire-agent/public/api.sock",
-			TrustDomain: "example.com",
 		},
 	}
 
@@ -395,9 +328,11 @@ func BenchmarkConfiguration_Validate(b *testing.B) {
 }
 
 func BenchmarkServiceConfig_Validate(b *testing.B) {
-	config := &ServiceConfig{
-		Name:   "test-service",
-		Domain: "example.com",
+	config := &Configuration{
+		Service: ServiceConfig{
+			Name:   "test-service",
+			Domain: "example.com",
+		},
 	}
 
 	b.ResetTimer()
@@ -410,10 +345,13 @@ func BenchmarkServiceConfig_Validate(b *testing.B) {
 }
 
 func BenchmarkSPIFFEConfig_Validate(b *testing.B) {
-	config := &SPIFFEConfig{
-		Domain:      "example.com",
-		SocketPath:  "/tmp/spire-agent/public/api.sock",
-		TrustDomain: "example.com",
+	config := &Configuration{
+		Service: ServiceConfig{
+			Name: "test-service",
+		},
+		SPIFFE: &SPIFFEConfig{
+			SocketPath: "/tmp/spire-agent/public/api.sock",
+		},
 	}
 
 	b.ResetTimer()

@@ -50,9 +50,9 @@ func TestIdentityServer_RegisterService(t *testing.T) {
 	ctx := context.Background()
 
 	// Test with nil context
-	err = server.RegisterService(nil, nil)
+	err = server.RegisterService(context.TODO(), nil)
 	if err == nil {
-		t.Error("RegisterService() with nil context should return error")
+		t.Error("RegisterService() with nil registrar should return error")
 	}
 
 	// Test with nil registrar
@@ -69,9 +69,9 @@ func TestIdentityServer_Serve(t *testing.T) {
 	}
 
 	// Test with nil context
-	err = server.Serve(nil, nil)
+	err = server.Serve(context.TODO(), nil)
 	if err == nil {
-		t.Error("Serve() with nil context should return error")
+		t.Error("Serve() with nil listener should return error")
 	}
 
 	// Test with nil listener

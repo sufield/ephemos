@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"strings" 
 	"testing"
 
@@ -150,12 +151,12 @@ func TestRegisterCmdValidation(t *testing.T) {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Basic validation logic
 			if len(args) == 0 {
-				return cobra.ErrMissingArg
+				return errors.New("missing required argument: service name")
 			}
 
 			serviceName := args[0]
 			if strings.TrimSpace(serviceName) == "" {
-				return cobra.ErrInvalidArg
+				return errors.New("invalid argument: service name cannot be empty")
 			}
 
 			return nil

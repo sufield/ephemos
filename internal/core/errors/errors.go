@@ -81,5 +81,18 @@ type ValidationError struct {
 }
 
 func (e *ValidationError) Error() string {
-	return fmt.Sprintf("validation failed for field '%s': %s (value: %v)", e.Field, e.Message, e.Value)
+	valueStr := fmt.Sprintf("%v", e.Value)
+	if e.Value == nil {
+		valueStr = "<nil>"
+	}
+	return fmt.Sprintf("validation failed for field '%s' with value '%s': %s", e.Field, valueStr, e.Message)
+}
+
+// NewValidationError creates a new validation error
+func NewValidationError(field, value, message string) *ValidationError {
+	return &ValidationError{
+		Field:   field,
+		Value:   value,
+		Message: message,
+	}
 }
