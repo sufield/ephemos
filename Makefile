@@ -1,7 +1,7 @@
 .PHONY: build proto examples test demo clean install-tools
 
 # Variables
-PROTO_DIR := api/proto
+PROTO_DIR := examples/proto
 GO_OUT := internal/proto
 PROTOC := protoc
 CLI_BINARY := ephemos
