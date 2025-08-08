@@ -200,7 +200,7 @@ func (c *clientConnection) Connect(ctx context.Context, serviceName, address str
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	
-	conn, err := grpc.DialContext(ctx, address, c.dialOption)
+	conn, err := grpc.NewClient(address, c.dialOption)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to service %s at %s: %w", serviceName, address, err)
 	}

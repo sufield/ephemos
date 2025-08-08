@@ -236,7 +236,7 @@ func TestRegisterCmdCompletion(t *testing.T) {
 	}
 
 	// Test completion with existing args (should return no more completions)
-	completions, directive = cmd.ValidArgsFunction(cmd, []string{"existing-service"}, "")
+	completions, _ = cmd.ValidArgsFunction(cmd, []string{"existing-service"}, "")
 	
 	if len(completions) != 0 {
 		t.Error("Expected no completions when service name already provided")

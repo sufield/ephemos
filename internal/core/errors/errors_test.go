@@ -323,19 +323,26 @@ func BenchmarkNewValidationError(b *testing.B) {
 
 func TestErrorInterface(t *testing.T) {
 	// Test that our custom errors implement the error interface
-	var err error
-
 	baseDomainError := &DomainError{
 		Code:    "TEST",
 		Message: "Test message",
 	}
-	err = NewDomainError(baseDomainError, nil)
-	if err == nil {
-		t.Error("DomainError should implement error interface")
+	domainErr := NewDomainError(baseDomainError, nil)
+	// Verify it implements error interface by calling Error()
+	if domainErr.Error() == "" {
+		t.Error("DomainError should have non-empty error message")
 	}
 
-	err = NewValidationError("field", "value", "message")
-	if err == nil {
-		t.Error("ValidationError should implement error interface")
+	validationErr := NewValidationError("field", "value", "message")
+	// Verify it implements error interface by calling Error()
+	if validationErr.Error() == "" {
+		t.Error("ValidationError should have non-empty error message")
 	}
+	
+	// Test that both can be assigned to error interface
+	var err error
+	err = domainErr
+	_ = err // Use the variable to avoid unused variable error
+	err = validationErr
+	_ = err // Use the variable to avoid unused variable error
 }

@@ -2,8 +2,6 @@ package transport
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	
 	"github.com/sufield/ephemos/internal/core/domain"
@@ -71,21 +69,3 @@ func (p *GRPCTransportProvider) createAuthInterceptor(policy *domain.Authenticat
 	}
 }
 
-func createTLSConfig(cert *domain.Certificate, bundle *domain.TrustBundle) *tls.Config {
-	certPool := x509.NewCertPool()
-	for _, ca := range bundle.Certificates {
-		certPool.AddCert(ca)
-	}
-	
-	tlsCert := tls.Certificate{
-		Certificate: [][]byte{cert.Cert.Raw},
-		PrivateKey:  cert.PrivateKey,
-	}
-	
-	return &tls.Config{
-		Certificates: []tls.Certificate{tlsCert},
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		ClientCAs:    certPool,
-		RootCAs:      certPool,
-	}
-}

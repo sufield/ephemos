@@ -204,7 +204,7 @@ func TestRegistrar_RegisterService(t *testing.T) {
 			}
 
 			if tt.wantErr && tt.errorType != nil {
-				switch tt.errorType.(type) {
+				switch v := tt.errorType.(type) {
 				case *errors.DomainError:
 					if _, ok := err.(*errors.DomainError); !ok {
 						t.Errorf("Expected DomainError, got %T", err)
@@ -213,6 +213,8 @@ func TestRegistrar_RegisterService(t *testing.T) {
 					if _, ok := err.(*errors.ValidationError); !ok {
 						t.Errorf("Expected ValidationError, got %T", err)
 					}
+				default:
+					t.Errorf("Unexpected error type: %T", v)
 				}
 			}
 		})
