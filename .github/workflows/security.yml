@@ -53,7 +53,7 @@ jobs:
         go-licenses report ./... > licenses.txt
         
     - name: Upload license report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: license-report
         path: licenses.txt
@@ -171,7 +171,7 @@ jobs:
         cyclonedx-gomod mod -json -output sbom.json
         
     - name: Upload SBOM
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: sbom
         path: sbom.json
@@ -184,7 +184,7 @@ jobs:
       continue-on-error: true
       
     - name: Upload OSV results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: osv-scan-results
         path: osv-results.json
