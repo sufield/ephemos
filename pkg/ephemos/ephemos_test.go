@@ -1,19 +1,20 @@
-package ephemos
+package ephemos_test
 
 import (
 	"sync"
 	"testing"
 
+	"github.com/sufield/ephemos/pkg/ephemos"
 	"google.golang.org/grpc"
 )
 
 // TestRegistrationTracker tracks registrations for testing purposes.
 // This is a real implementation, not a mock.
 type TestRegistrationTracker struct {
-	mu              sync.Mutex
-	registered      bool
-	registerCount   int
-	lastServer      *grpc.Server
+	mu            sync.Mutex
+	registered    bool
+	registerCount int
+	lastServer    *grpc.Server
 }
 
 // NewTestRegistrationTracker creates a new registration tracker.
@@ -21,7 +22,7 @@ func NewTestRegistrationTracker() *TestRegistrationTracker {
 	return &TestRegistrationTracker{}
 }
 
-// RegisterFunction returns a function that can be used with NewServiceRegistrar.
+// RegisterFunction returns a function that can be used with ephemos.NewServiceRegistrar.
 func (t *TestRegistrationTracker) RegisterFunction() func(*grpc.Server) {
 	return func(server *grpc.Server) {
 		t.mu.Lock()
@@ -57,7 +58,7 @@ func (t *TestRegistrationTracker) Reset() {
 
 func TestNewServiceRegistrar(t *testing.T) {
 	tracker := NewTestRegistrationTracker()
-	
+
 	tests := []struct {
 		name         string
 		registerFunc func(*grpc.Server)
@@ -77,16 +78,13 @@ func TestNewServiceRegistrar(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			registrar := NewServiceRegistrar(tt.registerFunc)
+			registrar := ephemos.NewServiceRegistrar(tt.registerFunc)
 
 			if (registrar == nil) != tt.expectNil {
-				t.Errorf("NewServiceRegistrar() = %v, expectNil = %v", registrar == nil, tt.expectNil)
+				t.Errorf("ephemos.NewServiceRegistrar() = %v, expectNil = %v", registrar == nil, tt.expectNil)
 			}
 
-			// Test that it implements ServiceRegistrar interface
-			if _, ok := registrar.(ServiceRegistrar); !ok {
-				t.Error("NewServiceRegistrar() result does not implement ServiceRegistrar interface")
-			}
+			// registrar is already of type ephemos.ServiceRegistrar, so interface is implemented by design
 		})
 	}
 }
@@ -101,7 +99,8 @@ func TestGenericServiceRegistrar_Register(t *testing.T) {
 			name: "calls registration function",
 			setupFunc: func() (*TestRegistrationTracker, func(*grpc.Server)) {
 				tracker := NewTestRegistrationTracker()
-				return tracker, tracker.RegisterFunction()
+				fn := tracker.RegisterFunction()
+				return tracker, fn
 			},
 			shouldCall: true,
 		},
@@ -117,8 +116,8 @@ func TestGenericServiceRegistrar_Register(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tracker, registerFunc := tt.setupFunc()
-			
-			registrar := NewServiceRegistrar(registerFunc)
+
+			registrar := ephemos.NewServiceRegistrar(registerFunc)
 			grpcServer := grpc.NewServer()
 			defer grpcServer.Stop()
 
@@ -138,14 +137,14 @@ func TestGenericServiceRegistrar_Integration(t *testing.T) {
 	defer grpcServer.Stop()
 
 	tracker := NewTestRegistrationTracker()
-	registrar := NewServiceRegistrar(tracker.RegisterFunction())
+	registrar := ephemos.NewServiceRegistrar(tracker.RegisterFunction())
 
 	registrar.Register(grpcServer)
 
 	if !tracker.IsRegistered() {
 		t.Error("Registration function was not called during integration test")
 	}
-	
+
 	if tracker.GetRegisterCount() != 1 {
 		t.Errorf("Expected registration count to be 1, got %d", tracker.GetRegisterCount())
 	}
@@ -153,15 +152,15 @@ func TestGenericServiceRegistrar_Integration(t *testing.T) {
 
 func TestGenericServiceRegistrar_MultipleRegistrations(t *testing.T) {
 	tracker := NewTestRegistrationTracker()
-	registrar := NewServiceRegistrar(tracker.RegisterFunction())
-	
+	registrar := ephemos.NewServiceRegistrar(tracker.RegisterFunction())
+
 	// Register with multiple servers
 	for i := 0; i < 3; i++ {
 		server := grpc.NewServer()
 		registrar.Register(server)
 		server.Stop()
 	}
-	
+
 	if tracker.GetRegisterCount() != 3 {
 		t.Errorf("Expected 3 registrations, got %d", tracker.GetRegisterCount())
 	}
@@ -170,19 +169,19 @@ func TestGenericServiceRegistrar_MultipleRegistrations(t *testing.T) {
 func BenchmarkNewServiceRegistrar(b *testing.B) {
 	tracker := NewTestRegistrationTracker()
 	registerFunc := tracker.RegisterFunction()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = NewServiceRegistrar(registerFunc)
+		_ = ephemos.NewServiceRegistrar(registerFunc)
 	}
 }
 
 func BenchmarkGenericServiceRegistrar_Register(b *testing.B) {
 	tracker := NewTestRegistrationTracker()
-	registrar := NewServiceRegistrar(tracker.RegisterFunction())
+	registrar := ephemos.NewServiceRegistrar(tracker.RegisterFunction())
 	server := grpc.NewServer()
 	defer server.Stop()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		registrar.Register(server)
@@ -192,16 +191,19 @@ func BenchmarkGenericServiceRegistrar_Register(b *testing.B) {
 func ExampleNewServiceRegistrar() {
 	// Example showing how to use the generic registrar
 	// (This would normally be in your main application code)
-	
+
 	// Create your service implementation
 	// serviceImpl := &MyServiceImpl{}
 
 	// Register using the generic registrar - no boilerplate needed!
-	registrar := NewServiceRegistrar(func(s *grpc.Server) {
+	registrar := ephemos.NewServiceRegistrar(func(_ *grpc.Server) {
+		// In a real implementation, you would register your gRPC service here:
 		// proto.RegisterMyServiceServer(s, serviceImpl)
 	})
 
 	// Use with Ephemos server
 	// server.RegisterService(ctx, registrar)
 	_ = registrar // Avoid unused variable in example
+
+	// Output:
 }

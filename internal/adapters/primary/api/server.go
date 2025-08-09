@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// IdentityServer provides a secure gRPC server with SPIFFE-based identity management.
 type IdentityServer struct {
 	identityService *services.IdentityService
 	configProvider  ports.ConfigurationProvider
@@ -24,18 +25,19 @@ type IdentityServer struct {
 	mu              sync.Mutex
 }
 
-func NewIdentityServer(configPath string) (*IdentityServer, error) {
-	configProvider := config.NewConfigProvider()
+// NewIdentityServer creates a new identity server with the given configuration.
+func NewIdentityServer(ctx context.Context, configPath string) (*IdentityServer, error) {
+	configProvider := config.NewFileProvider()
 
 	var cfg *ports.Configuration
 	var err error
 	if configPath != "" {
-		cfg, err = configProvider.LoadConfiguration(context.Background(), configPath)
+		cfg, err = configProvider.LoadConfiguration(ctx, configPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load configuration: %w", err)
 		}
 	} else {
-		cfg = configProvider.GetDefaultConfiguration(context.Background())
+		cfg = configProvider.GetDefaultConfiguration(ctx)
 		if cfg == nil {
 			return nil, &errors.ValidationError{
 				Field:   "configuration",
@@ -45,12 +47,12 @@ func NewIdentityServer(configPath string) (*IdentityServer, error) {
 		}
 	}
 
-	spiffeProvider, err := spiffe.NewSPIFFEProvider(cfg.SPIFFE)
+	spiffeProvider, err := spiffe.NewProvider(cfg.SPIFFE)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SPIFFE provider: %w", err)
 	}
 
-	transportProvider := transport.NewGRPCTransportProvider(spiffeProvider)
+	transportProvider := transport.NewGRPCProvider(spiffeProvider)
 
 	identityService, err := services.NewIdentityService(
 		spiffeProvider,
@@ -68,6 +70,7 @@ func NewIdentityServer(configPath string) (*IdentityServer, error) {
 	}, nil
 }
 
+// RegisterService registers a gRPC service with the identity server.
 func (s *IdentityServer) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
 	// Input validation
 	if serviceRegistrar == nil {
@@ -92,6 +95,7 @@ func (s *IdentityServer) RegisterService(ctx context.Context, serviceRegistrar S
 	return nil
 }
 
+// Serve starts the identity server on the provided listener.
 func (s *IdentityServer) Serve(ctx context.Context, listener net.Listener) error {
 	// Input validation
 	if listener == nil {
@@ -118,6 +122,7 @@ func (s *IdentityServer) Serve(ctx context.Context, listener net.Listener) error
 	return nil
 }
 
+// Close gracefully shuts down the identity server.
 func (s *IdentityServer) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

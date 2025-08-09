@@ -11,8 +11,8 @@ import (
 // InMemoryProvider is a real implementation of ConfigurationProvider that stores
 // configurations in memory. This is useful for testing without mocks.
 type InMemoryProvider struct {
-	mu           sync.RWMutex
-	configs      map[string]*ports.Configuration
+	mu            sync.RWMutex
+	configs       map[string]*ports.Configuration
 	defaultConfig *ports.Configuration
 }
 
@@ -48,6 +48,15 @@ func (p *InMemoryProvider) SetDefaultConfiguration(config *ports.Configuration) 
 
 // LoadConfiguration retrieves a configuration by path.
 func (p *InMemoryProvider) LoadConfiguration(ctx context.Context, path string) (*ports.Configuration, error) {
+	// Check for context cancellation
+	if ctx != nil {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("context canceled: %w", ctx.Err())
+		default:
+		}
+	}
+
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -66,6 +75,15 @@ func (p *InMemoryProvider) LoadConfiguration(ctx context.Context, path string) (
 
 // GetDefaultConfiguration returns the default configuration.
 func (p *InMemoryProvider) GetDefaultConfiguration(ctx context.Context) *ports.Configuration {
+	// Check for context cancellation
+	if ctx != nil {
+		select {
+		case <-ctx.Done():
+			return nil // Return nil on cancellation
+		default:
+		}
+	}
+
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return copyConfiguration(p.defaultConfig)
@@ -77,25 +95,25 @@ func copyConfiguration(config *ports.Configuration) *ports.Configuration {
 		return nil
 	}
 
-	copy := &ports.Configuration{
+	cfgCopy := &ports.Configuration{
 		Service: config.Service,
 	}
 
 	if config.SPIFFE != nil {
-		copy.SPIFFE = &ports.SPIFFEConfig{
+		cfgCopy.SPIFFE = &ports.SPIFFEConfig{
 			SocketPath: config.SPIFFE.SocketPath,
 		}
 	}
 
 	if config.AuthorizedClients != nil {
-		copy.AuthorizedClients = make([]string, len(config.AuthorizedClients))
-		copy.AuthorizedClients = append(copy.AuthorizedClients, config.AuthorizedClients...)
+		cfgCopy.AuthorizedClients = make([]string, len(config.AuthorizedClients))
+		cfgCopy.AuthorizedClients = append(cfgCopy.AuthorizedClients, config.AuthorizedClients...)
 	}
 
 	if config.TrustedServers != nil {
-		copy.TrustedServers = make([]string, len(config.TrustedServers))
-		copy.TrustedServers = append(copy.TrustedServers, config.TrustedServers...)
+		cfgCopy.TrustedServers = make([]string, len(config.TrustedServers))
+		cfgCopy.TrustedServers = append(cfgCopy.TrustedServers, config.TrustedServers...)
 	}
 
-	return copy
+	return cfgCopy
 }

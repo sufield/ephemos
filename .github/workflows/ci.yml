@@ -297,8 +297,17 @@ jobs:
     - name: Run integration test
       run: |
         cd scripts/demo
+        # Verify config and binary exist
+        if [ ! -f "../../config/echo-server.yaml" ]; then
+          echo "❌ Config file ../../config/echo-server.yaml not found"
+          exit 1
+        fi
+        if [ ! -x "../../bin/echo-server" ]; then
+          echo "❌ echo-server binary not found or not executable"
+          exit 1
+        fi
         # Test server can start and get identity
-        timeout 10 bash -c 'EPHEMOS_CONFIG=config/echo-server.yaml ECHO_SERVER_ADDRESS=:50099 ../../bin/echo-server > test-server.log 2>&1 &'
+        timeout 10 bash -c 'EPHEMOS_CONFIG=../../config/echo-server.yaml ECHO_SERVER_ADDRESS=:50099 ../../bin/echo-server > test-server.log 2>&1 &'
         sleep 5
         
         # Check if server got identity

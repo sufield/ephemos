@@ -99,7 +99,7 @@ func (c *EchoClient) Echo(ctx context.Context, message string) (*EchoResponse, e
 	if c.Client == nil {
 		return nil, fmt.Errorf("echo client not properly initialized")
 	}
-	
+
 	// Get the actual gRPC client via the embedded Client's method
 	grpcClient := c.Client.Client()
 	if grpcClient == nil {

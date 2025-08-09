@@ -1,3 +1,4 @@
+// Package spiffe provides SPIFFE identity management and X.509 certificate handling.
 package spiffe
 
 import (
@@ -12,25 +13,28 @@ import (
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
-type SPIFFEProvider struct {
+// Provider provides SPIFFE identities.
+type Provider struct {
 	socketPath string
 	x509Source *workloadapi.X509Source
 }
 
-func NewSPIFFEProvider(config *ports.SPIFFEConfig) (*SPIFFEProvider, error) {
+// NewProvider creates a provider.
+func NewProvider(config *ports.SPIFFEConfig) (*Provider, error) {
 	if config == nil {
 		// Use default socket path when no config is provided
-		return &SPIFFEProvider{
+		return &Provider{
 			socketPath: "/tmp/spire-agent/public/api.sock",
 		}, nil
 	}
 
-	return &SPIFFEProvider{
+	return &Provider{
 		socketPath: config.SocketPath,
 	}, nil
 }
 
-func (p *SPIFFEProvider) GetServiceIdentity(ctx context.Context) (*domain.ServiceIdentity, error) {
+// GetServiceIdentity fetches identity.
+func (p *Provider) GetServiceIdentity(ctx context.Context) (*domain.ServiceIdentity, error) {
 	if err := p.ensureSource(ctx); err != nil {
 		return nil, err
 	}
@@ -58,7 +62,8 @@ func (p *SPIFFEProvider) GetServiceIdentity(ctx context.Context) (*domain.Servic
 	}, nil
 }
 
-func (p *SPIFFEProvider) GetCertificate(ctx context.Context) (*domain.Certificate, error) {
+// GetCertificate fetches cert.
+func (p *Provider) GetCertificate(ctx context.Context) (*domain.Certificate, error) {
 	if err := p.ensureSource(ctx); err != nil {
 		return nil, err
 	}
@@ -75,7 +80,8 @@ func (p *SPIFFEProvider) GetCertificate(ctx context.Context) (*domain.Certificat
 	}, nil
 }
 
-func (p *SPIFFEProvider) GetTrustBundle(ctx context.Context) (*domain.TrustBundle, error) {
+// GetTrustBundle fetches bundle.
+func (p *Provider) GetTrustBundle(ctx context.Context) (*domain.TrustBundle, error) {
 	if err := p.ensureSource(ctx); err != nil {
 		return nil, err
 	}
@@ -90,7 +96,7 @@ func (p *SPIFFEProvider) GetTrustBundle(ctx context.Context) (*domain.TrustBundl
 	}, nil
 }
 
-func (p *SPIFFEProvider) ensureSource(ctx context.Context) error {
+func (p *Provider) ensureSource(ctx context.Context) error {
 	if p.x509Source != nil {
 		return nil
 	}
@@ -109,7 +115,8 @@ func (p *SPIFFEProvider) ensureSource(ctx context.Context) error {
 	return nil
 }
 
-func (p *SPIFFEProvider) GetTLSConfig(ctx context.Context) (tlsconfig.Authorizer, error) {
+// GetTLSConfig gets TLS config.
+func (p *Provider) GetTLSConfig(ctx context.Context) (tlsconfig.Authorizer, error) {
 	if err := p.ensureSource(ctx); err != nil {
 		return nil, err
 	}
@@ -117,11 +124,18 @@ func (p *SPIFFEProvider) GetTLSConfig(ctx context.Context) (tlsconfig.Authorizer
 	return tlsconfig.AuthorizeAny(), nil
 }
 
-func (p *SPIFFEProvider) GetX509Source() *workloadapi.X509Source {
+// GetX509Source returns source.
+func (p *Provider) GetX509Source() *workloadapi.X509Source {
 	return p.x509Source
 }
 
-func (p *SPIFFEProvider) Close() error {
+// GetSocketPath returns path.
+func (p *Provider) GetSocketPath() string {
+	return p.socketPath
+}
+
+// Close closes the provider.
+func (p *Provider) Close() error {
 	if p.x509Source != nil {
 		if err := p.x509Source.Close(); err != nil {
 			return fmt.Errorf("failed to close X509 source: %w", err)

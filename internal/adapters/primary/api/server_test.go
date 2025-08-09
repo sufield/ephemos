@@ -1,10 +1,12 @@
-package api
+package api_test
 
 import (
 	"context"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/sufield/ephemos/internal/adapters/primary/api"
 )
 
 func TestIdentityServer_NewIdentityServer(t *testing.T) {
@@ -27,28 +29,28 @@ func TestIdentityServer_NewIdentityServer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server, err := NewIdentityServer(tt.configPath)
+			ctx := t.Context()
+			server, err := api.NewIdentityServer(ctx, tt.configPath)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewIdentityServer() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("api.NewIdentityServer() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && server == nil {
-				t.Error("NewIdentityServer() returned nil server")
+				t.Error("api.NewIdentityServer() returned nil server")
 			}
 		})
 	}
 }
 
 func TestIdentityServer_RegisterService(t *testing.T) {
-	server, err := NewIdentityServer("")
+	ctx := t.Context()
+	server, err := api.NewIdentityServer(ctx, "")
 	if err != nil {
 		t.Skip("Skipping RegisterService tests - could not create server:", err)
 	}
 
-	ctx := context.Background()
-
 	// Test with nil context
-	err = server.RegisterService(context.TODO(), nil)
+	err = server.RegisterService(t.Context(), nil)
 	if err == nil {
 		t.Error("RegisterService() with nil registrar should return error")
 	}
@@ -61,19 +63,19 @@ func TestIdentityServer_RegisterService(t *testing.T) {
 }
 
 func TestIdentityServer_Serve(t *testing.T) {
-	server, err := NewIdentityServer("")
+	ctx := t.Context()
+	server, err := api.NewIdentityServer(ctx, "")
 	if err != nil {
 		t.Skip("Skipping Serve tests - could not create server:", err)
 	}
 
 	// Test with nil context
-	err = server.Serve(context.TODO(), nil)
+	err = server.Serve(t.Context(), nil)
 	if err == nil {
 		t.Error("Serve() with nil listener should return error")
 	}
 
 	// Test with nil listener
-	ctx := context.Background()
 	err = server.Serve(ctx, nil)
 	if err == nil {
 		t.Error("Serve() with nil listener should return error")
@@ -89,7 +91,7 @@ func TestIdentityServer_Serve(t *testing.T) {
 		defer lis.Close()
 
 		// Create a context that will be canceled quickly
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 		defer cancel()
 
 		// Start serving in a goroutine
@@ -111,7 +113,8 @@ func TestIdentityServer_Serve(t *testing.T) {
 }
 
 func TestIdentityServer_Close(t *testing.T) {
-	server, err := NewIdentityServer("")
+	ctx := t.Context()
+	server, err := api.NewIdentityServer(ctx, "")
 	if err != nil {
 		t.Skip("Skipping Close test - could not create server:", err)
 	}
@@ -131,16 +134,15 @@ func TestIdentityServer_Close(t *testing.T) {
 // It provides a real implementation instead of a mock
 
 func TestIdentityServer_RegisterService_WithRealService(t *testing.T) {
-	server, err := NewIdentityServer("")
+	ctx := t.Context()
+	server, err := api.NewIdentityServer(ctx, "")
 	if err != nil {
 		t.Skip("Skipping RegisterService test - could not create server:", err)
 	}
 
-	ctx := t.Context()
-	
 	// Use a real test service instead of a mock
-	testService := NewTestService()
-	registrar := NewTestServiceRegistrar(testService)
+	testService := api.NewTestService()
+	registrar := api.NewTestServiceRegistrar(testService)
 
 	err = server.RegisterService(ctx, registrar)
 	if err != nil {
@@ -150,7 +152,7 @@ func TestIdentityServer_RegisterService_WithRealService(t *testing.T) {
 	if !registrar.IsRegistered() {
 		t.Error("RegisterService() did not call Register on the registrar")
 	}
-	
+
 	if registrar.GetRegisterCount() != 1 {
 		t.Errorf("Expected Register to be called once, got %d", registrar.GetRegisterCount())
 	}

@@ -3,7 +3,7 @@ package errors
 
 import "fmt"
 
-// DomainError represents errors in the domain logic
+// DomainError represents errors in the domain logic.
 type DomainError struct {
 	Code    string
 	Message string
@@ -21,7 +21,7 @@ func (e *DomainError) Unwrap() error {
 	return e.Err
 }
 
-// Common domain errors
+// Common domain errors.
 var (
 	ErrInvalidServiceName = &DomainError{
 		Code:    "INVALID_SERVICE_NAME",
@@ -64,7 +64,7 @@ var (
 	}
 )
 
-// NewDomainError creates a new domain error with context
+// NewDomainError creates a new domain error with context.
 func NewDomainError(base *DomainError, err error) error {
 	return &DomainError{
 		Code:    base.Code,
@@ -73,7 +73,7 @@ func NewDomainError(base *DomainError, err error) error {
 	}
 }
 
-// ValidationError represents input validation errors
+// ValidationError represents input validation errors.
 type ValidationError struct {
 	Field   string
 	Value   interface{}
@@ -88,7 +88,7 @@ func (e *ValidationError) Error() string {
 	return fmt.Sprintf("validation failed for field '%s' with value '%s': %s", e.Field, valueStr, e.Message)
 }
 
-// NewValidationError creates a new validation error
+// NewValidationError creates a new validation error.
 func NewValidationError(field, value, message string) *ValidationError {
 	return &ValidationError{
 		Field:   field,

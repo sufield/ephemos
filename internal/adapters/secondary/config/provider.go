@@ -1,9 +1,11 @@
+// Package config provides configuration management for Ephemos.
 package config
 
 import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/sufield/ephemos/internal/core/errors"
@@ -11,19 +13,32 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
-type ConfigProvider struct{}
+// FileProvider provides configs from files.
+type FileProvider struct{}
 
-func NewConfigProvider() *ConfigProvider {
-	return &ConfigProvider{}
+// NewFileProvider creates provider.
+func NewFileProvider() *FileProvider {
+	return &FileProvider{}
 }
 
-func (p *ConfigProvider) LoadConfiguration(ctx context.Context, path string) (*ports.Configuration, error) {
-	// Validate input path
+// LoadConfiguration loads config.
+func (p *FileProvider) LoadConfiguration(ctx context.Context, path string) (*ports.Configuration, error) {
+	// Validate and clean input path
 	if strings.TrimSpace(path) == "" {
 		return nil, &errors.ValidationError{
 			Field:   "path",
 			Value:   path,
 			Message: "configuration file path cannot be empty or whitespace",
+		}
+	}
+
+	// Clean path and prevent path traversal attacks
+	cleanPath := filepath.Clean(path)
+	if strings.Contains(cleanPath, "..") {
+		return nil, &errors.ValidationError{
+			Field:   "path",
+			Value:   path,
+			Message: "path traversal detected in configuration file path",
 		}
 	}
 
@@ -36,7 +51,7 @@ func (p *ConfigProvider) LoadConfiguration(ctx context.Context, path string) (*p
 		}
 	}
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
 	}
@@ -54,7 +69,8 @@ func (p *ConfigProvider) LoadConfiguration(ctx context.Context, path string) (*p
 	return &config, nil
 }
 
-func (p *ConfigProvider) GetDefaultConfiguration(ctx context.Context) *ports.Configuration {
+// GetDefaultConfiguration gets default.
+func (p *FileProvider) GetDefaultConfiguration(ctx context.Context) *ports.Configuration {
 	// Check for context cancellation
 	if ctx != nil {
 		select {

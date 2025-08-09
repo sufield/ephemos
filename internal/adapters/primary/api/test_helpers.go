@@ -51,7 +51,7 @@ func (s *TestService) GetLastInput() string {
 }
 
 // TestMethod implements a simple test RPC method.
-func (s *TestService) TestMethod(ctx context.Context, req *TestRequest) (*TestResponse, error) {
+func (s *TestService) TestMethod(_ context.Context, req *TestRequest) (*TestResponse, error) {
 	s.mu.Lock()
 	s.callCount++
 	s.lastInput = req.GetInput()
@@ -71,10 +71,10 @@ func (s *TestService) TestMethod(ctx context.Context, req *TestRequest) (*TestRe
 // TestServiceRegistrar is a real implementation of ServiceRegistrar for testing.
 // It registers a real gRPC service, not a mock.
 type TestServiceRegistrar struct {
-	service        *TestService
-	registered     bool
-	registerCount  int
-	mu             sync.Mutex
+	service       *TestService
+	registered    bool
+	registerCount int
+	mu            sync.Mutex
 }
 
 // NewTestServiceRegistrar creates a new test service registrar.
@@ -91,7 +91,7 @@ func NewTestServiceRegistrar(service *TestService) *TestServiceRegistrar {
 func (r *TestServiceRegistrar) Register(server *grpc.Server) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	if server != nil {
 		// In a real scenario, this would be:
 		// RegisterTestServiceServer(server, r.service)
@@ -120,11 +120,12 @@ func (r *TestServiceRegistrar) GetService() *TestService {
 	return r.service
 }
 
-// Simple message types for testing (these would normally be generated from proto)
+// TestRequest represents a test request message for gRPC testing.
 type TestRequest struct {
 	Input string
 }
 
+// GetInput returns the input field of the test request.
 func (r *TestRequest) GetInput() string {
 	if r != nil {
 		return r.Input
@@ -132,10 +133,12 @@ func (r *TestRequest) GetInput() string {
 	return ""
 }
 
+// TestResponse represents a test response message for gRPC testing.
 type TestResponse struct {
 	Output string
 }
 
+// GetOutput returns the output field of the test response.
 func (r *TestResponse) GetOutput() string {
 	if r != nil {
 		return r.Output
@@ -143,9 +146,10 @@ func (r *TestResponse) GetOutput() string {
 	return ""
 }
 
-// UnimplementedTestServiceServer is a minimal implementation for forward compatibility
+// UnimplementedTestServiceServer is a minimal implementation for forward compatibility.
 type UnimplementedTestServiceServer struct{}
 
+// TestMethod provides an unimplemented test method for forward compatibility.
 func (UnimplementedTestServiceServer) TestMethod(context.Context, *TestRequest) (*TestResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method TestMethod not implemented")
 }

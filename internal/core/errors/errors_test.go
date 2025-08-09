@@ -1,20 +1,22 @@
-package errors
+package errors_test
 
 import (
 	"errors"
 	"strings"
 	"testing"
+
+	coreerrors "github.com/sufield/ephemos/internal/core/errors"
 )
 
 func TestDomainError_Error(t *testing.T) {
 	tests := []struct {
 		name        string
-		domainError *DomainError
+		domainError *coreerrors.DomainError
 		want        string
 	}{
 		{
 			name: "simple error",
-			domainError: &DomainError{
+			domainError: &coreerrors.DomainError{
 				Code:    "INVALID_DOMAIN",
 				Message: "Domain cannot be empty",
 			},
@@ -22,7 +24,7 @@ func TestDomainError_Error(t *testing.T) {
 		},
 		{
 			name: "error with wrapped error",
-			domainError: &DomainError{
+			domainError: &coreerrors.DomainError{
 				Code:    "CONNECTION_FAILED",
 				Message: "Failed to connect to SPIRE",
 				Err:     errors.New("connection refused"),
@@ -31,7 +33,7 @@ func TestDomainError_Error(t *testing.T) {
 		},
 		{
 			name: "empty message",
-			domainError: &DomainError{
+			domainError: &coreerrors.DomainError{
 				Code:    "UNKNOWN",
 				Message: "",
 			},
@@ -39,7 +41,7 @@ func TestDomainError_Error(t *testing.T) {
 		},
 		{
 			name: "empty code",
-			domainError: &DomainError{
+			domainError: &coreerrors.DomainError{
 				Code:    "",
 				Message: "Something went wrong",
 			},
@@ -59,19 +61,19 @@ func TestDomainError_Error(t *testing.T) {
 
 func TestDomainError_Unwrap(t *testing.T) {
 	originalErr := errors.New("original error")
-	domainErr := &DomainError{
+	domainErr := &coreerrors.DomainError{
 		Code:    "TEST_ERROR",
 		Message: "Test error message",
 		Err:     originalErr,
 	}
 
 	unwrapped := domainErr.Unwrap()
-	if unwrapped != originalErr {
+	if !errors.Is(unwrapped, originalErr) {
 		t.Errorf("DomainError.Unwrap() = %v, want %v", unwrapped, originalErr)
 	}
 
 	// Test with no wrapped error
-	domainErrNoWrap := &DomainError{
+	domainErrNoWrap := &coreerrors.DomainError{
 		Code:    "TEST_ERROR",
 		Message: "Test error message",
 	}
@@ -85,12 +87,12 @@ func TestDomainError_Unwrap(t *testing.T) {
 func TestValidationError_Error(t *testing.T) {
 	tests := []struct {
 		name            string
-		validationError *ValidationError
+		validationError *coreerrors.ValidationError
 		want            string
 	}{
 		{
 			name: "string field",
-			validationError: &ValidationError{
+			validationError: &coreerrors.ValidationError{
 				Field:   "domain",
 				Value:   "example.com",
 				Message: "invalid domain format",
@@ -99,7 +101,7 @@ func TestValidationError_Error(t *testing.T) {
 		},
 		{
 			name: "integer field",
-			validationError: &ValidationError{
+			validationError: &coreerrors.ValidationError{
 				Field:   "port",
 				Value:   8080,
 				Message: "port must be between 1 and 65535",
@@ -108,7 +110,7 @@ func TestValidationError_Error(t *testing.T) {
 		},
 		{
 			name: "nil value",
-			validationError: &ValidationError{
+			validationError: &coreerrors.ValidationError{
 				Field:   "config",
 				Value:   nil,
 				Message: "configuration cannot be nil",
@@ -117,7 +119,7 @@ func TestValidationError_Error(t *testing.T) {
 		},
 		{
 			name: "empty message",
-			validationError: &ValidationError{
+			validationError: &coreerrors.ValidationError{
 				Field:   "test",
 				Value:   "value",
 				Message: "",
@@ -141,24 +143,27 @@ func TestNewDomainError(t *testing.T) {
 	message := "Test message"
 	err := errors.New("wrapped error")
 
-	baseDomainError := &DomainError{
+	baseDomainError := &coreerrors.DomainError{
 		Code:    code,
 		Message: message,
 	}
 
-	resultErr := NewDomainError(baseDomainError, err)
-	domainErr := resultErr.(*DomainError)
+	resultErr := coreerrors.NewDomainError(baseDomainError, err)
+	var domainErr *coreerrors.DomainError
+	if !errors.As(resultErr, &domainErr) {
+		t.Fatalf("coreerrors.NewDomainError() did not return a DomainError")
+	}
 
 	if domainErr.Code != code {
-		t.Errorf("NewDomainError() code = %v, want %v", domainErr.Code, code)
+		t.Errorf("coreerrors.NewDomainError() code = %v, want %v", domainErr.Code, code)
 	}
 
 	if domainErr.Message != message {
-		t.Errorf("NewDomainError() message = %v, want %v", domainErr.Message, message)
+		t.Errorf("coreerrors.NewDomainError() message = %v, want %v", domainErr.Message, message)
 	}
 
-	if domainErr.Err != err {
-		t.Errorf("NewDomainError() err = %v, want %v", domainErr.Err, err)
+	if !errors.Is(domainErr.Err, err) {
+		t.Errorf("coreerrors.NewDomainError() err = %v, want %v", domainErr.Err, err)
 	}
 }
 
@@ -167,29 +172,29 @@ func TestNewValidationError(t *testing.T) {
 	value := "testValue"
 	message := "Test validation message"
 
-	validationErr := NewValidationError(field, value, message)
+	validationErr := coreerrors.NewValidationError(field, value, message)
 
 	if validationErr.Field != field {
-		t.Errorf("NewValidationError() field = %v, want %v", validationErr.Field, field)
+		t.Errorf("coreerrors.NewValidationError() field = %v, want %v", validationErr.Field, field)
 	}
 
 	if validationErr.Value != value {
-		t.Errorf("NewValidationError() value = %v, want %v", validationErr.Value, value)
+		t.Errorf("coreerrors.NewValidationError() value = %v, want %v", validationErr.Value, value)
 	}
 
 	if validationErr.Message != message {
-		t.Errorf("NewValidationError() message = %v, want %v", validationErr.Message, message)
+		t.Errorf("coreerrors.NewValidationError() message = %v, want %v", validationErr.Message, message)
 	}
 }
 
 func TestErrorWrapping(t *testing.T) {
 	// Test that errors can be properly wrapped and unwrapped
 	originalErr := errors.New("original error")
-	baseDomainError := &DomainError{
+	baseDomainError := &coreerrors.DomainError{
 		Code:    "WRAPPER",
 		Message: "Wrapped error",
 	}
-	domainErr := NewDomainError(baseDomainError, originalErr)
+	domainErr := coreerrors.NewDomainError(baseDomainError, originalErr)
 
 	// Test errors.Is
 	if !errors.Is(domainErr, originalErr) {
@@ -197,44 +202,48 @@ func TestErrorWrapping(t *testing.T) {
 	}
 
 	// Test errors.As
-	var targetErr *DomainError
+	var targetErr *coreerrors.DomainError
 	if !errors.As(domainErr, &targetErr) {
 		t.Error("errors.As should extract DomainError")
 	}
 
-	if targetErr.Err != originalErr {
+	if !errors.Is(targetErr.Err, originalErr) {
 		t.Errorf("errors.As extracted wrong wrapped error: got %v, want %v", targetErr.Err, originalErr)
 	}
 }
 
 func TestErrorTypes(t *testing.T) {
 	// Test type assertions
-	baseDomainError := &DomainError{
+	baseDomainError := &coreerrors.DomainError{
 		Code:    "TEST",
 		Message: "Test message",
 	}
-	domainErr := NewDomainError(baseDomainError, nil)
-	validationErr := NewValidationError("field", "value", "message")
+	domainErr := coreerrors.NewDomainError(baseDomainError, nil)
+	validationErr := coreerrors.NewValidationError("field", "value", "message")
 
 	// Test DomainError type assertion
-	if _, ok := domainErr.(*DomainError); !ok {
-		t.Error("DomainError should be of type *DomainError")
+	var testDomainErr *coreerrors.DomainError
+	if !errors.As(domainErr, &testDomainErr) {
+		t.Error("DomainError should be of type *coreerrors.DomainError")
 	}
 
 	// Test ValidationError type assertion via error interface
-	var validationErrInterface error = validationErr
-	if _, ok := validationErrInterface.(*ValidationError); !ok {
-		t.Error("ValidationError should be of type *ValidationError")
+	validationErrInterface := error(validationErr)
+	var testValidationErr *coreerrors.ValidationError
+	if !errors.As(validationErrInterface, &testValidationErr) {
+		t.Error("ValidationError should be of type *coreerrors.ValidationError")
 	}
 
 	// Cross-type assertions should fail
-	if _, ok := domainErr.(*ValidationError); ok {
-		t.Error("DomainError should not be of type *ValidationError")
+	var crossTestValidationErr *coreerrors.ValidationError
+	if errors.As(domainErr, &crossTestValidationErr) {
+		t.Error("DomainError should not be of type *coreerrors.ValidationError")
 	}
 
-	var domainErrInterface error = domainErr
-	if _, ok := domainErrInterface.(*ValidationError); ok {
-		t.Error("DomainError should not be of type *ValidationError when cast to error interface")
+	domainErrInterface := domainErr
+	var crossTestValidationErr2 *coreerrors.ValidationError
+	if errors.As(domainErrInterface, &crossTestValidationErr2) {
+		t.Error("DomainError should not be of type *coreerrors.ValidationError when cast to error interface")
 	}
 }
 
@@ -242,17 +251,17 @@ func TestErrorChaining(t *testing.T) {
 	// Test chaining multiple errors
 	level1Err := errors.New("level 1 error")
 
-	level2Base := &DomainError{
+	level2Base := &coreerrors.DomainError{
 		Code:    "LEVEL2",
 		Message: "Level 2 error",
 	}
-	level2Err := NewDomainError(level2Base, level1Err)
+	level2Err := coreerrors.NewDomainError(level2Base, level1Err)
 
-	level3Base := &DomainError{
+	level3Base := &coreerrors.DomainError{
 		Code:    "LEVEL3",
 		Message: "Level 3 error",
 	}
-	level3Err := NewDomainError(level3Base, level2Err)
+	level3Err := coreerrors.NewDomainError(level3Base, level2Err)
 
 	// Should be able to find the original error
 	if !errors.Is(level3Err, level1Err) {
@@ -280,11 +289,11 @@ func TestErrorChaining(t *testing.T) {
 }
 
 func BenchmarkDomainError_Error(b *testing.B) {
-	baseDomainError := &DomainError{
+	baseDomainError := &coreerrors.DomainError{
 		Code:    "BENCHMARK",
 		Message: "Benchmark error message",
 	}
-	domainErr := NewDomainError(baseDomainError, errors.New("wrapped"))
+	domainErr := coreerrors.NewDomainError(baseDomainError, errors.New("wrapped"))
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -293,7 +302,7 @@ func BenchmarkDomainError_Error(b *testing.B) {
 }
 
 func BenchmarkValidationError_Error(b *testing.B) {
-	validationErr := NewValidationError("field", "value", "validation message")
+	validationErr := coreerrors.NewValidationError("field", "value", "validation message")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -303,37 +312,37 @@ func BenchmarkValidationError_Error(b *testing.B) {
 
 func BenchmarkNewDomainError(b *testing.B) {
 	wrappedErr := errors.New("wrapped error")
-	baseDomainError := &DomainError{
+	baseDomainError := &coreerrors.DomainError{
 		Code:    "CODE",
 		Message: "message",
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = NewDomainError(baseDomainError, wrappedErr)
+		_ = coreerrors.NewDomainError(baseDomainError, wrappedErr)
 	}
 }
 
 func BenchmarkNewValidationError(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = NewValidationError("field", "value", "message")
+		_ = coreerrors.NewValidationError("field", "value", "message")
 	}
 }
 
 func TestErrorInterface(t *testing.T) {
 	// Test that our custom errors implement the error interface
-	baseDomainError := &DomainError{
+	baseDomainError := &coreerrors.DomainError{
 		Code:    "TEST",
 		Message: "Test message",
 	}
-	domainErr := NewDomainError(baseDomainError, nil)
+	domainErr := coreerrors.NewDomainError(baseDomainError, nil)
 	// Verify it implements error interface by calling Error()
 	if domainErr.Error() == "" {
 		t.Error("DomainError should have non-empty error message")
 	}
 
-	validationErr := NewValidationError("field", "value", "message")
+	validationErr := coreerrors.NewValidationError("field", "value", "message")
 	// Verify it implements error interface by calling Error()
 	if validationErr.Error() == "" {
 		t.Error("ValidationError should have non-empty error message")

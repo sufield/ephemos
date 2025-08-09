@@ -28,7 +28,7 @@ type TestEchoServer struct {
 func (s *TestEchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (*proto.EchoResponse, error) {
 	s.callCount++
 	s.lastMessage = req.Message
-	
+
 	// Simulate different behaviors based on input
 	if req.Message == "error" {
 		return nil, status.Error(codes.Internal, "simulated server error")
@@ -37,7 +37,7 @@ func (s *TestEchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (*pro
 		time.Sleep(2 * time.Second)
 		return nil, status.Error(codes.DeadlineExceeded, "simulated timeout")
 	}
-	
+
 	return &proto.EchoResponse{
 		Message: req.Message,
 		From:    "test-echo-server",

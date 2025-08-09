@@ -1,3 +1,4 @@
+// Package transport provides gRPC transport implementations for secure communication.
 package transport
 
 import (
@@ -11,20 +12,23 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-type GRPCTransportProvider struct {
-	spiffeProvider *spiffe.SPIFFEProvider
+// GRPCProvider provides gRPC transport.
+type GRPCProvider struct {
+	spiffeProvider *spiffe.Provider
 }
 
-func NewGRPCTransportProvider(spiffeProvider *spiffe.SPIFFEProvider) *GRPCTransportProvider {
-	return &GRPCTransportProvider{
+// NewGRPCProvider creates a new provider.
+func NewGRPCProvider(spiffeProvider *spiffe.Provider) *GRPCProvider {
+	return &GRPCProvider{
 		spiffeProvider: spiffeProvider,
 	}
 }
 
-func (p *GRPCTransportProvider) CreateServerTransport(
-	ctx context.Context,
-	cert *domain.Certificate,
-	bundle *domain.TrustBundle,
+// CreateServerTransport creates server transport.
+func (p *GRPCProvider) CreateServerTransport(
+	_ context.Context,
+	_ *domain.Certificate,
+	_ *domain.TrustBundle,
 	policy *domain.AuthenticationPolicy,
 ) (*grpc.Server, error) {
 	source := p.spiffeProvider.GetX509Source()
@@ -44,11 +48,12 @@ func (p *GRPCTransportProvider) CreateServerTransport(
 	return grpc.NewServer(opts...), nil
 }
 
-func (p *GRPCTransportProvider) CreateClientTransport(
-	ctx context.Context,
-	cert *domain.Certificate,
-	bundle *domain.TrustBundle,
-	policy *domain.AuthenticationPolicy,
+// CreateClientTransport creates client transport.
+func (p *GRPCProvider) CreateClientTransport(
+	_ context.Context,
+	_ *domain.Certificate,
+	_ *domain.TrustBundle,
+	_ *domain.AuthenticationPolicy,
 ) (grpc.DialOption, error) {
 	source := p.spiffeProvider.GetX509Source()
 	if source == nil {
@@ -63,8 +68,8 @@ func (p *GRPCTransportProvider) CreateClientTransport(
 	return grpc.WithTransportCredentials(creds), nil
 }
 
-func (p *GRPCTransportProvider) createAuthInterceptor(policy *domain.AuthenticationPolicy) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func (p *GRPCProvider) createAuthInterceptor(_ *domain.AuthenticationPolicy) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		return handler(ctx, req)
 	}
 }

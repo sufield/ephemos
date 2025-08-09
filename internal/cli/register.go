@@ -1,3 +1,4 @@
+// Package cli provides command-line interface for Ephemos.
 package cli
 
 import (
@@ -12,6 +13,7 @@ import (
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
+//nolint:gochecknoglobals // CLI flags require global variables in Cobra
 var (
 	configFile    string
 	serviceName   string
@@ -19,7 +21,7 @@ var (
 	selector      string
 )
 
-var registerCmd = &cobra.Command{
+var registerCmd = &cobra.Command{ //nolint:gochecknoglobals // Cobra command pattern
 	Use:   "register",
 	Short: "Register a service with SPIRE",
 	Long: `Register a service identity with SPIRE server.
@@ -36,86 +38,112 @@ Examples:
 	RunE: runRegister,
 }
 
-func init() {
+func init() { //nolint:gochecknoinits // Cobra requires init for flag setup
 	registerCmd.Flags().StringVarP(&configFile, "config", "c", "", "Path to configuration file")
 	registerCmd.Flags().StringVarP(&serviceName, "name", "n", "", "Service name")
 	registerCmd.Flags().StringVarP(&serviceDomain, "domain", "d", "example.org", "Service domain")
 	registerCmd.Flags().StringVarP(&selector, "selector", "s", "", "Custom selector (default: executable path)")
 }
 
-func runRegister(cmd *cobra.Command, args []string) error {
+func runRegister(_ *cobra.Command, _ []string) error {
 	ctx := context.Background()
 
-	// Create configuration
-	var cfg *ports.Configuration
+	cfg, err := loadConfiguration(ctx)
+	if err != nil {
+		return err
+	}
 
-	if configFile != "" {
-		// Load from config file
-		configProvider := config.NewConfigProvider()
-		var err error
-		cfg, err = configProvider.LoadConfiguration(ctx, configFile)
-		if err != nil {
-			return fmt.Errorf("failed to load configuration: %w", err)
-		}
-	} else if serviceName != "" {
-		// Create from command line arguments
-		cfg = &ports.Configuration{
-			Service: ports.ServiceConfig{
-				Name:   serviceName,
-				Domain: serviceDomain,
-			},
-		}
+	if err := performRegistration(ctx); err != nil {
+		return err
+	}
 
-		// Save to temporary config file for the registrar
-		tempFile, err := os.CreateTemp("", "ephemos-*.yaml")
-		if err != nil {
-			return fmt.Errorf("failed to create temp config: %w", err)
-		}
-		defer os.Remove(tempFile.Name())
+	logRegistrationSuccess(cfg)
+	return nil
+}
 
-		// Write config to temp file
-		configContent := fmt.Sprintf(`service:
+func loadConfiguration(ctx context.Context) (*ports.Configuration, error) {
+	switch {
+	case configFile != "":
+		return loadFromConfigFile(ctx)
+	case serviceName != "":
+		return createTempConfigFromFlags()
+	default:
+		return nil, fmt.Errorf("either --config or --name must be provided")
+	}
+}
+
+func loadFromConfigFile(ctx context.Context) (*ports.Configuration, error) {
+	configProvider := config.NewFileProvider()
+	cfg, err := configProvider.LoadConfiguration(ctx, configFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+	return cfg, nil
+}
+
+func createTempConfigFromFlags() (*ports.Configuration, error) {
+	cfg := &ports.Configuration{
+		Service: ports.ServiceConfig{
+			Name:   serviceName,
+			Domain: serviceDomain,
+		},
+	}
+
+	tempFile, err := os.CreateTemp("", "ephemos-*.yaml")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp config: %w", err)
+	}
+	defer func() {
+		if err := os.Remove(tempFile.Name()); err != nil {
+			slog.Warn("Failed to remove temp file", "file", tempFile.Name(), "error", err)
+		}
+	}()
+
+	configContent := fmt.Sprintf(`service:
   name: %s
   domain: %s
 `, serviceName, serviceDomain)
 
-		if _, err := tempFile.WriteString(configContent); err != nil {
-			return fmt.Errorf("failed to write temp config: %w", err)
-		}
-		tempFile.Close()
-
-		configFile = tempFile.Name()
-	} else {
-		return fmt.Errorf("either --config or --name must be provided")
+	if _, err := tempFile.WriteString(configContent); err != nil {
+		return nil, fmt.Errorf("failed to write temp config: %w", err)
+	}
+	if err := tempFile.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close temp file: %w", err)
 	}
 
-	// Create registrar
+	configFile = tempFile.Name()
+	return cfg, nil
+}
+
+func performRegistration(ctx context.Context) error {
 	registrarConfig := &cli.RegistrarConfig{
 		SPIRESocketPath: os.Getenv("SPIRE_SOCKET_PATH"),
 		Logger:          slog.Default(),
 	}
 
-	configProvider := config.NewConfigProvider()
+	configProvider := config.NewFileProvider()
 	registrar := cli.NewRegistrar(configProvider, registrarConfig)
 
-	// Register the service
 	if err := registrar.RegisterService(ctx, configFile); err != nil {
 		return fmt.Errorf("registration failed: %w", err)
 	}
+	return nil
+}
 
-	fmt.Printf("Successfully registered service '%s' in domain '%s'\n", cfg.Service.Name, cfg.Service.Domain)
-	fmt.Printf("SPIFFE ID: spiffe://%s/%s\n", cfg.Service.Domain, cfg.Service.Name)
+func logRegistrationSuccess(cfg *ports.Configuration) {
+	slog.Info("Successfully registered service",
+		"service", cfg.Service.Name,
+		"domain", cfg.Service.Domain,
+		"spiffe_id", fmt.Sprintf("spiffe://%s/%s", cfg.Service.Domain, cfg.Service.Name))
 
 	if selector != "" {
-		fmt.Printf("Selector: %s\n", selector)
+		slog.Info("Service registered with selector", "selector", selector)
 	} else {
 		execPath, err := os.Executable()
 		if err == nil {
-			fmt.Printf("Selector: unix:path:%s\n", execPath)
+			slog.Info("Service registered with auto-determined selector", "selector", fmt.Sprintf("unix:path:%s", execPath))
 		} else {
-			fmt.Printf("Selector: (auto-determined)\n")
+			slog.Info("Service registered with auto-determined selector")
 		}
 	}
-
-	return nil
 }

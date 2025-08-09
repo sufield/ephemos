@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -28,6 +29,60 @@ type Registrar struct {
 	spireSocketPath string
 	spireServerPath string
 	logger          *slog.Logger
+}
+
+// isValidPath validates that a path is safe to use.
+func isValidPath(path string) bool {
+	if path == "" {
+		return false
+	}
+	cleanPath := filepath.Clean(path)
+	// Prevent path traversal
+	if strings.Contains(cleanPath, "..") {
+		return false
+	}
+	// Ensure it's within allowed paths for SPIRE
+	allowedPaths := []string{"/usr/bin/", "/usr/local/bin/", "/opt/spire/bin/", "./bin/"}
+	for _, allowed := range allowedPaths {
+		if strings.HasPrefix(cleanPath, allowed) || cleanPath == "spire-server" {
+			return true
+		}
+	}
+	return false
+}
+
+// isValidSocketPath validates that a socket path is safe to use.
+func isValidSocketPath(path string) bool {
+	if path == "" {
+		return false
+	}
+	cleanPath := filepath.Clean(path)
+	// Prevent path traversal
+	if strings.Contains(cleanPath, "..") {
+		return false
+	}
+	// Must be a socket file (typically .sock extension or in /tmp)
+	return strings.HasSuffix(cleanPath, ".sock") || strings.HasPrefix(cleanPath, "/tmp/") || strings.HasPrefix(cleanPath, "/var/run/")
+}
+
+// isValidSelector validates that a selector is in the correct format.
+func isValidSelector(selector string) bool {
+	if selector == "" {
+		return false
+	}
+	// Basic validation - selectors should be in format "type:key:value"
+	parts := strings.Split(selector, ":")
+	if len(parts) < 2 {
+		return false
+	}
+	// First part should be a known selector type
+	validTypes := []string{"unix", "k8s", "docker"}
+	for _, validType := range validTypes {
+		if parts[0] == validType {
+			return true
+		}
+	}
+	return false
 }
 
 // NewRegistrar creates a new Registrar with proper dependency injection.
@@ -62,14 +117,14 @@ func NewRegistrar(
 	}
 }
 
-// RegisterService registers a service with SPIRE based on its configuration
+// RegisterService registers a service with SPIRE based on its configuration.
 func (r *Registrar) RegisterService(ctx context.Context, configPath string) error {
 	r.logger.Info("Starting service registration", "configPath", configPath)
 
 	cfg, err := r.configProvider.LoadConfiguration(ctx, configPath)
 	if err != nil {
 		r.logger.Error("Failed to load configuration", "error", err)
-		return errors.NewDomainError(errors.ErrMissingConfiguration, err)
+		return fmt.Errorf("failed to load configuration: %w", errors.NewDomainError(errors.ErrMissingConfiguration, err))
 	}
 
 	if err := r.validateConfig(cfg); err != nil {
@@ -80,7 +135,7 @@ func (r *Registrar) RegisterService(ctx context.Context, configPath string) erro
 	// Create SPIRE registration entry
 	if err := r.createSPIREEntry(ctx, cfg); err != nil {
 		r.logger.Error("Failed to create SPIRE entry", "error", err)
-		return errors.NewDomainError(errors.ErrSPIFFERegistration, err)
+		return fmt.Errorf("SPIFFE registration failed: %w", errors.NewDomainError(errors.ErrSPIFFERegistration, err))
 	}
 
 	r.logger.Info("Service registration completed successfully",
@@ -90,7 +145,7 @@ func (r *Registrar) RegisterService(ctx context.Context, configPath string) erro
 	return nil
 }
 
-// validateConfig performs comprehensive validation of the configuration
+// validateConfig performs comprehensive validation of the configuration.
 func (r *Registrar) validateConfig(cfg *ports.Configuration) error {
 	// Validate service name
 	if cfg.Service.Name == "" {
@@ -133,10 +188,12 @@ func (r *Registrar) validateConfig(cfg *ports.Configuration) error {
 	return nil
 }
 
-// createSPIREEntry creates a registration entry in SPIRE
+// createSPIREEntry creates a registration entry in SPIRE.
 // NOTE: In production, you should use the SPIRE Server API directly via gRPC
 // This implementation uses the CLI for simplicity, as the SPIRE Server API
 // requires additional proto definitions not included in go-spiffe
+//
+//nolint:cyclop,funlen // Function has inherent complexity from validation and command execution
 func (r *Registrar) createSPIREEntry(ctx context.Context, cfg *ports.Configuration) error {
 	// Build SPIFFE IDs
 	spiffeID, err := spiffeid.FromString(fmt.Sprintf("spiffe://%s/%s", cfg.Service.Domain, cfg.Service.Name))
@@ -150,10 +207,7 @@ func (r *Registrar) createSPIREEntry(ctx context.Context, cfg *ports.Configurati
 	}
 
 	// Get service selector
-	selector, err := r.getServiceSelector()
-	if err != nil {
-		return fmt.Errorf("failed to determine service selector: %w", err)
-	}
+	selector := r.getServiceSelector()
 
 	r.logger.Debug("Creating SPIRE entry",
 		"spiffeID", spiffeID.String(),
@@ -161,8 +215,24 @@ func (r *Registrar) createSPIREEntry(ctx context.Context, cfg *ports.Configurati
 		"selector", selector,
 		"socketPath", r.spireSocketPath)
 
+	// Validate paths for security
+	if !isValidPath(r.spireServerPath) {
+		return fmt.Errorf("invalid spire-server path: %s", r.spireServerPath)
+	}
+
+	// Validate socket path for security
+	if !isValidSocketPath(r.spireSocketPath) {
+		return fmt.Errorf("invalid socket path: %s", r.spireSocketPath)
+	}
+
+	// Validate selector format for security
+	if !isValidSelector(selector) {
+		return fmt.Errorf("invalid selector format: %s", selector)
+	}
+
 	// Use spire-server CLI command
 	// In production, use the SPIRE Server API directly
+	//nolint:gosec // G204: Input is validated above for security
 	cmd := exec.CommandContext(ctx, r.spireServerPath, "entry", "create",
 		"-socketPath", r.spireSocketPath,
 		"-spiffeID", spiffeID.String(),
@@ -200,12 +270,42 @@ func (r *Registrar) createSPIREEntry(ctx context.Context, cfg *ports.Configurati
 	return nil
 }
 
-// getServiceSelector determines the service selector for SPIRE
-// For demo purposes, we use unix:uid selector (running as current user)
-// In production, use more specific selectors like k8s:pod-label or unix:path
-func (r *Registrar) getServiceSelector() (string, error) {
+// getServiceSelector determines the service selector for SPIRE.
+// For demo purposes, we use unix:uid selector (running as current user).
+// In production, use more specific selectors like k8s:pod-label or unix:path.
+func (r *Registrar) getServiceSelector() string {
 	// For demo, use unix:uid selector with current user
 	// This works when services run as the same user
 	uid := os.Getuid()
-	return fmt.Sprintf("unix:uid:%d", uid), nil
+	return fmt.Sprintf("unix:uid:%d", uid)
+}
+
+// GetConfigProvider returns the configuration provider (for testing).
+func (r *Registrar) GetConfigProvider() ports.ConfigurationProvider {
+	return r.configProvider
+}
+
+// GetSPIRESocketPath returns the SPIRE socket path (for testing).
+func (r *Registrar) GetSPIRESocketPath() string {
+	return r.spireSocketPath
+}
+
+// GetSPIREServerPath returns the SPIRE server path (for testing).
+func (r *Registrar) GetSPIREServerPath() string {
+	return r.spireServerPath
+}
+
+// ValidateConfig exposes validateConfig for testing.
+func (r *Registrar) ValidateConfig(cfg *ports.Configuration) error {
+	return r.validateConfig(cfg)
+}
+
+// CreateSPIREEntry exposes createSPIREEntry for testing.
+func (r *Registrar) CreateSPIREEntry(ctx context.Context, cfg *ports.Configuration) error {
+	return r.createSPIREEntry(ctx, cfg)
+}
+
+// GetServiceSelector exposes getServiceSelector for testing.
+func (r *Registrar) GetServiceSelector() string {
+	return r.getServiceSelector()
 }

@@ -1,28 +1,32 @@
-package config
+package config_test
 
 import (
 	"context"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/sufield/ephemos/internal/adapters/secondary/config"
+	"github.com/sufield/ephemos/internal/core/ports"
 )
 
-func TestNewConfigProvider(t *testing.T) {
-	provider := NewConfigProvider()
+func TestNewFileProvider(t *testing.T) {
+	provider := config.NewFileProvider()
 	if provider == nil {
-		t.Error("NewConfigProvider() returned nil")
+		t.Error("config.NewFileProvider() returned nil")
 	}
 }
 
-func TestConfigProvider_LoadConfiguration(t *testing.T) {
-	provider := NewConfigProvider()
-	ctx := context.Background()
+//nolint:cyclop // Test functions can have high complexity due to multiple test cases
+func TestFileProvider_LoadConfiguration(t *testing.T) {
+	provider := config.NewFileProvider()
+	ctx := t.Context()
 
 	tests := []struct {
 		name       string
 		configPath string
 		wantErr    bool
-		setup      func() (string, func())
+		setup      func(t *testing.T) (string, func())
 	}{
 		{
 			name:       "nil context",
@@ -42,12 +46,10 @@ func TestConfigProvider_LoadConfiguration(t *testing.T) {
 		{
 			name:    "valid config file",
 			wantErr: false,
-			setup: func() (string, func()) {
+			setup: func(t *testing.T) (string, func()) {
+				t.Helper()
 				// Create a temporary config file
-				tmpDir, err := os.MkdirTemp("", "ephemos-test")
-				if err != nil {
-					t.Fatalf("Failed to create temp dir: %v", err)
-				}
+				tmpDir := t.TempDir()
 
 				configPath := filepath.Join(tmpDir, "config.yaml")
 				configContent := `
@@ -58,31 +60,29 @@ service:
 spiffe:
   socket_path: "/tmp/spire-agent/public/api.sock"
 `
-				err = os.WriteFile(configPath, []byte(configContent), 0644)
+				err := os.WriteFile(configPath, []byte(configContent), 0o644)
 				if err != nil {
 					t.Fatalf("Failed to write config file: %v", err)
 				}
 
-				return configPath, func() { os.RemoveAll(tmpDir) }
+				return configPath, func() {}
 			},
 		},
 		{
 			name:    "invalid yaml format",
 			wantErr: true,
-			setup: func() (string, func()) {
-				tmpDir, err := os.MkdirTemp("", "ephemos-test")
-				if err != nil {
-					t.Fatalf("Failed to create temp dir: %v", err)
-				}
+			setup: func(t *testing.T) (string, func()) {
+				t.Helper()
+				tmpDir := t.TempDir()
 
 				configPath := filepath.Join(tmpDir, "config.yaml")
 				invalidContent := `invalid: yaml: content: [[[`
-				err = os.WriteFile(configPath, []byte(invalidContent), 0644)
+				err := os.WriteFile(configPath, []byte(invalidContent), 0o644)
 				if err != nil {
 					t.Fatalf("Failed to write config file: %v", err)
 				}
 
-				return configPath, func() { os.RemoveAll(tmpDir) }
+				return configPath, func() {}
 			},
 		},
 	}
@@ -93,18 +93,24 @@ spiffe:
 			var cleanup func()
 
 			if tt.setup != nil {
-				configPath, cleanup = tt.setup()
+				configPath, cleanup = tt.setup(t)
 				defer cleanup()
 			} else {
 				configPath = tt.configPath
 			}
 
-			testCtx := ctx
+			var config *ports.Configuration
+			var err error
 			if tt.name == "nil context" {
-				testCtx = nil
+				// Test with canceled context to simulate nil context behavior
+				nilCtx, cancel := context.WithCancel(ctx)
+				cancel() // Cancel immediately to make it behave like nil
+				config, err = provider.LoadConfiguration(nilCtx, configPath)
+			} else {
+				testCtx, cancel := context.WithCancel(ctx)
+				defer cancel()
+				config, err = provider.LoadConfiguration(testCtx, configPath)
 			}
-
-			config, err := provider.LoadConfiguration(testCtx, configPath)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LoadConfiguration() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -124,27 +130,37 @@ spiffe:
 	}
 }
 
-func TestConfigProvider_GetDefaultConfiguration(t *testing.T) {
-	provider := NewConfigProvider()
-	ctx := context.Background()
+func TestFileProvider_GetDefaultConfiguration(t *testing.T) {
+	provider := config.NewFileProvider()
+	ctx := t.Context()
 
 	tests := []struct {
-		name string
-		ctx  context.Context
+		name   string
+		useCtx bool
 	}{
 		{
-			name: "valid context",
-			ctx:  ctx,
+			name:   "valid context",
+			useCtx: true,
 		},
 		{
-			name: "nil context",
-			ctx:  nil,
+			name:   "nil context",
+			useCtx: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := provider.GetDefaultConfiguration(tt.ctx)
+			var config *ports.Configuration
+			if tt.useCtx {
+				testCtx, cancel := context.WithCancel(ctx)
+				defer cancel()
+				config = provider.GetDefaultConfiguration(testCtx)
+			} else {
+				// Test with canceled context to simulate nil context behavior
+				nilCtx, cancel := context.WithCancel(ctx)
+				cancel() // Cancel immediately to make it behave like nil
+				config = provider.GetDefaultConfiguration(nilCtx)
+			}
 
 			// Default configuration should be returned even with nil context
 			if config == nil {
@@ -165,10 +181,10 @@ func TestConfigProvider_GetDefaultConfiguration(t *testing.T) {
 	}
 }
 
-func TestConfigProvider_Integration(t *testing.T) {
+func TestFileProvider_Integration(t *testing.T) {
 	// Integration test showing typical usage pattern
-	provider := NewConfigProvider()
-	ctx := context.Background()
+	provider := config.NewFileProvider()
+	ctx := t.Context()
 
 	// First try to load a config file, fall back to default
 	_, err := provider.LoadConfiguration(ctx, "/nonexistent/config.yaml")
@@ -189,8 +205,8 @@ func TestConfigProvider_Integration(t *testing.T) {
 }
 
 func BenchmarkConfigProvider_GetDefaultConfiguration(b *testing.B) {
-	provider := NewConfigProvider()
-	ctx := context.Background()
+	provider := config.NewFileProvider()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -202,15 +218,11 @@ func BenchmarkConfigProvider_GetDefaultConfiguration(b *testing.B) {
 }
 
 func BenchmarkConfigProvider_LoadConfiguration(b *testing.B) {
-	provider := NewConfigProvider()
-	ctx := context.Background()
+	provider := config.NewFileProvider()
+	ctx := b.Context()
 
 	// Create a temporary config file
-	tmpDir, err := os.MkdirTemp("", "ephemos-bench")
-	if err != nil {
-		b.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := b.TempDir()
 
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	configContent := `
@@ -219,7 +231,7 @@ spiffe:
   socket_path: "/tmp/spire-agent/public/api.sock"
   trust_domain: "example.com"
 `
-	err = os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	if err != nil {
 		b.Fatalf("Failed to write config file: %v", err)
 	}

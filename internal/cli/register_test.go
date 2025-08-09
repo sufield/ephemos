@@ -1,4 +1,4 @@
-package cli
+package cli_test
 
 import (
 	"bytes"
@@ -38,21 +38,21 @@ func TestRegisterCmd(t *testing.T) {
 			// Create a copy of the actual register command for testing
 			cmd := &cobra.Command{
 				Use:   "register",
-				Short: "Register a service with SPIRE",  
-				Long: `Register a service identity with SPIRE server.`,
-				RunE: func(cmd *cobra.Command, args []string) error {
+				Short: "Register a service with SPIRE",
+				Long:  `Register a service identity with SPIRE server.`,
+				RunE: func(cmd *cobra.Command, _ []string) error {
 					// Simplified mock that matches expected behavior
 					configFlag, _ := cmd.Flags().GetString("config")
 					nameFlag, _ := cmd.Flags().GetString("name")
-					
+
 					if configFlag == "" && nameFlag == "" {
 						return fmt.Errorf("either --config or --name must be provided")
 					}
 					return nil
 				},
 			}
-			
-			// Add the actual flags  
+
+			// Add the actual flags
 			cmd.Flags().StringP("config", "c", "", "Path to configuration file")
 			cmd.Flags().StringP("name", "n", "", "Service name")
 			cmd.Flags().StringP("domain", "d", "example.org", "Service domain")
@@ -85,7 +85,7 @@ func TestRegisterCmdFlags(t *testing.T) {
 	cmd := &cobra.Command{
 		Use:   "register",
 		Short: "Register a service with SPIFFE/SPIRE",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			return nil
 		},
 	}
@@ -153,7 +153,7 @@ func TestRegisterCmdValidation(t *testing.T) {
 	cmd := &cobra.Command{
 		Use:   "register",
 		Short: "Register a service with SPIFFE/SPIRE",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			// Basic validation logic
 			if len(args) == 0 {
 				return errors.New("missing required argument: service name")
@@ -216,7 +216,7 @@ func TestRegisterCmdCompletion(t *testing.T) {
 		Use:   "register",
 		Short: "Register a service with SPIFFE/SPIRE",
 		Args:  cobra.ExactArgs(1),
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		ValidArgsFunction: func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 			// Return some example service names for completion
 			if len(args) == 0 {
 				return []string{
@@ -265,7 +265,7 @@ Examples:
   ephemos register --name echo-server --domain example.org
   ephemos register --name echo-server --domain example.org --selector unix:uid:1000`,
 	}
-	
+
 	// Add flags like the real command
 	cmd.Flags().StringP("config", "c", "", "Path to configuration file")
 	cmd.Flags().StringP("name", "n", "", "Service name")
@@ -294,7 +294,7 @@ func BenchmarkRegisterCmdExecution(b *testing.B) {
 	cmd := &cobra.Command{
 		Use:   "register",
 		Short: "Register a service with SPIFFE/SPIRE",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			// Mock implementation
 			return nil
 		},

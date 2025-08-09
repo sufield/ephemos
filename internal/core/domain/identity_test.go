@@ -1,9 +1,11 @@
-package domain
+package domain_test
 
 import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/sufield/ephemos/internal/core/domain"
 )
 
 func TestNewServiceIdentity(t *testing.T) {
@@ -31,10 +33,10 @@ func TestNewServiceIdentity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			identity := NewServiceIdentity(tt.serviceName, tt.domain)
+			identity := domain.NewServiceIdentity(tt.serviceName, tt.domain)
 
 			if identity == nil {
-				t.Error("NewServiceIdentity() returned nil identity")
+				t.Error("domain.NewServiceIdentity() returned nil identity")
 				return
 			}
 
@@ -93,7 +95,7 @@ func TestServiceIdentity_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			identity := NewServiceIdentity(tt.serviceName, tt.domain)
+			identity := domain.NewServiceIdentity(tt.serviceName, tt.domain)
 			err := identity.Validate()
 
 			if (err != nil) != tt.wantErr {
@@ -145,7 +147,7 @@ func TestServiceIdentity_URIGeneration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			identity := NewServiceIdentity(tt.serviceName, tt.domain)
+			identity := domain.NewServiceIdentity(tt.serviceName, tt.domain)
 
 			if identity.URI != tt.expectedURI {
 				t.Errorf("URI = %v, want %v", identity.URI, tt.expectedURI)
@@ -154,22 +156,27 @@ func TestServiceIdentity_URIGeneration(t *testing.T) {
 	}
 }
 
+const (
+	testServiceName = "test-service"
+	testDomain      = "example.com"
+)
+
 func TestServiceIdentity_Fields(t *testing.T) {
 	// Test that all fields are properly set
-	serviceName := "test-service"
-	domain := "example.com"
+	serviceName := testServiceName
+	domainName := testDomain
 
-	identity := NewServiceIdentity(serviceName, domain)
+	identity := domain.NewServiceIdentity(serviceName, domainName)
 
 	if identity.Name != serviceName {
 		t.Errorf("Name = %v, want %v", identity.Name, serviceName)
 	}
 
-	if identity.Domain != domain {
-		t.Errorf("Domain = %v, want %v", identity.Domain, domain)
+	if identity.Domain != domainName {
+		t.Errorf("Domain = %v, want %v", identity.Domain, domainName)
 	}
 
-	expectedURI := fmt.Sprintf("spiffe://%s/%s", domain, serviceName)
+	expectedURI := fmt.Sprintf("spiffe://%s/%s", domainName, serviceName)
 	if identity.URI != expectedURI {
 		t.Errorf("URI = %v, want %v", identity.URI, expectedURI)
 	}
@@ -177,7 +184,7 @@ func TestServiceIdentity_Fields(t *testing.T) {
 
 func TestServiceIdentity_Immutability(t *testing.T) {
 	// Test that the identity remains immutable after creation
-	identity := NewServiceIdentity("test-service", "example.com")
+	identity := domain.NewServiceIdentity("test-service", "example.com")
 
 	originalName := identity.Name
 	originalDomain := identity.Domain
@@ -238,10 +245,10 @@ func TestServiceIdentity_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			identity := NewServiceIdentity(tt.serviceName, tt.domain)
+			identity := domain.NewServiceIdentity(tt.serviceName, tt.domain)
 
 			if identity == nil {
-				t.Error("NewServiceIdentity() returned nil")
+				t.Error("domain.NewServiceIdentity() returned nil")
 				return
 			}
 
@@ -264,19 +271,19 @@ func TestServiceIdentity_EdgeCases(t *testing.T) {
 
 func BenchmarkNewServiceIdentity(b *testing.B) {
 	serviceName := "test-service"
-	domain := "example.com"
+	domainName := "example.com"
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		identity := NewServiceIdentity(serviceName, domain)
+		identity := domain.NewServiceIdentity(serviceName, domainName)
 		if identity == nil {
-			b.Error("NewServiceIdentity returned nil")
+			b.Error("domain.NewServiceIdentity returned nil")
 		}
 	}
 }
 
 func BenchmarkServiceIdentity_Validate(b *testing.B) {
-	identity := NewServiceIdentity("test-service", "example.com")
+	identity := domain.NewServiceIdentity("test-service", "example.com")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -288,7 +295,7 @@ func BenchmarkServiceIdentity_Validate(b *testing.B) {
 }
 
 func BenchmarkServiceIdentity_URIAccess(b *testing.B) {
-	identity := NewServiceIdentity("test-service", "example.com")
+	identity := domain.NewServiceIdentity("test-service", "example.com")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -301,7 +308,7 @@ func BenchmarkServiceIdentity_URIAccess(b *testing.B) {
 
 func TestServiceIdentity_String(t *testing.T) {
 	// Test string representation through URI field
-	identity := NewServiceIdentity("test-service", "example.com")
+	identity := domain.NewServiceIdentity("test-service", "example.com")
 
 	if identity.URI == "" {
 		t.Error("URI should not be empty")
@@ -322,7 +329,7 @@ func TestServiceIdentity_String(t *testing.T) {
 
 func TestServiceIdentity_Concurrent(t *testing.T) {
 	// Test concurrent access to identity fields
-	identity := NewServiceIdentity("test-service", "example.com")
+	identity := domain.NewServiceIdentity("test-service", "example.com")
 
 	done := make(chan bool, 10)
 

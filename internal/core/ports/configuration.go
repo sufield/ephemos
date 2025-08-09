@@ -1,3 +1,4 @@
+// Package ports defines interfaces for core services and domain boundaries.
 package ports
 
 import (
@@ -8,7 +9,7 @@ import (
 	"github.com/sufield/ephemos/internal/core/errors"
 )
 
-// YAML tag constants to avoid hardcoding
+// YAML tag constants to avoid hardcoding.
 const (
 	ServiceYAMLTag           = "service"
 	SPIFFEYAMLTag            = "spiffe"
@@ -34,12 +35,12 @@ type Configuration struct {
 	// AuthorizedClients lists SPIFFE IDs that are allowed to connect to this service.
 	// Each entry must be a valid SPIFFE ID (e.g., "spiffe://example.org/client-service").
 	// Empty list means no client authorization is enforced.
-	AuthorizedClients []string `yaml:"authorized_clients,omitempty"`
+	AuthorizedClients []string `yaml:"authorizedClients,omitempty"`
 
 	// TrustedServers lists SPIFFE IDs of servers this client trusts to connect to.
 	// Each entry must be a valid SPIFFE ID (e.g., "spiffe://example.org/server-service").
 	// Empty list means all servers are trusted (not recommended for production).
-	TrustedServers []string `yaml:"trusted_servers,omitempty"`
+	TrustedServers []string `yaml:"trustedServers,omitempty"`
 }
 
 // ServiceConfig contains the core service identification settings.
@@ -60,7 +61,7 @@ type SPIFFEConfig struct {
 	// SocketPath is the path to the SPIRE agent's Unix domain socket.
 	// Must be an absolute path to a valid Unix socket file.
 	// Common default: "/tmp/spire-agent/public/api.sock"
-	SocketPath string `yaml:"socket_path"`
+	SocketPath string `yaml:"socketPath"`
 }
 
 // Validate checks if the configuration is valid and returns any validation errors.
@@ -100,6 +101,19 @@ func (c *Configuration) Validate() error {
 }
 
 func (c *Configuration) validateService() error {
+	if err := c.validateServiceName(); err != nil {
+		return err
+	}
+
+	if err := c.validateServiceDomain(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+//nolint:cyclop // Validation function has inherent complexity from multiple checks
+func (c *Configuration) validateServiceName() error {
 	if strings.TrimSpace(c.Service.Name) == "" {
 		return &errors.ValidationError{
 			Field:   "service.name",
@@ -121,10 +135,14 @@ func (c *Configuration) validateService() error {
 		}
 	}
 
+	return nil
+}
+
+func (c *Configuration) validateServiceDomain() error {
 	// Validate domain format if provided
 	if c.Service.Domain != "" {
 		domain := strings.TrimSpace(c.Service.Domain)
-		if len(domain) == 0 {
+		if domain == "" {
 			return &errors.ValidationError{
 				Field:   "service.domain",
 				Value:   c.Service.Domain,

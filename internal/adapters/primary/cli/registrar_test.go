@@ -1,4 +1,4 @@
-package cli
+package cli_test
 
 import (
 	"context"
@@ -9,15 +9,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sufield/ephemos/internal/adapters/primary/cli"
 	"github.com/sufield/ephemos/internal/adapters/secondary/config"
 	corerrors "github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
-// Helper function to create a test configuration provider with pre-loaded configs
+// Helper function to create a test configuration provider with pre-loaded configs.
 func createTestConfigProvider() *config.InMemoryProvider {
 	provider := config.NewInMemoryProvider()
-	
+
 	// Set up some test configurations
 	provider.SetConfiguration("valid.yaml", createValidTestConfig())
 	provider.SetConfiguration("invalid-name.yaml", &ports.Configuration{
@@ -33,11 +34,11 @@ func createTestConfigProvider() *config.InMemoryProvider {
 		},
 	})
 	provider.SetConfiguration("test.yaml", createValidTestConfig())
-	
+
 	return provider
 }
 
-// Helper function to create a provider that returns errors
+// Helper function to create a provider that returns errors.
 type errorProvider struct {
 	*config.InMemoryProvider
 	errorOnPath string
@@ -47,17 +48,21 @@ func (e *errorProvider) LoadConfiguration(ctx context.Context, path string) (*po
 	if path == e.errorOnPath {
 		return nil, fmt.Errorf("simulated error for path: %s", path)
 	}
-	return e.InMemoryProvider.LoadConfiguration(ctx, path)
+	config, err := e.InMemoryProvider.LoadConfiguration(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("configuration load failed: %w", err)
+	}
+	return config, nil
 }
 
 func createErrorProvider() *errorProvider {
 	return &errorProvider{
 		InMemoryProvider: config.NewInMemoryProvider(),
-		errorOnPath:     "error.yaml",
+		errorOnPath:      "error.yaml",
 	}
 }
 
-// Helper function to create a valid test configuration
+// Helper function to create a valid test configuration.
 func createValidTestConfig() *ports.Configuration {
 	return &ports.Configuration{
 		Service: ports.ServiceConfig{
@@ -76,7 +81,7 @@ func TestNewRegistrar(t *testing.T) {
 	tests := []struct {
 		name           string
 		configProvider ports.ConfigurationProvider
-		config         *RegistrarConfig
+		config         *cli.RegistrarConfig
 		expectedSocket string
 		expectedServer string
 	}{
@@ -90,7 +95,7 @@ func TestNewRegistrar(t *testing.T) {
 		{
 			name:           "custom config",
 			configProvider: configProvider,
-			config: &RegistrarConfig{
+			config: &cli.RegistrarConfig{
 				SPIRESocketPath: "/custom/socket.sock",
 				SPIREServerPath: "/custom/spire-server",
 			},
@@ -100,7 +105,7 @@ func TestNewRegistrar(t *testing.T) {
 		{
 			name:           "partial config",
 			configProvider: configProvider,
-			config: &RegistrarConfig{
+			config: &cli.RegistrarConfig{
 				SPIRESocketPath: "/custom/socket.sock",
 			},
 			expectedSocket: "/custom/socket.sock",
@@ -110,22 +115,22 @@ func TestNewRegistrar(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			registrar := NewRegistrar(tt.configProvider, tt.config)
+			registrar := cli.NewRegistrar(tt.configProvider, tt.config)
 
 			if registrar == nil {
-				t.Fatal("NewRegistrar() returned nil")
+				t.Fatal("cli.NewRegistrar() returned nil")
 			}
 
-			if registrar.configProvider != tt.configProvider {
+			if registrar.GetConfigProvider() != tt.configProvider {
 				t.Error("ConfigProvider not set correctly")
 			}
 
-			if registrar.spireSocketPath != tt.expectedSocket {
-				t.Errorf("spireSocketPath = %v, want %v", registrar.spireSocketPath, tt.expectedSocket)
+			if registrar.GetSPIRESocketPath() != tt.expectedSocket {
+				t.Errorf("spireSocketPath = %v, want %v", registrar.GetSPIRESocketPath(), tt.expectedSocket)
 			}
 
-			if registrar.spireServerPath != tt.expectedServer {
-				t.Errorf("spireServerPath = %v, want %v", registrar.spireServerPath, tt.expectedServer)
+			if registrar.GetSPIREServerPath() != tt.expectedServer {
+				t.Errorf("spireServerPath = %v, want %v", registrar.GetSPIREServerPath(), tt.expectedServer)
 			}
 		})
 	}
@@ -137,10 +142,10 @@ func TestNewRegistrar_EnvironmentVariable(t *testing.T) {
 	t.Setenv("SPIRE_SOCKET_PATH", testSocket)
 
 	configProvider := createTestConfigProvider()
-	registrar := NewRegistrar(configProvider, nil)
+	registrar := cli.NewRegistrar(configProvider, nil)
 
-	if registrar.spireSocketPath != testSocket {
-		t.Errorf("spireSocketPath = %v, want %v", registrar.spireSocketPath, testSocket)
+	if registrar.GetSPIRESocketPath() != testSocket {
+		t.Errorf("spireSocketPath = %v, want %v", registrar.GetSPIRESocketPath(), testSocket)
 	}
 }
 
@@ -207,11 +212,11 @@ func TestRegistrar_RegisterService(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := &RegistrarConfig{
+			config := &cli.RegistrarConfig{
 				SPIREServerPath: "echo", // Use echo instead of spire-server for testing
 				Logger:          slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
 			}
-			registrar := NewRegistrar(tt.configProvider, config)
+			registrar := cli.NewRegistrar(tt.configProvider, config)
 
 			ctx := t.Context()
 			err := registrar.RegisterService(ctx, tt.configPath)
@@ -243,12 +248,9 @@ func TestRegistrar_RegisterService(t *testing.T) {
 
 func TestRegistrar_getServiceSelector(t *testing.T) {
 	configProvider := createTestConfigProvider()
-	registrar := NewRegistrar(configProvider, nil)
+	registrar := cli.NewRegistrar(configProvider, nil)
 
-	selector, err := registrar.getServiceSelector()
-	if err != nil {
-		t.Fatalf("getServiceSelector() error = %v", err)
-	}
+	selector := registrar.GetServiceSelector()
 
 	expectedPrefix := "unix:uid:"
 	if !strings.HasPrefix(selector, expectedPrefix) {
@@ -315,11 +317,11 @@ func TestRegistrar_validateConfig(t *testing.T) {
 	}
 
 	configProvider := createTestConfigProvider()
-	registrar := NewRegistrar(configProvider, nil)
+	registrar := cli.NewRegistrar(configProvider, nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := registrar.validateConfig(tt.config)
+			err := registrar.ValidateConfig(tt.config)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validateConfig() error = %v, wantErr %v", err, tt.wantErr)
@@ -339,18 +341,18 @@ func TestRegistrar_validateConfig(t *testing.T) {
 func TestRegistrar_createSPIREEntry(t *testing.T) {
 	// Use echo command as a stand-in for spire-server
 	// This tests that the command construction and execution work correctly
-	config := &RegistrarConfig{
+	config := &cli.RegistrarConfig{
 		SPIREServerPath: "echo", // Use echo to test command construction
 		SPIRESocketPath: "/tmp/test.sock",
 		Logger:          slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
 	}
-	registrar := NewRegistrar(createTestConfigProvider(), config)
+	registrar := cli.NewRegistrar(createTestConfigProvider(), config)
 
 	testConfig := createValidTestConfig()
 	ctx := t.Context()
 
 	// This will succeed because echo always succeeds, so we test the success path
-	err := registrar.createSPIREEntry(ctx, testConfig)
+	err := registrar.CreateSPIREEntry(ctx, testConfig)
 
 	// Echo command succeeds, so this should not error
 	// The real validation is for SPIRE server response parsing, not command execution
@@ -364,7 +366,7 @@ func TestRegistrar_createSPIREEntry(t *testing.T) {
 
 func TestRegistrar_EdgeCases(t *testing.T) {
 	configProvider := createTestConfigProvider()
-	registrar := NewRegistrar(configProvider, nil)
+	registrar := cli.NewRegistrar(configProvider, nil)
 
 	// Test with hyphenated service name
 	hyphenatedConfig := &ports.Configuration{
@@ -373,7 +375,7 @@ func TestRegistrar_EdgeCases(t *testing.T) {
 			Domain: "example.org",
 		},
 	}
-	if err := registrar.validateConfig(hyphenatedConfig); err != nil {
+	if err := registrar.ValidateConfig(hyphenatedConfig); err != nil {
 		t.Errorf("validateConfig() should accept hyphenated names, got error: %v", err)
 	}
 
@@ -384,7 +386,7 @@ func TestRegistrar_EdgeCases(t *testing.T) {
 			Domain: "123.example.org",
 		},
 	}
-	if err := registrar.validateConfig(numericDomainConfig); err != nil {
+	if err := registrar.ValidateConfig(numericDomainConfig); err != nil {
 		t.Errorf("validateConfig() should accept numeric domains, got error: %v", err)
 	}
 }
@@ -396,13 +398,13 @@ func TestRegistrar_Integration(t *testing.T) {
 	configProvider := createTestConfigProvider()
 	configProvider.SetConfiguration("test.yaml", config)
 
-	registrarConfig := &RegistrarConfig{
+	registrarConfig := &cli.RegistrarConfig{
 		SPIREServerPath: "echo", // Use echo as a safe command for testing
 		SPIRESocketPath: "/tmp/test.sock",
 		Logger:          slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
 	}
 
-	registrar := NewRegistrar(configProvider, registrarConfig)
+	registrar := cli.NewRegistrar(configProvider, registrarConfig)
 
 	ctx := t.Context()
 
@@ -426,7 +428,7 @@ func TestRegistrar_ErrorHandling(t *testing.T) {
 		name         string
 		config       *ports.Configuration
 		expectedType error
-		setupFunc    func(*Registrar)
+		setupFunc    func(*cli.Registrar)
 	}{
 		{
 			name: "invalid service name characters",
@@ -454,8 +456,8 @@ func TestRegistrar_ErrorHandling(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			configProvider := createTestConfigProvider()
 			configProvider.SetConfiguration("test-config.yaml", tt.config)
-			
-			registrar := NewRegistrar(configProvider, &RegistrarConfig{
+
+			registrar := cli.NewRegistrar(configProvider, &cli.RegistrarConfig{
 				SPIREServerPath: "echo",
 				Logger:          slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
 			})
@@ -472,14 +474,18 @@ func TestRegistrar_ErrorHandling(t *testing.T) {
 				return
 			}
 
+			// Check for expected error type using errors.As
+			var validationErr *corerrors.ValidationError
+			var domainErr *corerrors.DomainError
+
+			// Check for expected error type using errors.As
+			//nolint:errorlint // We're checking the expected type template, not the actual error
 			switch tt.expectedType.(type) {
 			case *corerrors.ValidationError:
-				var validationErr *corerrors.ValidationError
 				if !errors.As(err, &validationErr) {
 					t.Errorf("Expected ValidationError, got %T: %v", err, err)
 				}
 			case *corerrors.DomainError:
-				var domainErr *corerrors.DomainError
 				if !errors.As(err, &domainErr) {
 					t.Errorf("Expected DomainError, got %T: %v", err, err)
 				}
@@ -488,12 +494,12 @@ func TestRegistrar_ErrorHandling(t *testing.T) {
 	}
 }
 
-// Benchmark tests using real implementations
+// Benchmark tests using real implementations.
 func BenchmarkRegistrar_RegisterService(b *testing.B) {
 	configProvider := createTestConfigProvider()
-	registrar := NewRegistrar(configProvider, nil)
+	registrar := cli.NewRegistrar(configProvider, nil)
 
-	ctx := context.Background()
+	ctx := b.Context()
 	for i := 0; i < b.N; i++ {
 		_ = registrar.RegisterService(ctx, "valid.yaml")
 	}
@@ -501,19 +507,19 @@ func BenchmarkRegistrar_RegisterService(b *testing.B) {
 
 func BenchmarkRegistrar_validateConfig(b *testing.B) {
 	configProvider := createTestConfigProvider()
-	registrar := NewRegistrar(configProvider, nil)
+	registrar := cli.NewRegistrar(configProvider, nil)
 	config := createValidTestConfig()
 
 	for i := 0; i < b.N; i++ {
-		_ = registrar.validateConfig(config)
+		_ = registrar.ValidateConfig(config)
 	}
 }
 
 func BenchmarkRegistrar_getServiceSelector(b *testing.B) {
 	configProvider := createTestConfigProvider()
-	registrar := NewRegistrar(configProvider, nil)
+	registrar := cli.NewRegistrar(configProvider, nil)
 
 	for i := 0; i < b.N; i++ {
-		_, _ = registrar.getServiceSelector()
+		_ = registrar.GetServiceSelector()
 	}
 }

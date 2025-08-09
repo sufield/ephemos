@@ -1,3 +1,4 @@
+// Package api provides high-level client and server APIs for secure SPIFFE-based communication.
 package api
 
 import (
@@ -16,25 +17,27 @@ import (
 	"google.golang.org/grpc"
 )
 
+// IdentityClient provides a high-level API for connecting to SPIFFE-secured services.
 type IdentityClient struct {
 	identityService *services.IdentityService
 	connection      services.ClientConnection
 	mu              sync.Mutex
 }
 
-func NewIdentityClient(configPath string) (*IdentityClient, error) {
-	configProvider := config.NewConfigProvider()
+// NewIdentityClient creates a new IdentityClient with the given configuration file path.
+func NewIdentityClient(ctx context.Context, configPath string) (*IdentityClient, error) {
+	configProvider := config.NewFileProvider()
 
 	var cfg *ports.Configuration
 	var err error
 
 	if configPath != "" {
-		cfg, err = configProvider.LoadConfiguration(context.Background(), configPath)
+		cfg, err = configProvider.LoadConfiguration(ctx, configPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load configuration: %w", err)
 		}
 	} else {
-		cfg = configProvider.GetDefaultConfiguration(context.Background())
+		cfg = configProvider.GetDefaultConfiguration(ctx)
 		if cfg == nil {
 			return nil, &errors.ValidationError{
 				Field:   "configuration",
@@ -44,12 +47,12 @@ func NewIdentityClient(configPath string) (*IdentityClient, error) {
 		}
 	}
 
-	spiffeProvider, err := spiffe.NewSPIFFEProvider(cfg.SPIFFE)
+	spiffeProvider, err := spiffe.NewProvider(cfg.SPIFFE)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SPIFFE provider: %w", err)
 	}
 
-	transportProvider := transport.NewGRPCTransportProvider(spiffeProvider)
+	transportProvider := transport.NewGRPCProvider(spiffeProvider)
 
 	identityService, err := services.NewIdentityService(
 		spiffeProvider,
@@ -65,6 +68,7 @@ func NewIdentityClient(configPath string) (*IdentityClient, error) {
 	}, nil
 }
 
+// Connect establishes a secure connection to a remote service using SPIFFE identities.
 func (c *IdentityClient) Connect(ctx context.Context, serviceName, address string) (*ClientConnection, error) {
 	// Input validation
 	if ctx == nil {
@@ -123,6 +127,7 @@ func (c *IdentityClient) Connect(ctx context.Context, serviceName, address strin
 	return &ClientConnection{conn: grpcConn}, nil
 }
 
+// Close cleans up the client resources and closes any connections.
 func (c *IdentityClient) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -136,10 +141,12 @@ func (c *IdentityClient) Close() error {
 	return nil
 }
 
+// ClientConnection represents a secure client connection to a remote service.
 type ClientConnection struct {
 	conn *grpc.ClientConn
 }
 
+// Close terminates the client connection and cleans up resources.
 func (c *ClientConnection) Close() error {
 	if c.conn == nil {
 		return nil // Safe to call Close on nil connection
@@ -150,6 +157,7 @@ func (c *ClientConnection) Close() error {
 	return nil
 }
 
+// GetClientConnection returns the underlying gRPC client connection.
 func (c *ClientConnection) GetClientConnection() *grpc.ClientConn {
 	return c.conn
 }

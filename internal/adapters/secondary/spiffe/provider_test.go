@@ -1,12 +1,13 @@
-package spiffe
+package spiffe_test
 
 import (
 	"testing"
 
+	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
-func TestNewSPIFFEProvider(t *testing.T) {
+func TestNewProvider(t *testing.T) {
 	tests := []struct {
 		name    string
 		config  *ports.SPIFFEConfig
@@ -35,13 +36,13 @@ func TestNewSPIFFEProvider(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			provider, err := NewSPIFFEProvider(tt.config)
+			provider, err := spiffe.NewProvider(tt.config)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewSPIFFEProvider() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("spiffe.NewProvider() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && provider == nil {
-				t.Error("NewSPIFFEProvider() returned nil provider")
+				t.Error("spiffe.NewProvider() returned nil provider")
 			}
 		})
 	}
@@ -76,14 +77,14 @@ func TestSPIFFEProvider_SocketPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			provider, err := NewSPIFFEProvider(tt.config)
+			provider, err := spiffe.NewProvider(tt.config)
 			if err != nil {
-				t.Errorf("NewSPIFFEProvider() error = %v", err)
+				t.Errorf("spiffe.NewProvider() error = %v", err)
 				return
 			}
 
-			if provider.socketPath != tt.expectPath {
-				t.Errorf("socketPath = %v, want %v", provider.socketPath, tt.expectPath)
+			if provider.GetSocketPath() != tt.expectPath {
+				t.Errorf("socketPath = %v, want %v", provider.GetSocketPath(), tt.expectPath)
 			}
 		})
 	}
@@ -91,11 +92,11 @@ func TestSPIFFEProvider_SocketPath(t *testing.T) {
 
 func TestSPIFFEProvider_Close(t *testing.T) {
 	// Test that Close doesn't panic when called on an uninitialized provider
-	provider, err := NewSPIFFEProvider(&ports.SPIFFEConfig{
+	provider, err := spiffe.NewProvider(&ports.SPIFFEConfig{
 		SocketPath: "/tmp/spire-agent/public/api.sock",
 	})
 	if err != nil {
-		t.Fatalf("NewSPIFFEProvider() failed: %v", err)
+		t.Fatalf("spiffe.NewProvider() failed: %v", err)
 	}
 
 	// Close should not panic and should be safe to call multiple times
@@ -112,11 +113,11 @@ func TestSPIFFEProvider_Close(t *testing.T) {
 }
 
 func TestSPIFFEProvider_GetX509Source(t *testing.T) {
-	provider, err := NewSPIFFEProvider(&ports.SPIFFEConfig{
+	provider, err := spiffe.NewProvider(&ports.SPIFFEConfig{
 		SocketPath: "/tmp/spire-agent/public/api.sock",
 	})
 	if err != nil {
-		t.Fatalf("NewSPIFFEProvider() failed: %v", err)
+		t.Fatalf("spiffe.NewProvider() failed: %v", err)
 	}
 
 	// Should return nil before any SPIRE operations
@@ -165,26 +166,26 @@ func TestSPIFFEProvider_SocketPathValidation(t *testing.T) {
 				SocketPath: tt.socketPath,
 			}
 
-			provider, err := NewSPIFFEProvider(config)
+			provider, err := spiffe.NewProvider(config)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewSPIFFEProvider() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("spiffe.NewProvider() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			if !tt.wantErr && provider == nil {
-				t.Error("NewSPIFFEProvider() returned nil provider for valid config")
+				t.Error("spiffe.NewProvider() returned nil provider for valid config")
 			}
 		})
 	}
 }
 
-func BenchmarkNewSPIFFEProvider(b *testing.B) {
+func BenchmarkNewProvider(b *testing.B) {
 	config := &ports.SPIFFEConfig{
 		SocketPath: "/tmp/spire-agent/public/api.sock",
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		provider, err := NewSPIFFEProvider(config)
+		provider, err := spiffe.NewProvider(config)
 		if err == nil && provider != nil {
 			provider.Close()
 		}

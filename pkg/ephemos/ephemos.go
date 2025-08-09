@@ -49,7 +49,7 @@ type GenericServiceRegistrar struct {
 //
 // Parameters:
 //   - registerFunc: A function that registers your service with the gRPC server.
-//                  This is typically just calling your generated Register*Server function.
+//     This is typically just calling your generated Register*Server function.
 //
 // Example:
 //
@@ -179,7 +179,7 @@ func NewIdentityServer(ctx context.Context, configPath string) (Server, error) {
 		return nil, fmt.Errorf("invalid config path: %w", err)
 	}
 
-	server, err := api.NewIdentityServer(validConfigPath)
+	server, err := api.NewIdentityServer(ctx, validConfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity server: %w", err)
 	}
@@ -222,7 +222,7 @@ func NewIdentityClient(ctx context.Context, configPath string) (Client, error) {
 		return nil, fmt.Errorf("invalid config path: %w", err)
 	}
 
-	client, err := api.NewIdentityClient(validConfigPath)
+	client, err := api.NewIdentityClient(ctx, validConfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity client: %w", err)
 	}
