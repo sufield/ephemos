@@ -59,7 +59,7 @@ func (s *TestService) TestMethod(ctx context.Context, req *TestRequest) (*TestRe
 	s.mu.Unlock()
 
 	if shouldFail {
-		return nil, status.Error(failCode, "simulated failure")
+		return nil, fmt.Errorf("test service failure: %w", status.Error(failCode, "simulated failure"))
 	}
 
 	return &TestResponse{

@@ -144,7 +144,10 @@ func (c *ClientConnection) Close() error {
 	if c.conn == nil {
 		return nil // Safe to call Close on nil connection
 	}
-	return c.conn.Close()
+	if err := c.conn.Close(); err != nil {
+		return fmt.Errorf("failed to close client connection: %w", err)
+	}
+	return nil
 }
 
 func (c *ClientConnection) GetClientConnection() *grpc.ClientConn {

@@ -28,7 +28,7 @@ proto:
 	echo "Protobuf generation completed!"
 
 # Build example applications
-examples:
+examples: proto
 	echo "Building example applications..."
 	mkdir -p bin
 	go build -v -o bin/$(SERVER_BINARY) ./examples/echo-server

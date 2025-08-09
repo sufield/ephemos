@@ -112,7 +112,10 @@ func (s *IdentityServer) Serve(ctx context.Context, listener net.Listener) error
 	s.mu.Unlock()
 
 	slog.Info("Server ready", "service", s.serviceName, "address", listener.Addr().String())
-	return s.grpcServer.Serve(listener)
+	if err := s.grpcServer.Serve(listener); err != nil {
+		return fmt.Errorf("failed to serve gRPC server: %w", err)
+	}
+	return nil
 }
 
 func (s *IdentityServer) Close() error {

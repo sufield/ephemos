@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -14,7 +16,10 @@ Use this CLI to register services, manage identities, and configure authenticati
 }
 
 func Execute() error {
-	return rootCmd.Execute()
+	if err := rootCmd.Execute(); err != nil {
+		return fmt.Errorf("failed to execute command: %w", err)
+	}
+	return nil
 }
 
 func init() {

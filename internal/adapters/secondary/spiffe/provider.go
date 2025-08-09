@@ -123,7 +123,9 @@ func (p *SPIFFEProvider) GetX509Source() *workloadapi.X509Source {
 
 func (p *SPIFFEProvider) Close() error {
 	if p.x509Source != nil {
-		return p.x509Source.Close()
+		if err := p.x509Source.Close(); err != nil {
+			return fmt.Errorf("failed to close X509 source: %w", err)
+		}
 	}
 	return nil
 }
