@@ -99,6 +99,10 @@ spire-agent.conf
 # Generated protobuf files
 *.pb.go
 
+# Demo logs and PIDs
+scripts/demo/*.log
+scripts/demo/*.pid
+
 # Docker
 .dockerignore
 

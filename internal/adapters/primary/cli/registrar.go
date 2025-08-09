@@ -201,15 +201,12 @@ func (r *Registrar) createSPIREEntry(ctx context.Context, cfg *ports.Configurati
 }
 
 // getServiceSelector determines the service selector for SPIRE
-// For service-to-service authentication, we use path-based selectors
+// For demo purposes, we use unix:uid selector (running as current user)
+// In production, use more specific selectors like k8s:pod-label or unix:path
 func (r *Registrar) getServiceSelector() (string, error) {
-	// Get the current executable path for the selector
-	execPath, err := os.Executable()
-	if err != nil {
-		return "", fmt.Errorf("failed to get executable path: %w", err)
-	}
-	
-	// Use the executable path as the selector for service identification
-	return fmt.Sprintf("unix:path:%s", execPath), nil
+	// For demo, use unix:uid selector with current user
+	// This works when services run as the same user
+	uid := os.Getuid()
+	return fmt.Sprintf("unix:uid:%d", uid), nil
 }
 

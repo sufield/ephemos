@@ -1,7 +1,20 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR="$(dirname "$0")"
+
+# Clean up PIDs on exit
+trap 'rm -f "$SCRIPT_DIR/spire-server.pid" "$SCRIPT_DIR/spire-agent.pid" || true' EXIT
+
 echo "Starting SPIRE services..."
+
+# Kill any existing SPIRE processes to free up ports
+echo "Cleaning up any existing SPIRE processes..."
+sudo pkill -f spire-server 2>/dev/null || true
+sudo pkill -f spire-agent 2>/dev/null || true
+sudo pkill -f echo-server 2>/dev/null || true
+pkill -f echo-server 2>/dev/null || true
+sleep 2
 
 # Generate upstream CA if it doesn't exist
 if [ ! -f /opt/spire/data/upstream_ca.key ]; then
@@ -11,17 +24,32 @@ if [ ! -f /opt/spire/data/upstream_ca.key ]; then
         -subj "/C=US/ST=CA/L=SF/O=Example/CN=upstream-ca" 2>/dev/null
 fi
 
-# Start SPIRE server
+# Start SPIRE server and capture logs
 echo "Starting SPIRE server..."
-sudo systemctl start spire-server
+sudo systemctl stop spire-server 2>/dev/null || true
+sudo spire-server run -config /opt/spire/conf/server.conf > "$SCRIPT_DIR/spire-server.log" 2>&1 &
+SERVER_PID=$!
+echo "SPIRE Server PID: $SERVER_PID"
 sleep 3
 
 # Check if server is running
-if ! sudo systemctl is-active --quiet spire-server; then
-    echo "Error: SPIRE server failed to start"
-    sudo journalctl -u spire-server -n 20
+if ! kill -0 $SERVER_PID 2>/dev/null; then
+    echo "Error: SPIRE server failed to start. Log:"
+    cat "$SCRIPT_DIR/spire-server.log"
     exit 1
 fi
+
+# Show startup log
+echo "SPIRE Server startup log:"
+cat "$SCRIPT_DIR/spire-server.log" | head -5 | sed 's/^/[SPIRE-SERVER] /'
+
+# Run health check and append to log
+if ! sudo spire-server healthcheck -socketPath /tmp/spire-server/private/api.sock >> "$SCRIPT_DIR/spire-server.log" 2>&1; then
+    echo "Error: SPIRE server health check failed"
+    cat "$SCRIPT_DIR/spire-server.log"
+    exit 1
+fi
+echo "✓ SPIRE Server health check passed"
 
 # Generate join token for agent
 echo "Generating join token..."
@@ -29,24 +57,45 @@ TOKEN=$(sudo spire-server token generate -spiffeID spiffe://example.org/spire-ag
 
 # Configure agent with join token
 echo "Configuring agent with join token..."
-sudo spire-agent run -config /opt/spire/conf/agent.conf -joinToken $TOKEN &
-AGENT_PID=$!
+sudo spire-agent run -config /opt/spire/conf/agent.conf -joinToken $TOKEN > /dev/null 2>&1 &
+TEMP_AGENT_PID=$!
 sleep 3
 
 # Kill the temporary agent process
-kill $AGENT_PID 2>/dev/null || true
+kill $TEMP_AGENT_PID 2>/dev/null || true
 
-# Start SPIRE agent via systemd
+# Start SPIRE agent and capture logs
 echo "Starting SPIRE agent..."
-sudo systemctl start spire-agent
+sudo systemctl stop spire-agent 2>/dev/null || true
+sudo spire-agent run -config /opt/spire/conf/agent.conf > "$SCRIPT_DIR/spire-agent.log" 2>&1 &
+AGENT_PID=$!
+echo "SPIRE Agent PID: $AGENT_PID"
 sleep 2
 
 # Check if agent is running
-if ! sudo systemctl is-active --quiet spire-agent; then
-    echo "Error: SPIRE agent failed to start"
-    sudo journalctl -u spire-agent -n 20
+if ! kill -0 $AGENT_PID 2>/dev/null; then
+    echo "Error: SPIRE agent failed to start. Log:"
+    cat "$SCRIPT_DIR/spire-agent.log"
     exit 1
 fi
+
+# Show startup log
+echo "SPIRE Agent startup log:"
+cat "$SCRIPT_DIR/spire-agent.log" | head -5 | sed 's/^/[SPIRE-AGENT] /'
+
+# Run health check and append to log
+if ! sudo spire-agent healthcheck -socketPath /tmp/spire-agent/public/api.sock >> "$SCRIPT_DIR/spire-agent.log" 2>&1; then
+    echo "Error: SPIRE agent health check failed"
+    cat "$SCRIPT_DIR/spire-agent.log"
+    exit 1
+fi
+echo "✓ SPIRE Agent health check passed"
+
+# Configure socket permissions for non-root access
+echo "Configuring socket permissions..."
+sudo chown :$(id -g) /tmp/spire-agent/public/api.sock
+sudo chmod 770 /tmp/spire-agent/public/api.sock
+echo "✓ Socket permissions configured for user access"
 
 # Create initial node entry
 echo "Creating node entry..."
@@ -59,11 +108,16 @@ sudo spire-server entry create \
 echo ""
 echo "SPIRE services started successfully!"
 echo ""
-echo "SPIRE Server Status:"
-sudo systemctl status spire-server --no-pager | head -n 3
+echo "SPIRE Server PID: $SERVER_PID (running in background)"
+echo "SPIRE Agent PID: $AGENT_PID (running in background)"
 echo ""
-echo "SPIRE Agent Status:"
-sudo systemctl status spire-agent --no-pager | head -n 3
+echo "Log files created:"
+echo "  - spire-server.log"
+echo "  - spire-agent.log"
 echo ""
 echo "To register services, run:"
 echo "  ./setup-demo.sh"
+
+# Export PIDs for cleanup later
+echo "$SERVER_PID" > "$SCRIPT_DIR/spire-server.pid"
+echo "$AGENT_PID" > "$SCRIPT_DIR/spire-agent.pid"

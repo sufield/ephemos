@@ -41,7 +41,7 @@ test:
 	go test -v ./...
 	echo "Tests completed!"
 
-# Run complete demo
+# Run complete demo with output capture
 demo: proto build examples
 	@echo "Running Ephemos demo..."
 	@echo "========================"
@@ -55,10 +55,23 @@ demo: proto build examples
 	@echo "Step 3: Setting up demo services..."
 	@cd scripts/demo && ./setup-demo.sh
 	@echo ""
-	@echo "Step 4: Running demo..."
-	@cd scripts/demo && ./run-demo.sh
+	@echo "Step 4: Running demo with client-server interactions..."
+	@echo "-------------------------------------------------------"
+	@cd scripts/demo && ./run-demo.sh | tee demo.log || { echo "Demo failed! Check scripts/demo/*.log for details"; exit 1; }
 	@echo ""
-	@echo "Demo completed!"
+	@echo "==============================================="
+	@echo "SPIRE Infrastructure Logs:"
+	@echo "==============================================="
+	@if [ -f scripts/demo/spire-server.log ]; then echo "SPIRE SERVER LOG:"; cat scripts/demo/spire-server.log | sed 's/^/[SPIRE-SERVER] /'; fi
+	@if [ -f scripts/demo/spire-agent.log ]; then echo ""; echo "SPIRE AGENT LOG:"; cat scripts/demo/spire-agent.log | sed 's/^/[SPIRE-AGENT] /'; fi
+	@echo ""
+	@echo "==============================================="
+	@echo "Application Interaction Logs:"
+	@echo "==============================================="
+	@if [ -f scripts/demo/client.log ]; then echo "CLIENT LOG:"; cat scripts/demo/client.log; fi
+	@if [ -f scripts/demo/server.log ]; then echo ""; echo "SERVER LOG:"; cat scripts/demo/server.log; fi
+	@echo ""
+	@echo "Demo completed successfully!"
 
 # Force reinstall SPIRE and run demo
 demo-force: SPIRE_ARGS=--force
@@ -73,6 +86,8 @@ clean:
 	echo "Cleaning build artifacts..."
 	rm -rf bin/
 	rm -f $(GO_OUT)/*.pb.go
+	rm -f scripts/demo/*.log scripts/demo/*.pid
+	rm -f demo.log
 	echo "Clean completed!"
 
 # Install all prerequisites for Ubuntu 24
