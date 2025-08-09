@@ -23,10 +23,10 @@ bin/
 *.exe
 *.test
 *.out
-echo-server
-echo-client
-ephemos
-ephemos-cli
+/echo-server
+/echo-client
+/ephemos
+/ephemos-cli
 
 # IDE and editor files
 .vscode/

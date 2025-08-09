@@ -191,10 +191,12 @@ make clean
 ## Requirements
 
 ### System Requirements
-- Go 1.24.5 or later
-- Protocol Buffers compiler (protoc)
+- **Go 1.23 or later** (Go 1.24.5+ recommended)
+- Protocol Buffers compiler (protoc) 
 - Ubuntu 24 (for demo scripts)
 - SPIRE 1.8+ (automatically installed by demo)
+
+**Note**: Go versions 1.22 and earlier are not supported due to missing standard library packages (`slices`, `maps`, `log/slog`, `math/rand/v2`).
 
 ### Installing Protocol Buffers Compiler
 

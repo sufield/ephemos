@@ -43,7 +43,7 @@ You'll create two services that communicate securely:
 
 ## Prerequisites
 
-- **Go 1.21+**: `go version` should show 1.21 or later
+- **Go 1.23+**: `go version` should show 1.23 or later
 - **Docker**: For running SPIRE infrastructure
 - **Basic gRPC knowledge**: Understanding of protocol buffers and gRPC
 
