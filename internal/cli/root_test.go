@@ -49,7 +49,7 @@ func TestRootCmd(t *testing.T) {
 				Long: `Ephemos provides identity-based authentication for backend services using SPIFFE/SPIRE.
 Use this CLI to register services, manage identities, and configure authentication policies.`,
 			}
-			
+
 			// Add the register command to match the real structure
 			cmd.AddCommand(&cobra.Command{
 				Use:   "register",
@@ -79,11 +79,11 @@ Use this CLI to register services, manage identities, and configure authenticati
 func TestExecute(t *testing.T) {
 	// Test the actual Execute function
 	// Note: This will use the global rootCmd which has side effects
-	
+
 	// We can't easily test Execute() in isolation because it uses the global rootCmd
 	// and os.Args. In a real implementation, you might want to refactor this to be
 	// more testable by accepting arguments as parameters.
-	
+
 	// For now, we just test that Execute doesn't panic
 	defer func() {
 		if r := recover(); r != nil {
@@ -159,7 +159,7 @@ func TestRootCmdFlags(t *testing.T) {
 	// Test that the command can parse flags without error
 	args := []string{"--help"}
 	rootCmd.SetArgs(args)
-	
+
 	// Capture output to avoid printing during test
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)

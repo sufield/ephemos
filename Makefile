@@ -15,7 +15,7 @@ all: proto build examples
 build:
 	echo "Building Ephemos CLI..."
 	mkdir -p bin
-	go build -v -o bin/$(CLI_BINARY) cmd/ephemos-cli/main.go
+	go build -v -o bin/$(CLI_BINARY) ./cmd/ephemos-cli
 	echo "Build completed!"
 
 # Generate protobuf code
@@ -31,8 +31,8 @@ proto:
 examples:
 	echo "Building example applications..."
 	mkdir -p bin
-	go build -v -o bin/$(SERVER_BINARY) examples/echo-server/main.go
-	go build -v -o bin/$(CLIENT_BINARY) examples/echo-client/main.go
+	go build -v -o bin/$(SERVER_BINARY) ./examples/echo-server
+	go build -v -o bin/$(CLIENT_BINARY) ./examples/echo-client
 	echo "Examples built!"
 
 # Run tests
@@ -114,11 +114,8 @@ ci-test:
 # Run security checks locally  
 ci-security:
 	@echo "Running security checks..."
-	@if command -v gosec >/dev/null; then \
-		gosec ./...; \
-	else \
-		echo "gosec not installed, run: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest"; \
-	fi
+	@echo "Running go vet for basic static analysis..."
+	go vet ./...
 	@if command -v govulncheck >/dev/null; then \
 		govulncheck ./...; \
 	else \

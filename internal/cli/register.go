@@ -6,17 +6,17 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/spf13/cobra"
 	"github.com/sufield/ephemos/internal/adapters/primary/cli"
 	"github.com/sufield/ephemos/internal/adapters/secondary/config"
 	"github.com/sufield/ephemos/internal/core/ports"
-	"github.com/spf13/cobra"
 )
 
 var (
-	configFile   string
-	serviceName  string
+	configFile    string
+	serviceName   string
 	serviceDomain string
-	selector     string
+	selector      string
 )
 
 var registerCmd = &cobra.Command{
@@ -45,10 +45,10 @@ func init() {
 
 func runRegister(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
-	
+
 	// Create configuration
 	var cfg *ports.Configuration
-	
+
 	if configFile != "" {
 		// Load from config file
 		configProvider := config.NewConfigProvider()
@@ -65,47 +65,47 @@ func runRegister(cmd *cobra.Command, args []string) error {
 				Domain: serviceDomain,
 			},
 		}
-		
+
 		// Save to temporary config file for the registrar
 		tempFile, err := os.CreateTemp("", "ephemos-*.yaml")
 		if err != nil {
 			return fmt.Errorf("failed to create temp config: %w", err)
 		}
 		defer os.Remove(tempFile.Name())
-		
+
 		// Write config to temp file
 		configContent := fmt.Sprintf(`service:
   name: %s
   domain: %s
 `, serviceName, serviceDomain)
-		
+
 		if _, err := tempFile.WriteString(configContent); err != nil {
 			return fmt.Errorf("failed to write temp config: %w", err)
 		}
 		tempFile.Close()
-		
+
 		configFile = tempFile.Name()
 	} else {
 		return fmt.Errorf("either --config or --name must be provided")
 	}
-	
+
 	// Create registrar
 	registrarConfig := &cli.RegistrarConfig{
 		SPIRESocketPath: os.Getenv("SPIRE_SOCKET_PATH"),
 		Logger:          slog.Default(),
 	}
-	
+
 	configProvider := config.NewConfigProvider()
 	registrar := cli.NewRegistrar(configProvider, registrarConfig)
-	
+
 	// Register the service
 	if err := registrar.RegisterService(ctx, configFile); err != nil {
 		return fmt.Errorf("registration failed: %w", err)
 	}
-	
+
 	fmt.Printf("Successfully registered service '%s' in domain '%s'\n", cfg.Service.Name, cfg.Service.Domain)
 	fmt.Printf("SPIFFE ID: spiffe://%s/%s\n", cfg.Service.Domain, cfg.Service.Name)
-	
+
 	if selector != "" {
 		fmt.Printf("Selector: %s\n", selector)
 	} else {
@@ -116,6 +116,6 @@ func runRegister(cmd *cobra.Command, args []string) error {
 			fmt.Printf("Selector: (auto-determined)\n")
 		}
 	}
-	
+
 	return nil
 }

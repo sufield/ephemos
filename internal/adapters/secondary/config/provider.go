@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	
+
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
 	yaml "gopkg.in/yaml.v3"
@@ -26,31 +26,31 @@ func (p *ConfigProvider) LoadConfiguration(ctx context.Context, path string) (*p
 			Message: "configuration file path cannot be empty or whitespace",
 		}
 	}
-	
+
 	// Check for context cancellation
 	if ctx != nil {
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("configuration loading cancelled: %w", ctx.Err())
+			return nil, fmt.Errorf("configuration loading canceled: %w", ctx.Err())
 		default:
 		}
 	}
-	
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
 	}
-	
+
 	var config ports.Configuration
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse config file %s: %w", path, err)
 	}
-	
+
 	// Validate the loaded configuration
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration in file %s: %w", path, err)
 	}
-	
+
 	return &config, nil
 }
 
@@ -63,7 +63,7 @@ func (p *ConfigProvider) GetDefaultConfiguration(ctx context.Context) *ports.Con
 		default:
 		}
 	}
-	
+
 	return &ports.Configuration{
 		Service: ports.ServiceConfig{
 			Name:   "ephemos-service", // Default service name

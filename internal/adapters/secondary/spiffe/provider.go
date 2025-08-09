@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sufield/ephemos/internal/core/domain"
-	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
+	"github.com/sufield/ephemos/internal/core/domain"
+	"github.com/sufield/ephemos/internal/core/ports"
 )
 
 type SPIFFEProvider struct {
@@ -24,7 +24,7 @@ func NewSPIFFEProvider(config *ports.SPIFFEConfig) (*SPIFFEProvider, error) {
 			socketPath: "/tmp/spire-agent/public/api.sock",
 		}, nil
 	}
-	
+
 	return &SPIFFEProvider{
 		socketPath: config.SocketPath,
 	}, nil

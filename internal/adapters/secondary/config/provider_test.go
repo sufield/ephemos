@@ -48,19 +48,21 @@ func TestConfigProvider_LoadConfiguration(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to create temp dir: %v", err)
 				}
-				
+
 				configPath := filepath.Join(tmpDir, "config.yaml")
 				configContent := `
+service:
+  name: "test-service"
+  domain: "example.com"
+
 spiffe:
-  domain: "test.example.com"
   socket_path: "/tmp/spire-agent/public/api.sock"
-  trust_domain: "example.com"
 `
 				err = os.WriteFile(configPath, []byte(configContent), 0644)
 				if err != nil {
 					t.Fatalf("Failed to write config file: %v", err)
 				}
-				
+
 				return configPath, func() { os.RemoveAll(tmpDir) }
 			},
 		},
@@ -72,14 +74,14 @@ spiffe:
 				if err != nil {
 					t.Fatalf("Failed to create temp dir: %v", err)
 				}
-				
+
 				configPath := filepath.Join(tmpDir, "config.yaml")
 				invalidContent := `invalid: yaml: content: [[[`
 				err = os.WriteFile(configPath, []byte(invalidContent), 0644)
 				if err != nil {
 					t.Fatalf("Failed to write config file: %v", err)
 				}
-				
+
 				return configPath, func() { os.RemoveAll(tmpDir) }
 			},
 		},
@@ -89,7 +91,7 @@ spiffe:
 		t.Run(tt.name, func(t *testing.T) {
 			var configPath string
 			var cleanup func()
-			
+
 			if tt.setup != nil {
 				configPath, cleanup = tt.setup()
 				defer cleanup()
@@ -143,7 +145,7 @@ func TestConfigProvider_GetDefaultConfiguration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := provider.GetDefaultConfiguration(tt.ctx)
-			
+
 			// Default configuration should be returned even with nil context
 			if config == nil {
 				t.Error("GetDefaultConfiguration() returned nil")

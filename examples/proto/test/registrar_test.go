@@ -49,7 +49,7 @@ func TestEchoServiceRegistrar_Register(t *testing.T) {
 
 	// Test with nil server in registrar
 	nilRegistrar := proto.NewEchoServiceRegistrar(nil)
-	
+
 	// This test checks that Register doesn't panic with nil server
 	// The actual gRPC registration may fail, but the registrar should handle it gracefully
 	defer func() {
@@ -95,7 +95,7 @@ func TestEchoServiceRegistrar_Integration(t *testing.T) {
 func TestServiceRegistrarInterface(t *testing.T) {
 	// This test ensures that EchoServiceRegistrar implements the expected interface
 	var registrar interface{} = proto.NewEchoServiceRegistrar(&MockEchoServer{})
-	
+
 	// Check if it has the Register method with correct signature
 	if r, ok := registrar.(interface{ Register(*grpc.Server) }); !ok {
 		t.Error("EchoServiceRegistrar does not implement Register(*grpc.Server) method")
@@ -103,7 +103,7 @@ func TestServiceRegistrarInterface(t *testing.T) {
 		// Verify we can call Register without panic
 		grpcServer := grpc.NewServer()
 		defer grpcServer.Stop()
-		
+
 		defer func() {
 			if recover() != nil {
 				t.Error("Register method panicked")
@@ -116,7 +116,7 @@ func TestServiceRegistrarInterface(t *testing.T) {
 func BenchmarkEchoServiceRegistrar_Register(b *testing.B) {
 	mockServer := &MockEchoServer{}
 	registrar := proto.NewEchoServiceRegistrar(mockServer)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		grpcServer := grpc.NewServer()

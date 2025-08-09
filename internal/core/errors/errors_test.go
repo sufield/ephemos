@@ -145,7 +145,7 @@ func TestNewDomainError(t *testing.T) {
 		Code:    code,
 		Message: message,
 	}
-	
+
 	resultErr := NewDomainError(baseDomainError, err)
 	domainErr := resultErr.(*DomainError)
 
@@ -241,15 +241,15 @@ func TestErrorTypes(t *testing.T) {
 func TestErrorChaining(t *testing.T) {
 	// Test chaining multiple errors
 	level1Err := errors.New("level 1 error")
-	
+
 	level2Base := &DomainError{
 		Code:    "LEVEL2",
 		Message: "Level 2 error",
 	}
 	level2Err := NewDomainError(level2Base, level1Err)
-	
+
 	level3Base := &DomainError{
-		Code:    "LEVEL3", 
+		Code:    "LEVEL3",
 		Message: "Level 3 error",
 	}
 	level3Err := NewDomainError(level3Base, level2Err)
@@ -338,7 +338,7 @@ func TestErrorInterface(t *testing.T) {
 	if validationErr.Error() == "" {
 		t.Error("ValidationError should have non-empty error message")
 	}
-	
+
 	// Test that both can be assigned to error interface
 	var err error
 	err = domainErr

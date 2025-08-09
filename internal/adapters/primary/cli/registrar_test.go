@@ -116,13 +116,9 @@ func TestNewRegistrar(t *testing.T) {
 }
 
 func TestNewRegistrar_EnvironmentVariables(t *testing.T) {
-	// Save original environment
-	originalSocket := os.Getenv("SPIRE_SOCKET_PATH")
-	defer os.Setenv("SPIRE_SOCKET_PATH", originalSocket)
-
 	// Set environment variable
 	testSocket := "/env/test/socket.sock"
-	os.Setenv("SPIRE_SOCKET_PATH", testSocket)
+	t.Setenv("SPIRE_SOCKET_PATH", testSocket)
 
 	mockProvider := &mockConfigProvider{}
 	registrar := NewRegistrar(mockProvider, nil)
@@ -354,7 +350,7 @@ func TestRegistrar_createSPIREEntry(t *testing.T) {
 
 	// This will succeed because echo always succeeds, so we test the success path
 	err := registrar.createSPIREEntry(ctx, testConfig)
-	
+
 	// Echo command succeeds, so this should not error
 	// The real validation is for SPIRE server response parsing, not command execution
 	if err != nil {
@@ -391,13 +387,13 @@ func TestRegistrar_getServiceSelector(t *testing.T) {
 		t.Error("getServiceSelector() returned empty selector")
 	}
 
-	if !strings.HasPrefix(selector, "unix:path:") {
-		t.Errorf("Expected selector to start with 'unix:path:', got: %v", selector)
+	if !strings.HasPrefix(selector, "unix:uid:") {
+		t.Errorf("Expected selector to start with 'unix:uid:', got: %v", selector)
 	}
 
-	// The selector should contain a path to an executable
-	if !strings.Contains(selector, "/") {
-		t.Errorf("Expected selector to contain a file path, got: %v", selector)
+	// The selector should contain a numeric UID
+	if !strings.ContainsAny(selector, "0123456789") {
+		t.Errorf("Expected selector to contain a numeric UID, got: %v", selector)
 	}
 }
 
@@ -415,10 +411,10 @@ func TestRegistrar_Integration(t *testing.T) {
 	registrar := NewRegistrar(mockProvider, registrarConfig)
 
 	ctx := context.Background()
-	
+
 	// This may succeed or fail depending on how echo responds to the arguments
 	err := registrar.RegisterService(ctx, "test.yaml")
-	
+
 	// Echo command may succeed, so we just log the result
 	if err != nil {
 		t.Logf("Got expected behavior with echo command: %v", err)
@@ -547,13 +543,13 @@ func TestRegistrar_ServiceNameValidation(t *testing.T) {
 
 	invalidNames := []string{
 		"",
-		"-service",      // starts with hyphen
-		"service-",      // ends with hyphen
-		"service_name",  // contains underscore
-		"service name",  // contains space
-		"service!",      // contains special character
+		"-service",       // starts with hyphen
+		"service-",       // ends with hyphen
+		"service_name",   // contains underscore
+		"service name",   // contains space
+		"service!",       // contains special character
 		"service@domain", // contains @ symbol
-		"service.name",  // contains dot
+		"service.name",   // contains dot
 		// Note: "service--name" is actually valid per the regex
 	}
 
@@ -606,17 +602,17 @@ func TestRegistrar_DomainValidation(t *testing.T) {
 		"sub.domain.example.org",
 		"123.example.org",
 		"example123.org",
-		"localhost",     // Actually valid per the regex
-		"example..org",  // Actually valid per the regex (allows consecutive dots)
+		"localhost",    // Actually valid per the regex
+		"example..org", // Actually valid per the regex (allows consecutive dots)
 	}
 
 	invalidDomains := []string{
 		"",
-		".example.org",  // starts with dot
-		"example.org.",  // ends with dot
-		"exam ple.org",  // contains space
-		"example.o!rg",  // contains special character
-		"example@org",   // contains @ symbol
+		".example.org", // starts with dot
+		"example.org.", // ends with dot
+		"exam ple.org", // contains space
+		"example.o!rg", // contains special character
+		"example@org",  // contains @ symbol
 	}
 
 	// Test valid domains

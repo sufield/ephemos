@@ -27,37 +27,37 @@ var (
 		Code:    "INVALID_SERVICE_NAME",
 		Message: "service name is invalid",
 	}
-	
+
 	ErrInvalidDomain = &DomainError{
 		Code:    "INVALID_DOMAIN",
 		Message: "domain is invalid",
 	}
-	
+
 	ErrMissingConfiguration = &DomainError{
 		Code:    "MISSING_CONFIGURATION",
 		Message: "required configuration is missing",
 	}
-	
+
 	ErrSPIFFERegistration = &DomainError{
 		Code:    "SPIFFE_REGISTRATION_FAILED",
 		Message: "failed to register service with SPIFFE",
 	}
-	
+
 	ErrInvalidSocketPath = &DomainError{
 		Code:    "INVALID_SOCKET_PATH",
 		Message: "SPIFFE socket path is invalid",
 	}
-	
+
 	ErrCertificateUnavailable = &DomainError{
 		Code:    "CERTIFICATE_UNAVAILABLE",
 		Message: "certificate is not available",
 	}
-	
+
 	ErrTrustBundleUnavailable = &DomainError{
 		Code:    "TRUST_BUNDLE_UNAVAILABLE",
 		Message: "trust bundle is not available",
 	}
-	
+
 	ErrConnectionFailed = &DomainError{
 		Code:    "CONNECTION_FAILED",
 		Message: "failed to establish connection",

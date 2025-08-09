@@ -7,9 +7,9 @@ import (
 
 func TestConfiguration_Validate(t *testing.T) {
 	tests := []struct {
-		name   string
-		config *Configuration
-		wantErr bool
+		name          string
+		config        *Configuration
+		wantErr       bool
 		errorContains string
 	}{
 		{
@@ -20,7 +20,7 @@ func TestConfiguration_Validate(t *testing.T) {
 					Domain: "example.com",
 				},
 				SPIFFE: &SPIFFEConfig{
-					SocketPath:  "/tmp/spire-agent/public/api.sock",
+					SocketPath: "/tmp/spire-agent/public/api.sock",
 				},
 			},
 			wantErr: false,
@@ -30,10 +30,10 @@ func TestConfiguration_Validate(t *testing.T) {
 			config: &Configuration{
 				Service: ServiceConfig{}, // Empty service config to test validation
 				SPIFFE: &SPIFFEConfig{
-					SocketPath:  "/tmp/spire-agent/public/api.sock",
+					SocketPath: "/tmp/spire-agent/public/api.sock",
 				},
 			},
-			wantErr: true,
+			wantErr:       true,
 			errorContains: "service name is required",
 		},
 		{
@@ -45,7 +45,7 @@ func TestConfiguration_Validate(t *testing.T) {
 				},
 				SPIFFE: nil,
 			},
-			wantErr: false, // SPIFFE config is optional
+			wantErr:       false, // SPIFFE config is optional
 			errorContains: "",
 		},
 		{
@@ -56,10 +56,10 @@ func TestConfiguration_Validate(t *testing.T) {
 					Domain: "example.com",
 				},
 				SPIFFE: &SPIFFEConfig{
-					SocketPath:  "/tmp/spire-agent/public/api.sock",
+					SocketPath: "/tmp/spire-agent/public/api.sock",
 				},
 			},
-			wantErr: true,
+			wantErr:       true,
 			errorContains: "service name is required",
 		},
 		{
@@ -70,10 +70,10 @@ func TestConfiguration_Validate(t *testing.T) {
 					Domain: "",
 				},
 				SPIFFE: &SPIFFEConfig{
-					SocketPath:  "/tmp/spire-agent/public/api.sock",
+					SocketPath: "/tmp/spire-agent/public/api.sock",
 				},
 			},
-			wantErr: false, // Domain is optional
+			wantErr:       false, // Domain is optional
 			errorContains: "",
 		},
 		{
@@ -84,10 +84,10 @@ func TestConfiguration_Validate(t *testing.T) {
 					Domain: "example.com",
 				},
 				SPIFFE: &SPIFFEConfig{
-					SocketPath:  "/tmp/spire-agent/public/api.sock",
+					SocketPath: "/tmp/spire-agent/public/api.sock",
 				},
 			},
-			wantErr: true,
+			wantErr:       true,
 			errorContains: "service name is required",
 		},
 		{
@@ -98,10 +98,10 @@ func TestConfiguration_Validate(t *testing.T) {
 					Domain: "example.com",
 				},
 				SPIFFE: &SPIFFEConfig{
-					SocketPath:  "",
+					SocketPath: "",
 				},
 			},
-			wantErr: true,
+			wantErr:       true,
 			errorContains: "socket path is required",
 		},
 	}
@@ -125,8 +125,8 @@ func TestConfiguration_Validate(t *testing.T) {
 
 func TestServiceConfig_Validate(t *testing.T) {
 	tests := []struct {
-		name   string
-		config ServiceConfig
+		name    string
+		config  ServiceConfig
 		wantErr bool
 	}{
 		{
@@ -187,28 +187,28 @@ func TestServiceConfig_Validate(t *testing.T) {
 
 func TestSPIFFEConfig_Validate(t *testing.T) {
 	tests := []struct {
-		name   string
-		config *SPIFFEConfig
+		name    string
+		config  *SPIFFEConfig
 		wantErr bool
 	}{
 		{
 			name: "valid config",
 			config: &SPIFFEConfig{
-				SocketPath:  "/tmp/spire-agent/public/api.sock",
+				SocketPath: "/tmp/spire-agent/public/api.sock",
 			},
 			wantErr: false,
 		},
 		{
 			name: "empty socket path",
 			config: &SPIFFEConfig{
-				SocketPath:  "",
+				SocketPath: "",
 			},
 			wantErr: true,
 		},
 		{
 			name: "whitespace socket path",
 			config: &SPIFFEConfig{
-				SocketPath:  "  /tmp/spire-agent/public/api.sock  ",
+				SocketPath: "  /tmp/spire-agent/public/api.sock  ",
 			},
 			wantErr: false, // Should be trimmed and valid
 		},
@@ -239,7 +239,7 @@ func TestConfiguration_DefaultValues(t *testing.T) {
 			Domain: "example.com",
 		},
 		SPIFFE: &SPIFFEConfig{
-			SocketPath:  "/tmp/spire-agent/public/api.sock",
+			SocketPath: "/tmp/spire-agent/public/api.sock",
 		},
 	}
 
@@ -252,8 +252,8 @@ func TestConfiguration_DefaultValues(t *testing.T) {
 func TestConfiguration_EdgeCases(t *testing.T) {
 	// Test edge cases and boundary conditions
 	tests := []struct {
-		name   string
-		config *Configuration
+		name    string
+		config  *Configuration
 		wantErr bool
 	}{
 		{
@@ -264,7 +264,7 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 					Domain: "example.com",
 				},
 				SPIFFE: &SPIFFEConfig{
-					SocketPath:  "/tmp/spire-agent/public/api.sock",
+					SocketPath: "/tmp/spire-agent/public/api.sock",
 				},
 			},
 			wantErr: false, // Should be valid unless there's a length limit
@@ -277,7 +277,7 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 					Domain: "example.com",
 				},
 				SPIFFE: &SPIFFEConfig{
-					SocketPath:  "/tmp/spire-agent/public/api.sock",
+					SocketPath: "/tmp/spire-agent/public/api.sock",
 				},
 			},
 			wantErr: true, // Unicode not allowed in service names
@@ -290,7 +290,7 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 					Domain: "example.com",
 				},
 				SPIFFE: &SPIFFEConfig{
-					SocketPath:  "/tmp/spire-agent/public/api.sock?query=1",
+					SocketPath: "/tmp/spire-agent/public/api.sock?query=1",
 				},
 			},
 			wantErr: false, // Path validation may vary
@@ -314,7 +314,7 @@ func BenchmarkConfiguration_Validate(b *testing.B) {
 			Domain: "example.com",
 		},
 		SPIFFE: &SPIFFEConfig{
-			SocketPath:  "/tmp/spire-agent/public/api.sock",
+			SocketPath: "/tmp/spire-agent/public/api.sock",
 		},
 	}
 

@@ -61,8 +61,8 @@ func TestNewClient(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "nil factory",
-			conn: &grpc.ClientConn{}, // This is just for testing - normally would be a real connection
+			name:    "nil factory",
+			conn:    &grpc.ClientConn{}, // This is just for testing - normally would be a real connection
 			factory: nil,
 			wantErr: true,
 		},

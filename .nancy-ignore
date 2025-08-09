@@ -1,6 +1,0 @@
-# Nancy ignore file for acceptable vulnerabilities
-# Format: CVE-YYYY-NNNN until YYYY-MM-DD
-
-# Example entries (remove if not applicable):
-# CVE-2021-44716 until 2024-12-31  # net/http: limit growth of header canonicalization cache
-# CVE-2022-27664 until 2024-12-31  # net/http: handle server errors after sending GOAWAY

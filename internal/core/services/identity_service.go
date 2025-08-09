@@ -39,17 +39,17 @@ func NewIdentityService(
 			Message: "configuration cannot be nil",
 		}
 	}
-	
+
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
-	
+
 	// Create and validate identity during initialization
 	identity := domain.NewServiceIdentity(config.Service.Name, config.Service.Domain)
 	if err := identity.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid service identity: %w", err)
 	}
-	
+
 	return &IdentityService{
 		identityProvider:  identityProvider,
 		transportProvider: transportProvider,
@@ -69,7 +69,7 @@ func (s *IdentityService) CreateServerIdentity(ctx context.Context) (*grpc.Serve
 			Message: "context cannot be nil",
 		}
 	}
-	
+
 	s.mu.RLock()
 	identity := s.cachedIdentity
 	config := s.config
@@ -109,7 +109,7 @@ func (s *IdentityService) CreateClientIdentity(ctx context.Context) (ClientConne
 			Message: "context cannot be nil",
 		}
 	}
-	
+
 	s.mu.RLock()
 	identity := s.cachedIdentity
 	config := s.config
@@ -141,7 +141,6 @@ func (s *IdentityService) CreateClientIdentity(ctx context.Context) (ClientConne
 	}, nil
 }
 
-
 // ClientConnection represents a client connection with identity-based authentication.
 // It provides secure connection establishment to servers with automatic certificate validation.
 type ClientConnection interface {
@@ -167,7 +166,7 @@ func (c *clientConnection) Connect(ctx context.Context, serviceName, address str
 			Message: "context cannot be nil",
 		}
 	}
-	
+
 	if strings.TrimSpace(serviceName) == "" {
 		return nil, &errors.ValidationError{
 			Field:   "serviceName",
@@ -175,7 +174,7 @@ func (c *clientConnection) Connect(ctx context.Context, serviceName, address str
 			Message: "service name cannot be empty or whitespace",
 		}
 	}
-	
+
 	if strings.TrimSpace(address) == "" {
 		return nil, &errors.ValidationError{
 			Field:   "address",
@@ -183,7 +182,7 @@ func (c *clientConnection) Connect(ctx context.Context, serviceName, address str
 			Message: "address cannot be empty or whitespace",
 		}
 	}
-	
+
 	// Validate address format
 	if _, _, err := net.SplitHostPort(address); err != nil {
 		return nil, &errors.ValidationError{
@@ -192,18 +191,18 @@ func (c *clientConnection) Connect(ctx context.Context, serviceName, address str
 			Message: "address must be in format 'host:port'",
 		}
 	}
-	
+
 	serviceName = strings.TrimSpace(serviceName)
 	address = strings.TrimSpace(address)
-	
+
 	// Thread-safe connection establishment
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	conn, err := grpc.NewClient(address, c.dialOption)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to service %s at %s: %w", serviceName, address, err)
 	}
-	
+
 	return conn, nil
 }

@@ -20,6 +20,7 @@ type Client[T any] struct {
 // The factory function should create a service-specific client from the connection.
 //
 // Example:
+//
 //	client, err := NewClient(conn, NewEchoServiceClient)
 //	if err != nil {
 //		return err
@@ -32,7 +33,7 @@ func NewClient[T any](conn *grpc.ClientConn, factory func(grpc.ClientConnInterfa
 	if factory == nil {
 		return nil, fmt.Errorf("client factory function cannot be nil")
 	}
-	
+
 	return &Client[T]{
 		client: factory(conn),
 		conn:   conn,
@@ -65,19 +66,20 @@ type EchoClient struct {
 // This demonstrates the recommended pattern for service-specific clients.
 //
 // Example:
+//
 //	echoClient, err := proto.NewEchoClient(conn)
 //	if err != nil {
 //		return err
 //	}
 //	defer echoClient.Close()
-//	
+//
 //	resp, err := echoClient.Echo(ctx, "Hello, World!")
 func NewEchoClient(conn *grpc.ClientConn) (*EchoClient, error) {
 	client, err := NewClient(conn, NewEchoServiceClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create echo client: %w", err)
 	}
-	
+
 	return &EchoClient{Client: client}, nil
 }
 
@@ -93,19 +95,19 @@ func (c *EchoClient) Echo(ctx context.Context, message string) (*EchoResponse, e
 	if ctx == nil {
 		return nil, fmt.Errorf("context cannot be nil")
 	}
-	
+
 	if c.Client == nil || c.client == nil {
 		return nil, fmt.Errorf("echo client not properly initialized")
 	}
-	
+
 	// Trim whitespace but allow empty messages for echo functionality
 	message = strings.TrimSpace(message)
-	
+
 	req := &EchoRequest{Message: message}
 	resp, err := c.client.Echo(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call Echo service: %w", err)
 	}
-	
+
 	return resp, nil
 }

@@ -14,9 +14,10 @@
 //   - Service selector management
 //
 // Usage:
-//   ephemos register --config config.yaml --selector unix:user:1000
-//   ephemos validate --config config.yaml
-//   ephemos health --config config.yaml --verbose
+//
+//	ephemos register --config config.yaml --selector unix:user:1000
+//	ephemos validate --config config.yaml
+//	ephemos health --config config.yaml --verbose
 //
 // The tool integrates with SPIRE infrastructure to provide streamlined
 // service identity management for microservices and distributed systems.

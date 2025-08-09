@@ -40,9 +40,9 @@ type TrustBundle struct {
 }
 
 type AuthenticationPolicy struct {
-	ServiceIdentity    *ServiceIdentity
-	AuthorizedClients  []string
-	TrustedServers     []string
+	ServiceIdentity   *ServiceIdentity
+	AuthorizedClients []string
+	TrustedServers    []string
 }
 
 func NewAuthenticationPolicy(identity *ServiceIdentity) *AuthenticationPolicy {

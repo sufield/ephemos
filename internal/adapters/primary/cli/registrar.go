@@ -9,16 +9,16 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
-	
+
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
-	"github.com/spiffe/go-spiffe/v2/spiffeid"
 )
 
 // RegistrarConfig holds configuration for the Registrar
 type RegistrarConfig struct {
 	SPIRESocketPath string
-	SPIREServerPath string  // Path to spire-server binary
+	SPIREServerPath string // Path to spire-server binary
 	Logger          *slog.Logger
 }
 
@@ -38,22 +38,22 @@ func NewRegistrar(
 	if config == nil {
 		config = &RegistrarConfig{}
 	}
-	
+
 	if config.SPIRESocketPath == "" {
 		config.SPIRESocketPath = os.Getenv("SPIRE_SOCKET_PATH")
 		if config.SPIRESocketPath == "" {
 			config.SPIRESocketPath = "/tmp/spire-server/private/api.sock"
 		}
 	}
-	
+
 	if config.SPIREServerPath == "" {
 		config.SPIREServerPath = "spire-server"
 	}
-	
+
 	if config.Logger == nil {
 		config.Logger = slog.Default()
 	}
-	
+
 	return &Registrar{
 		configProvider:  configProvider,
 		spireSocketPath: config.SPIRESocketPath,
@@ -65,28 +65,28 @@ func NewRegistrar(
 // RegisterService registers a service with SPIRE based on its configuration
 func (r *Registrar) RegisterService(ctx context.Context, configPath string) error {
 	r.logger.Info("Starting service registration", "configPath", configPath)
-	
+
 	cfg, err := r.configProvider.LoadConfiguration(ctx, configPath)
 	if err != nil {
 		r.logger.Error("Failed to load configuration", "error", err)
 		return errors.NewDomainError(errors.ErrMissingConfiguration, err)
 	}
-	
+
 	if err := r.validateConfig(cfg); err != nil {
 		r.logger.Error("Invalid configuration", "error", err)
 		return err
 	}
-	
+
 	// Create SPIRE registration entry
 	if err := r.createSPIREEntry(ctx, cfg); err != nil {
 		r.logger.Error("Failed to create SPIRE entry", "error", err)
 		return errors.NewDomainError(errors.ErrSPIFFERegistration, err)
 	}
-	
-	r.logger.Info("Service registration completed successfully", 
+
+	r.logger.Info("Service registration completed successfully",
 		"service", cfg.Service.Name,
 		"domain", cfg.Service.Domain)
-	
+
 	return nil
 }
 
@@ -100,7 +100,7 @@ func (r *Registrar) validateConfig(cfg *ports.Configuration) error {
 			Message: "service name is required",
 		}
 	}
-	
+
 	// Validate service name format (alphanumeric with hyphens)
 	validName := regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$`)
 	if !validName.MatchString(cfg.Service.Name) {
@@ -110,7 +110,7 @@ func (r *Registrar) validateConfig(cfg *ports.Configuration) error {
 			Message: "service name must be alphanumeric with optional hyphens",
 		}
 	}
-	
+
 	// Validate domain
 	if cfg.Service.Domain == "" {
 		return &errors.ValidationError{
@@ -119,7 +119,7 @@ func (r *Registrar) validateConfig(cfg *ports.Configuration) error {
 			Message: "service domain is required",
 		}
 	}
-	
+
 	// Validate domain format (basic DNS name validation)
 	validDomain := regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-\.]*[a-zA-Z0-9])?$`)
 	if !validDomain.MatchString(cfg.Service.Domain) {
@@ -129,7 +129,7 @@ func (r *Registrar) validateConfig(cfg *ports.Configuration) error {
 			Message: "service domain must be a valid DNS name",
 		}
 	}
-	
+
 	return nil
 }
 
@@ -143,24 +143,24 @@ func (r *Registrar) createSPIREEntry(ctx context.Context, cfg *ports.Configurati
 	if err != nil {
 		return fmt.Errorf("failed to parse SPIFFE ID: %w", err)
 	}
-	
+
 	parentID, err := spiffeid.FromString(fmt.Sprintf("spiffe://%s/spire-agent", cfg.Service.Domain))
 	if err != nil {
 		return fmt.Errorf("failed to parse parent ID: %w", err)
 	}
-	
+
 	// Get service selector
 	selector, err := r.getServiceSelector()
 	if err != nil {
 		return fmt.Errorf("failed to determine service selector: %w", err)
 	}
-	
+
 	r.logger.Debug("Creating SPIRE entry",
 		"spiffeID", spiffeID.String(),
 		"parentID", parentID.String(),
 		"selector", selector,
 		"socketPath", r.spireSocketPath)
-	
+
 	// Use spire-server CLI command
 	// In production, use the SPIRE Server API directly
 	cmd := exec.CommandContext(ctx, r.spireServerPath, "entry", "create",
@@ -170,33 +170,33 @@ func (r *Registrar) createSPIREEntry(ctx context.Context, cfg *ports.Configurati
 		"-selector", selector,
 		"-ttl", "3600",
 	)
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		outputStr := string(output)
-		
+
 		// Check if entry already exists (not an error)
 		if strings.Contains(outputStr, "already exists") {
 			r.logger.Info("Registration entry already exists", "service", cfg.Service.Name)
 			return nil
 		}
-		
+
 		// Check for specific error conditions
 		if strings.Contains(outputStr, "permission denied") {
 			return fmt.Errorf("permission denied: ensure you have access to SPIRE socket at %s", r.spireSocketPath)
 		}
-		
+
 		if strings.Contains(outputStr, "connection refused") || strings.Contains(outputStr, "no such file") {
 			return fmt.Errorf("SPIRE server not running or not accessible at %s", r.spireSocketPath)
 		}
-		
+
 		return fmt.Errorf("SPIRE registration failed: %w\nOutput: %s", err, outputStr)
 	}
-	
-	r.logger.Info("Created SPIRE registration entry", 
+
+	r.logger.Info("Created SPIRE registration entry",
 		"service", cfg.Service.Name,
 		"output", string(output))
-	
+
 	return nil
 }
 
@@ -209,4 +209,3 @@ func (r *Registrar) getServiceSelector() (string, error) {
 	uid := os.Getuid()
 	return fmt.Sprintf("unix:uid:%d", uid), nil
 }
-

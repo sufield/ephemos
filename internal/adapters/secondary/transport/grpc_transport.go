@@ -3,10 +3,10 @@ package transport
 import (
 	"context"
 	"fmt"
-	
-	"github.com/sufield/ephemos/internal/core/domain"
-	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
+
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
+	"github.com/sufield/ephemos/internal/core/domain"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -31,16 +31,16 @@ func (p *GRPCTransportProvider) CreateServerTransport(
 	if source == nil {
 		return nil, fmt.Errorf("X509 source not initialized")
 	}
-	
+
 	tlsConfig := tlsconfig.MTLSServerConfig(source, source, tlsconfig.AuthorizeAny())
-	
+
 	creds := credentials.NewTLS(tlsConfig)
-	
+
 	opts := []grpc.ServerOption{
 		grpc.Creds(creds),
 		grpc.UnaryInterceptor(p.createAuthInterceptor(policy)),
 	}
-	
+
 	return grpc.NewServer(opts...), nil
 }
 
@@ -54,12 +54,12 @@ func (p *GRPCTransportProvider) CreateClientTransport(
 	if source == nil {
 		return nil, fmt.Errorf("X509 source not initialized")
 	}
-	
+
 	tlsConfig := tlsconfig.MTLSClientConfig(source, source, tlsconfig.AuthorizeAny())
 	tlsConfig.ServerName = ""
-	
+
 	creds := credentials.NewTLS(tlsConfig)
-	
+
 	return grpc.WithTransportCredentials(creds), nil
 }
 
@@ -68,4 +68,3 @@ func (p *GRPCTransportProvider) createAuthInterceptor(policy *domain.Authenticat
 		return handler(ctx, req)
 	}
 }
-

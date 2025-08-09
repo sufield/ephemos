@@ -8,8 +8,8 @@ import (
 
 func TestNewSPIFFEProvider(t *testing.T) {
 	tests := []struct {
-		name   string
-		config *ports.SPIFFEConfig
+		name    string
+		config  *ports.SPIFFEConfig
 		wantErr bool
 	}{
 		{
@@ -81,7 +81,7 @@ func TestSPIFFEProvider_SocketPath(t *testing.T) {
 				t.Errorf("NewSPIFFEProvider() error = %v", err)
 				return
 			}
-			
+
 			if provider.socketPath != tt.expectPath {
 				t.Errorf("socketPath = %v, want %v", provider.socketPath, tt.expectPath)
 			}
@@ -179,7 +179,7 @@ func TestSPIFFEProvider_SocketPathValidation(t *testing.T) {
 
 func BenchmarkNewSPIFFEProvider(b *testing.B) {
 	config := &ports.SPIFFEConfig{
-		SocketPath: "/tmp/spire-agent/public/api.sock", 
+		SocketPath: "/tmp/spire-agent/public/api.sock",
 	}
 
 	b.ResetTimer()

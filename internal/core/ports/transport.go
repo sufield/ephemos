@@ -17,7 +17,7 @@ type ServerTransport interface {
 	GetListener() interface{}
 }
 
-// ClientTransport represents a client-side transport  
+// ClientTransport represents a client-side transport
 type ClientTransport interface {
 	Connect() error
 	Close() error

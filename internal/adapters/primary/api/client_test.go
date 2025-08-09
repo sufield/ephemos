@@ -40,7 +40,7 @@ func TestIdentityClient_NewIdentityClient(t *testing.T) {
 func TestIdentityClient_Connect(t *testing.T) {
 	// Note: This is a basic test structure. In production, you would use mocks
 	// and dependency injection to test without actual SPIFFE infrastructure.
-	
+
 	tests := []struct {
 		name        string
 		serviceName string
@@ -85,7 +85,7 @@ func TestIdentityClient_Connect(t *testing.T) {
 			if tt.name == "nil context" {
 				ctx = nil
 			}
-			
+
 			_, err := client.Connect(ctx, tt.serviceName, tt.address)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Connect() error = %v, wantErr %v", err, tt.wantErr)

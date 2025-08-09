@@ -21,7 +21,7 @@ func TestIdentityServer_NewIdentityServer(t *testing.T) {
 			wantErr:    true, // Default config may not be valid without proper SPIFFE setup
 		},
 		{
-			name:       "invalid config path", 
+			name:       "invalid config path",
 			configPath: "/nonexistent/path",
 			wantErr:    true,
 		},
@@ -90,7 +90,7 @@ func TestIdentityServer_Serve(t *testing.T) {
 		}
 		defer lis.Close()
 
-		// Create a context that will be cancelled quickly
+		// Create a context that will be canceled quickly
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 

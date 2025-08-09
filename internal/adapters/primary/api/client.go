@@ -6,7 +6,7 @@ import (
 	"net"
 	"strings"
 	"sync"
-	
+
 	"github.com/sufield/ephemos/internal/adapters/secondary/config"
 	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
 	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
@@ -24,10 +24,10 @@ type IdentityClient struct {
 
 func NewIdentityClient(configPath string) (*IdentityClient, error) {
 	configProvider := config.NewConfigProvider()
-	
+
 	var cfg *ports.Configuration
 	var err error
-	
+
 	if configPath != "" {
 		cfg, err = configProvider.LoadConfiguration(context.Background(), configPath)
 		if err != nil {
@@ -43,14 +43,14 @@ func NewIdentityClient(configPath string) (*IdentityClient, error) {
 			}
 		}
 	}
-	
+
 	spiffeProvider, err := spiffe.NewSPIFFEProvider(cfg.SPIFFE)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SPIFFE provider: %w", err)
 	}
-	
+
 	transportProvider := transport.NewGRPCTransportProvider(spiffeProvider)
-	
+
 	identityService, err := services.NewIdentityService(
 		spiffeProvider,
 		transportProvider,
@@ -59,7 +59,7 @@ func NewIdentityClient(configPath string) (*IdentityClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity service: %w", err)
 	}
-	
+
 	return &IdentityClient{
 		identityService: identityService,
 	}, nil
@@ -74,7 +74,7 @@ func (c *IdentityClient) Connect(ctx context.Context, serviceName, address strin
 			Message: "context cannot be nil",
 		}
 	}
-	
+
 	if strings.TrimSpace(serviceName) == "" {
 		return nil, &errors.ValidationError{
 			Field:   "serviceName",
@@ -82,7 +82,7 @@ func (c *IdentityClient) Connect(ctx context.Context, serviceName, address strin
 			Message: "service name cannot be empty or whitespace",
 		}
 	}
-	
+
 	if strings.TrimSpace(address) == "" {
 		return nil, &errors.ValidationError{
 			Field:   "address",
@@ -90,7 +90,7 @@ func (c *IdentityClient) Connect(ctx context.Context, serviceName, address strin
 			Message: "address cannot be empty or whitespace",
 		}
 	}
-	
+
 	// Validate address format (host:port)
 	if _, _, err := net.SplitHostPort(address); err != nil {
 		return nil, &errors.ValidationError{
@@ -99,10 +99,10 @@ func (c *IdentityClient) Connect(ctx context.Context, serviceName, address strin
 			Message: "address must be in format 'host:port'",
 		}
 	}
-	
+
 	serviceName = strings.TrimSpace(serviceName)
 	address = strings.TrimSpace(address)
-	
+
 	// Thread-safe connection initialization
 	c.mu.Lock()
 	if c.connection == nil {
@@ -114,25 +114,25 @@ func (c *IdentityClient) Connect(ctx context.Context, serviceName, address strin
 		c.connection = conn
 	}
 	c.mu.Unlock()
-	
+
 	grpcConn, err := c.connection.Connect(ctx, serviceName, address)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to service %s at %s: %w", serviceName, address, err)
 	}
-	
+
 	return &ClientConnection{conn: grpcConn}, nil
 }
 
 func (c *IdentityClient) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if c.connection != nil {
 		// Close the underlying connection if it supports closing
 		// This is a safe no-op if the connection doesn't need explicit cleanup
 		c.connection = nil
 	}
-	
+
 	return nil
 }
 

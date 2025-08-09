@@ -19,6 +19,7 @@ type EchoServiceRegistrar struct {
 // with the actual business logic for the service.
 //
 // Example:
+//
 //	server := &MyEchoServer{} // implements EchoServiceServer
 //	registrar := proto.NewEchoServiceRegistrar(server)
 //	err := ephemosServer.RegisterService(ctx, registrar)
