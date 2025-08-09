@@ -1,0 +1,199 @@
+name: Security & Dependencies
+
+on:
+  schedule:
+    # Run daily at 1 AM UTC
+    - cron: '0 1 * * *'
+  push:
+    branches: [ main ]
+    paths:
+      - 'go.mod'
+      - 'go.sum'
+  workflow_dispatch:
+
+jobs:
+  # Dependency vulnerability scanning
+  vulnerability-scan:
+    name: Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Install govulncheck
+      run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      
+    - name: Run vulnerability check
+      run: govulncheck ./...
+      
+    - name: Install nancy
+      run: go install github.com/sonatypeoss/nancy@latest
+      
+    - name: Check dependencies with nancy
+      run: |
+        go list -json -deps ./... | nancy sleuth --exclude-vulnerability-file .nancy-ignore
+      continue-on-error: true
+
+  # License compliance check
+  license-check:
+    name: License Check
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Install go-licenses
+      run: go install github.com/google/go-licenses@latest
+      
+    - name: Check licenses
+      run: |
+        go-licenses check ./...
+        go-licenses report ./... > licenses.txt
+        
+    - name: Upload license report
+      uses: actions/upload-artifact@v3
+      with:
+        name: license-report
+        path: licenses.txt
+
+  # Dependency updates via Dependabot-like functionality
+  dependency-update:
+    name: Dependency Update Check
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Check for outdated dependencies
+      run: |
+        go list -u -m all > current-deps.txt
+        echo "## Dependency Status" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        cat current-deps.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        
+    - name: Try updating dependencies
+      run: |
+        go get -u ./...
+        go mod tidy
+        
+    - name: Check if updates are available
+      id: check-updates
+      run: |
+        if git diff --quiet go.mod go.sum; then
+          echo "updates=false" >> $GITHUB_OUTPUT
+        else
+          echo "updates=true" >> $GITHUB_OUTPUT
+          echo "## Available Updates" >> $GITHUB_STEP_SUMMARY
+          echo '```diff' >> $GITHUB_STEP_SUMMARY
+          git diff go.mod go.sum >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi
+        
+    - name: Create dependency update PR
+      if: steps.check-updates.outputs.updates == 'true'
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: 'chore: update Go dependencies'
+        title: 'chore: update Go dependencies'
+        body: |
+          Automated dependency updates detected.
+          
+          This PR updates Go modules to their latest versions.
+          
+          Please review the changes and ensure all tests pass before merging.
+        branch: chore/dependency-updates
+        delete-branch: true
+
+  # SAST (Static Application Security Testing)
+  sast-scan:
+    name: SAST Scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: go
+        
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Build for CodeQL
+      run: |
+        go build -v ./...
+        
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      
+    - name: Run Semgrep
+      uses: returntocorp/semgrep-action@v1
+      with:
+        config: >-
+          p/security-audit
+          p/secrets
+          p/owasp-top-ten
+          p/golang
+      env:
+        SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+      continue-on-error: true
+
+  # Supply chain security
+  supply-chain-security:
+    name: Supply Chain Security
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Install cyclonedx-gomod
+      run: go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+      
+    - name: Generate SBOM
+      run: |
+        cyclonedx-gomod mod -json -output sbom.json
+        
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v3
+      with:
+        name: sbom
+        path: sbom.json
+        
+    - name: Install osv-scanner
+      run: go install github.com/google/osv-scanner/cmd/osv-scanner@latest
+      
+    - name: Run OSV Scanner
+      run: osv-scanner --format json --output osv-results.json ./...
+      continue-on-error: true
+      
+    - name: Upload OSV results
+      uses: actions/upload-artifact@v3
+      with:
+        name: osv-scan-results
+        path: osv-results.json
+      if: always()

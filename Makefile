@@ -90,6 +90,49 @@ clean:
 	rm -f demo.log
 	echo "Clean completed!"
 
+# CI/CD targets
+.PHONY: ci-lint ci-test ci-security ci-build ci-all
+
+# Run linting checks locally
+ci-lint:
+	@echo "Running linting checks..."
+	go fmt ./...
+	go vet ./...
+	@if command -v golangci-lint >/dev/null; then \
+		golangci-lint run --config=.golangci.yml; \
+	else \
+		echo "golangci-lint not installed, run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v1.55.2"; \
+	fi
+
+# Run all tests locally
+ci-test:
+	@echo "Running tests..."
+	go test -race -coverprofile=coverage.out -covermode=atomic ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+# Run security checks locally  
+ci-security:
+	@echo "Running security checks..."
+	@if command -v gosec >/dev/null; then \
+		gosec ./...; \
+	else \
+		echo "gosec not installed, run: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest"; \
+	fi
+	@if command -v govulncheck >/dev/null; then \
+		govulncheck ./...; \
+	else \
+		echo "govulncheck not installed, run: go install golang.org/x/vuln/cmd/govulncheck@latest"; \
+	fi
+
+# Build all targets
+ci-build: build examples
+	@echo "All builds completed successfully!"
+
+# Run all CI checks locally
+ci-all: ci-lint ci-test ci-security ci-build
+	@echo "All CI checks completed successfully!"
+
 # Install all prerequisites for Ubuntu 24
 install-tools:
 	@echo "Installing all prerequisites for Ephemos on Ubuntu 24..."

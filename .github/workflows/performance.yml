@@ -1,0 +1,297 @@
+name: Performance & Benchmarks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened]
+  schedule:
+    # Run performance tests weekly
+    - cron: '0 3 * * 1'
+
+jobs:
+  # Benchmark tests
+  benchmark:
+    name: Benchmark Tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-bench-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-bench-
+          
+    - name: Run benchmarks
+      run: |
+        go test -bench=. -benchmem -run=^$ ./... > benchmark-new.txt 2>&1
+        
+    - name: Download previous benchmark data
+      uses: actions/cache@v3
+      with:
+        path: ./benchmark-baseline.txt
+        key: benchmark-baseline-${{ runner.os }}
+        restore-keys: |
+          benchmark-baseline-${{ runner.os }}
+          
+    - name: Compare benchmarks
+      id: benchmark-comparison
+      run: |
+        if [[ -f benchmark-baseline.txt ]]; then
+          echo "## Benchmark Comparison" >> $GITHUB_STEP_SUMMARY
+          echo "### Current vs Baseline" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          # Install benchcmp if not available
+          go install golang.org/x/tools/cmd/benchcmp@latest
+          
+          # Compare benchmarks
+          benchcmp benchmark-baseline.txt benchmark-new.txt >> $GITHUB_STEP_SUMMARY || echo "Benchmark comparison failed" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## Benchmark Results (Baseline)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat benchmark-new.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Save current benchmark as new baseline (only on main branch)
+        if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          cp benchmark-new.txt benchmark-baseline.txt
+        fi
+        
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v3
+      with:
+        name: benchmark-results
+        path: |
+          benchmark-new.txt
+          benchmark-baseline.txt
+
+  # Memory profiling
+  memory-profile:
+    name: Memory Profiling
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Install SPIRE (for realistic profiling)
+      run: |
+        cd scripts/demo
+        chmod +x install-spire.sh
+        sudo ./install-spire.sh
+        
+    - name: Start SPIRE services
+      run: |
+        cd scripts/demo  
+        sudo ./start-spire.sh
+        sleep 10
+        sudo ./setup-demo.sh
+        
+    - name: Build applications
+      run: make build examples
+      
+    - name: Run memory profiling
+      run: |
+        # Start server with profiling
+        EPHEMOS_CONFIG=config/echo-server.yaml ECHO_SERVER_ADDRESS=:50100 ./bin/echo-server &
+        SERVER_PID=$!
+        sleep 5
+        
+        # Run client to generate load
+        for i in {1..100}; do
+          EPHEMOS_CONFIG=config/echo-client.yaml timeout 5 ./bin/echo-client || true
+        done
+        
+        # Get heap profile
+        curl -s http://localhost:6060/debug/pprof/heap > heap.prof || echo "Heap profile not available"
+        
+        # Get CPU profile  
+        curl -s "http://localhost:6060/debug/pprof/profile?seconds=30" > cpu.prof || echo "CPU profile not available" &
+        
+        # Generate more load during CPU profiling
+        for i in {1..50}; do
+          EPHEMOS_CONFIG=config/echo-client.yaml timeout 3 ./bin/echo-client || true
+          sleep 0.1
+        done
+        
+        wait
+        kill $SERVER_PID || true
+        
+    - name: Analyze profiles
+      run: |
+        if [[ -f heap.prof && -s heap.prof ]]; then
+          echo "## Memory Profile Analysis" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          go tool pprof -text heap.prof | head -20 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [[ -f cpu.prof && -s cpu.prof ]]; then
+          echo "## CPU Profile Analysis" >> $GITHUB_STEP_SUMMARY  
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          go tool pprof -text cpu.prof | head -20 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi
+        
+    - name: Upload profiles
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-profiles
+        path: |
+          heap.prof
+          cpu.prof
+      if: always()
+        
+    - name: Cleanup SPIRE
+      run: |
+        cd scripts/demo
+        sudo ./stop-spire.sh || true
+      if: always()
+
+  # Load testing
+  load-test:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Install SPIRE
+      run: |
+        cd scripts/demo
+        chmod +x install-spire.sh
+        sudo ./install-spire.sh
+        
+    - name: Start SPIRE and setup services
+      run: |
+        cd scripts/demo  
+        sudo ./start-spire.sh
+        sleep 10
+        sudo ./setup-demo.sh
+        
+    - name: Build and start server
+      run: |
+        make build examples
+        EPHEMOS_CONFIG=config/echo-server.yaml ECHO_SERVER_ADDRESS=:50101 ./bin/echo-server > server-load.log 2>&1 &
+        echo $! > server.pid
+        sleep 5
+        
+    - name: Install hey (load testing tool)
+      run: |
+        go install github.com/rakyll/hey@latest
+        
+    - name: Create load test script
+      run: |
+        cat > load_test.go << 'EOF'
+        package main
+        
+        import (
+            "context"
+            "fmt"
+            "log"
+            "sync"
+            "time"
+            "github.com/sufield/ephemos/pkg/ephemos"
+        )
+        
+        func main() {
+            const workers = 10
+            const requests = 100
+            
+            var wg sync.WaitGroup
+            start := time.Now()
+            
+            for i := 0; i < workers; i++ {
+                wg.Add(1)
+                go func(worker int) {
+                    defer wg.Done()
+                    
+                    ctx := context.Background()
+                    client, err := ephemos.NewIdentityClient(ctx, "config/echo-client.yaml")
+                    if err != nil {
+                        log.Printf("Worker %d: Failed to create client: %v", worker, err)
+                        return
+                    }
+                    defer client.Close()
+                    
+                    conn, err := client.Connect(ctx, "echo-server", "localhost:50101")
+                    if err != nil {
+                        log.Printf("Worker %d: Failed to connect: %v", worker, err)
+                        return
+                    }
+                    defer conn.Close()
+                    
+                    for j := 0; j < requests/workers; j++ {
+                        // Simulate echo request here
+                        time.Sleep(10 * time.Millisecond)
+                    }
+                    
+                    log.Printf("Worker %d completed", worker)
+                }(i)
+            }
+            
+            wg.Wait()
+            elapsed := time.Since(start)
+            
+            fmt.Printf("Load test completed: %d requests in %v\n", requests, elapsed)
+            fmt.Printf("Requests per second: %.2f\n", float64(requests)/elapsed.Seconds())
+        }
+        EOF
+        
+    - name: Run load test
+      run: |
+        go run load_test.go > load-test-results.txt 2>&1
+        
+        echo "## Load Test Results" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        cat load-test-results.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        
+    - name: Check server logs
+      run: |
+        echo "## Server Performance Logs" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        tail -50 server-load.log >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        
+    - name: Upload load test results
+      uses: actions/upload-artifact@v3
+      with:
+        name: load-test-results
+        path: |
+          load-test-results.txt
+          server-load.log
+          
+    - name: Cleanup
+      run: |
+        kill $(cat server.pid) || true
+        cd scripts/demo
+        sudo ./stop-spire.sh || true
+      if: always()

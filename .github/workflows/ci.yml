@@ -1,0 +1,351 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run weekly on Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+
+env:
+  GO_VERSION: '1.21'
+
+jobs:
+  # Code Quality Checks
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+          
+    - name: Download dependencies
+      run: go mod download
+      
+    - name: Install golangci-lint
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
+        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+        
+    - name: Run golangci-lint
+      run: golangci-lint run --timeout=5m --config=.golangci.yml
+      
+    - name: Go vet
+      run: go vet ./...
+      
+    - name: Go fmt check
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "The following files are not properly formatted:"
+          gofmt -s -l .
+          exit 1
+        fi
+
+  # Security Scanning
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Install gosec
+      run: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+      
+    - name: Run gosec
+      run: gosec -fmt sarif -out gosec.sarif ./...
+      continue-on-error: true
+      
+    - name: Upload SARIF file
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: gosec.sarif
+      if: always()
+
+  # Build Matrix
+  build:
+    name: Build
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go-version: ['1.20', '1.21', '1.22']
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.go-version }}
+        
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ matrix.go-version }}-
+          ${{ runner.os }}-go-
+          
+    - name: Download dependencies
+      run: go mod download
+      
+    - name: Build CLI
+      run: go build -v -o bin/ephemos ./cmd/ephemos-cli
+      
+    - name: Build examples
+      run: |
+        go build -v -o bin/echo-server ./examples/echo-server
+        go build -v -o bin/echo-client ./examples/echo-client
+        
+    - name: Verify builds
+      shell: bash
+      run: |
+        ./bin/ephemos --help
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          ./bin/echo-server.exe --help || echo "Server help not available"
+        else
+          ./bin/echo-server --help || echo "Server help not available"
+        fi
+
+  # Testing
+  test:
+    name: Test
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        go-version: ['1.20', '1.21', '1.22']
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.go-version }}
+        
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ matrix.go-version }}-
+          
+    - name: Download dependencies
+      run: go mod download
+      
+    - name: Run tests with race detection
+      run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+      
+    - name: Generate coverage report
+      run: go tool cover -html=coverage.out -o coverage.html
+      
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  # Integration Tests (Linux only, requires SPIRE)
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Install SPIRE
+      run: |
+        cd scripts/demo
+        chmod +x install-spire.sh
+        sudo ./install-spire.sh
+        
+    - name: Build applications
+      run: make build examples
+      
+    - name: Start SPIRE services
+      run: |
+        cd scripts/demo  
+        sudo ./start-spire.sh
+        sleep 10
+        
+    - name: Set up demo services
+      run: |
+        cd scripts/demo
+        sudo ./setup-demo.sh
+        
+    - name: Run integration test
+      run: |
+        cd scripts/demo
+        # Test server can start and get identity
+        timeout 10 bash -c 'EPHEMOS_CONFIG=config/echo-server.yaml ECHO_SERVER_ADDRESS=:50099 ../../bin/echo-server > test-server.log 2>&1 &'
+        sleep 5
+        
+        # Check if server got identity
+        if grep -q "Server identity created" test-server.log; then
+          echo "✅ Server successfully obtained SPIFFE identity"
+        else
+          echo "❌ Server failed to obtain SPIFFE identity"
+          cat test-server.log
+          exit 1
+        fi
+        
+    - name: Cleanup SPIRE
+      run: |
+        cd scripts/demo
+        sudo ./stop-spire.sh || true
+        sudo pkill -f spire-server || true
+        sudo pkill -f spire-agent || true
+      if: always()
+
+  # Dependency Check
+  deps:
+    name: Dependency Check
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Install nancy
+      run: go install github.com/sonatypeoss/nancy@latest
+      
+    - name: Check dependencies for vulnerabilities
+      run: |
+        go list -json -deps ./... | nancy sleuth
+        
+    - name: Go mod verify
+      run: go mod verify
+      
+    - name: Check for unused dependencies
+      run: |
+        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+        golangci-lint run --disable-all --enable unused
+
+  # Performance Benchmarks
+  benchmark:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Run benchmarks
+      run: |
+        go test -bench=. -benchmem ./... > benchmark.txt 2>&1
+        echo "## Benchmark Results" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        cat benchmark.txt >> $GITHUB_STEP_SUMMARY  
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # Release Build (on tags)
+  release:
+    name: Release Build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [lint, security, build, test]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Install cross-compilation tools
+      run: |
+        go install github.com/goreleaser/goreleaser@latest
+        
+    - name: Create release builds
+      run: |
+        mkdir -p dist
+        
+        # Build for multiple platforms
+        PLATFORMS="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
+        
+        for PLATFORM in $PLATFORMS; do
+          OS=${PLATFORM%/*}
+          ARCH=${PLATFORM#*/}
+          
+          echo "Building for $OS/$ARCH..."
+          
+          if [ "$OS" = "windows" ]; then
+            EXT=".exe"
+          else
+            EXT=""
+          fi
+          
+          GOOS=$OS GOARCH=$ARCH go build -o dist/ephemos-$OS-$ARCH$EXT ./cmd/ephemos-cli
+          GOOS=$OS GOARCH=$ARCH go build -o dist/echo-server-$OS-$ARCH$EXT ./examples/echo-server
+          GOOS=$OS GOARCH=$ARCH go build -o dist/echo-client-$OS-$ARCH$EXT ./examples/echo-client
+        done
+        
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        release_name: Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+        
+    - name: Upload Release Assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dist/
+        asset_name: ephemos-binaries
+        asset_content_type: application/zip

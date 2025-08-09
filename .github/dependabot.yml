@@ -1,0 +1,47 @@
+version: 2
+updates:
+  # Enable version updates for Go modules
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:00"
+    open-pull-requests-limit: 5
+    assignees:
+      - "sufield"
+    reviewers:
+      - "sufield"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "go"
+    ignore:
+      # Ignore major version updates for critical dependencies
+      - dependency-name: "google.golang.org/grpc"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "github.com/spiffe/go-spiffe/v2"
+        update-types: ["version-update:semver-major"]
+    
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday" 
+      time: "02:00"
+    open-pull-requests-limit: 3
+    assignees:
+      - "sufield"
+    reviewers:
+      - "sufield"
+    commit-message:
+      prefix: "ci"
+      prefix-development: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
