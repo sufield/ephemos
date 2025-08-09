@@ -18,14 +18,14 @@ type mockConfigProvider struct {
 	err    error
 }
 
-func (m *mockConfigProvider) LoadConfiguration(ctx context.Context, path string) (*ports.Configuration, error) {
+func (m *mockConfigProvider) LoadConfiguration(_ context.Context, path string) (*ports.Configuration, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
 	return m.config, nil
 }
 
-func (m *mockConfigProvider) GetDefaultConfiguration(ctx context.Context) *ports.Configuration {
+func (m *mockConfigProvider) GetDefaultConfiguration(_ context.Context) *ports.Configuration {
 	return &ports.Configuration{
 		Service: ports.ServiceConfig{
 			Name:   "default-service",
@@ -346,7 +346,7 @@ func TestRegistrar_createSPIREEntry(t *testing.T) {
 	registrar := NewRegistrar(&mockConfigProvider{}, config)
 
 	testConfig := createValidTestConfig()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// This will succeed because echo always succeeds, so we test the success path
 	err := registrar.createSPIREEntry(ctx, testConfig)
@@ -410,7 +410,7 @@ func TestRegistrar_Integration(t *testing.T) {
 
 	registrar := NewRegistrar(mockProvider, registrarConfig)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// This may succeed or fail depending on how echo responds to the arguments
 	err := registrar.RegisterService(ctx, "test.yaml")

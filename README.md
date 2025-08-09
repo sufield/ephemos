@@ -45,8 +45,10 @@ if err != nil {
 }
 defer server.Close()
 
-// Register service - no gRPC details exposed
-serviceRegistrar := proto.NewEchoServiceRegistrar(&EchoServer{})
+// Register service using the generic registrar (recommended - no boilerplate)
+serviceRegistrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
+	proto.RegisterEchoServiceServer(s, &EchoServer{})
+})
 server.RegisterService(ctx, serviceRegistrar)
 
 // Start listening - completely abstracted
@@ -107,6 +109,46 @@ authorized_clients:
 trusted_servers:
   - "trusted-server"
 ```
+
+## Service Registration
+
+Ephemos offers two approaches for registering your gRPC services:
+
+### Option 1: Generic Registrar (Recommended)
+
+Use the built-in generic registrar - no boilerplate code required:
+
+```go
+// Works for any gRPC service - just one line!
+registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
+	proto.RegisterYourServiceServer(s, &YourServiceImpl{})
+})
+server.RegisterService(ctx, registrar)
+```
+
+### Option 2: Custom Registrar (Advanced)
+
+For developers who want more control, you can create service-specific registrars:
+
+```go
+type YourServiceRegistrar struct {
+	server proto.YourServiceServer
+}
+
+func NewYourServiceRegistrar(server proto.YourServiceServer) *YourServiceRegistrar {
+	return &YourServiceRegistrar{server: server}
+}
+
+func (r *YourServiceRegistrar) Register(grpcServer *grpc.Server) {
+	proto.RegisterYourServiceServer(grpcServer, r.server)
+}
+
+// Usage
+registrar := NewYourServiceRegistrar(&YourServiceImpl{})
+server.RegisterService(ctx, registrar)
+```
+
+**Recommendation**: Use the generic registrar unless you need custom registration logic or validation.
 
 ### Example Configurations
 

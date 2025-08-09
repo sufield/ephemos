@@ -11,22 +11,69 @@ import (
 
 	"github.com/sufield/ephemos/internal/adapters/primary/api"
 	"github.com/sufield/ephemos/internal/core/errors"
+	"google.golang.org/grpc"
 )
 
 // ServiceRegistrar is the interface that service implementations must implement.
 // Implementations should register their gRPC service with the provided server.
 // This interface abstracts away gRPC registration details from service developers.
 //
-// Example implementation:
+// Most developers should use the generic NewServiceRegistrar function instead of
+// implementing this interface directly:
 //
-//	type EchoServiceRegistrar struct {
-//		service EchoServiceServer
-//	}
+//	// Recommended approach (no boilerplate):
+//	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
+//		proto.RegisterYourServiceServer(s, &yourService{})
+//	})
 //
-//	func (r *EchoServiceRegistrar) Register(grpcServer *grpc.Server) {
-//		proto.RegisterEchoServiceServer(grpcServer, r.service)
-//	}
+// Advanced users can implement this interface directly for custom registration logic.
 type ServiceRegistrar = api.ServiceRegistrar
+
+// GenericServiceRegistrar is a generic implementation that can register any gRPC service
+// without requiring developers to write service-specific registrars. This eliminates
+// boilerplate code and makes service registration a one-liner.
+//
+// Example usage:
+//
+//	// Instead of writing a custom registrar, use the generic one:
+//	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
+//		proto.RegisterYourServiceServer(s, &YourServiceImpl{})
+//	})
+//	server.RegisterService(ctx, registrar)
+type GenericServiceRegistrar struct {
+	registerFunc func(*grpc.Server)
+}
+
+// NewServiceRegistrar creates a generic registrar that can be used for any gRPC service.
+// This eliminates the need to write service-specific registrars, reducing boilerplate code.
+//
+// Parameters:
+//   - registerFunc: A function that registers your service with the gRPC server.
+//                  This is typically just calling your generated Register*Server function.
+//
+// Example:
+//
+//	// For an Echo service:
+//	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
+//		proto.RegisterEchoServiceServer(s, &MyEchoServer{})
+//	})
+//
+//	// For any other service:
+//	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
+//		proto.RegisterUserServiceServer(s, &MyUserService{})
+//	})
+func NewServiceRegistrar(registerFunc func(*grpc.Server)) ServiceRegistrar {
+	return &GenericServiceRegistrar{
+		registerFunc: registerFunc,
+	}
+}
+
+// Register implements the ServiceRegistrar interface by calling the provided registration function.
+func (r *GenericServiceRegistrar) Register(grpcServer *grpc.Server) {
+	if r.registerFunc != nil {
+		r.registerFunc(grpcServer)
+	}
+}
 
 // Server represents an identity-aware gRPC server that handles automatic mTLS authentication.
 // Services registered with this server will automatically use SPIFFE/SPIRE for identity verification.
@@ -111,7 +158,9 @@ type Client interface {
 //	}
 //	defer server.Close()
 //
-//	registrar := proto.NewServiceRegistrar(&myService{})
+//	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
+//		proto.RegisterYourServiceServer(s, &myService{})
+//	})
 //	server.RegisterService(ctx, registrar)
 //	lis, _ := net.Listen("tcp", ":50051")
 //	defer lis.Close()

@@ -15,14 +15,14 @@ import (
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
-// RegistrarConfig holds configuration for the Registrar
+// RegistrarConfig holds configuration for the Registrar.
 type RegistrarConfig struct {
 	SPIRESocketPath string
 	SPIREServerPath string // Path to spire-server binary
 	Logger          *slog.Logger
 }
 
-// Registrar handles service registration with SPIRE
+// Registrar handles service registration with SPIRE.
 type Registrar struct {
 	configProvider  ports.ConfigurationProvider
 	spireSocketPath string
@@ -30,7 +30,7 @@ type Registrar struct {
 	logger          *slog.Logger
 }
 
-// NewRegistrar creates a new Registrar with proper dependency injection
+// NewRegistrar creates a new Registrar with proper dependency injection.
 func NewRegistrar(
 	configProvider ports.ConfigurationProvider,
 	config *RegistrarConfig,
@@ -121,7 +121,7 @@ func (r *Registrar) validateConfig(cfg *ports.Configuration) error {
 	}
 
 	// Validate domain format (basic DNS name validation)
-	validDomain := regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-\.]*[a-zA-Z0-9])?$`)
+	validDomain := regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-.]*[a-zA-Z0-9])?$`)
 	if !validDomain.MatchString(cfg.Service.Domain) {
 		return &errors.ValidationError{
 			Field:   "Service.Domain",

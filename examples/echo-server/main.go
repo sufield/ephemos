@@ -12,6 +12,7 @@ import (
 
 	"github.com/sufield/ephemos/examples/proto"
 	"github.com/sufield/ephemos/pkg/ephemos"
+	"google.golang.org/grpc"
 )
 
 // EchoServer implements the EchoServiceServer interface.
@@ -66,12 +67,10 @@ func main() {
 		}
 	}()
 
-	// Create and validate service registrar
-	serviceRegistrar := proto.NewEchoServiceRegistrar(&EchoServer{})
-	if serviceRegistrar == nil {
-		slog.Error("Failed to create service registrar")
-		os.Exit(1)
-	}
+	// Register service using the generic registrar (no boilerplate required)
+	serviceRegistrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
+		proto.RegisterEchoServiceServer(s, &EchoServer{})
+	})
 
 	if err := server.RegisterService(ctx, serviceRegistrar); err != nil {
 		slog.Error("Failed to register service", "error", err)
