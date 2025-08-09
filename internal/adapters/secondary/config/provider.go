@@ -8,9 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	yaml "gopkg.in/yaml.v3"
+
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
-	yaml "gopkg.in/yaml.v3"
 )
 
 // FileProvider provides configs from files.

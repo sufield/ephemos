@@ -4,8 +4,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/sufield/ephemos/pkg/ephemos"
 	"google.golang.org/grpc"
+
+	"github.com/sufield/ephemos/pkg/ephemos"
 )
 
 // TestRegistrationTracker tracks registrations for testing purposes.

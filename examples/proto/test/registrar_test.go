@@ -3,8 +3,9 @@ package test
 import (
 	"testing"
 
-	"github.com/sufield/ephemos/examples/proto"
 	"google.golang.org/grpc"
+
+	"github.com/sufield/ephemos/examples/proto"
 )
 
 func TestNewEchoServiceRegistrar(t *testing.T) {

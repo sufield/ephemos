@@ -9,9 +9,10 @@ import (
 	"os"
 	"strings"
 
+	"google.golang.org/grpc"
+
 	"github.com/sufield/ephemos/internal/adapters/primary/api"
 	"github.com/sufield/ephemos/internal/core/errors"
-	"google.golang.org/grpc"
 )
 
 // ServiceRegistrar is the interface that service implementations must implement.

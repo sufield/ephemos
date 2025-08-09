@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
 	"github.com/sufield/ephemos/internal/adapters/primary/cli"
 	"github.com/sufield/ephemos/internal/adapters/secondary/config"
 	"github.com/sufield/ephemos/internal/core/ports"

@@ -7,13 +7,14 @@ import (
 	"net"
 	"sync"
 
+	"google.golang.org/grpc"
+
 	"github.com/sufield/ephemos/internal/adapters/secondary/config"
 	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
 	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/sufield/ephemos/internal/core/services"
-	"google.golang.org/grpc"
 )
 
 // IdentityServer provides a secure gRPC server with SPIFFE-based identity management.

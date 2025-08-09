@@ -8,10 +8,11 @@ import (
 	"strings"
 	"sync"
 
+	"google.golang.org/grpc"
+
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
-	"google.golang.org/grpc"
 )
 
 // IdentityService manages service identities and provides authenticated transport.

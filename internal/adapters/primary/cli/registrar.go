@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
+
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
 )

@@ -6,10 +6,11 @@ import (
 	"fmt"
 
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
-	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
-	"github.com/sufield/ephemos/internal/core/domain"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+
+	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
+	"github.com/sufield/ephemos/internal/core/domain"
 )
 
 // GRPCProvider provides gRPC transport.

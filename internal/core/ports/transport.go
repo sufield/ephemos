@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/sufield/ephemos/internal/core/domain"
 	"google.golang.org/grpc"
+
+	"github.com/sufield/ephemos/internal/core/domain"
 )
 
 // ErrTransportCreationFailed is returned when transport creation fails.

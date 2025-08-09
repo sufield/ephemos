@@ -10,9 +10,10 @@ import (
 	"syscall"
 	"time"
 
+	"google.golang.org/grpc"
+
 	"github.com/sufield/ephemos/examples/proto"
 	"github.com/sufield/ephemos/pkg/ephemos"
-	"google.golang.org/grpc"
 )
 
 // EchoServer implements the EchoServiceServer interface.

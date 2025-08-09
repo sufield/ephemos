@@ -8,13 +8,14 @@ import (
 	"strings"
 	"sync"
 
+	"google.golang.org/grpc"
+
 	"github.com/sufield/ephemos/internal/adapters/secondary/config"
 	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
 	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/sufield/ephemos/internal/core/services"
-	"google.golang.org/grpc"
 )
 
 // IdentityClient provides a high-level API for connecting to SPIFFE-secured services.

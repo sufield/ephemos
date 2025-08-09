@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sufield/ephemos/examples/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
+
+	"github.com/sufield/ephemos/examples/proto"
 )
 
 const bufSize = 1024 * 1024

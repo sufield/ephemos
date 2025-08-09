@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+
 	"github.com/sufield/ephemos/internal/cli"
 )
 
