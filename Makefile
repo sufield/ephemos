@@ -2,7 +2,7 @@
 
 # Variables
 PROTO_DIR := examples/proto
-GO_OUT := internal/proto
+GO_OUT := examples/proto
 PROTOC := protoc
 CLI_BINARY := ephemos
 SERVER_BINARY := echo-server
