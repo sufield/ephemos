@@ -15,7 +15,7 @@ func TestNewEchoServiceRegistrar(t *testing.T) {
 	}{
 		{
 			name:   "valid server",
-			server: &MockEchoServer{},
+			server: &TestEchoServer{},
 			want:   true,
 		},
 		{
@@ -42,8 +42,8 @@ func TestEchoServiceRegistrar_Register(t *testing.T) {
 		defer grpcServer.Stop()
 
 		// Create registrar with mock server
-		mockServer := &MockEchoServer{}
-		registrar := proto.NewEchoServiceRegistrar(mockServer)
+		testServer := &TestEchoServer{}
+		registrar := proto.NewEchoServiceRegistrar(testServer)
 
 		// This should not panic or return error
 		registrar.Register(grpcServer)
@@ -74,7 +74,7 @@ func TestEchoServiceRegistrar_Integration(t *testing.T) {
 	defer grpcServer.Stop()
 
 	// Create and register echo service
-	echoServer := &MockEchoServer{}
+	echoServer := &TestEchoServer{}
 	registrar := proto.NewEchoServiceRegistrar(echoServer)
 	registrar.Register(grpcServer)
 
@@ -102,7 +102,7 @@ func TestEchoServiceRegistrar_Integration(t *testing.T) {
 // Additional test to verify registrar interface compliance
 func TestServiceRegistrarInterface(t *testing.T) {
 	// This test ensures that EchoServiceRegistrar implements the expected interface
-	var registrar interface{} = proto.NewEchoServiceRegistrar(&MockEchoServer{})
+	var registrar interface{} = proto.NewEchoServiceRegistrar(&TestEchoServer{})
 
 	// Check if it has the Register method with correct signature
 	if r, ok := registrar.(interface{ Register(*grpc.Server) }); !ok {
@@ -122,8 +122,8 @@ func TestServiceRegistrarInterface(t *testing.T) {
 }
 
 func BenchmarkEchoServiceRegistrar_Register(b *testing.B) {
-	mockServer := &MockEchoServer{}
-	registrar := proto.NewEchoServiceRegistrar(mockServer)
+	testServer := &TestEchoServer{}
+	registrar := proto.NewEchoServiceRegistrar(testServer)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

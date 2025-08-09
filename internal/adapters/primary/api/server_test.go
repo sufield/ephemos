@@ -5,8 +5,6 @@ import (
 	"net"
 	"testing"
 	"time"
-
-	"google.golang.org/grpc"
 )
 
 func TestIdentityServer_NewIdentityServer(t *testing.T) {
@@ -129,30 +127,31 @@ func TestIdentityServer_Close(t *testing.T) {
 	}
 }
 
-// MockServiceRegistrar implements the ServiceRegistrar interface for testing
-type MockServiceRegistrar struct {
-	registerCalled bool
-}
+// TestServiceRegistrar is now defined in test_helpers.go
+// It provides a real implementation instead of a mock
 
-func (m *MockServiceRegistrar) Register(server *grpc.Server) {
-	m.registerCalled = true
-}
-
-func TestIdentityServer_RegisterService_WithMock(t *testing.T) {
+func TestIdentityServer_RegisterService_WithRealService(t *testing.T) {
 	server, err := NewIdentityServer("")
 	if err != nil {
-		t.Skip("Skipping mock RegisterService test - could not create server:", err)
+		t.Skip("Skipping RegisterService test - could not create server:", err)
 	}
 
-	ctx := context.Background()
-	mock := &MockServiceRegistrar{}
+	ctx := t.Context()
+	
+	// Use a real test service instead of a mock
+	testService := NewTestService()
+	registrar := NewTestServiceRegistrar(testService)
 
-	err = server.RegisterService(ctx, mock)
+	err = server.RegisterService(ctx, registrar)
 	if err != nil {
-		t.Errorf("RegisterService() with mock returned error: %v", err)
+		t.Errorf("RegisterService() returned error: %v", err)
 	}
 
-	if !mock.registerCalled {
-		t.Error("RegisterService() did not call Register on the mock")
+	if !registrar.IsRegistered() {
+		t.Error("RegisterService() did not call Register on the registrar")
+	}
+	
+	if registrar.GetRegisterCount() != 1 {
+		t.Errorf("Expected Register to be called once, got %d", registrar.GetRegisterCount())
 	}
 }

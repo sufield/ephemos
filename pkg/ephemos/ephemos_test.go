@@ -1,31 +1,63 @@
 package ephemos
 
 import (
+	"sync"
 	"testing"
 
 	"google.golang.org/grpc"
 )
 
-// Mock service interface for testing
-type MockService interface {
-	TestMethod() string
+// TestRegistrationTracker tracks registrations for testing purposes.
+// This is a real implementation, not a mock.
+type TestRegistrationTracker struct {
+	mu              sync.Mutex
+	registered      bool
+	registerCount   int
+	lastServer      *grpc.Server
 }
 
-// Mock service implementation
-type mockServiceImpl struct{}
-
-func (m *mockServiceImpl) TestMethod() string {
-	return "test"
+// NewTestRegistrationTracker creates a new registration tracker.
+func NewTestRegistrationTracker() *TestRegistrationTracker {
+	return &TestRegistrationTracker{}
 }
 
-// Mock registration function
-var mockRegistered = false
+// RegisterFunction returns a function that can be used with NewServiceRegistrar.
+func (t *TestRegistrationTracker) RegisterFunction() func(*grpc.Server) {
+	return func(server *grpc.Server) {
+		t.mu.Lock()
+		defer t.mu.Unlock()
+		t.registered = true
+		t.registerCount++
+		t.lastServer = server
+	}
+}
 
-func mockRegisterFunction(server *grpc.Server) {
-	mockRegistered = true
+// IsRegistered returns whether registration occurred.
+func (t *TestRegistrationTracker) IsRegistered() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.registered
+}
+
+// GetRegisterCount returns the number of times registration occurred.
+func (t *TestRegistrationTracker) GetRegisterCount() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.registerCount
+}
+
+// Reset resets the tracker state.
+func (t *TestRegistrationTracker) Reset() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.registered = false
+	t.registerCount = 0
+	t.lastServer = nil
 }
 
 func TestNewServiceRegistrar(t *testing.T) {
+	tracker := NewTestRegistrationTracker()
+	
 	tests := []struct {
 		name         string
 		registerFunc func(*grpc.Server)
@@ -33,7 +65,7 @@ func TestNewServiceRegistrar(t *testing.T) {
 	}{
 		{
 			name:         "valid registration function",
-			registerFunc: mockRegisterFunction,
+			registerFunc: tracker.RegisterFunction(),
 			expectNil:    false,
 		},
 		{
@@ -61,38 +93,40 @@ func TestNewServiceRegistrar(t *testing.T) {
 
 func TestGenericServiceRegistrar_Register(t *testing.T) {
 	tests := []struct {
-		name         string
-		registerFunc func(*grpc.Server)
-		shouldCall   bool
+		name       string
+		setupFunc  func() (*TestRegistrationTracker, func(*grpc.Server))
+		shouldCall bool
 	}{
 		{
 			name: "calls registration function",
-			registerFunc: func(server *grpc.Server) {
-				mockRegistered = true
+			setupFunc: func() (*TestRegistrationTracker, func(*grpc.Server)) {
+				tracker := NewTestRegistrationTracker()
+				return tracker, tracker.RegisterFunction()
 			},
 			shouldCall: true,
 		},
 		{
-			name:         "handles nil registration function gracefully",
-			registerFunc: nil,
-			shouldCall:   false,
+			name: "handles nil registration function gracefully",
+			setupFunc: func() (*TestRegistrationTracker, func(*grpc.Server)) {
+				return NewTestRegistrationTracker(), nil
+			},
+			shouldCall: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset mock state
-			mockRegistered = false
-
-			registrar := NewServiceRegistrar(tt.registerFunc)
+			tracker, registerFunc := tt.setupFunc()
+			
+			registrar := NewServiceRegistrar(registerFunc)
 			grpcServer := grpc.NewServer()
 			defer grpcServer.Stop()
 
 			// Should not panic
 			registrar.Register(grpcServer)
 
-			if mockRegistered != tt.shouldCall {
-				t.Errorf("Register() called registration function = %v, want %v", mockRegistered, tt.shouldCall)
+			if tracker.IsRegistered() != tt.shouldCall {
+				t.Errorf("Register() called registration function = %v, want %v", tracker.IsRegistered(), tt.shouldCall)
 			}
 		})
 	}
@@ -103,17 +137,55 @@ func TestGenericServiceRegistrar_Integration(t *testing.T) {
 	grpcServer := grpc.NewServer()
 	defer grpcServer.Stop()
 
-	called := false
-	registrar := NewServiceRegistrar(func(s *grpc.Server) {
-		called = true
-		// In real usage, this would be something like:
-		// proto.RegisterYourServiceServer(s, &YourServiceImpl{})
-	})
+	tracker := NewTestRegistrationTracker()
+	registrar := NewServiceRegistrar(tracker.RegisterFunction())
 
 	registrar.Register(grpcServer)
 
-	if !called {
+	if !tracker.IsRegistered() {
 		t.Error("Registration function was not called during integration test")
+	}
+	
+	if tracker.GetRegisterCount() != 1 {
+		t.Errorf("Expected registration count to be 1, got %d", tracker.GetRegisterCount())
+	}
+}
+
+func TestGenericServiceRegistrar_MultipleRegistrations(t *testing.T) {
+	tracker := NewTestRegistrationTracker()
+	registrar := NewServiceRegistrar(tracker.RegisterFunction())
+	
+	// Register with multiple servers
+	for i := 0; i < 3; i++ {
+		server := grpc.NewServer()
+		registrar.Register(server)
+		server.Stop()
+	}
+	
+	if tracker.GetRegisterCount() != 3 {
+		t.Errorf("Expected 3 registrations, got %d", tracker.GetRegisterCount())
+	}
+}
+
+func BenchmarkNewServiceRegistrar(b *testing.B) {
+	tracker := NewTestRegistrationTracker()
+	registerFunc := tracker.RegisterFunction()
+	
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = NewServiceRegistrar(registerFunc)
+	}
+}
+
+func BenchmarkGenericServiceRegistrar_Register(b *testing.B) {
+	tracker := NewTestRegistrationTracker()
+	registrar := NewServiceRegistrar(tracker.RegisterFunction())
+	server := grpc.NewServer()
+	defer server.Stop()
+	
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		registrar.Register(server)
 	}
 }
 

@@ -17,25 +17,37 @@ const bufSize = 1024 * 1024
 
 var lis *bufconn.Listener
 
-// MockEchoServer implements the EchoServiceServer interface for testing
-type MockEchoServer struct {
+// TestEchoServer is a real implementation of EchoServiceServer for testing.
+// It provides configurable behavior without using mocks.
+type TestEchoServer struct {
 	proto.UnimplementedEchoServiceServer
+	callCount   int
+	lastMessage string
 }
 
-func (s *MockEchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (*proto.EchoResponse, error) {
+func (s *TestEchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (*proto.EchoResponse, error) {
+	s.callCount++
+	s.lastMessage = req.Message
+	
+	// Simulate different behaviors based on input
 	if req.Message == "error" {
-		return nil, status.Error(codes.Internal, "mock error")
+		return nil, status.Error(codes.Internal, "simulated server error")
 	}
+	if req.Message == "timeout" {
+		time.Sleep(2 * time.Second)
+		return nil, status.Error(codes.DeadlineExceeded, "simulated timeout")
+	}
+	
 	return &proto.EchoResponse{
 		Message: req.Message,
-		From:    "mock-server",
+		From:    "test-echo-server",
 	}, nil
 }
 
 func init() {
 	lis = bufconn.Listen(bufSize)
 	s := grpc.NewServer()
-	proto.RegisterEchoServiceServer(s, &MockEchoServer{})
+	proto.RegisterEchoServiceServer(s, &TestEchoServer{})
 	go func() {
 		if err := s.Serve(lis); err != nil {
 			panic(err)
@@ -173,8 +185,8 @@ func TestEchoClient_Echo(t *testing.T) {
 				if resp.Message != expectedMessage {
 					t.Errorf("Echo() response message = %v, want %v", resp.Message, expectedMessage)
 				}
-				if resp.From != "mock-server" {
-					t.Errorf("Echo() response from = %v, want mock-server", resp.From)
+				if resp.From != "test-echo-server" {
+					t.Errorf("Echo() response from = %v, want test-echo-server", resp.From)
 				}
 			}
 		})
