@@ -1,12 +1,47 @@
 #!/bin/bash
 set -e
 
-echo "Installing SPIRE for Ubuntu 24..."
-
 # Configuration
 SPIRE_VERSION="1.8.7"
 INSTALL_DIR="/opt/spire"
 SPIRE_URL="https://github.com/spiffe/spire/releases/download/v${SPIRE_VERSION}/spire-${SPIRE_VERSION}-linux-amd64-musl.tar.gz"
+
+# Parse command line arguments
+FORCE_INSTALL=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --force)
+            FORCE_INSTALL=true
+            shift
+            ;;
+        --version)
+            SPIRE_VERSION="$2"
+            SPIRE_URL="https://github.com/spiffe/spire/releases/download/v${SPIRE_VERSION}/spire-${SPIRE_VERSION}-linux-amd64-musl.tar.gz"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--force] [--version VERSION]"
+            exit 1
+            ;;
+    esac
+done
+
+# Check if SPIRE is already installed
+if [ -f "/usr/local/bin/spire-server" ] && [ "$FORCE_INSTALL" = false ]; then
+    INSTALLED_VERSION=$(spire-server version 2>/dev/null | grep "Server" | awk '{print $3}' | cut -d'v' -f2 || echo "unknown")
+    
+    if [ "$INSTALLED_VERSION" = "$SPIRE_VERSION" ]; then
+        echo "SPIRE version $SPIRE_VERSION is already installed."
+        echo "Use --force to reinstall or --version to specify a different version."
+        exit 0
+    else
+        echo "SPIRE version $INSTALLED_VERSION is installed, but version $SPIRE_VERSION is requested."
+        echo "Upgrading SPIRE..."
+    fi
+fi
+
+echo "Installing SPIRE $SPIRE_VERSION for Ubuntu 24..."
 
 
 # Create installation directory
@@ -83,8 +118,8 @@ agent {
     server_address = "127.0.0.1"
     server_port = "8081"
     socket_path = "/tmp/spire-agent/public/api.sock"
-    trust_bundle_path = "/opt/spire/data/bundle.crt"
     trust_domain = "example.org"
+    insecure_bootstrap = true
 }
 
 plugins {

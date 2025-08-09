@@ -47,7 +47,7 @@ demo: proto build examples
 	@echo "========================"
 	@echo ""
 	@echo "Step 1: Installing SPIRE (if needed)..."
-	@cd scripts/demo && ./install-spire.sh
+	@cd scripts/demo && ./install-spire.sh $(SPIRE_ARGS)
 	@echo ""
 	@echo "Step 2: Starting SPIRE services..."
 	@cd scripts/demo && ./start-spire.sh
@@ -59,6 +59,14 @@ demo: proto build examples
 	@cd scripts/demo && ./run-demo.sh
 	@echo ""
 	@echo "Demo completed!"
+
+# Force reinstall SPIRE and run demo
+demo-force: SPIRE_ARGS=--force
+demo-force: demo
+
+# Install specific SPIRE version and run demo (usage: make demo-version VERSION=1.9.0)
+demo-version: SPIRE_ARGS=--version $(VERSION)
+demo-version: demo
 
 # Clean build artifacts
 clean:
@@ -272,8 +280,10 @@ help:
 	@echo "  make fmt             - Format code"
 	@echo "  make lint            - Lint code"
 	@echo ""
-	@echo "Demo target:"
-	@echo "  make demo            - Run complete demo (5 minutes)"
+	@echo "Demo targets:"
+	@echo "  make demo            - Run complete demo (checks for existing SPIRE)"
+	@echo "  make demo-force      - Force reinstall SPIRE and run demo"
+	@echo "  make demo-version VERSION=1.9.0 - Install specific SPIRE version"
 	@echo ""
 	@echo "Help:"
 	@echo "  make help            - Show this help message"

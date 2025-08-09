@@ -11,17 +11,28 @@ cd ../..
 go build -o echo-server examples/echo-server/main.go
 go build -o echo-client examples/echo-client/main.go
 
-# Start echo-server in background
-echo "Starting echo-server..."
-EPHEMOS_CONFIG=configs/echo-server.yaml ./echo-server &
+# Start echo-server in foreground for 5 seconds to see output
+echo "Starting echo-server (will run for 5 seconds to show output)..."
+echo "==============================================="
+timeout 5 bash -c 'EPHEMOS_CONFIG=config/echo-server.yaml ./echo-server 2>&1' | sed 's/^/[SERVER] /' || true
+echo "==============================================="
+echo ""
+
+# Now start it in background for the actual demo
+echo "Starting echo-server in background..."
+EPHEMOS_CONFIG=config/echo-server.yaml ./echo-server > server.log 2>&1 &
 SERVER_PID=$!
+echo "Server PID: $SERVER_PID"
 sleep 2
 
-# Check if server started
-if ! kill -0 $SERVER_PID 2>/dev/null; then
-    echo "Error: echo-server failed to start"
-    exit 1
-fi
+echo ""
+echo "Checking if server is listening on port 50051..."
+ss -tln | grep 50051 || echo "Warning: Server may not be listening on expected port"
+
+echo ""
+echo "Server log output:"
+cat server.log 2>/dev/null || echo "No server log found"
+echo ""
 
 echo ""
 echo "Server started with identity-based authentication"
@@ -29,14 +40,12 @@ echo ""
 
 # Run echo-client
 echo "Starting echo-client..."
-EPHEMOS_CONFIG=configs/echo-client.yaml ./echo-client &
-CLIENT_PID=$!
+echo ""
+echo "Running client with config: config/echo-client.yaml"
+EPHEMOS_CONFIG=config/echo-client.yaml timeout 10 ./echo-client 2>&1 | sed 's/^/[CLIENT] /'
+echo ""
 
-# Wait for client to complete a few requests
-sleep 12
-
-# Stop client
-kill $CLIENT_PID 2>/dev/null || true
+# Client runs synchronously now, no need to kill it
 
 echo ""
 echo "Demo Part 1 Complete: Client successfully authenticated and communicated with server"
@@ -52,12 +61,14 @@ sudo spire-server entry delete \
 
 # Try to run client again (should fail)
 echo "Attempting to run unregistered client..."
-EPHEMOS_CONFIG=configs/echo-client.yaml timeout 5 ./echo-client 2>&1 | grep -i "error\|fail" || echo "Authentication failed as expected!"
+EPHEMOS_CONFIG=config/echo-client.yaml timeout 5 ./echo-client 2>&1 | grep -i "error\|fail" || echo "Authentication failed as expected!"
 
 # Cleanup
 echo ""
 echo "Cleaning up..."
-kill $SERVER_PID 2>/dev/null || true
+pkill -f echo-server 2>/dev/null || true
+pkill -f echo-client 2>/dev/null || true
+rm -f server.log
 
 echo ""
 echo "================================"

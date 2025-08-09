@@ -6,4 +6,4 @@ spiffe:
   socket_path: "/tmp/spire-agent/public/api.sock"
   
 authorized_clients:
-  - "echo-client"
+  - "spiffe://example.org/echo-client"
