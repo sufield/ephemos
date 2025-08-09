@@ -96,15 +96,21 @@ func (c *EchoClient) Echo(ctx context.Context, message string) (*EchoResponse, e
 		return nil, fmt.Errorf("context cannot be nil")
 	}
 
-	if c.Client == nil || c.client == nil {
+	if c.Client == nil {
 		return nil, fmt.Errorf("echo client not properly initialized")
+	}
+	
+	// Get the actual gRPC client via the embedded Client's method
+	grpcClient := c.Client.Client()
+	if grpcClient == nil {
+		return nil, fmt.Errorf("echo service client not properly initialized")
 	}
 
 	// Trim whitespace but allow empty messages for echo functionality
 	message = strings.TrimSpace(message)
 
 	req := &EchoRequest{Message: message}
-	resp, err := c.client.Echo(ctx, req)
+	resp, err := grpcClient.Echo(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call Echo service: %w", err)
 	}

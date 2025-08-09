@@ -46,7 +46,9 @@ func TestRootCmd(t *testing.T) {
 			cmd := &cobra.Command{
 				Use:   "ephemos",
 				Short: "Identity-based authentication CLI for SPIFFE/SPIRE services",
-				Long: `Ephemos provides identity-based authentication for backend services using SPIFFE/SPIRE.
+				Long: `Identity-based authentication CLI for SPIFFE/SPIRE services.
+
+Ephemos provides identity-based authentication for backend services using SPIFFE/SPIRE.
 Use this CLI to register services, manage identities, and configure authentication policies.`,
 			}
 
@@ -150,10 +152,25 @@ func TestRootCmdFlags(t *testing.T) {
 		t.Fatal("rootCmd is nil")
 	}
 
-	// Test help flag exists
-	helpFlag := rootCmd.Flags().Lookup("help")
+	// Test help flag exists (help flag is added automatically by cobra)
+	// We need to check both local and persistent flags
+	helpFlag := rootCmd.LocalFlags().Lookup("help")
 	if helpFlag == nil {
-		t.Error("help flag not found")
+		helpFlag = rootCmd.PersistentFlags().Lookup("help") 
+	}
+	if helpFlag == nil {
+		// Help flag is automatically added by cobra, check if help functionality works
+		var buf bytes.Buffer
+		rootCmd.SetOut(&buf)
+		rootCmd.SetErr(&buf)
+		rootCmd.SetArgs([]string{"--help"})
+		
+		err := rootCmd.Execute()
+		output := buf.String()
+		
+		if err != nil || !strings.Contains(output, "help for ephemos") {
+			t.Error("help flag functionality not working")
+		}
 	}
 
 	// Test that the command can parse flags without error
