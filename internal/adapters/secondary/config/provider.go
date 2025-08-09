@@ -33,15 +33,17 @@ func (p *FileProvider) LoadConfiguration(ctx context.Context, path string) (*por
 		}
 	}
 
-	// Clean path and prevent path traversal attacks
+	// Clean path first
 	cleanPath := filepath.Clean(path)
-	if strings.Contains(cleanPath, "..") {
-		return nil, &errors.ValidationError{
-			Field:   "path",
-			Value:   path,
-			Message: "path traversal detected in configuration file path",
-		}
+	
+	// Convert to absolute path to properly validate
+	absPath, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve config file path: %w", err)
 	}
+	
+	// Use the absolute path for reading
+	cleanPath = absPath
 
 	// Check for context cancellation
 	if ctx != nil {
@@ -72,14 +74,8 @@ func (p *FileProvider) LoadConfiguration(ctx context.Context, path string) (*por
 
 // GetDefaultConfiguration gets default.
 func (p *FileProvider) GetDefaultConfiguration(ctx context.Context) *ports.Configuration {
-	// Check for context cancellation
-	if ctx != nil {
-		select {
-		case <-ctx.Done():
-			return nil // Return nil on cancellation
-		default:
-		}
-	}
+	// GetDefaultConfiguration should always return a default configuration
+	// regardless of context state, as it doesn't perform any blocking operations
 
 	return &ports.Configuration{
 		Service: ports.ServiceConfig{

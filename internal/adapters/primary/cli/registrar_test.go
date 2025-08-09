@@ -353,7 +353,6 @@ func TestRegistrar_createSPIREEntry(t *testing.T) {
 
 	// This will succeed because echo always succeeds, so we test the success path
 	err := registrar.CreateSPIREEntry(ctx, testConfig)
-
 	// Echo command succeeds, so this should not error
 	// The real validation is for SPIRE server response parsing, not command execution
 	if err != nil {
@@ -410,7 +409,6 @@ func TestRegistrar_Integration(t *testing.T) {
 
 	// This may succeed or fail depending on how echo responds to the arguments
 	err := registrar.RegisterService(ctx, "test.yaml")
-
 	// Echo command may succeed, so we just log the result
 	if err != nil {
 		// Check if it's a validation error (expected for certain configs)

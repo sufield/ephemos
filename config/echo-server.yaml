@@ -3,7 +3,7 @@ service:
   domain: "example.org"
   
 spiffe:
-  socket_path: "/tmp/spire-agent/public/api.sock"
+  socketPath: "/tmp/spire-agent/public/api.sock"
   
 authorized_clients:
   - "spiffe://example.org/echo-client"

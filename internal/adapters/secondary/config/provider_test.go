@@ -58,7 +58,7 @@ service:
   domain: "example.com"
 
 spiffe:
-  socket_path: "/tmp/spire-agent/public/api.sock"
+  socketPath: "/tmp/spire-agent/public/api.sock"
 `
 				err := os.WriteFile(configPath, []byte(configContent), 0o644)
 				if err != nil {
@@ -226,10 +226,12 @@ func BenchmarkConfigProvider_LoadConfiguration(b *testing.B) {
 
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	configContent := `
+service:
+  name: "benchmark-service"
+  domain: "test.example.com"
+
 spiffe:
-  domain: "test.example.com" 
-  socket_path: "/tmp/spire-agent/public/api.sock"
-  trust_domain: "example.com"
+  socketPath: "/tmp/spire-agent/public/api.sock"
 `
 	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	if err != nil {

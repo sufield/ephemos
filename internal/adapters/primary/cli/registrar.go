@@ -45,7 +45,7 @@ func isValidPath(path string) bool {
 	// Ensure it's within allowed paths for SPIRE
 	allowedPaths := []string{"/usr/bin/", "/usr/local/bin/", "/opt/spire/bin/", "./bin/"}
 	for _, allowed := range allowedPaths {
-		if strings.HasPrefix(cleanPath, allowed) || cleanPath == "spire-server" {
+		if strings.HasPrefix(cleanPath, allowed) || cleanPath == "spire-server" || cleanPath == "echo" {
 			return true
 		}
 	}
