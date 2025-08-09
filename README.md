@@ -31,16 +31,22 @@ make demo
 ```go
 import (
 	"context"
+	"net"
 	"github.com/sufield/ephemos/pkg/ephemos"
+	"github.com/sufield/ephemos/examples/proto"
 )
 
 ctx := context.Background()
 
-// One line for identity-based authentication
-server := ephemos.IdentityServer()
+// Create identity-based server with config
+server, err := ephemos.NewIdentityServer(ctx, "config/echo-server.yaml")
+if err != nil {
+	log.Fatal(err)
+}
+defer server.Close()
 
 // Register service - no gRPC details exposed
-serviceRegistrar := proto.NewYourServiceRegistrar(&yourService{})
+serviceRegistrar := proto.NewEchoServiceRegistrar(&EchoServer{})
 server.RegisterService(ctx, serviceRegistrar)
 
 // Start listening - completely abstracted
@@ -54,16 +60,29 @@ server.Serve(ctx, lis)
 import (
 	"context"
 	"github.com/sufield/ephemos/pkg/ephemos"
+	"github.com/sufield/ephemos/examples/proto"
 )
 
 // Simple connection with identity
 ctx := context.Background()
-client := ephemos.IdentityClient()
-conn, _ := client.Connect(ctx, "service-name", "localhost:50051")
+client, err := ephemos.NewIdentityClient(ctx, "config/echo-client.yaml")
+if err != nil {
+	log.Fatal(err)
+}
+defer client.Close()
+
+conn, err := client.Connect(ctx, "echo-server", "localhost:50051")
+if err != nil {
+	log.Fatal(err)
+}
 defer conn.Close() // Always defer Close for proper cleanup
 
 // Create service client - no gRPC details exposed
-serviceClient := proto.NewYourServiceClient(conn.GetClientConnection())
+echoClient, err := proto.NewEchoClient(conn.GetClientConnection())
+if err != nil {
+	log.Fatal(err)
+}
+defer echoClient.Close()
 ```
 
 ## Configuration
@@ -220,4 +239,4 @@ MIT License
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for details on how to submit Pull Requests, report issues, and contribute to the project.
