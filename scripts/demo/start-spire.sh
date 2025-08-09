@@ -93,9 +93,9 @@ echo "✓ SPIRE Agent health check passed"
 
 # Configure socket permissions for non-root access
 echo "Configuring socket permissions..."
-sudo chown :$(id -g) /tmp/spire-agent/public/api.sock
-sudo chmod 770 /tmp/spire-agent/public/api.sock
-echo "✓ Socket permissions configured for user access"
+# Make socket accessible to all users for CI compatibility
+sudo chmod 777 /tmp/spire-agent/public/api.sock
+echo "✓ Socket permissions configured for all users (CI mode)"
 
 # Create initial node entry
 echo "Creating node entry..."

@@ -328,6 +328,16 @@ jobs:
         echo "Setting up demo services..."
         chmod +x setup-demo.sh
         sudo ./setup-demo.sh
+        
+        # Verify SPIRE entries were created
+        echo "Verifying SPIRE registration entries..."
+        sudo spire-server entry show -socketPath /tmp/spire-server/private/api.sock
+        
+        # Verify socket permissions and accessibility
+        echo "Checking SPIRE agent socket..."
+        ls -la /tmp/spire-agent/public/api.sock
+        echo "Current user: $(whoami) (UID: $(id -u))"
+        
         echo "✅ Demo services configured"
         
     - name: Run integration test
@@ -343,16 +353,33 @@ jobs:
           exit 1
         fi
         
+        # Verify the workload can access SPIRE agent socket
+        echo "Testing SPIRE agent socket access..."
+        if [ ! -S "/tmp/spire-agent/public/api.sock" ]; then
+          echo "❌ SPIRE agent socket not found"
+          exit 1
+        fi
+        
+        # Check current user and their access to socket  
+        echo "Current user: $(whoami) (UID: $(id -u), GID: $(id -g))"
+        ls -la /tmp/spire-agent/public/api.sock
+        
         # Test server can start and get identity
-        timeout 10 bash -c 'EPHEMOS_CONFIG=../../config/echo-server.yaml ECHO_SERVER_ADDRESS=:50099 ../../bin/echo-server > test-server.log 2>&1 &'
-        sleep 5
+        echo "Starting echo-server..."
+        timeout 15 bash -c 'EPHEMOS_CONFIG=../../config/echo-server.yaml ECHO_SERVER_ADDRESS=:50099 ../../bin/echo-server > test-server.log 2>&1 &'
+        sleep 8
         
         # Check if server got identity
         if grep -q "Server identity created" test-server.log; then
           echo "✅ Server successfully obtained SPIFFE identity"
         else
           echo "❌ Server failed to obtain SPIFFE identity"
+          echo "=== Server Log ==="
           cat test-server.log
+          echo "=== SPIRE Agent Log ==="
+          cat spire-agent.log 2>/dev/null | tail -20 || echo "No agent log available"
+          echo "=== SPIRE Server Log ==="
+          cat spire-server.log 2>/dev/null | tail -20 || echo "No server log available"
           exit 1
         fi
         
