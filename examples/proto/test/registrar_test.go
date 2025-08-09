@@ -36,28 +36,36 @@ func TestNewEchoServiceRegistrar(t *testing.T) {
 }
 
 func TestEchoServiceRegistrar_Register(t *testing.T) {
-	// Create a mock gRPC server for testing
-	grpcServer := grpc.NewServer()
-	defer grpcServer.Stop()
+	t.Run("valid server registration", func(t *testing.T) {
+		// Create a mock gRPC server for testing
+		grpcServer := grpc.NewServer()
+		defer grpcServer.Stop()
 
-	// Create registrar with mock server
-	mockServer := &MockEchoServer{}
-	registrar := proto.NewEchoServiceRegistrar(mockServer)
+		// Create registrar with mock server
+		mockServer := &MockEchoServer{}
+		registrar := proto.NewEchoServiceRegistrar(mockServer)
 
-	// This should not panic or return error
-	registrar.Register(grpcServer)
+		// This should not panic or return error
+		registrar.Register(grpcServer)
+	})
 
-	// Test with nil server in registrar
-	nilRegistrar := proto.NewEchoServiceRegistrar(nil)
+	t.Run("nil server registration", func(t *testing.T) {
+		// Create separate gRPC server for nil server test
+		grpcServer := grpc.NewServer()
+		defer grpcServer.Stop()
 
-	// This test checks that Register doesn't panic with nil server
-	// The actual gRPC registration may fail, but the registrar should handle it gracefully
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("Register() with nil server panicked: %v", r)
-		}
-	}()
-	nilRegistrar.Register(grpcServer)
+		// Test with nil server in registrar
+		nilRegistrar := proto.NewEchoServiceRegistrar(nil)
+
+		// This test checks that Register doesn't panic with nil server
+		// The actual gRPC registration may fail, but the registrar should handle it gracefully
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("Register() with nil server panicked: %v", r)
+			}
+		}()
+		nilRegistrar.Register(grpcServer)
+	})
 }
 
 func TestEchoServiceRegistrar_Integration(t *testing.T) {
