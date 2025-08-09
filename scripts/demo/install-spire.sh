@@ -50,11 +50,30 @@ sudo mkdir -p ${INSTALL_DIR}
 
 # Download SPIRE
 echo "Downloading SPIRE ${SPIRE_VERSION}..."
-wget -q --show-progress ${SPIRE_URL} -O /tmp/spire.tar.gz
+if ! wget -q --show-progress ${SPIRE_URL} -O /tmp/spire.tar.gz; then
+    echo "❌ Failed to download SPIRE from ${SPIRE_URL}"
+    exit 1
+fi
+
+# Verify download
+if [ ! -f "/tmp/spire.tar.gz" ] || [ ! -s "/tmp/spire.tar.gz" ]; then
+    echo "❌ SPIRE download failed or file is empty"
+    exit 1
+fi
 
 # Extract SPIRE
 echo "Extracting SPIRE..."
-sudo tar -xzf /tmp/spire.tar.gz -C ${INSTALL_DIR} --strip-components=1
+if ! sudo tar -xzf /tmp/spire.tar.gz -C ${INSTALL_DIR} --strip-components=1; then
+    echo "❌ Failed to extract SPIRE"
+    exit 1
+fi
+
+# Verify binaries were extracted
+if [ ! -f "${INSTALL_DIR}/bin/spire-server" ] || [ ! -f "${INSTALL_DIR}/bin/spire-agent" ]; then
+    echo "❌ SPIRE binaries not found in ${INSTALL_DIR}/bin/"
+    ls -la ${INSTALL_DIR}/bin/ 2>/dev/null || echo "Directory does not exist"
+    exit 1
+fi
 
 # Create symlinks
 echo "Creating symlinks..."

@@ -278,7 +278,19 @@ jobs:
       run: |
         cd scripts/demo
         chmod +x install-spire.sh
+        echo "Installing SPIRE..."
         sudo ./install-spire.sh
+        echo "SPIRE installation completed"
+        # Verify installation
+        if [ ! -f "/usr/local/bin/spire-server" ]; then
+          echo "❌ SPIRE server binary not found after installation"
+          exit 1
+        fi
+        if [ ! -f "/usr/local/bin/spire-agent" ]; then
+          echo "❌ SPIRE agent binary not found after installation"
+          exit 1
+        fi
+        echo "✅ SPIRE binaries installed successfully"
         
     - name: Build applications
       run: make build examples
@@ -286,13 +298,37 @@ jobs:
     - name: Start SPIRE services
       run: |
         cd scripts/demo  
+        echo "Starting SPIRE services..."
+        chmod +x start-spire.sh
         sudo ./start-spire.sh
+        echo "Waiting for SPIRE services to start..."
         sleep 10
+        
+        # Verify SPIRE server is running
+        if ! sudo spire-server healthcheck -socketPath /tmp/spire-server/private/api.sock; then
+          echo "❌ SPIRE server health check failed"
+          echo "SPIRE server log:"
+          cat spire-server.log 2>/dev/null || echo "No server log found"
+          exit 1
+        fi
+        
+        # Verify SPIRE agent is running  
+        if ! sudo spire-agent healthcheck -socketPath /tmp/spire-agent/public/api.sock; then
+          echo "❌ SPIRE agent health check failed"
+          echo "SPIRE agent log:"
+          cat spire-agent.log 2>/dev/null || echo "No agent log found"
+          exit 1
+        fi
+        
+        echo "✅ SPIRE services are running"
         
     - name: Set up demo services
       run: |
         cd scripts/demo
+        echo "Setting up demo services..."
+        chmod +x setup-demo.sh
         sudo ./setup-demo.sh
+        echo "✅ Demo services configured"
         
     - name: Run integration test
       run: |
@@ -306,6 +342,7 @@ jobs:
           echo "❌ echo-server binary not found or not executable"
           exit 1
         fi
+        
         # Test server can start and get identity
         timeout 10 bash -c 'EPHEMOS_CONFIG=../../config/echo-server.yaml ECHO_SERVER_ADDRESS=:50099 ../../bin/echo-server > test-server.log 2>&1 &'
         sleep 5

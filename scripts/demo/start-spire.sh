@@ -30,11 +30,11 @@ sudo systemctl stop spire-server 2>/dev/null || true
 sudo spire-server run -config /opt/spire/conf/server.conf > "$SCRIPT_DIR/spire-server.log" 2>&1 &
 SERVER_PID=$!
 echo "SPIRE Server PID: $SERVER_PID"
-sleep 3
+sleep 5  # Give more time to start
 
-# Check if server is running
-if ! kill -0 $SERVER_PID 2>/dev/null; then
-    echo "Error: SPIRE server failed to start. Log:"
+# Check if server process exists (use pgrep to find the actual spire-server process)
+if ! pgrep -f "spire-server.*run" > /dev/null; then
+    echo "Error: SPIRE server process not found. Log:"
     cat "$SCRIPT_DIR/spire-server.log"
     exit 1
 fi
@@ -70,11 +70,11 @@ sudo systemctl stop spire-agent 2>/dev/null || true
 sudo spire-agent run -config /opt/spire/conf/agent.conf > "$SCRIPT_DIR/spire-agent.log" 2>&1 &
 AGENT_PID=$!
 echo "SPIRE Agent PID: $AGENT_PID"
-sleep 2
+sleep 3  # Give more time to start
 
-# Check if agent is running
-if ! kill -0 $AGENT_PID 2>/dev/null; then
-    echo "Error: SPIRE agent failed to start. Log:"
+# Check if agent process exists (use pgrep to find the actual spire-agent process)
+if ! pgrep -f "spire-agent.*run" > /dev/null; then
+    echo "Error: SPIRE agent process not found. Log:"
     cat "$SCRIPT_DIR/spire-agent.log"
     exit 1
 fi

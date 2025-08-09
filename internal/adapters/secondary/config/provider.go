@@ -35,13 +35,13 @@ func (p *FileProvider) LoadConfiguration(ctx context.Context, path string) (*por
 
 	// Clean path first
 	cleanPath := filepath.Clean(path)
-	
+
 	// Convert to absolute path to properly validate
 	absPath, err := filepath.Abs(cleanPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve config file path: %w", err)
 	}
-	
+
 	// Use the absolute path for reading
 	cleanPath = absPath
 
@@ -73,7 +73,7 @@ func (p *FileProvider) LoadConfiguration(ctx context.Context, path string) (*por
 }
 
 // GetDefaultConfiguration gets default.
-func (p *FileProvider) GetDefaultConfiguration(ctx context.Context) *ports.Configuration {
+func (p *FileProvider) GetDefaultConfiguration(_ context.Context) *ports.Configuration {
 	// GetDefaultConfiguration should always return a default configuration
 	// regardless of context state, as it doesn't perform any blocking operations
 
