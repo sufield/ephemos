@@ -184,6 +184,75 @@ Ephemos looks for configuration in these locations (in order):
 
 ## Deployment Questions
 
+### How does certificate acquisition differ between demo and production?
+
+The fundamental SPIFFE/SPIRE mechanism is the same, but the **attestation method** (how services prove their identity) differs significantly:
+
+#### Demo Environment (Local Development)
+- **Attestation**: Unix UID (`unix:uid:0` for root) - any root process gets the certificate
+- **Registration**: Manual via CLI (`ephemos register --name service-name`)
+- **Bootstrap**: Insecure (`insecure_bootstrap = true` in agent config)
+- **Socket Path**: `/tmp/spire-agent/public/api.sock`
+- **Security**: Weak - suitable only for local testing
+
+**Demo Flow:**
+```
+Service → SPIRE Agent: "I'm UID 0 (root)"
+Agent → Service: "Here's certificate for echo-server"
+⚠️ Problem: Any root process gets this certificate!
+```
+
+#### Production Environment
+- **Attestation**: Platform-specific (Kubernetes pods, AWS instances, Docker containers)
+- **Registration**: Automated via CI/CD, operators, or IaC
+- **Bootstrap**: Secure with pre-distributed trust bundles
+- **Socket Path**: `/run/spire/sockets/agent.sock` (standard production path)
+- **Security**: Strong - only the actual workload gets its certificate
+
+**Production Flow (Kubernetes example):**
+```
+Service (in pod) → SPIRE Agent: "I need a certificate"
+Agent → K8s API: "Tell me about this pod"
+K8s API → Agent: "Pod: echo-server-7d4b9, Namespace: prod, ServiceAccount: echo-server"
+Agent → Service: "✓ Verified! Here's certificate for echo-server"
+✅ Only the real echo-server pod gets this certificate!
+```
+
+#### Production Attestation Methods
+
+1. **Kubernetes**: 
+   ```bash
+   -selector k8s:ns:production
+   -selector k8s:sa:echo-server
+   -selector k8s:pod-label:app:echo-server
+   ```
+
+2. **AWS EC2**:
+   ```bash
+   -selector aws_iid:instance-id:i-1234567890
+   -selector aws_iid:tag:Name:echo-server
+   ```
+
+3. **Docker**:
+   ```bash
+   -selector docker:label:app:echo-server
+   -selector docker:image:company/echo-server:v1.2.3
+   ```
+
+#### What Stays the Same
+Your application code using Ephemos remains **identical** in both environments:
+
+```go
+// This code works in BOTH demo and production:
+server := ephemos.NewIdentityServer(ctx, configPath)
+client := ephemos.NewIdentityClient(ctx, configPath)
+```
+
+The differences are only in:
+- How services are registered (manual vs automated)
+- How identities are verified (Unix UID vs platform attestation)
+- Where SPIRE runs (local vs distributed)
+
 ### What are the system requirements?
 
 - **Go Version**: 1.24.5 or later
