@@ -77,6 +77,21 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         
+    - name: Install Protocol Buffers compiler
+      run: |
+        sudo apt update && sudo apt install -y protobuf-compiler
+        
+    - name: Install Go protobuf tools
+      run: |
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+        
+    - name: Download dependencies
+      run: go mod download
+      
+    - name: Generate protobuf code
+      run: make proto
+        
     - name: Run basic security checks
       run: |
         # Use go vet for basic static analysis
@@ -297,6 +312,21 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         
+    - name: Install Protocol Buffers compiler
+      run: |
+        sudo apt update && sudo apt install -y protobuf-compiler
+        
+    - name: Install Go protobuf tools
+      run: |
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+        
+    - name: Download dependencies
+      run: go mod download
+      
+    - name: Generate protobuf code
+      run: make proto
+        
     - name: Install govulncheck
       run: go install golang.org/x/vuln/cmd/govulncheck@latest
       
@@ -325,6 +355,21 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
+        
+    - name: Install Protocol Buffers compiler
+      run: |
+        sudo apt update && sudo apt install -y protobuf-compiler
+        
+    - name: Install Go protobuf tools
+      run: |
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+        
+    - name: Download dependencies
+      run: go mod download
+      
+    - name: Generate protobuf code
+      run: make proto
         
     - name: Run benchmarks
       run: |
