@@ -102,7 +102,11 @@ clean:
 	echo "Clean completed!"
 
 # CI/CD targets
-.PHONY: ci-lint ci-test ci-security ci-build ci-all
+.PHONY: ci-setup ci-lint ci-test ci-security ci-build ci-all
+
+# Setup environment for CI
+ci-setup: proto
+	@echo "CI setup completed - protobuf files generated"
 
 # Run linting checks locally
 ci-lint:

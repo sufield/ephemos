@@ -1,0 +1,41 @@
+name: 'Setup Go Environment'
+description: 'Setup Go with caching and version verification'
+inputs:
+  go-version:
+    description: 'Go version to install'
+    required: false
+    default: '1.24'
+  verify-version:
+    description: 'Whether to verify the Go version matches expected'
+    required: false
+    default: 'true'
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.go-version }}
+        
+    - name: Verify Go version
+      if: ${{ inputs.verify-version == 'true' }}
+      shell: bash
+      run: |
+        echo "Expected Go version: ${{ inputs.go-version }}"
+        echo "Actual Go version: $(go version)"
+        go version | grep -E "(go1\.(23|24))" || (echo "ERROR: Go version is not 1.23 or 1.24" && exit 1)
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ inputs.go-version }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ inputs.go-version }}-
+          ${{ runner.os }}-go-
+          
+    - name: Download dependencies
+      shell: bash
+      run: go mod download
