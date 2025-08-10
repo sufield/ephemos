@@ -11,6 +11,7 @@ import (
 // TestSPIFFEProvider_Conformance runs the IdentityProvider contract suite against SPIFFE provider.
 func TestSPIFFEProvider_Conformance(t *testing.T) {
 	identityprovider.Run(t, func(t *testing.T) ports.IdentityProvider {
+		t.Helper()
 		// Create SPIFFE provider with default config
 		provider, err := spiffe.NewProvider(nil)
 		if err != nil {

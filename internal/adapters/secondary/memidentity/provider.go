@@ -13,7 +13,7 @@ import (
 type Provider struct {
 	mu       sync.RWMutex
 	identity *domain.ServiceIdentity
-	cert     *domain.Certificate  
+	cert     *domain.Certificate
 	bundle   *domain.TrustBundle
 	closed   bool
 }
@@ -22,11 +22,11 @@ type Provider struct {
 func New() *Provider {
 	// Create fake X.509 certificate for testing
 	fakeCert := &x509.Certificate{}
-	
+
 	return &Provider{
 		identity: &domain.ServiceIdentity{
 			Name:   "test-service",
-			Domain: "example.com", 
+			Domain: "example.com",
 			URI:    "spiffe://example.com/test-service",
 		},
 		cert: &domain.Certificate{
@@ -60,11 +60,11 @@ func (p *Provider) WithCertificate(cert *domain.Certificate) *Provider {
 func (p *Provider) GetServiceIdentity() (*domain.ServiceIdentity, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	if p.closed {
 		return nil, ports.ErrIdentityNotFound
 	}
-	
+
 	return p.identity, nil
 }
 
@@ -72,23 +72,23 @@ func (p *Provider) GetServiceIdentity() (*domain.ServiceIdentity, error) {
 func (p *Provider) GetCertificate() (*domain.Certificate, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	if p.closed {
 		return nil, ports.ErrIdentityNotFound
 	}
-	
+
 	return p.cert, nil
 }
 
 // GetTrustBundle returns the configured trust bundle.
 func (p *Provider) GetTrustBundle() (*domain.TrustBundle, error) {
-	p.mu.RLock() 
+	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	if p.closed {
 		return nil, ports.ErrIdentityNotFound
 	}
-	
+
 	return p.bundle, nil
 }
 
