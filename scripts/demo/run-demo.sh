@@ -84,6 +84,43 @@ go build -o bin/echo-server examples/echo-server/main.go || { echo "ERROR: Faile
 # Always rebuild client to ensure it has the correct port
 go build -o bin/echo-client examples/echo-client/main.go || { echo "ERROR: Failed to build echo-client"; exit 1; }
 
+# Register SPIRE entries before starting services
+echo "Registering SPIRE entries..."
+# Get the UID that will run the services
+ACTUAL_UID=$(id -u)
+ACTUAL_USER=$(whoami)
+echo "Services will run as user: $ACTUAL_USER (UID: $ACTUAL_UID)"
+
+# Register echo-server with correct UID
+echo "Registering echo-server with unix:uid:$ACTUAL_UID selector..."
+if sudo spire-server entry create \
+    -socketPath /tmp/spire-server/private/api.sock \
+    -spiffeID spiffe://example.org/echo-server \
+    -parentID spiffe://example.org/spire-agent \
+    -selector unix:uid:$ACTUAL_UID \
+    -ttl 3600 2>/dev/null; then
+    echo "✓ Echo-server entry created successfully"
+else
+    echo "✓ Echo-server entry already exists or creation failed, continuing..."
+fi
+
+# Register echo-client with correct UID
+echo "Registering echo-client with unix:uid:$ACTUAL_UID selector..."
+if sudo spire-server entry create \
+    -socketPath /tmp/spire-server/private/api.sock \
+    -spiffeID spiffe://example.org/echo-client \
+    -parentID spiffe://example.org/spire-agent \
+    -selector unix:uid:$ACTUAL_UID \
+    -ttl 3600 2>/dev/null; then
+    echo "✓ Echo-client entry created successfully"
+else
+    echo "✓ Echo-client entry already exists or creation failed, continuing..."
+fi
+
+# Wait a moment for entries to propagate
+echo "Waiting for SPIRE entries to propagate..."
+sleep 3
+
 # Start echo-server in background and capture output
 echo "Starting echo-server on port ${ECHO_SERVER_ADDRESS:-:50051}..."
 EPHEMOS_CONFIG=config/echo-server.yaml ECHO_SERVER_ADDRESS=${ECHO_SERVER_ADDRESS:-:50051} ./bin/echo-server > scripts/demo/server.log 2>&1 &
