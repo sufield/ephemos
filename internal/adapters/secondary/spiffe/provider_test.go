@@ -192,7 +192,8 @@ func BenchmarkNewProvider(b *testing.B) {
 	}
 }
 
-// Note: Tests that require actual SPIRE infrastructure are omitted
+
+// Note: Tests that require actual SPIRE infrastructure are omitted  
 // as they would timeout in CI/testing environments without SPIRE running.
 // These methods (GetServiceIdentity, GetCertificate, GetTrustBundle, GetTLSConfig)
 // are integration-tested in environments with SPIRE running.
