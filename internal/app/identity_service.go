@@ -1,22 +1,20 @@
-// Package services provides core business logic services.
-package services
+// Package app provides application use cases and orchestration logic.
+package app
 
 import (
 	"fmt"
 	"sync"
 
-	"github.com/sufield/ephemos/internal/core/domain"
-	"github.com/sufield/ephemos/internal/core/errors"
-	"github.com/sufield/ephemos/internal/core/ports"
+	"github.com/sufield/ephemos/internal/domain"
 )
 
 // IdentityService manages service identities and provides authenticated transport.
 // It handles certificate management, identity validation, and secure connection establishment.
 // The service caches validated identities for performance and thread-safety.
 type IdentityService struct {
-	identityProvider  ports.IdentityProvider
-	transportProvider ports.TransportProvider
-	config            *ports.Configuration
+	identityProvider  IdentityProvider
+	transportProvider TransportProvider
+	config            *Configuration
 	cachedIdentity    *domain.ServiceIdentity
 	mu                sync.RWMutex
 }
@@ -25,12 +23,12 @@ type IdentityService struct {
 // The configuration is validated and cached during initialization for better performance.
 // Returns an error if the configuration is invalid.
 func NewIdentityService(
-	identityProvider ports.IdentityProvider,
-	transportProvider ports.TransportProvider,
-	config *ports.Configuration,
+	identityProvider IdentityProvider,
+	transportProvider TransportProvider,
+	config *Configuration,
 ) (*IdentityService, error) {
 	if config == nil {
-		return nil, &errors.ValidationError{
+		return nil, &ValidationError{
 			Field:   "config",
 			Value:   nil,
 			Message: "configuration cannot be nil",
@@ -58,7 +56,7 @@ func NewIdentityService(
 // CreateServerIdentity creates a server with identity-based authentication.
 // Uses the cached identity and configuration to avoid redundant validation.
 // Returns a configured server ready for service registration.
-func (s *IdentityService) CreateServerIdentity() (ports.Server, error) {
+func (s *IdentityService) CreateServerIdentity() (Server, error) {
 	s.mu.RLock()
 	identity := s.cachedIdentity
 	config := s.config
@@ -90,7 +88,7 @@ func (s *IdentityService) CreateServerIdentity() (ports.Server, error) {
 // CreateClientIdentity creates a client connection with identity-based authentication.
 // Uses the cached identity and configuration to avoid redundant validation.
 // Returns a client ready for establishing secure connections to servers.
-func (s *IdentityService) CreateClientIdentity() (ports.Client, error) {
+func (s *IdentityService) CreateClientIdentity() (Client, error) {
 	s.mu.RLock()
 	identity := s.cachedIdentity
 	config := s.config
