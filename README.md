@@ -5,6 +5,7 @@ Ephemos is a Go library that provides identity-based authentication for backend 
 ## Features
 
 - **Simple API**: One-line setup for both servers and clients
+- **No Plaintext API Keys**: No more leaking plaintext secrets
 - **Abstraction**: No SPIFFE/SPIRE terminology exposed to developers
 - **Automatic Certificate Rotation**: Transparent handling of certificate lifecycle
 - **Elegant Architecture**: Hexagonal architecture with proper separation of concerns
