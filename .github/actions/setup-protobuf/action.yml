@@ -1,0 +1,55 @@
+name: 'Setup Protocol Buffers'
+description: 'Install protobuf compiler and Go protobuf tools'
+inputs:
+  verify-installation:
+    description: 'Whether to verify protobuf tools are properly installed'
+    required: false
+    default: 'false'
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Protocol Buffers compiler (Ubuntu)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        echo "Installing protobuf compiler for Ubuntu..."
+        sudo apt update && sudo apt install -y protobuf-compiler
+        
+    - name: Install Protocol Buffers compiler (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        echo "Installing protobuf compiler for macOS..."
+        brew install protobuf
+        
+    - name: Install Protocol Buffers compiler (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        echo "Installing protobuf compiler for Windows..."
+        choco install protoc
+        
+    - name: Install Go protobuf tools
+      shell: bash
+      run: |
+        echo "Installing Go protobuf tools..."
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+        
+    - name: Verify installation
+      if: ${{ inputs.verify-installation == 'true' }}
+      shell: bash
+      run: |
+        echo "Verifying protoc installation..."
+        which protoc || (echo "❌ protoc not found after installation" && exit 1)
+        protoc --version || (echo "❌ protoc version check failed" && exit 1)
+        echo "✅ protoc installed successfully"
+        
+        echo "Verifying Go protobuf tools..."
+        which protoc-gen-go || (echo "❌ protoc-gen-go not found" && exit 1)
+        which protoc-gen-go-grpc || (echo "❌ protoc-gen-go-grpc not found" && exit 1)
+        echo "✅ Go protobuf tools installed successfully"
+        
+    - name: Generate protobuf code
+      shell: bash
+      run: make proto

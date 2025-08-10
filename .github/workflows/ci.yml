@@ -21,53 +21,25 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up Go
-      uses: actions/setup-go@v5
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Verify Go version
-      run: |
-        echo "Expected Go version: ${{ env.GO_VERSION }}"
-        echo "Actual Go version: $(go version)"
-        go version | grep -E "(go1\.(23|24))" || (echo "ERROR: Go version is not 1.23 or 1.24" && exit 1)
-        
-    - name: Cache Go modules
-      uses: actions/cache@v4
+    - name: Setup Protocol Buffers
+      uses: ./.github/actions/setup-protobuf
       with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
-          
-    - name: Install Protocol Buffers compiler
-      run: |
-        sudo apt update && sudo apt install -y protobuf-compiler
+        verify-installation: true
         
-    - name: Install Go protobuf tools
-      run: |
-        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-        
-    - name: Download dependencies
-      run: go mod download
-      
-    - name: Generate protobuf code
-      run: make proto
-      
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v6
       with:
         version: latest
         args: --timeout=5m --config=.golangci.yml
       
-    - name: Go vet
-      run: go vet ./...
-      
-    - name: Go fmt check
+    - name: Additional checks
       run: |
+        go vet ./...
         if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
           echo "The following files are not properly formatted:"
           gofmt -s -l .
@@ -82,31 +54,13 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up Go
-      uses: actions/setup-go@v5
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Install Protocol Buffers compiler
-      run: |
-        sudo apt update && sudo apt install -y protobuf-compiler
-        
-    - name: Install Go protobuf tools
-      run: |
-        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-        
-    - name: Download dependencies
-      run: go mod download
-      
-    - name: Generate protobuf code
-      run: make proto
-        
-    - name: Run basic security checks
-      run: |
-        # Use go vet for basic static analysis
-        go vet ./...
-        echo "Basic security checks completed"
+    - name: Setup and run security checks
+      run: make ci-setup && make ci-security
 
   # Build Matrix
   build:
@@ -120,69 +74,25 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up Go
-      uses: actions/setup-go@v5
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
       with:
         go-version: ${{ matrix.go-version }}
         
-    - name: Verify Go version
-      run: |
-        echo "Expected Go version: ${{ matrix.go-version }}"
-        echo "Actual Go version: $(go version)"
-        go version | grep -E "(go1\.(23|24))" || (echo "ERROR: Go version is not 1.23 or 1.24" && exit 1)
-        
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-${{ matrix.go-version }}-
-          ${{ runner.os }}-go-
-          
-    - name: Install Protocol Buffers compiler
-      run: |
-        if [[ "${{ matrix.os }}" == "ubuntu-latest" ]] || [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-            sudo apt update && sudo apt install -y protobuf-compiler
-          else
-            brew install protobuf
-          fi
-        elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-          choco install protoc
-        fi
-      shell: bash
+    - name: Setup Protocol Buffers
+      uses: ./.github/actions/setup-protobuf
       
-    - name: Install Go protobuf tools
+    - name: Build and verify
       run: |
-        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-      
-    - name: Download dependencies
-      run: go mod download
-      
-    - name: Generate protobuf code
-      run: make proto
-      
-    - name: Build CLI
-      run: go build -v -o bin/ephemos ./cmd/ephemos-cli
-      
-    - name: Build examples
-      run: |
-        go build -v -o bin/echo-server ./examples/echo-server
-        go build -v -o bin/echo-client ./examples/echo-client
-        
-    - name: Verify builds
-      shell: bash
-      run: |
+        make ci-build
         ./bin/ephemos --help
+        # Platform-specific binary testing
         if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
           ./bin/echo-server.exe --help || echo "Server help not available"
         else
           ./bin/echo-server --help || echo "Server help not available"
         fi
+      shell: bash
 
   # Testing
   test:
@@ -196,52 +106,16 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up Go
-      uses: actions/setup-go@v5
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
       with:
         go-version: ${{ matrix.go-version }}
         
-    - name: Verify Go version
-      run: |
-        echo "Expected Go version: ${{ matrix.go-version }}"
-        echo "Actual Go version: $(go version)"
-        go version | grep -E "(go1\.(23|24))" || (echo "ERROR: Go version is not 1.23 or 1.24" && exit 1)
-        
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-${{ matrix.go-version }}-
-          
-    - name: Install Protocol Buffers compiler
-      run: |
-        if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-          sudo apt update && sudo apt install -y protobuf-compiler
-        else
-          brew install protobuf
-        fi
-      shell: bash
+    - name: Setup Protocol Buffers
+      uses: ./.github/actions/setup-protobuf
       
-    - name: Install Go protobuf tools
-      run: |
-        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-      
-    - name: Download dependencies
-      run: go mod download
-      
-    - name: Generate protobuf code
-      run: make proto
-      
-    - name: Run tests with race detection
-      run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
-      
-    - name: Generate coverage report
-      run: go tool cover -html=coverage.out -o coverage.html
+    - name: Run tests and generate coverage
+      run: make ci-setup && make ci-test
       
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
@@ -260,30 +134,15 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up Go
-      uses: actions/setup-go@v5
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Install Protocol Buffers compiler
-      run: |
-        echo "Updating package list..."
-        sudo apt update
-        echo "Installing protobuf-compiler..."
-        sudo apt install -y protobuf-compiler
-        # Verify installation
-        echo "Verifying protoc installation..."
-        which protoc || (echo "❌ protoc not found after installation" && exit 1)
-        protoc --version || (echo "❌ protoc version check failed" && exit 1)
-        echo "✅ protoc installed successfully"
-        
-    - name: Install Go protobuf tools
-      run: |
-        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-        # Verify Go plugins are in PATH
-        which protoc-gen-go
-        which protoc-gen-go-grpc
+    - name: Setup Protocol Buffers
+      uses: ./.github/actions/setup-protobuf
+      with:
+        verify-installation: true
         
     - name: Install SPIRE
       run: |
@@ -304,11 +163,7 @@ jobs:
         echo "✅ SPIRE binaries installed successfully"
         
     - name: Build applications
-      run: |
-        echo "Checking protoc availability..."
-        which protoc || echo "protoc not found in PATH"
-        echo "PATH: $PATH"
-        make build examples
+      run: make ci-build
       
     - name: Start SPIRE services
       run: |
@@ -414,38 +269,24 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up Go
-      uses: actions/setup-go@v5
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Install Protocol Buffers compiler
+    - name: Setup and run dependency checks
       run: |
-        sudo apt update && sudo apt install -y protobuf-compiler
+        make ci-setup
+        # Install govulncheck
+        go install golang.org/x/vuln/cmd/govulncheck@latest
         
-    - name: Install Go protobuf tools
-      run: |
-        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-        
-    - name: Download dependencies
-      run: go mod download
-      
-    - name: Generate protobuf code
-      run: make proto
-        
-    - name: Install govulncheck
-      run: go install golang.org/x/vuln/cmd/govulncheck@latest
-      
-    - name: Check dependencies for vulnerabilities
-      run: |
+        # Check dependencies for vulnerabilities
         govulncheck ./...
         
-    - name: Go mod verify
-      run: go mod verify
-      
-    - name: Check for unused dependencies
-      run: |
+        # Go mod verify
+        go mod verify
+        
+        # Check for unused dependencies
         go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
         golangci-lint run --disable-all --enable unused --config=/dev/null
 
@@ -458,28 +299,17 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up Go
-      uses: actions/setup-go@v5
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Install Protocol Buffers compiler
-      run: |
-        sudo apt update && sudo apt install -y protobuf-compiler
-        
-    - name: Install Go protobuf tools
-      run: |
-        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-        
-    - name: Download dependencies
-      run: go mod download
-      
-    - name: Generate protobuf code
-      run: make proto
+    - name: Setup Protocol Buffers
+      uses: ./.github/actions/setup-protobuf
         
     - name: Run benchmarks
       run: |
+        make ci-setup
         go test -bench=. -benchmem ./... > benchmark.txt 2>&1
         echo "## Benchmark Results" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
@@ -498,17 +328,20 @@ jobs:
       with:
         fetch-depth: 0
         
-    - name: Set up Go
-      uses: actions/setup-go@v5
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
       with:
         go-version: ${{ env.GO_VERSION }}
         
+    - name: Setup Protocol Buffers
+      uses: ./.github/actions/setup-protobuf
+        
     - name: Install cross-compilation tools
-      run: |
-        go install github.com/goreleaser/goreleaser@latest
+      run: go install github.com/goreleaser/goreleaser@latest
         
     - name: Create release builds
       run: |
+        make ci-setup
         mkdir -p dist
         
         # Build for multiple platforms
