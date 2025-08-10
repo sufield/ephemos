@@ -268,11 +268,17 @@ jobs:
     - name: Install Protocol Buffers compiler
       run: |
         sudo apt update && sudo apt install -y protobuf-compiler
+        # Verify installation
+        which protoc
+        protoc --version
         
     - name: Install Go protobuf tools
       run: |
         go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
         go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+        # Verify Go plugins are in PATH
+        which protoc-gen-go
+        which protoc-gen-go-grpc
         
     - name: Install SPIRE
       run: |

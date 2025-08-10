@@ -98,6 +98,7 @@ spire-agent.conf
 
 # Generated protobuf files
 *.pb.go
+internal/proto/
 
 # Demo logs and PIDs
 scripts/demo/*.log
