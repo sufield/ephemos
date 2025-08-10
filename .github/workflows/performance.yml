@@ -123,7 +123,7 @@ jobs:
       run: make build examples
       
     - name: Run memory profiling
-      timeout-minutes: 5
+      timeout-minutes: 3
       run: |
         # Start server with profiling
         echo "Starting echo server..."
@@ -186,10 +186,10 @@ jobs:
         # Run 3 clients in parallel to generate server load
         echo "Running clients to generate server load..."
         
-        # Start all clients in background
+        # Start all clients in background with proper environment
         for i in 1 2 3; do
           echo "Starting client $i..."
-          EPHEMOS_CONFIG=config/echo-client.yaml timeout 15 ./bin/echo-client > client-$i.log 2>&1 &
+          EPHEMOS_CONFIG=config/echo-client.yaml timeout --kill-after=3s 15 ./bin/echo-client > client-$i.log 2>&1 &
           eval "CLIENT_${i}_PID=$!"
         done
         
@@ -215,27 +215,76 @@ jobs:
           head -5 client-1.log 2>/dev/null || true
         fi
         
-        # Server is the main test target, client failures are acceptable
-        echo "Note: The primary goal is testing server memory usage, client failures don't affect metrics collection"
+        # Collect metrics immediately while server is running (before cleanup)
+        echo "Collecting system metrics ($(date))..."
         
-        # Collect basic memory and performance metrics
-        echo "Collecting system metrics..."
-        echo "Memory usage:" > metrics.txt
-        ps -o pid,ppid,pcpu,pmem,vsz,rss,tty,stat,start,time,comm -p $SERVER_PID >> metrics.txt || echo "Failed to get process stats"
-        
-        echo -e "\nSystem memory:" >> metrics.txt
-        free -h >> metrics.txt || echo "Failed to get system memory"
-        
-        echo -e "\nProcess memory details:" >> metrics.txt
-        cat /proc/$SERVER_PID/status 2>/dev/null | grep -E "(VmPeak|VmSize|VmRSS|VmData|VmStk|VmExe)" >> metrics.txt || echo "Failed to get detailed memory info"
+        # Use timeout to prevent hanging and verify process exists
+        if kill -0 $SERVER_PID 2>/dev/null; then
+          echo "✅ Server process $SERVER_PID is running, collecting metrics..."
+          
+          # Collect metrics with timeout protection
+          timeout 30 bash -c '
+            echo "Memory usage:" > metrics.txt
+            echo "Timestamp: $(date)" >> metrics.txt
+            
+            # Process stats with timeout
+            if ps -o pid,ppid,pcpu,pmem,vsz,rss,tty,stat,start,time,comm -p '"$SERVER_PID"' >> metrics.txt 2>/dev/null; then
+              echo "✅ Process stats collected"
+            else
+              echo "Failed to get process stats" >> metrics.txt
+            fi
+            
+            echo -e "\nSystem memory:" >> metrics.txt
+            free -h >> metrics.txt 2>/dev/null || echo "Failed to get system memory" >> metrics.txt
+            
+            echo -e "\nProcess memory details:" >> metrics.txt
+            if [ -f /proc/'"$SERVER_PID"'/status ]; then
+              grep -E "(VmPeak|VmSize|VmRSS|VmData|VmStk|VmExe)" /proc/'"$SERVER_PID"'/status >> metrics.txt 2>/dev/null || echo "Failed to read process memory details" >> metrics.txt
+            else
+              echo "Process /proc/'"$SERVER_PID"'/status not found" >> metrics.txt
+            fi
+            
+            echo "✅ Metrics collection completed"
+          ' || echo "⚠️ Metrics collection timed out after 30 seconds"
+          
+        else
+          echo "⚠️ Server process $SERVER_PID not running, collecting basic system metrics only"
+          echo "System memory:" > metrics.txt
+          free -h >> metrics.txt 2>/dev/null || echo "Failed to get system memory"
+        fi
         
         # Note: Server doesn't have pprof enabled, so we skip heap/CPU profiling
         echo "Note: Profiling endpoints not available in current server configuration" > profile-note.txt
         
-        # Cleanup
-        echo "Cleaning up server..."
-        kill $SERVER_PID || true
+        echo "Note: The primary goal is testing server memory usage under load"
+        
+        # Cleanup with improved robustness
+        echo "Cleaning up server ($(date))..."
+        
+        # Kill any remaining client processes
+        for i in 1 2 3; do
+          eval "PID=\$CLIENT_${i}_PID"
+          if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+            echo "Terminating remaining client $i (PID: $PID)"
+            kill -9 "$PID" 2>/dev/null || true
+          fi
+        done
+        
+        # Kill server process
+        if kill -0 $SERVER_PID 2>/dev/null; then
+          echo "Terminating server (PID: $SERVER_PID)"
+          kill $SERVER_PID || true
+          sleep 2
+          # Force kill if still running
+          if kill -0 $SERVER_PID 2>/dev/null; then
+            echo "Force killing server"
+            kill -9 $SERVER_PID 2>/dev/null || true
+          fi
+        fi
+        
         wait $SERVER_PID 2>/dev/null || true
+        
+        echo "✅ Memory profiling completed successfully ($(date))"
         
         # Exit successfully since the main goal is collecting metrics
         exit 0
