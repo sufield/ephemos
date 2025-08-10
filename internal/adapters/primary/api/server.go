@@ -96,7 +96,7 @@ func (s *IdentityServer) RegisterService(ctx context.Context, serviceRegistrar S
 	if err := s.domainServer.RegisterService(portServiceRegistrar); err != nil {
 		return fmt.Errorf("failed to register service: %w", err)
 	}
-	
+
 	slog.Info("Service registered successfully", "service", s.serviceName)
 	return nil
 }
@@ -122,7 +122,7 @@ func (s *IdentityServer) Serve(ctx context.Context, listener net.Listener) error
 	s.mu.Unlock()
 
 	slog.Info("Server ready", "service", s.serviceName, "address", listener.Addr().String())
-	
+
 	// Adapt net.Listener to ports.Listener
 	portListener := transport.NewNetListener(listener)
 	if err := s.domainServer.Start(portListener); err != nil {
@@ -146,7 +146,7 @@ func (s *IdentityServer) Close() error {
 	return nil
 }
 
-func (s *IdentityServer) initializeServer(ctx context.Context) error {
+func (s *IdentityServer) initializeServer(_ context.Context) error {
 	server, err := s.identityService.CreateServerIdentity()
 	if err != nil {
 		return fmt.Errorf("failed to create server identity: %w", err)

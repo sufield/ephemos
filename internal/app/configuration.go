@@ -1,5 +1,5 @@
-// Package ports defines interfaces for core services and domain boundaries.
-package ports
+// Package app defines interfaces for core services and domain boundaries.
+package app
 
 import (
 	"context"
