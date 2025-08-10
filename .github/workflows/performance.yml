@@ -167,34 +167,14 @@ jobs:
         ls -la /tmp/spire-agent/public/api.sock 2>/dev/null || echo "SPIFFE socket not found"
         sudo spire-server entry show -socketPath /tmp/spire-server/private/api.sock 2>/dev/null | head -20 || echo "Could not list SPIFFE entries"
         
-        # Re-register entries with current user's UID
-        echo "Re-registering SPIFFE entries for current user..."
+        # Check if entries need updating
+        echo "Verifying SPIFFE entries match current user..."
         CURRENT_UID=$(id -u)
-        
-        # Delete old entries and create new ones with correct UID
-        sudo spire-server entry delete -socketPath /tmp/spire-server/private/api.sock \
-          -spiffeID spiffe://example.org/echo-server 2>/dev/null || true
-        sudo spire-server entry delete -socketPath /tmp/spire-server/private/api.sock \
-          -spiffeID spiffe://example.org/echo-client 2>/dev/null || true
-          
-        sudo spire-server entry create -socketPath /tmp/spire-server/private/api.sock \
-          -spiffeID spiffe://example.org/echo-server \
-          -parentID spiffe://example.org/spire-agent \
-          -selector unix:uid:${CURRENT_UID} \
-          -ttl 3600 || echo "Failed to create server entry"
-          
-        sudo spire-server entry create -socketPath /tmp/spire-server/private/api.sock \
-          -spiffeID spiffe://example.org/echo-client \
-          -parentID spiffe://example.org/spire-agent \
-          -selector unix:uid:${CURRENT_UID} \
-          -ttl 3600 || echo "Failed to create client entry"
-          
-        echo "Updated SPIFFE entries:"
-        sudo spire-server entry show -socketPath /tmp/spire-server/private/api.sock | grep -A2 "uid:${CURRENT_UID}"
-        
-        # Give SPIRE time to propagate the new entries
-        echo "Waiting for SPIFFE entries to propagate..."
-        sleep 5
+        if sudo spire-server entry show -socketPath /tmp/spire-server/private/api.sock | grep -q "uid:${CURRENT_UID}"; then
+          echo "✅ SPIFFE entries already configured for UID ${CURRENT_UID}"
+        else
+          echo "❌ SPIFFE entries need updating for UID ${CURRENT_UID}"
+        fi
         
         # Run limited client load
         echo "Running client load test..."
@@ -202,14 +182,14 @@ jobs:
         
         # First client with verbose output for debugging
         echo "Running first client with debug output:"
-        timeout 5 EPHEMOS_CONFIG=config/echo-client.yaml ./bin/echo-client 2>&1 | head -10 || echo "First client failed (exit code: $?)"
+        EPHEMOS_CONFIG=config/echo-client.yaml timeout 5 ./bin/echo-client 2>&1 | head -10 || echo "First client failed (exit code: $?)"
         
         # Run remaining clients
         SUCCESSFUL_CLIENTS=0
         FAILED_CLIENTS=0
         
         for i in {2..5}; do
-          if timeout 3 EPHEMOS_CONFIG=config/echo-client.yaml ./bin/echo-client > /dev/null 2>&1; then
+          if EPHEMOS_CONFIG=config/echo-client.yaml timeout 3 ./bin/echo-client > /dev/null 2>&1; then
             echo "Client $i succeeded"
             ((SUCCESSFUL_CLIENTS++))
           else
