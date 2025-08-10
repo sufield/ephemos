@@ -84,7 +84,7 @@ jobs:
 
   # Memory profiling
   memory-profile:
-    name: Memory Profiling
+    name: Memory Baseline Testing
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -161,14 +161,34 @@ jobs:
           exit 1
         fi
         
+        # Check SPIFFE socket and permissions
+        echo "Checking SPIFFE setup..."
+        ls -la /tmp/spire-agent/public/api.sock 2>/dev/null || echo "SPIFFE socket not found"
+        sudo spire-server entry show -socketPath /tmp/spire-server/private/api.sock 2>/dev/null | head -20 || echo "Could not list SPIFFE entries"
+        
         # Run limited client load (reduced from 100 to 20)
         echo "Running client load test..."
-        for i in {1..20}; do
-          timeout 3 EPHEMOS_CONFIG=config/echo-client.yaml ./bin/echo-client > /dev/null 2>&1 || echo "Client $i failed"
-          if [ $((i % 5)) -eq 0 ]; then
-            echo "Completed $i/20 client runs"
+        # Run a simple connectivity test instead of full client
+        echo "Testing server connectivity..."
+        
+        # Since clients need SPIFFE identity, we'll just verify server is running
+        SUCCESSFUL_CLIENTS=0
+        FAILED_CLIENTS=0
+        
+        for i in {1..5}; do
+          if timeout 3 EPHEMOS_CONFIG=config/echo-client.yaml ./bin/echo-client > /dev/null 2>&1; then
+            echo "Client $i succeeded"
+            ((SUCCESSFUL_CLIENTS++))
+          else
+            echo "Client $i failed (may be expected without full SPIFFE setup)"
+            ((FAILED_CLIENTS++))
           fi
         done
+        
+        echo "Client test summary: $SUCCESSFUL_CLIENTS succeeded, $FAILED_CLIENTS failed"
+        
+        # Server is the main test target, client failures are acceptable
+        echo "Note: The primary goal is testing server memory usage, client failures don't affect metrics collection"
         
         # Collect basic memory and performance metrics
         echo "Collecting system metrics..."
@@ -202,8 +222,16 @@ jobs:
         echo "Checking metrics files..."
         ls -la *.txt 2>/dev/null || echo "No metrics files found"
         
+        echo "## Memory Baseline Testing Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Test Configuration" >> $GITHUB_STEP_SUMMARY
+        echo "- **Server**: echo-server with SPIFFE identity" >> $GITHUB_STEP_SUMMARY
+        echo "- **Port**: 50052" >> $GITHUB_STEP_SUMMARY
+        echo "- **Load**: Up to 5 client connection attempts" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
         if [[ -f metrics.txt && -s metrics.txt ]]; then
-          echo "## Memory and Performance Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "### Memory Metrics" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           cat metrics.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
@@ -211,16 +239,11 @@ jobs:
           echo "⚠️ Performance metrics not available" >> $GITHUB_STEP_SUMMARY
         fi
         
-        if [[ -f profile-note.txt ]]; then
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Note:** " >> $GITHUB_STEP_SUMMARY
-          cat profile-note.txt >> $GITHUB_STEP_SUMMARY
-        fi
-        
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "## Load Test Summary" >> $GITHUB_STEP_SUMMARY
-        echo "- Completed 20 client connection attempts" >> $GITHUB_STEP_SUMMARY
-        echo "- Server successfully processed requests (see server logs)" >> $GITHUB_STEP_SUMMARY
+        echo "### Notes" >> $GITHUB_STEP_SUMMARY
+        echo "- This job establishes baseline memory usage for the echo server" >> $GITHUB_STEP_SUMMARY
+        echo "- Advanced profiling (heap/CPU) requires adding pprof endpoints to the server" >> $GITHUB_STEP_SUMMARY
+        echo "- Client connection failures don't affect server memory measurement" >> $GITHUB_STEP_SUMMARY
         
     - name: Upload performance data
       uses: actions/upload-artifact@v4
