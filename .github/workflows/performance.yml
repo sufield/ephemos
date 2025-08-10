@@ -125,7 +125,7 @@ jobs:
     - name: Run memory profiling
       run: |
         # Start server with profiling
-        EPHEMOS_CONFIG=config/echo-server.yaml ECHO_SERVER_ADDRESS=:50100 ./bin/echo-server &
+        EPHEMOS_CONFIG=config/echo-server.yaml ECHO_SERVER_ADDRESS=:50052 ./bin/echo-server &
         SERVER_PID=$!
         sleep 5
         
