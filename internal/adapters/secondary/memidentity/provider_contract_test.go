@@ -10,7 +10,7 @@ import (
 
 // TestMemIdentityProvider_Conformance runs the IdentityProvider contract suite against the fake.
 func TestMemIdentityProvider_Conformance(t *testing.T) {
-	identityprovider.Run(t, func(t *testing.T) ports.IdentityProvider {
+	identityprovider.Run(t, func(_ *testing.T) ports.IdentityProvider {
 		return memidentity.New()
 	})
 }
