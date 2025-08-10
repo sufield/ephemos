@@ -183,19 +183,26 @@ jobs:
         echo "Running client load test..."
         echo "Testing server connectivity..."
         
-        # Run 3 clients to generate some load for memory measurement
+        # Run 3 clients in parallel to generate server load
         echo "Running clients to generate server load..."
-        SUCCESSFUL_CLIENTS=0
         
+        # Start all clients in background
         for i in 1 2 3; do
           echo "Starting client $i..."
-          # Client makes 5 requests with 2-second delays = ~12+ seconds total
-          if EPHEMOS_CONFIG=config/echo-client.yaml timeout 15 ./bin/echo-client > client-$i.log 2>&1; then
+          EPHEMOS_CONFIG=config/echo-client.yaml timeout 15 ./bin/echo-client > client-$i.log 2>&1 &
+          eval "CLIENT_${i}_PID=$!"
+        done
+        
+        # Wait for all clients to complete
+        echo "Waiting for clients to complete..."
+        SUCCESSFUL_CLIENTS=0
+        for i in 1 2 3; do
+          eval "PID=\$CLIENT_${i}_PID"
+          if wait $PID 2>/dev/null; then
             echo "✅ Client $i completed successfully"
             SUCCESSFUL_CLIENTS=$((SUCCESSFUL_CLIENTS + 1))
           else
-            EXIT_CODE=$?
-            echo "⚠️ Client $i timed out or failed (exit code: $EXIT_CODE)"
+            echo "⚠️ Client $i failed"
           fi
         done
         
