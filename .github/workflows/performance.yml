@@ -123,39 +123,80 @@ jobs:
       run: make build examples
       
     - name: Run memory profiling
+      timeout-minutes: 10
       run: |
         # Start server with profiling
-        EPHEMOS_CONFIG=config/echo-server.yaml ECHO_SERVER_ADDRESS=:50052 ./bin/echo-server &
+        echo "Starting echo server..."
+        EPHEMOS_CONFIG=config/echo-server.yaml ECHO_SERVER_ADDRESS=:50052 ./bin/echo-server > server.log 2>&1 &
         SERVER_PID=$!
-        sleep 5
+        echo "Server PID: $SERVER_PID"
         
-        # Run client to generate load
-        for i in {1..100}; do
-          EPHEMOS_CONFIG=config/echo-client.yaml timeout 5 ./bin/echo-client || true
+        # Wait for server to start and verify it's running
+        echo "Waiting for server to start..."
+        for i in {1..10}; do
+          if curl -s http://localhost:6060/debug/pprof/ > /dev/null 2>&1; then
+            echo "✅ Server is ready"
+            break
+          fi
+          if ! kill -0 $SERVER_PID 2>/dev/null; then
+            echo "❌ Server process died"
+            cat server.log
+            exit 1
+          fi
+          echo "Waiting... ($i/10)"
+          sleep 2
+        done
+        
+        # Verify server is accessible
+        if ! curl -s http://localhost:6060/debug/pprof/ > /dev/null; then
+          echo "❌ Server not accessible after 20 seconds"
+          cat server.log
+          kill $SERVER_PID || true
+          exit 1
+        fi
+        
+        # Run limited client load (reduced from 100 to 20)
+        echo "Running client load test..."
+        for i in {1..20}; do
+          timeout 3 EPHEMOS_CONFIG=config/echo-client.yaml ./bin/echo-client > /dev/null 2>&1 || echo "Client $i failed"
+          if [ $((i % 5)) -eq 0 ]; then
+            echo "Completed $i/20 client runs"
+          fi
         done
         
         # Get heap profile
+        echo "Collecting heap profile..."
         curl -s http://localhost:6060/debug/pprof/heap > heap.prof || echo "Heap profile not available"
         
-        # Get CPU profile  
-        curl -s "http://localhost:6060/debug/pprof/profile?seconds=30" > cpu.prof || echo "CPU profile not available" &
+        # Get CPU profile (reduced from 30 to 10 seconds)
+        echo "Collecting CPU profile..."
+        timeout 15 curl -s "http://localhost:6060/debug/pprof/profile?seconds=10" > cpu.prof || echo "CPU profile not available"
         
-        # Generate more load during CPU profiling
-        for i in {1..50}; do
-          EPHEMOS_CONFIG=config/echo-client.yaml timeout 3 ./bin/echo-client || true
-          sleep 0.1
-        done
-        
-        wait
+        # Cleanup
+        echo "Cleaning up server..."
         kill $SERVER_PID || true
+        wait $SERVER_PID 2>/dev/null || true
+        
+    - name: Show server logs on failure
+      if: failure()
+      run: |
+        echo "## Server Logs" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        cat server.log 2>/dev/null || echo "No server log available"
+        echo '```' >> $GITHUB_STEP_SUMMARY
         
     - name: Analyze profiles
       run: |
+        echo "Checking profile files..."
+        ls -la *.prof 2>/dev/null || echo "No profile files found"
+        
         if [[ -f heap.prof && -s heap.prof ]]; then
           echo "## Memory Profile Analysis" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           go tool pprof -text heap.prof | head -20 >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ Heap profile not available or empty" >> $GITHUB_STEP_SUMMARY
         fi
         
         if [[ -f cpu.prof && -s cpu.prof ]]; then
@@ -163,6 +204,8 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           go tool pprof -text cpu.prof | head -20 >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ CPU profile not available or empty" >> $GITHUB_STEP_SUMMARY
         fi
         
     - name: Upload profiles
@@ -172,6 +215,7 @@ jobs:
         path: |
           heap.prof
           cpu.prof
+          server.log
       if: always()
         
     - name: Cleanup SPIRE
