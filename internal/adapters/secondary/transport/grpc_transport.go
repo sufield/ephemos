@@ -47,7 +47,7 @@ func (p *GRPCProvider) CreateServer(
 	}
 
 	grpcServer := grpc.NewServer(opts...)
-	
+
 	return &GRPCServer{
 		server: grpcServer,
 	}, nil
@@ -69,7 +69,7 @@ func (p *GRPCProvider) CreateClient(
 
 	creds := credentials.NewTLS(tlsConfig)
 	dialOption := grpc.WithTransportCredentials(creds)
-	
+
 	return &GRPCClient{
 		dialOption: dialOption,
 	}, nil
@@ -94,13 +94,16 @@ func (s *GRPCServer) Start(listener ports.Listener) error {
 	if listener == nil {
 		return fmt.Errorf("listener cannot be nil")
 	}
-	
+
 	// Convert our domain listener to a net.Listener
 	// We know NetListener wraps net.Listener, so extract it
 	if netListener, ok := listener.(*NetListener); ok {
-		return s.server.Serve(netListener.listener)
+		if err := s.server.Serve(netListener.listener); err != nil {
+			return fmt.Errorf("failed to serve: %w", err)
+		}
+		return nil
 	}
-	
+
 	return fmt.Errorf("listener must be a NetListener wrapping net.Listener")
 }
 
@@ -151,7 +154,10 @@ func (c *GRPCConnection) GetClientConnection() interface{} {
 
 // Close closes the connection.
 func (c *GRPCConnection) Close() error {
-	return c.conn.Close()
+	if err := c.conn.Close(); err != nil {
+		return fmt.Errorf("failed to close connection: %w", err)
+	}
+	return nil
 }
 
 // NetListener adapts net.Listener to ports.Listener.
@@ -166,12 +172,19 @@ func NewNetListener(listener net.Listener) ports.Listener {
 
 // Accept waits for and returns the next connection.
 func (l *NetListener) Accept() (interface{}, error) {
-	return l.listener.Accept()
+	conn, err := l.listener.Accept()
+	if err != nil {
+		return nil, fmt.Errorf("failed to accept connection: %w", err)
+	}
+	return conn, nil
 }
 
 // Close closes the listener.
 func (l *NetListener) Close() error {
-	return l.listener.Close()
+	if err := l.listener.Close(); err != nil {
+		return fmt.Errorf("failed to close listener: %w", err)
+	}
+	return nil
 }
 
 // Addr returns the listener's network address.

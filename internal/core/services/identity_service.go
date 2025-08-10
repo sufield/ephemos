@@ -123,12 +123,20 @@ func (s *IdentityService) CreateClientIdentity() (ports.Client, error) {
 func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 	// In a pure domain service, we delegate to the port without exposing context
 	// The adapter layer will handle context management
-	return s.identityProvider.GetCertificate()
+	cert, err := s.identityProvider.GetCertificate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get certificate: %w", err)
+	}
+	return cert, nil
 }
 
 // getTrustBundle retrieves the trust bundle from the identity provider.
 func (s *IdentityService) getTrustBundle() (*domain.TrustBundle, error) {
 	// In a pure domain service, we delegate to the port without exposing context
 	// The adapter layer will handle context management
-	return s.identityProvider.GetTrustBundle()
+	bundle, err := s.identityProvider.GetTrustBundle()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get trust bundle: %w", err)
+	}
+	return bundle, nil
 }
