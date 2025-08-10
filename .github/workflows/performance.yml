@@ -95,6 +95,17 @@ jobs:
       with:
         go-version: '1.24'
         
+    - name: Install Protocol Buffers compiler
+      run: |
+        echo "Installing protoc..."
+        sudo apt update && sudo apt install -y protobuf-compiler
+        which protoc && protoc --version
+        
+    - name: Install Go protobuf tools
+      run: |
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+        
     - name: Install SPIRE (for realistic profiling)
       run: |
         cd scripts/demo
@@ -183,6 +194,17 @@ jobs:
       with:
         go-version: '1.24'
         
+    - name: Install Protocol Buffers compiler
+      run: |
+        echo "Installing protoc..."
+        sudo apt update && sudo apt install -y protobuf-compiler
+        which protoc && protoc --version
+        
+    - name: Install Go protobuf tools
+      run: |
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+        
     - name: Install SPIRE
       run: |
         cd scripts/demo
@@ -209,7 +231,7 @@ jobs:
         
     - name: Create load test script
       run: |
-        cat > load_test.go << 'EOF'
+        cat > loadtest.go << 'EOF'
         package main
         
         import (
@@ -267,7 +289,7 @@ jobs:
         
     - name: Run load test
       run: |
-        go run load_test.go > load-test-results.txt 2>&1
+        go run loadtest.go > load-test-results.txt 2>&1
         
         echo "## Load Test Results" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY

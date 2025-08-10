@@ -65,7 +65,12 @@ jobs:
         for pkg in $(go list ./...); do
           pkg_name=$(basename $pkg)
           echo "Generating docs for $pkg"
-          go doc -all $pkg > docs/api/${pkg_name}.md
+          if go doc -all $pkg > docs/api/${pkg_name}.md 2>/dev/null; then
+            echo "✅ Documentation generated for $pkg"
+          else
+            echo "⚠️  Skipping $pkg (no documentable source files)"
+            rm -f docs/api/${pkg_name}.md
+          fi
         done
         
     - name: Install go-swagger
