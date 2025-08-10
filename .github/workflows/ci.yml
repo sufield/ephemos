@@ -267,10 +267,15 @@ jobs:
         
     - name: Install Protocol Buffers compiler
       run: |
-        sudo apt update && sudo apt install -y protobuf-compiler
+        echo "Updating package list..."
+        sudo apt update
+        echo "Installing protobuf-compiler..."
+        sudo apt install -y protobuf-compiler
         # Verify installation
-        which protoc
-        protoc --version
+        echo "Verifying protoc installation..."
+        which protoc || (echo "❌ protoc not found after installation" && exit 1)
+        protoc --version || (echo "❌ protoc version check failed" && exit 1)
+        echo "✅ protoc installed successfully"
         
     - name: Install Go protobuf tools
       run: |
@@ -299,7 +304,11 @@ jobs:
         echo "✅ SPIRE binaries installed successfully"
         
     - name: Build applications
-      run: make build examples
+      run: |
+        echo "Checking protoc availability..."
+        which protoc || echo "protoc not found in PATH"
+        echo "PATH: $PATH"
+        make build examples
       
     - name: Start SPIRE services
       run: |

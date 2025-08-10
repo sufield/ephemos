@@ -96,9 +96,11 @@ spire-agent.conf
 *.tar
 *.zip
 
-# Generated protobuf files
-*.pb.go
+# Generated protobuf files (except examples)
 internal/proto/
+# Allow examples/proto/*.pb.go to be committed for CI compatibility
+*.pb.go
+!examples/proto/*.pb.go
 
 # Demo logs and PIDs
 scripts/demo/*.log

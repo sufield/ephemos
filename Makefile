@@ -22,10 +22,21 @@ build:
 proto:
 	echo "Generating protobuf code..."
 	mkdir -p $(GO_OUT)
-	$(PROTOC) --go_out=$(GO_OUT) --go_opt=paths=source_relative \
-		--go-grpc_out=$(GO_OUT) --go-grpc_opt=paths=source_relative \
-		-I $(PROTO_DIR) $(PROTO_DIR)/echo.proto
-	echo "Protobuf generation completed!"
+	@if command -v protoc >/dev/null 2>&1; then \
+		$(PROTOC) --go_out=$(GO_OUT) --go_opt=paths=source_relative \
+			--go-grpc_out=$(GO_OUT) --go-grpc_opt=paths=source_relative \
+			-I $(PROTO_DIR) $(PROTO_DIR)/echo.proto && \
+		echo "Protobuf generation completed!"; \
+	else \
+		echo "Warning: protoc not found. Checking if protobuf files already exist..."; \
+		if [ -f "$(GO_OUT)/echo.pb.go" ] && [ -f "$(GO_OUT)/echo_grpc.pb.go" ]; then \
+			echo "✅ Protobuf files already exist, skipping generation"; \
+		else \
+			echo "❌ protoc not found and protobuf files don't exist"; \
+			echo "Please install protoc: apt-get install protobuf-compiler"; \
+			exit 1; \
+		fi; \
+	fi
 
 # Build example applications
 examples: proto
