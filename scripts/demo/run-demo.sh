@@ -117,8 +117,35 @@ else
     echo "✓ Echo-client entry already exists or creation failed, continuing..."
 fi
 
-# Wait a moment for entries to propagate
+# Wait for entries to propagate and verify they're available
 echo "Waiting for SPIRE entries to propagate..."
+sleep 5
+
+# Verify entries are actually registered and available
+echo "Verifying SPIRE entries are available..."
+RETRY_COUNT=0
+MAX_RETRIES=12  # 12 * 5 seconds = 60 seconds max wait
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if sudo spire-server entry show -socketPath /tmp/spire-server/private/api.sock 2>/dev/null | grep -q "echo-server"; then
+        echo "✅ SPIRE entries verified and ready"
+        break
+    else
+        echo "⏳ Waiting for SPIRE entries to be ready... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
+        sleep 5
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+    fi
+done
+
+if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+    echo "❌ TIMEOUT: SPIRE entries not ready after 60 seconds"
+    echo "Current entries:"
+    sudo spire-server entry show -socketPath /tmp/spire-server/private/api.sock 2>/dev/null || echo "Failed to query entries"
+    exit 1
+fi
+
+# Additional wait for agent to process the new entries
+echo "Allowing time for SPIRE agent to process entries..."
 sleep 3
 
 # Start echo-server in background and capture output
@@ -127,13 +154,63 @@ EPHEMOS_CONFIG=config/echo-server.yaml ECHO_SERVER_ADDRESS=${ECHO_SERVER_ADDRESS
 SERVER_PID=$!
 echo "Server PID: $SERVER_PID"
 
-# Wait for server to start and be ready
-sleep 5
+# Wait for server to start and get SPIFFE identity
+echo "Waiting for echo-server to obtain SPIFFE identity..."
+SERVER_READY=false
+WAIT_COUNT=0
+MAX_WAIT=24  # 24 * 5 seconds = 2 minutes max wait
 
-# Check SPIRE health before proceeding
+while [ $WAIT_COUNT -lt $MAX_WAIT ] && [ "$SERVER_READY" = "false" ]; do
+    if [ ! -f scripts/demo/server.log ]; then
+        echo "⏳ Waiting for server log file... (attempt $((WAIT_COUNT + 1))/$MAX_WAIT)"
+        sleep 5
+        WAIT_COUNT=$((WAIT_COUNT + 1))
+        continue
+    fi
+    
+    # Check if server is still running
+    if ! kill -0 $SERVER_PID 2>/dev/null; then
+        echo "❌ Echo-server process died. Check server log:"
+        cat scripts/demo/server.log
+        exit 1
+    fi
+    
+    # Check for successful identity creation
+    if grep -q "Server identity created\|Server ready\|Successfully obtained SPIFFE identity\|Identity service initialized" scripts/demo/server.log; then
+        echo "✅ Echo-server successfully obtained SPIFFE identity"
+        SERVER_READY=true
+        break
+    fi
+    
+    # Check for identity-related errors but continue if they're just temporary
+    if grep -q "failed to get X509 SVID\|No identity issued" scripts/demo/server.log; then
+        echo "⏳ Server attempting to get identity... (attempt $((WAIT_COUNT + 1))/$MAX_WAIT)"
+    elif grep -q "Failed to create identity server" scripts/demo/server.log; then
+        echo "❌ Identity server creation failed - check logs"
+        cat scripts/demo/server.log
+        exit 1
+    else
+        echo "⏳ Waiting for server to start... (attempt $((WAIT_COUNT + 1))/$MAX_WAIT)"
+        # Show last few lines for debugging
+        if [ -f scripts/demo/server.log ]; then
+            echo "   Last server log entries:"
+            tail -3 scripts/demo/server.log | sed 's/^/   /'
+        fi
+    fi
+    
+    sleep 5
+    WAIT_COUNT=$((WAIT_COUNT + 1))
+done
+
+if [ "$SERVER_READY" = "false" ]; then
+    echo "❌ TIMEOUT: Echo-server failed to obtain SPIFFE identity after 2 minutes"
+    echo "Server log content:"
+    cat scripts/demo/server.log
+    exit 1
+fi
+
+# Check SPIRE health
 echo "Checking SPIRE health..."
-# Note: Skipping sudo health checks to avoid password prompts
-# SPIRE processes should be running from previous setup
 ps aux | grep -E "(spire-server|spire-agent)" | grep -v grep > /dev/null || { echo "ERROR: SPIRE processes not found"; exit 1; }
 echo "✓ SPIRE processes detected"
 
