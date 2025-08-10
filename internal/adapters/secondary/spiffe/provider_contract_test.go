@@ -1,6 +1,7 @@
 package spiffe_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
@@ -10,6 +11,11 @@ import (
 
 // TestSPIFFEProvider_Conformance runs the IdentityProvider contract suite against SPIFFE provider.
 func TestSPIFFEProvider_Conformance(t *testing.T) {
+	// Skip if SPIRE agent socket is not available
+	if _, err := os.Stat("/tmp/spire-agent/public/api.sock"); os.IsNotExist(err) {
+		t.Skip("Skipping SPIFFE integration test: SPIRE agent not available")
+	}
+
 	identityprovider.Run(t, func(t *testing.T) ports.IdentityProvider {
 		t.Helper()
 		// Create SPIFFE provider with default config
