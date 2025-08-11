@@ -20,13 +20,31 @@ go.work
 # Built binaries and build artifacts
 bin/
 /build/
+dist/
 *.exe
 *.test
 *.out
+
+# Root level binaries (should never be committed)
 /echo-server
 /echo-client
 /ephemos
 /ephemos-cli
+echo-server
+echo-client
+ephemos
+ephemos-cli
+
+# Test binaries with any name pattern
+cli.test
+interceptors.test
+*.test
+
+# Benchmark files
+benchmark.txt
+benchmark-*.txt
+*.bench
+bench.out
 
 # IDE and editor files
 .vscode/
@@ -44,9 +62,15 @@ bin/
 ehthumbs.db
 Thumbs.db
 
-# Logs
+# Logs and debug files
 *.log
 logs/
+*.logs
+debug.log
+error.log
+test-server.log
+*.debug
+*.trace
 
 # Runtime data
 pids
@@ -54,13 +78,36 @@ pids
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like istanbul
+# Coverage files and reports
 coverage/
+coverage.*
+*.coverage
+*.coverprofile
+coverage.out
+coverage.html
+coverage.xml
+coverage.json
+*.cover
+*.prof
+.coverage
+htmlcov/
 
 # Temporary directories and files
 tmp/
 temp/
 *.tmp
+.temp/
+.tmp/
+
+# Go module download cache
+go.sum.tmp
+go.mod.tmp
+
+# Developer temp files
+*.swp
+*.swo
+.*.swp
+.*.swo
 
 # SPIRE data and configs (runtime generated)
 /data/
