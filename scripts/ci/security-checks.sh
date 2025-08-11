@@ -112,9 +112,15 @@ if find config/ -name "*.yaml" -o -name "*.yml" -o -name "*.json" | xargs ls -l 
 fi
 
 # Check for secret files with wrong permissions
-if [[ -f .secrets ]] && [[ "$(stat -c %a .secrets 2>/dev/null)" != "600" ]]; then
-    echo "❌ .secrets file has incorrect permissions" >&2
-    ((insecure_files++))
+if [[ -f .secrets ]]; then
+    current_perms=$(stat -c %a .secrets 2>/dev/null)
+    echo "Debug: .secrets permissions are: $current_perms" >&2
+    if [[ "$current_perms" != "600" ]]; then
+        echo "❌ .secrets file has incorrect permissions (expected 600, got $current_perms)" >&2
+        ((insecure_files++))
+    else
+        echo "✅ .secrets file has correct permissions (600)" >&2
+    fi
 fi
 
 if [[ $insecure_files -eq 0 ]]; then
