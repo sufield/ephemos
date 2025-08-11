@@ -77,7 +77,11 @@ go mod download
 echo "✅ Modules downloaded"
 echo
 
-echo "🏗️ === ATTEMPTING EXAMPLES BUILD ==="
+echo "🏗️ === BUILDING ALL TARGETS ==="
+echo "Building main CLI binary..."
+make build || echo "❌ Main build failed"
+
+echo "Building examples..."
 make examples || {
     echo "❌ Examples build failed"
     echo "Let's try building each example individually:"
