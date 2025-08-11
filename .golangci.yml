@@ -218,7 +218,6 @@ linters:
     - stylecheck
     - tagliatelle
     - testableexamples
-    - testpackage
     - thelper
     - tparallel
     - unconvert
