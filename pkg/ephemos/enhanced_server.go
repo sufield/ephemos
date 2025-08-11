@@ -182,8 +182,10 @@ func (s *EnhancedServer) Serve(ctx context.Context, listener net.Listener) error
 		cancel() // Cancel the serve context
 		return s.performShutdown(ctx)
 	case <-ctx.Done():
-		// Context canceled externally
-		return s.performShutdown(context.Background())
+		// Context canceled externally - use a fresh context for cleanup
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		return s.performShutdown(shutdownCtx)
 	}
 }
 
