@@ -411,6 +411,10 @@ func CreateClientInterceptors(
 //	ephemos.Mount[ports.EchoService](server, echoService)
 //	server.ListenAndServe(ctx)
 
+// Note: NewTransportServer and Mount are defined in server.go and are automatically
+// available as part of this package. If you're seeing "undefined" errors, ensure
+// your Go module cache is up to date with: go clean -modcache && go mod download
+
 // Legacy compatibility functions - deprecated, use New* functions instead
 
 // IdentityServer creates a new identity-aware server instance.
