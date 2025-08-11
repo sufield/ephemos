@@ -11,8 +11,10 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/sufield/ephemos/internal/adapters/interceptors"
 	"github.com/sufield/ephemos/internal/adapters/primary/api"
 	"github.com/sufield/ephemos/internal/core/errors"
+	"github.com/sufield/ephemos/internal/core/ports"
 )
 
 // ServiceRegistrar is the interface that service implementations must implement.
@@ -255,6 +257,139 @@ func validateConfigPath(configPath string) (string, error) {
 
 	// Return empty string to use defaults
 	return "", nil
+}
+
+// Built-in Interceptors
+
+// InterceptorConfig provides configuration for built-in interceptors.
+type InterceptorConfig struct {
+	// EnableAuth enables authentication interceptor
+	EnableAuth bool
+	// AuthConfig configuration for authentication
+	AuthConfig *interceptors.AuthConfig
+
+	// EnableIdentityPropagation enables identity propagation for outgoing calls
+	EnableIdentityPropagation bool
+	// IdentityPropagationConfig configuration for identity propagation
+	IdentityPropagationConfig *interceptors.IdentityPropagationConfig
+
+	// EnableLogging enables audit logging interceptor
+	EnableLogging bool
+	// LoggingConfig configuration for logging
+	LoggingConfig *interceptors.LoggingConfig
+
+	// EnableMetrics enables metrics collection interceptor
+	EnableMetrics bool
+	// MetricsConfig configuration for metrics
+	MetricsConfig *interceptors.MetricsConfig
+}
+
+// NewDefaultInterceptorConfig creates a default interceptor configuration.
+func NewDefaultInterceptorConfig() *InterceptorConfig {
+	return &InterceptorConfig{
+		EnableAuth:                true,
+		AuthConfig:                interceptors.DefaultAuthConfig(),
+		EnableIdentityPropagation: false, // Disabled by default
+		EnableLogging:             true,
+		LoggingConfig:             interceptors.NewSecureLoggingConfig(),
+		EnableMetrics:             true,
+		MetricsConfig:             interceptors.DefaultMetricsConfig("ephemos-service"),
+	}
+}
+
+// NewProductionInterceptorConfig creates a production-ready interceptor configuration.
+func NewProductionInterceptorConfig(serviceName string) *InterceptorConfig {
+	return &InterceptorConfig{
+		EnableAuth:                true,
+		AuthConfig:                interceptors.DefaultAuthConfig(),
+		EnableIdentityPropagation: true,
+		EnableLogging:             true,
+		LoggingConfig:             interceptors.NewSecureLoggingConfig(),
+		EnableMetrics:             true,
+		MetricsConfig:             interceptors.DefaultMetricsConfig(serviceName),
+	}
+}
+
+// NewDevelopmentInterceptorConfig creates a development-friendly interceptor configuration.
+func NewDevelopmentInterceptorConfig(serviceName string) *InterceptorConfig {
+	return &InterceptorConfig{
+		EnableAuth:                false, // Disabled for easier development
+		AuthConfig:                interceptors.DefaultAuthConfig(),
+		EnableIdentityPropagation: true,
+		EnableLogging:             true,
+		LoggingConfig:             interceptors.NewDebugLoggingConfig(),
+		EnableMetrics:             true,
+		MetricsConfig:             interceptors.DefaultMetricsConfig(serviceName),
+	}
+}
+
+// CreateServerInterceptors creates gRPC server interceptors based on configuration.
+func CreateServerInterceptors(
+	config *InterceptorConfig,
+	_ ports.IdentityProvider,
+) ([]grpc.UnaryServerInterceptor, []grpc.StreamServerInterceptor) {
+	var unaryInterceptors []grpc.UnaryServerInterceptor
+	var streamInterceptors []grpc.StreamServerInterceptor
+
+	// Identity propagation server interceptor (extracts metadata)
+	if config.EnableIdentityPropagation {
+		serverPropagation := interceptors.NewIdentityPropagationServerInterceptor(config.LoggingConfig.Logger)
+		unaryInterceptors = append(unaryInterceptors, serverPropagation.UnaryServerInterceptor())
+		streamInterceptors = append(streamInterceptors, serverPropagation.StreamServerInterceptor())
+	}
+
+	// Authentication interceptor
+	if config.EnableAuth {
+		authInterceptor := interceptors.NewAuthInterceptor(config.AuthConfig)
+		unaryInterceptors = append(unaryInterceptors, authInterceptor.UnaryServerInterceptor())
+		streamInterceptors = append(streamInterceptors, authInterceptor.StreamServerInterceptor())
+	}
+
+	// Logging interceptor
+	if config.EnableLogging {
+		loggingInterceptor := interceptors.NewLoggingInterceptor(config.LoggingConfig)
+		unaryInterceptors = append(unaryInterceptors, loggingInterceptor.UnaryServerInterceptor())
+		streamInterceptors = append(streamInterceptors, loggingInterceptor.StreamServerInterceptor())
+	}
+
+	// Metrics interceptor
+	if config.EnableMetrics {
+		metricsInterceptor := interceptors.NewMetricsInterceptor(config.MetricsConfig)
+		unaryInterceptors = append(unaryInterceptors, metricsInterceptor.UnaryServerInterceptor())
+		streamInterceptors = append(streamInterceptors, metricsInterceptor.StreamServerInterceptor())
+	}
+
+	return unaryInterceptors, streamInterceptors
+}
+
+// CreateClientInterceptors creates gRPC client interceptors based on configuration.
+func CreateClientInterceptors(
+	config *InterceptorConfig,
+	identityProvider ports.IdentityProvider,
+) ([]grpc.UnaryClientInterceptor, []grpc.StreamClientInterceptor) {
+	var unaryInterceptors []grpc.UnaryClientInterceptor
+	var streamInterceptors []grpc.StreamClientInterceptor
+
+	// Identity propagation client interceptor (adds metadata)
+	if config.EnableIdentityPropagation && identityProvider != nil {
+		if config.IdentityPropagationConfig == nil {
+			config.IdentityPropagationConfig = interceptors.DefaultIdentityPropagationConfig(identityProvider)
+		}
+		config.IdentityPropagationConfig.IdentityProvider = identityProvider
+
+		clientPropagation := interceptors.NewIdentityPropagationInterceptor(config.IdentityPropagationConfig)
+		unaryInterceptors = append(unaryInterceptors, clientPropagation.UnaryClientInterceptor())
+		streamInterceptors = append(streamInterceptors, clientPropagation.StreamClientInterceptor())
+	}
+
+	// Metrics interceptor
+	if config.EnableMetrics {
+		metricsInterceptor := interceptors.NewMetricsInterceptor(config.MetricsConfig)
+		unaryInterceptors = append(unaryInterceptors, metricsInterceptor.UnaryClientInterceptor())
+		streamInterceptors = append(streamInterceptors, metricsInterceptor.StreamClientInterceptor())
+	}
+
+	return unaryInterceptors, streamInterceptors
 }
 
 // Legacy compatibility functions - deprecated, use New* functions instead
