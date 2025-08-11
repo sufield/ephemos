@@ -90,3 +90,11 @@ runs:
         echo "✅ Protobuf code generated successfully"
         echo "Generated files:"
         ls -la examples/proto/*.pb.go
+        
+    - name: Clear Go build cache after protobuf generation
+      shell: bash  
+      run: |
+        echo "🧹 Clearing Go build cache after protobuf generation..."
+        go clean -cache || true
+        go clean -testcache || true
+        echo "✅ Build cache cleared to prevent stale module issues"
