@@ -89,7 +89,6 @@ func TestGracefulShutdownManager_BasicShutdown(t *testing.T) {
 	// Perform shutdown
 	ctx := t.Context()
 	err := manager.Shutdown(ctx)
-
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
@@ -316,7 +315,6 @@ func TestGracefulShutdownManager_SPIFFEProviderCleanup(t *testing.T) {
 	// Perform shutdown
 	ctx := t.Context()
 	err := manager.Shutdown(ctx)
-
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}

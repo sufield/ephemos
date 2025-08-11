@@ -11,7 +11,7 @@ import (
 	coreErrors "github.com/sufield/ephemos/internal/core/errors"
 )
 
-// FuzzResolveConfigPath tests the config path resolution with random inputs
+// FuzzResolveConfigPath tests the config path resolution with random inputs.
 func FuzzResolveConfigPath(f *testing.F) {
 	// Add seed corpus with common path patterns
 	f.Add("")
@@ -54,7 +54,7 @@ func FuzzResolveConfigPath(f *testing.F) {
 	})
 }
 
-// FuzzValidateFileAccess tests file access validation with random file paths
+// FuzzValidateFileAccess tests file access validation with random file paths.
 func FuzzValidateFileAccess(f *testing.F) {
 	// Seed corpus with various path patterns
 	f.Add("")
@@ -94,7 +94,7 @@ func FuzzValidateFileAccess(f *testing.F) {
 	})
 }
 
-// FuzzYAMLParsing tests YAML parsing with malformed/malicious YAML content
+// FuzzYAMLParsing tests YAML parsing with malformed/malicious YAML content.
 func FuzzYAMLParsing(f *testing.F) {
 	// Seed with valid and invalid YAML patterns
 	f.Add("service:\n  name: test")
@@ -127,7 +127,6 @@ func FuzzYAMLParsing(f *testing.F) {
 		defer cancel()
 
 		_, err := loadConfigFile(ctx, configFile)
-
 		// Parsing can fail, but should not panic or hang
 		// We mainly test for stability and proper error handling
 		if err != nil {
