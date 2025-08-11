@@ -664,6 +664,73 @@ graph TB
     class CF1,CF2,CF3,CF4,CF5 compliance
 ```
 
+### Supply Chain Security
+
+Ephemos includes comprehensive Software Bill of Materials (SBOM) generation to support supply chain security and compliance requirements.
+
+```mermaid
+graph TB
+    subgraph "SBOM Generation"
+        SG1[Syft Scanner]
+        SG2[Dependency Analysis]
+        SG3[License Detection]
+        SG4[Vulnerability Correlation]
+    end
+    
+    subgraph "SBOM Formats"
+        SF1[SPDX 2.3 JSON]
+        SF2[CycloneDX JSON]
+        SF3[Human Readable Summary]
+        SF4[Integrity Checksums]
+    end
+    
+    subgraph "Security Integration"
+        SI1[OSV Scanner]
+        SI2[Grype Scanner]
+        SI3[Trivy Scanner]
+        SI4[CI/CD Validation]
+    end
+    
+    subgraph "Compliance Support"
+        CS1[NTIA Minimum Elements]
+        CS2[Executive Order 14028]
+        CS3[ISO/IEC 5962 SPDX]
+        CS4[NIST SP 800-161]
+    end
+    
+    SG1 --> SF1
+    SG2 --> SF2
+    SG3 --> SF3
+    SG4 --> SF4
+    
+    SF1 --> SI1
+    SF2 --> SI2
+    SF1 --> SI3
+    SF4 --> SI4
+    
+    SI1 --> CS1
+    SI2 --> CS2
+    SI3 --> CS3
+    SI4 --> CS4
+    
+    classDef generation fill:#e3f2fd
+    classDef format fill:#e8f5e8
+    classDef security fill:#ffebee
+    classDef compliance fill:#fff3e0
+    
+    class SG1,SG2,SG3,SG4 generation
+    class SF1,SF2,SF3,SF4 format
+    class SI1,SI2,SI3,SI4 security
+    class CS1,CS2,CS3,CS4 compliance
+```
+
+**SBOM Capabilities:**
+- **Automated Generation**: SBOM files generated in CI/CD pipeline
+- **Multiple Formats**: SPDX and CycloneDX for tool compatibility
+- **Vulnerability Scanning**: Integration with security scanners
+- **Compliance Ready**: Supports regulatory requirements
+- **Integrity Verification**: Checksums for tamper detection
+
 ### Compliance Checklist
 
 - ✅ **Access Controls**: Role-based access to SPIRE administration
@@ -674,6 +741,17 @@ graph TB
 - ✅ **Regular Assessment**: Quarterly security reviews and penetration testing
 - ✅ **Data Protection**: Privacy controls and data minimization
 - ✅ **Backup and Recovery**: Disaster recovery procedures and testing
+- ✅ **Supply Chain Security**: SBOM generation and vulnerability scanning
+- ✅ **Dependency Tracking**: Complete software bill of materials
+- ✅ **License Compliance**: Automated license verification and reporting
+
+## Related Security Documentation
+
+- [SBOM Generation Guide](SBOM_GENERATION.md) - Comprehensive SBOM procedures
+- [CI/CD Security](CI_CD_SECURITY.md) - Pipeline security configuration
+- [Threat Model](THREAT_MODEL.md) - Security threat analysis
+- [Security Runbook](SECURITY_RUNBOOK.md) - Operational procedures
+- [Configuration Security](CONFIGURATION_SECURITY.md) - Secure configuration
 
 ---
 
