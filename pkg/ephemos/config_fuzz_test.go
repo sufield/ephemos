@@ -72,7 +72,7 @@ func FuzzValidateFileAccess(f *testing.F) {
 		// Create temporary directory with test file
 		tempDir := t.TempDir()
 		testFile := filepath.Join(tempDir, "valid.yaml")
-		os.WriteFile(testFile, []byte("test: value\n"), 0644)
+		os.WriteFile(testFile, []byte("test: value\n"), 0o644)
 
 		// Test should not panic regardless of input
 		err := validateFileAccess(path)
@@ -118,7 +118,7 @@ func FuzzYAMLParsing(f *testing.F) {
 		configFile := filepath.Join(tempDir, "fuzz.yaml")
 
 		// Write content (might be invalid)
-		if err := os.WriteFile(configFile, []byte(yamlContent), 0644); err != nil {
+		if err := os.WriteFile(configFile, []byte(yamlContent), 0o644); err != nil {
 			return // Skip if we can't write the file
 		}
 
@@ -176,7 +176,7 @@ transport:
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "fuzz.yaml")
 
-		if err := os.WriteFile(configFile, []byte(configYAML), 0644); err != nil {
+		if err := os.WriteFile(configFile, []byte(configYAML), 0o644); err != nil {
 			return
 		}
 
