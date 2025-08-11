@@ -1,7 +1,6 @@
 package ephemos
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net"
