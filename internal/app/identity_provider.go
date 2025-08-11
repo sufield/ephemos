@@ -3,7 +3,7 @@ package app
 import (
 	"errors"
 
-	"github.com/sufield/ephemos/internal/domain"
+	"github.com/sufield/ephemos/internal/core/domain"
 )
 
 // ErrIdentityNotFound is returned when an identity cannot be found.

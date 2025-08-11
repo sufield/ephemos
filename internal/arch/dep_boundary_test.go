@@ -122,7 +122,7 @@ func loadCorePackages(t *testing.T) []*packages.Package {
 	}
 
 	// Load all core packages (both old structure and new structure).
-	pkgs, err := packages.Load(cfg, "./internal/core/...", "./internal/domain/...", "./internal/app/...")
+	pkgs, err := packages.Load(cfg, "./internal/core/...", "./internal/app/...")
 	if err != nil {
 		t.Fatalf("packages.Load: %v", err)
 	}

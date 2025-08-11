@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/sufield/ephemos/internal/domain"
+	"github.com/sufield/ephemos/internal/core/domain"
+	"github.com/sufield/ephemos/internal/core/errors"
 )
 
 // IdentityService manages service identities and provides authenticated transport.
@@ -28,7 +29,7 @@ func NewIdentityService(
 	config *Configuration,
 ) (*IdentityService, error) {
 	if config == nil {
-		return nil, &ValidationError{
+		return nil, &errors.ValidationError{
 			Field:   "config",
 			Value:   nil,
 			Message: "configuration cannot be nil",
