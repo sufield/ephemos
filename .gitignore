@@ -52,9 +52,11 @@ bench.out
 .claude/
 **/.vscode/
 **/.claude/
+**/.idea/
 *.swp
 *.swo
 *~
+.DS_Store
 
 # OS generated files
 .DS_Store

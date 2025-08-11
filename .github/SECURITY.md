@@ -2,169 +2,139 @@
 
 ## Supported Versions
 
-We actively support the following versions of Ephemos with security updates:
+We take security seriously and provide security updates for the following versions of Ephemos:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
+| 1.x.x   | :white_check_mark: |
 | < 1.0   | :x:                |
 
 ## Reporting a Vulnerability
 
-**Please do not report security vulnerabilities through public GitHub issues.**
+We appreciate responsible disclosure of security vulnerabilities. If you discover a security issue, please follow these steps:
 
-The Ephemos team takes security seriously. If you believe you have found a security vulnerability in Ephemos, we encourage you to report it to us responsibly.
+### 🔒 Private Reporting (Preferred)
 
-### How to Report
+1. **Email**: Send details to security@sufield.com
+2. **Subject**: Include "[SECURITY] Ephemos Vulnerability Report"
+3. **Include**: 
+   - Description of the vulnerability
+   - Steps to reproduce
+   - Potential impact assessment
+   - Your contact information
 
-Send an email to **security@sufield.com** with the following information:
+### 📋 What to Include
 
-- **Subject**: `[SECURITY] Ephemos Vulnerability Report`
-- **Description**: Detailed description of the vulnerability
-- **Impact**: Assessment of potential impact and severity
-- **Reproduction**: Step-by-step instructions to reproduce the issue
-- **Environment**: Versions affected, operating system, etc.
-- **Proof of Concept**: If available (please be responsible)
+Please provide as much information as possible:
 
-### What to Expect
+- **Vulnerability Type**: Authentication bypass, injection, etc.
+- **Affected Components**: SPIFFE integration, gRPC interceptors, configuration handling
+- **Severity Assessment**: Your evaluation of the impact
+- **Reproduction Steps**: Clear instructions to reproduce
+- **Proof of Concept**: If applicable (non-destructive only)
+- **Suggested Fix**: If you have recommendations
 
-1. **Acknowledgment**: We will acknowledge receipt of your report within 48 hours
-2. **Initial Assessment**: We will provide an initial assessment within 5 business days
-3. **Regular Updates**: We will send updates on our progress at least every 5 business days
-4. **Resolution Timeline**: We aim to resolve critical security issues within 30 days
+### ⏱️ Response Timeline
 
-### Security Vulnerability Categories
+We are committed to responding promptly:
 
-We are particularly interested in reports concerning:
+- **Acknowledgment**: Within 48 hours
+- **Initial Assessment**: Within 5 business days  
+- **Resolution Timeline**: Based on severity assessment
+- **Public Disclosure**: Coordinated with reporter
 
-#### High Priority
-- **Authentication Bypass**: Circumventing SPIFFE/mTLS authentication
-- **Identity Spoofing**: Impersonating other services or identities
-- **Certificate Validation**: Issues with X.509 certificate verification
-- **Privilege Escalation**: Gaining unauthorized access to resources
-- **Injection Attacks**: SQL, command, or other injection vulnerabilities
-- **Cryptographic Issues**: Weak encryption, key management problems
+### 🎯 Severity Categories
 
-#### Medium Priority
-- **Information Disclosure**: Unintended exposure of sensitive data
-- **Denial of Service**: Resource exhaustion or availability issues
-- **gRPC Interceptor Bypass**: Circumventing security interceptors
-- **Logging Vulnerabilities**: Sensitive data exposure in logs
-- **Configuration Issues**: Insecure default configurations
+**Critical (Response: Immediate)**
+- Remote code execution
+- Authentication bypass
+- Service impersonation via SPIFFE
+- Production credential exposure
 
-#### Lower Priority
-- **Dependency Vulnerabilities**: Issues in third-party dependencies
-- **Documentation Issues**: Security-related documentation problems
-- **Best Practice Violations**: Sub-optimal security practices
+**High (Response: 1-3 days)**
+- Privilege escalation
+- Data exposure
+- Denial of service
+- Certificate validation bypass
 
-### Scope
+**Medium (Response: 1-2 weeks)**
+- Information disclosure
+- Configuration vulnerabilities
+- Logging sensitive data
 
-#### In Scope
-- Ephemos core library (`internal/`, `pkg/`, `cmd/`)
-- gRPC interceptors and authentication logic
-- SPIFFE/SPIRE integration components
-- Configuration and deployment scripts
-- Official examples and templates
-- CI/CD pipelines and build processes
+**Low (Response: 1 month)**
+- Documentation issues
+- Non-security configuration problems
 
-#### Out of Scope
-- Issues in third-party dependencies (report to respective maintainers)
-- Theoretical attacks without practical exploitation
-- Social engineering attacks
-- Physical security issues
-- Issues requiring physical access to infrastructure
-- Vulnerabilities in SPIFFE/SPIRE themselves (report to SPIFFE project)
+### 🛡️ Scope
 
-### Responsible Disclosure
+**In Scope:**
+- SPIFFE/SPIRE identity handling
+- gRPC interceptor security
+- Configuration validation
+- Authentication and authorization
+- Certificate management
+- Secrets handling
+- Docker/container security
 
-We request that you:
+**Out of Scope:**
+- Demo configurations (use example.org)
+- Social engineering
+- Physical attacks
+- DoS attacks requiring excessive resources
+- Issues in third-party dependencies (report to upstream)
 
-- **Do not** publicly disclose the vulnerability until we have addressed it
-- **Do not** access, modify, or delete data that doesn't belong to you
-- **Do not** perform actions that could negatively impact other users
-- **Do not** execute denial-of-service attacks
-- **Provide** sufficient information to reproduce the vulnerability
-- **Use** the latest version of Ephemos when testing
+### 🏆 Recognition
 
-### Security Response Process
+We believe in recognizing security researchers:
 
-1. **Triage** (1-2 business days)
-   - Verify and reproduce the vulnerability
-   - Assess severity using CVSS v3.1 scoring
-   - Determine affected versions and components
+- **Hall of Fame**: Public recognition (with permission)
+- **Attribution**: Credit in security advisories
+- **Swag**: Ephemos security researcher merchandise
+- **Monetary Rewards**: For critical vulnerabilities (case by case)
 
-2. **Investigation** (3-7 business days)
-   - Analyze root cause and impact
-   - Develop fix strategy
-   - Plan coordinated disclosure timeline
+### 📊 Security Measures
 
-3. **Development** (5-21 business days)
-   - Implement and test security fix
-   - Prepare security advisory
-   - Coordinate with distributors if needed
+Ephemos implements multiple security layers:
 
-4. **Release** (1-3 business days)
-   - Release patched versions
-   - Publish security advisory
-   - Update documentation
+- **Identity-Based Authentication**: SPIFFE/SPIRE integration
+- **mTLS Transport Security**: End-to-end encryption
+- **Configuration Validation**: Production security checks
+- **Secrets Scanning**: Automated secret detection
+- **Dependency Management**: Automated vulnerability updates
+- **Supply Chain Security**: SBOM generation and validation
 
-5. **Post-Release** (ongoing)
-   - Monitor for additional issues
-   - Update security documentation
-   - Improve security practices
+### 🔍 Security Testing
 
-### Security Advisories
+We welcome security research on:
 
-Security advisories will be published:
+- **Authentication bypass**: Attempts to circumvent SPIFFE authentication
+- **Authorization flaws**: Access control vulnerabilities
+- **Configuration injection**: Malicious configuration exploitation
+- **Certificate validation**: X.509 and SPIFFE certificate handling
+- **Interceptor bypass**: Security interceptor circumvention
 
-- On our [GitHub Security Advisories page](https://github.com/sufield/ephemos/security/advisories)
-- In the project README and changelog
-- Through appropriate security mailing lists
-- On the project website (if applicable)
+### ⚖️ Legal
 
-### Recognition
+This security policy operates under:
 
-We appreciate the security research community's efforts in keeping Ephemos secure. With your permission, we will:
+- **Safe Harbor**: Good faith security research is welcome
+- **Responsible Disclosure**: Coordinated vulnerability disclosure
+- **No Legal Action**: We will not pursue legal action for responsible research
+- **Attribution**: We may publicly credit researchers (with permission)
 
-- Acknowledge your contribution in the security advisory
-- List you in our security researchers hall of fame (if you wish)
-- Provide a reference letter for your responsible disclosure (upon request)
+### 📞 Contact Information
 
-### Security Best Practices for Users
+**Security Team**: security@sufield.com  
+**PGP Key**: Available upon request  
+**Response Time**: Business hours (UTC-5)
 
-#### Deployment Security
-- Always use the latest supported version
-- Follow the [Security Architecture Guide](../docs/security/SECURITY_ARCHITECTURE.md)
-- Implement the [Security Runbook](../docs/security/SECURITY_RUNBOOK.md) procedures
-- Review the [Threat Model](../docs/security/THREAT_MODEL.md) for your use case
+### 🔄 Updates
 
-#### Configuration Security
-- Use strong, unique trust domains (not `example.org`)
-- Implement proper SPIRE server hardening
-- Enable security logging and monitoring
-- Regularly rotate SPIFFE certificates
-- Follow principle of least privilege for service authorizations
-
-#### Development Security
-- Review interceptor configurations carefully
-- Validate all input parameters
-- Implement proper error handling without information disclosure
-- Use the built-in security interceptors
-- Follow secure coding practices
-
-### Contact Information
-
-- **Security Email**: security@sufield.com
-- **General Contact**: maintainer@sufield.com
-- **Project Repository**: https://github.com/sufield/ephemos
-- **Security Documentation**: [docs/security/](../docs/security/)
-
-### Legal
-
-This security policy is provided "as is" without warranty. The Ephemos team reserves the right to modify this policy at any time. By reporting security vulnerabilities, you agree to these terms and the responsible disclosure process outlined above.
+This security policy may be updated periodically. Check back regularly for the latest version.
 
 ---
 
-**Thank you for helping keep Ephemos and our users secure.**
+**Thank you for helping keep Ephemos secure!**
 
 *Last updated: August 2025*
