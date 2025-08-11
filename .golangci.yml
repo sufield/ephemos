@@ -4,7 +4,6 @@ run:
   tests: true
 
 output:
-  format: colored-line-number
   print-issued-lines: true
   print-linter-name: true
 
@@ -234,7 +233,6 @@ issues:
   exclude-dirs:
     - vendor
     - scripts
-  uniq-by-line: true
   exclude-rules:
     # Exclude some linters from running on tests files.
     - path: _test\.go
