@@ -154,7 +154,7 @@ jobs:
 
     - name: Upload ClusterFuzzLite results to Security tab
       uses: github/codeql-action/upload-sarif@4dd16135b69a43b6c8efb853346f8437d92d3c93 # v3.26.6
-      if: always()
+      if: always() && hashFiles('clusterfuzzlite-results.sarif') != ''
       with:
         sarif_file: clusterfuzzlite-results.sarif
         category: clusterfuzzlite
@@ -168,6 +168,7 @@ jobs:
           clusterfuzzlite-results.sarif
           .clusterfuzzlite/
         retention-days: 30
+        if-no-files-found: warn
 
   # Property-based testing with rapid (Go fuzzing alternative)
   property-testing:
