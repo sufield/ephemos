@@ -1,11 +1,16 @@
 # CI/CD Makefile for Ephemos
 # Handles continuous integration and deployment tasks
-.PHONY: ci-setup ci-lint ci-test ci-security ci-build ci-all
+.PHONY: ci-setup ci-lint ci-test ci-security ci-build ci-all clean-cache
 
 # Setup environment for CI
 ci-setup: proto
-	@echo "Cleaning Go build cache..."
+	@echo "Cleaning Go build cache (aggressive)..."
 	go clean -cache
+	go clean -modcache || true
+	go clean -testcache
+	@echo "Clearing any Go module proxy cache..."
+	go env -w GOPROXY=direct || true
+	go mod download
 	@echo "CI setup completed - protobuf files generated and cache cleared"
 
 # Run linting checks
@@ -30,8 +35,15 @@ ci-security:
 	@echo "Security checks completed!"
 
 # Build all targets
-ci-build: build examples
+ci-build: clean-cache build examples
 	@echo "All builds completed successfully!"
+
+# Clean all caches before building
+clean-cache:
+	@echo "Cleaning all Go caches before build..."
+	go clean -cache
+	go clean -testcache
+	go clean -modcache || true
 
 # Run all CI checks
 ci-all: ci-lint ci-test ci-security ci-build
