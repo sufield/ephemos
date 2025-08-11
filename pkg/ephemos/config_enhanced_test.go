@@ -7,7 +7,7 @@ import (
 )
 
 func TestConfigBuilder_PureCodeConfiguration(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test pure-code configuration
 	config, err := NewConfigBuilder().
@@ -49,7 +49,7 @@ func TestConfigBuilder_PureCodeConfiguration(t *testing.T) {
 }
 
 func TestConfigBuilder_EnvironmentOverrides(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set up environment variables
 	envVars := map[string]string{
@@ -113,7 +113,7 @@ func TestConfigBuilder_EnvironmentOverrides(t *testing.T) {
 }
 
 func TestLoadConfigFlexible_PureCode(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	config, err := LoadConfigFlexible(ctx,
 		WithPureCodeSource(),
@@ -137,13 +137,10 @@ func TestLoadConfigFlexible_PureCode(t *testing.T) {
 }
 
 func TestLoadConfigFlexible_EnvironmentOnly(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set environment variable
-	if err := os.Setenv("TEST_SERVICE_NAME", "test-env-service"); err != nil {
-		t.Fatalf("Failed to set env var: %v", err)
-	}
-	defer os.Unsetenv("TEST_SERVICE_NAME")
+	t.Setenv("TEST_SERVICE_NAME", "test-env-service")
 
 	// Note: WithService is applied AFTER environment variables are loaded,
 	// so it will override the environment. Let's test the environment-only approach.
@@ -162,7 +159,7 @@ func TestLoadConfigFlexible_EnvironmentOnly(t *testing.T) {
 }
 
 func TestConfigBuilder_Defaults(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test that defaults are used when no overrides are provided
 	config, err := NewConfigBuilder().
@@ -186,7 +183,7 @@ func TestConfigBuilder_Defaults(t *testing.T) {
 }
 
 func TestConfigBuilder_Validation(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test that validation still works with invalid configurations
 	// Use an invalid character in service name instead of empty string
