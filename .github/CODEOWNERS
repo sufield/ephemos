@@ -1,0 +1,20 @@
+# Global code owners - require review for all changes
+* @sufield
+
+# Security-critical files require additional scrutiny
+/.github/workflows/ @sufield
+/scripts/security/ @sufield
+/Makefile.security @sufield
+/docs/security/ @sufield
+SECURITY.md @sufield
+
+# Core application code
+/pkg/ @sufield
+/cmd/ @sufield
+
+# Configuration and build files
+Dockerfile* @sufield
+*.yml @sufield
+*.yaml @sufield
+go.mod @sufield
+go.sum @sufield
