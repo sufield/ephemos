@@ -1,5 +1,7 @@
 // Package main provides a configuration validation tool for Ephemos.
 // This tool helps validate configuration settings before deployment to production.
+//
+//nolint:forbidigo // CLI tool requires direct output to stdout
 package main
 
 import (

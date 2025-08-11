@@ -29,13 +29,58 @@ fi
 
 echo ""
 
+# TruffleHog scan with error handling
+echo "Running TruffleHog scan..."
+if command -v trufflehog >/dev/null 2>&1; then
+    if trufflehog filesystem --directory=. --only-verified --json 2>/dev/null | grep -q "SourceType"; then
+        echo "⚠️  TruffleHog found potential secrets" >&2
+        # Don't exit - continue with other scans
+    else
+        echo "✅ TruffleHog: No verified secrets found"
+    fi
+else
+    echo "❌ TruffleHog not installed" >&2
+    echo "Install with: make security-tools" >&2
+fi
+
+echo ""
+
 # Git-secrets scan with error handling  
 echo "Running git-secrets scan..."
 if command -v git-secrets >/dev/null 2>&1; then
+    # Initialize git-secrets if not already done
+    if ! git secrets --list >/dev/null 2>&1; then
+        echo "Initializing git-secrets..."
+        git secrets --register-aws >/dev/null 2>&1 || true
+        git secrets --install >/dev/null 2>&1 || true
+        
+        # Add custom patterns
+        git secrets --add '[aA][pP][iI][_-]?[kK][eE][yY].*[0-9a-zA-Z]{20,}' >/dev/null 2>&1 || true
+        git secrets --add '[A-Za-z0-9+/]{60,}=' >/dev/null 2>&1 || true
+        
+        # Add allowed patterns for test cases
+        git secrets --add --allowed 'spiffe://example\.org' >/dev/null 2>&1 || true
+        git secrets --add --allowed 'spiffe://test\.com' >/dev/null 2>&1 || true
+        git secrets --add --allowed 'pattern:\s*"spiffe://' >/dev/null 2>&1 || true
+    fi
+    
+    # Load allowed patterns from .gitallowed file if it exists
+    if [[ -f .gitallowed ]]; then
+        echo "Loading allowed patterns from .gitallowed..."
+        while IFS= read -r pattern; do
+            # Skip empty lines and comments
+            if [[ -n "$pattern" && ! "$pattern" =~ ^# ]]; then
+                git secrets --add --allowed "$pattern" >/dev/null 2>&1 || true
+            fi
+        done < .gitallowed
+    fi
+    
+    # Scan repository
     if git-secrets --scan --recursive .; then
         echo "✅ Git-secrets: No secrets found"
     else
-        echo "⚠️  git-secrets found potential secrets" >&2
+        echo "⚠️  git-secrets found potential secrets (may be false positives)" >&2
+        echo "   Check .gitallowed file for approved patterns" >&2
         # Don't exit - continue with other scans
     fi
 else

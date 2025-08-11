@@ -70,6 +70,36 @@ else
     verify_tool git-secrets
 fi
 
+# Install TruffleHog
+echo ""
+echo "Installing TruffleHog..."
+if command -v trufflehog >/dev/null 2>&1; then
+    echo "✅ TruffleHog already installed"
+    trufflehog --version || echo "  Version info not available"
+else
+    echo "Downloading TruffleHog..."
+    readonly TRUFFLEHOG_VERSION="v3.63.7"  # Pin to specific version
+    readonly SYSTEM_LOWER="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    readonly ARCH_MAPPED="$(uname -m | sed 's/x86_64/amd64/g' | sed 's/aarch64/arm64/g')"
+    readonly TRUFFLEHOG_URL="https://github.com/trufflesecurity/trufflehog/releases/download/${TRUFFLEHOG_VERSION}/trufflehog_${TRUFFLEHOG_VERSION}_${SYSTEM_LOWER}_${ARCH_MAPPED}.tar.gz"
+    
+    echo "Downloading from: $TRUFFLEHOG_URL"
+    
+    if command -v wget >/dev/null 2>&1; then
+        wget -q -O "$TEMP_DIR/trufflehog.tar.gz" "$TRUFFLEHOG_URL"
+    elif command -v curl >/dev/null 2>&1; then
+        curl -sSL -o "$TEMP_DIR/trufflehog.tar.gz" "$TRUFFLEHOG_URL"
+    else
+        echo "❌ Neither wget nor curl available" >&2
+        exit 1
+    fi
+    
+    # Extract and install
+    tar -xzf "$TEMP_DIR/trufflehog.tar.gz" -C "$TEMP_DIR"
+    sudo install -m 755 "$TEMP_DIR/trufflehog" "$INSTALL_DIR/trufflehog"
+    verify_tool trufflehog
+fi
+
 # Install trivy
 echo ""
 echo "Installing trivy..."
@@ -104,6 +134,7 @@ echo ""
 echo "Installed tools:"
 echo "  - gitleaks: Secret detection"
 echo "  - git-secrets: AWS secret detection"
+echo "  - trufflehog: Advanced secret detection"
 echo "  - trivy: Vulnerability scanning"
 echo ""
 echo "Next steps:"

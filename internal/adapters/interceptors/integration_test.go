@@ -281,7 +281,7 @@ func setupIntegrationServer(t *testing.T, tc *integrationTestCase) (*grpc.Server
 
 // createTestAuthInterceptor creates a test auth interceptor for bufconn testing.
 func createTestAuthInterceptor(tc *integrationTestCase) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		// Simulate auth behavior based on test case expectation
 		if tc.expectAuth {
 			// Inject test identity into context for authenticated scenarios
