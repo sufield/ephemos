@@ -133,13 +133,13 @@ func TestTransportServerIsProtocolAgnostic(t *testing.T) {
 // TestMountAPIIsGeneric ensures that the Mount function is truly generic
 // and doesn't have protocol-specific constraints.
 func TestMountAPIIsGeneric(t *testing.T) {
-	// Find the server.go file relative to the module root
-	serverFile := findServerFile(t)
+	// Find the ephemos.go file (where the exported Mount function is defined)
+	ephemosFile := findEphemosFile(t)
 
 	fset := token.NewFileSet()
-	node, err := parser.ParseFile(fset, serverFile, nil, parser.ParseComments)
+	node, err := parser.ParseFile(fset, ephemosFile, nil, parser.ParseComments)
 	if err != nil {
-		t.Fatalf("Failed to parse server.go: %v", err)
+		t.Fatalf("Failed to parse ephemos.go: %v", err)
 	}
 
 	foundMount := false
@@ -152,7 +152,7 @@ func TestMountAPIIsGeneric(t *testing.T) {
 	})
 
 	if !foundMount {
-		t.Error("Mount function not found in server.go")
+		t.Error("Mount function not found in ephemos.go")
 	}
 }
 
@@ -265,7 +265,7 @@ func findServerFile(t *testing.T) string {
 	// Try different possible paths relative to the test location
 	candidates := []string{
 		"../../../pkg/ephemos/server.go",
-		"pkg/ephemos/server.go", // From module root
+		"pkg/ephemos/server.go",   // From module root
 		"./pkg/ephemos/server.go", // From current dir if it's module root
 	}
 
@@ -301,5 +301,51 @@ func findServerFile(t *testing.T) string {
 	}
 
 	t.Fatalf("Could not locate server.go file. Current dir: %s, candidates tried: %v", currentDir, candidates)
+	return ""
+}
+
+// findEphemosFile locates the ephemos.go file relative to the module root.
+func findEphemosFile(t *testing.T) string {
+	t.Helper()
+
+	// Try different possible paths relative to the test location
+	candidates := []string{
+		"../../../pkg/ephemos/ephemos.go",
+		"pkg/ephemos/ephemos.go",   // From module root
+		"./pkg/ephemos/ephemos.go", // From current dir if it's module root
+	}
+
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+
+	// If none found, try to find it by walking up from current directory
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+
+	// Walk up the directory tree to find go.mod (module root)
+	dir := currentDir
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			// Found module root, ephemos.go should be at pkg/ephemos/ephemos.go
+			ephemosPath := filepath.Join(dir, "pkg", "ephemos", "ephemos.go")
+			if _, err := os.Stat(ephemosPath); err == nil {
+				return ephemosPath
+			}
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Reached filesystem root
+			break
+		}
+		dir = parent
+	}
+
+	t.Fatalf("Could not locate ephemos.go file. Current dir: %s, candidates tried: %v", currentDir, candidates)
 	return ""
 }
