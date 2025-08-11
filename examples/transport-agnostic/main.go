@@ -13,7 +13,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/sufield/ephemos/pkg/ephemos"
 )
 
@@ -82,14 +81,14 @@ func main() {
 
 	// Mount an echo service
 	echoService := &EchoServiceImpl{name: "transport-demo"}
-	if err := ephemos.Mount[ports.EchoService](server, echoService); err != nil {
+	if err := ephemos.Mount[ephemos.EchoService](server, echoService); err != nil {
 		log.Fatalf("Failed to mount echo service: %v", err)
 	}
 	log.Println("✅ Mounted EchoService")
 
 	// Mount a file service
 	fileService := &FileServiceImpl{}
-	if err := ephemos.Mount[ports.FileService](server, fileService); err != nil {
+	if err := ephemos.Mount[ephemos.FileService](server, fileService); err != nil {
 		log.Fatalf("Failed to mount file service: %v", err)
 	}
 	log.Println("✅ Mounted FileService")

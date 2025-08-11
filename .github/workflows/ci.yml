@@ -52,6 +52,33 @@ jobs:
           exit 1
         fi
 
+  # Public API Protection - Ensures examples only use public APIs
+  public-api-check:
+    name: Public API Protection
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      
+    - name: Setup Go Environment
+      uses: ./.github/actions/setup-go
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Setup Protocol Buffers (Required for CI/CD)
+      uses: ./.github/actions/setup-protobuf
+      
+    - name: Verify examples use only public APIs
+      run: |
+        echo "🔍 Checking that examples and docs only use public APIs..."
+        echo "This prevents external users from encountering import errors"
+        go test -v ./pkg/ephemos/internal_imports_test.go ./pkg/ephemos/types.go
+      
+    - name: Build all examples to verify they work for external users
+      run: |
+        echo "🏗️ Building all examples to verify external usability..."
+        make build examples
+
   # Security Scanning
   security:
     name: Security Scan

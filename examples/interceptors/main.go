@@ -11,8 +11,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/sufield/ephemos/examples/proto"
-	"github.com/sufield/ephemos/internal/adapters/interceptors"
-	"github.com/sufield/ephemos/internal/adapters/logging"
 	"github.com/sufield/ephemos/pkg/ephemos"
 )
 
@@ -21,24 +19,12 @@ type ExampleServer struct {
 	proto.UnimplementedEchoServiceServer
 }
 
-// Echo implements the echo service with interceptor support.
+// Echo implements the echo service with automatic identity-based authentication.
+// When interceptors are enabled, authentication happens automatically at the transport layer.
 func (s *ExampleServer) Echo(ctx context.Context, req *proto.EchoRequest) (*proto.EchoResponse, error) {
-	// Extract authenticated identity (if auth interceptor is enabled)
-	if identity, ok := interceptors.GetIdentityFromContext(ctx); ok {
-		slog.Info("Processing request from authenticated client",
-			"spiffe_id", identity.SPIFFEID,
-			"service", identity.ServiceName,
-			"message", req.Message)
-	}
-
-	// Extract propagated identity information
-	if requestID, ok := interceptors.GetRequestID(ctx); ok {
-		slog.Info("Processing request", "request_id", requestID)
-	}
-
-	if originalCaller, ok := interceptors.GetOriginalCaller(ctx); ok {
-		slog.Info("Request originated from", "original_caller", originalCaller)
-	}
+	// If this method is called, authentication has already succeeded!
+	// Ephemos interceptors handle identity verification before reaching this code
+	slog.Info("Processing authenticated request", "message", req.Message)
 
 	return &proto.EchoResponse{
 		Message: fmt.Sprintf("Echo: %s", req.Message),
@@ -48,11 +34,9 @@ func (s *ExampleServer) Echo(ctx context.Context, req *proto.EchoRequest) (*prot
 
 func main() {
 	// Setup logging
-	baseHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
-	})
-	secureLogger := logging.NewSecureLogger(baseHandler)
-	slog.SetDefault(secureLogger)
+	})))
 
 	// Example 1: Production configuration with all interceptors
 	fmt.Println("=== Production Configuration Example ===")
@@ -100,42 +84,11 @@ func runServerExample(configType string, interceptorConfig *ephemos.InterceptorC
 	// server.Serve(ctx, lis)
 }
 
-// createCustomInterceptorConfig demonstrates creating a custom interceptor configuration.
+// createCustomInterceptorConfig demonstrates using preset interceptor configurations.
 func createCustomInterceptorConfig() *ephemos.InterceptorConfig {
-	// Create custom auth config with specific allowed services
-	authConfig := interceptors.NewAllowListAuthConfig([]string{
-		"spiffe://example.org/echo-client",
-		"spiffe://example.org/admin-service",
-	})
-	authConfig.SkipMethods = []string{
-		"/grpc.health.v1.Health/Check",
-		"/example.EchoService/Ping", // Custom health check method
-	}
-
-	// Create custom logging config for audit requirements
-	loggingConfig := interceptors.DefaultLoggingConfig()
-	loggingConfig.LogPayloads = true // Enable payload logging for audit
-	loggingConfig.IncludeHeaders = []string{
-		"authorization",
-		"x-request-id",
-		"x-forwarded-for",
-	}
-
-	// Create custom metrics config
-	metricsConfig := interceptors.DefaultMetricsConfig("custom-service")
-	metricsConfig.EnablePayloadSize = true
-	metricsConfig.EnableActiveRequests = true
-
-	return &ephemos.InterceptorConfig{
-		EnableAuth:                true,
-		AuthConfig:                authConfig,
-		EnableIdentityPropagation: true,
-		IdentityPropagationConfig: nil, // Will use defaults
-		EnableLogging:             true,
-		LoggingConfig:             loggingConfig,
-		EnableMetrics:             true,
-		MetricsConfig:             metricsConfig,
-	}
+	// Use production preset configuration which enables all interceptors
+	// with secure defaults appropriate for production environments
+	return ephemos.NewProductionInterceptorConfig("custom-service")
 }
 
 // Example of using interceptors with a client
