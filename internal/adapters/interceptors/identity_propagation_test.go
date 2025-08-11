@@ -15,8 +15,6 @@ import (
 
 const testTrustDomain = "example.org"
 
-type identityTestContextKey string
-
 // Mock identity provider for testing.
 type mockIdentityProvider struct {
 	identity *domain.ServiceIdentity
@@ -582,7 +580,7 @@ func TestGetOrGenerateRequestID(t *testing.T) {
 	})
 
 	t.Run("from_context_value", func(t *testing.T) {
-		ctx := context.WithValue(t.Context(), identityTestContextKey("request-id"), "context-req-id")
+		ctx := context.WithValue(t.Context(), RequestIDContextKey{}, "context-req-id")
 
 		requestID := interceptor.getOrGenerateRequestID(ctx)
 
