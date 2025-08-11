@@ -250,6 +250,7 @@ func main() {
 }
 
 func testPresetConfigurationsAvailable(t *testing.T) {
+	t.Helper()
 	// Test that preset configurations are available
 	code := `
 package main

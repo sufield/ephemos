@@ -60,10 +60,10 @@ func demonstrateEnvironmentOnly(ctx context.Context) {
 
 	// Set environment variables
 	envVars := map[string]string{
-		"EPHEMOS_SERVICE_NAME":      "env-only-service",
-		"EPHEMOS_SERVICE_DOMAIN":    "env.example.com",
-		"EPHEMOS_TRANSPORT_TYPE":    "http",
-		"EPHEMOS_TRANSPORT_ADDRESS": ":8080",
+		"EPHEMOS_SERVICE_NAME":       "env-only-service",
+		"EPHEMOS_SERVICE_DOMAIN":     "env.example.com",
+		"EPHEMOS_TRANSPORT_TYPE":     "http",
+		"EPHEMOS_TRANSPORT_ADDRESS":  ":8080",
 		"EPHEMOS_AUTHORIZED_CLIENTS": "client-a, client-b, client-c",
 	}
 

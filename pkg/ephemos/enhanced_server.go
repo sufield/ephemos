@@ -20,6 +20,8 @@ import (
 const (
 	// DefaultReadyCheckInterval is the default polling interval for server ready checks.
 	DefaultReadyCheckInterval = 100 * time.Millisecond
+	// DefaultShutdownTimeout is the default timeout for shutdown operations.
+	DefaultShutdownTimeout = 30 * time.Second
 )
 
 // EnhancedServer provides a production-ready server with graceful shutdown.
@@ -183,7 +185,7 @@ func (s *EnhancedServer) Serve(ctx context.Context, listener net.Listener) error
 		return s.performShutdown(ctx)
 	case <-ctx.Done():
 		// Context canceled externally - use a fresh context for cleanup
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), DefaultShutdownTimeout)
 		defer cancel()
 		return s.performShutdown(shutdownCtx)
 	}
