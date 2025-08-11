@@ -51,7 +51,7 @@ spiffe:
 		}
 
 		// Test configuration loading - should handle invalid names gracefully
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 		defer cancel()
 
 		_, err := loadAndValidateConfig(ctx, configFile)
@@ -103,7 +103,7 @@ spiffe:
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 		defer cancel()
 
 		config, err := loadAndValidateConfig(ctx, configFile)
@@ -159,7 +159,7 @@ spiffe:
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 		defer cancel()
 
 		_, err := loadAndValidateConfig(ctx, configFile)
@@ -207,7 +207,7 @@ spiffe:
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 		defer cancel()
 
 		_, err := loadAndValidateConfig(ctx, configFile)
