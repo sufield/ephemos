@@ -73,7 +73,7 @@ clean:
 	@echo "Clean completed!"
 
 # Help
-help:
+core-help:
 	@echo "Core Ephemos Build Targets:"
 	@echo ""
 	@echo "  make build     - Build library and CLI"
