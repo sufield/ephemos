@@ -16,6 +16,15 @@ runs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ inputs.go-version }}
+    
+    - name: Clear Go caches (prevent stale cache issues)
+      shell: bash
+      run: |
+        echo "🧹 Clearing Go caches to prevent stale build issues..."
+        go clean -cache || true
+        go clean -testcache || true
+        go clean -modcache || true
+        echo "✅ Go caches cleared"
         
     - name: Verify Go version
       if: ${{ inputs.verify-version == 'true' }}
@@ -31,8 +40,9 @@ runs:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ inputs.go-version }}-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-${{ inputs.go-version }}-${{ hashFiles('**/go.sum') }}-${{ github.run_number }}
         restore-keys: |
+          ${{ runner.os }}-go-${{ inputs.go-version }}-${{ hashFiles('**/go.sum') }}-
           ${{ runner.os }}-go-${{ inputs.go-version }}-
           ${{ runner.os }}-go-
           
