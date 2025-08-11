@@ -7,6 +7,11 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -21,6 +26,8 @@ const (
 	TransportTypeGRPC = "grpc"
 	// TransportTypeHTTP represents HTTP transport type.
 	TransportTypeHTTP = "http"
+	// DefaultShutdownTimeout is the default timeout for graceful shutdown.
+	DefaultShutdownTimeout = 30 * time.Second
 )
 
 // TransportServer represents a transport-agnostic service server.
@@ -94,42 +101,118 @@ func (s *TransportServer) mountService(impl any) error {
 	}
 }
 
-// ListenAndServe starts the server on the configured address and transport.
-func (s *TransportServer) ListenAndServe(_ context.Context) error {
+// ListenAndServe starts the server on the configured address and transport with graceful shutdown.
+// It handles SIGINT and SIGTERM signals automatically for graceful shutdown.
+func (s *TransportServer) ListenAndServe(ctx context.Context) error {
+	addr := s.resolveAddress()
+
+	// Create a context that will be canceled on receiving shutdown signals
+	shutdownCtx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	switch s.config.Transport.Type {
+	case TransportTypeGRPC:
+		return s.serveGRPC(ctx, shutdownCtx, addr)
+	case TransportTypeHTTP:
+		return s.serveHTTP(ctx, shutdownCtx, addr)
+	default:
+		return fmt.Errorf("unsupported transport type: %s", s.config.Transport.Type)
+	}
+}
+
+func (s *TransportServer) resolveAddress() string {
 	addr := s.config.Transport.Address
 	if addr == "" {
 		addr = ":8080" // default
 	}
+	return addr
+}
 
-	switch s.config.Transport.Type {
-	case TransportTypeGRPC:
-		lis, err := net.Listen("tcp", addr)
-		if err != nil {
-			return fmt.Errorf("failed to listen on %s: %w", addr, err)
-		}
-		defer func() {
-			if closeErr := lis.Close(); closeErr != nil {
-				// Log the error but don't override the main error
-				// In a real implementation, this would use a logger
-				_ = closeErr
-			}
-		}()
-
-		if err := s.grpcServer.Serve(lis); err != nil {
-			return fmt.Errorf("gRPC server error: %w", err)
-		}
-		return nil
-
-	case TransportTypeHTTP:
-		s.httpServer.Addr = addr
-		if err := s.httpServer.ListenAndServe(); err != nil {
-			return fmt.Errorf("HTTP server error: %w", err)
-		}
-		return nil
-
-	default:
-		return fmt.Errorf("unsupported transport type: %s", s.config.Transport.Type)
+func (s *TransportServer) serveGRPC(_, shutdownCtx context.Context, addr string) error {
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("failed to listen on %s: %w", addr, err)
 	}
+	defer func() {
+		if closeErr := lis.Close(); closeErr != nil {
+			// Log the error but don't override the main error
+			// In a real implementation, this would use a logger
+			_ = closeErr
+		}
+	}()
+
+	var wg sync.WaitGroup
+	var serverErr error
+	var errMutex sync.Mutex
+
+	setServerError := func(err error) {
+		errMutex.Lock()
+		defer errMutex.Unlock()
+		if serverErr == nil && err != nil {
+			serverErr = err
+		}
+	}
+
+	// Start gRPC server in a goroutine
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := s.grpcServer.Serve(lis); err != nil {
+			setServerError(fmt.Errorf("gRPC server error: %w", err))
+		}
+	}()
+
+	// Wait for shutdown signal
+	<-shutdownCtx.Done()
+
+	// Graceful shutdown for gRPC server
+	s.grpcServer.GracefulStop()
+	wg.Wait()
+
+	errMutex.Lock()
+	defer errMutex.Unlock()
+	return serverErr
+}
+
+func (s *TransportServer) serveHTTP(ctx, shutdownCtx context.Context, addr string) error {
+	s.httpServer.Addr = addr
+
+	var wg sync.WaitGroup
+	var serverErr error
+	var errMutex sync.Mutex
+
+	setServerError := func(err error) {
+		errMutex.Lock()
+		defer errMutex.Unlock()
+		if serverErr == nil && err != nil {
+			serverErr = err
+		}
+	}
+
+	// Start HTTP server in a goroutine
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			setServerError(fmt.Errorf("HTTP server error: %w", err))
+		}
+	}()
+
+	// Wait for shutdown signal
+	<-shutdownCtx.Done()
+
+	// Graceful shutdown for HTTP server
+	shutdownTimeout, shutdownCancel := context.WithTimeout(ctx, DefaultShutdownTimeout)
+	defer shutdownCancel()
+
+	if err := s.httpServer.Shutdown(shutdownTimeout); err != nil {
+		setServerError(fmt.Errorf("HTTP server shutdown error: %w", err))
+	}
+	wg.Wait()
+
+	errMutex.Lock()
+	defer errMutex.Unlock()
+	return serverErr
 }
 
 // Close gracefully shuts down the server.

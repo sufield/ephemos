@@ -278,6 +278,164 @@ For complete identity-based authentication with SPIRE:
 make demo  # Complete SPIRE setup + authentication demo
 ```
 
+## Identity-Based Authentication
+
+Ephemos enforces **cryptographic identity authentication** using SPIFFE/SPIRE, replacing traditional API keys with short-lived X.509 certificates. Here's exactly how it works:
+
+### How Identity Authentication is Enforced
+
+#### 1. **Certificate-Based Authentication (Not API Keys)**
+
+```go
+// ❌ Traditional API Key Authentication:
+// if request.APIKey != "secret-key-123" { return Unauthorized }
+
+// ✅ Ephemos Identity Authentication:
+// Authentication happens at TLS transport layer using X.509 certificates
+server := ephemos.NewIdentityServer(ctx, "config.yaml")  // Automatic mTLS
+client := ephemos.NewIdentityClient(ctx, "config.yaml")  // Automatic mTLS
+```
+
+**Key Differences:**
+- **API Keys**: Plaintext secrets that can be intercepted or leaked
+- **Ephemos**: Cryptographic certificates that expire in 1 hour and auto-rotate
+
+#### 2. **Transport-Layer Security Enforcement**
+
+Authentication occurs at the **TLS handshake level**, not in application code:
+
+```go
+// Connection establishment with identity verification:
+conn, err := client.Connect("echo-server", "localhost:50051")
+// ↑ This line performs:
+// 1. mTLS handshake with both client and server certificates  
+// 2. Certificate validation against SPIFFE trust bundle
+// 3. SPIFFE ID verification (spiffe://example.org/echo-client)
+// 4. Connection establishment ONLY if authentication succeeds
+
+if err != nil {
+    // Authentication failed - connection never established
+    // Possible errors:
+    // - "certificate signed by unknown authority" 
+    // - "authentication handshake failed"
+    // - "transport: Error while dialing"
+    log.Fatal("Authentication failed:", err)
+}
+
+// If we reach here, identity authentication succeeded
+response, err := echoClient.Echo(ctx, &EchoRequest{Message: "Hello"})
+```
+
+#### 3. **Automatic Identity Verification**
+
+Every connection automatically verifies:
+
+| **Verification Step** | **What's Checked** | **Enforcement Point** |
+|----------------------|-------------------|---------------------|
+| **Certificate Validity** | Not expired, properly signed | TLS handshake |
+| **Trust Chain** | Issued by trusted SPIRE CA | TLS handshake |
+| **SPIFFE ID** | Matches expected service identity | TLS handshake |
+| **Mutual Authentication** | Both client AND server present certificates | TLS handshake |
+
+#### 4. **Service-Level Authorization**
+
+Beyond authentication, Ephemos enforces **service-level authorization**:
+
+```yaml
+# config/echo-server.yaml
+service:
+  name: "echo-server"
+  domain: "example.org"
+
+# Only these services can connect to this server:
+authorized_clients:
+  - "echo-client"        # ✅ Allowed
+  - "payment-service"    # ✅ Allowed
+  # "malicious-service"  # ❌ Denied - not in list
+```
+
+**Enforcement Flow:**
+```
+1. TLS Handshake: "I'm spiffe://example.org/mystery-service"
+2. Certificate Valid: ✅ Certificate is cryptographically valid
+3. Authorization Check: ❌ "mystery-service" not in authorized_clients
+4. Connection Rejected: Transport-level failure before app code runs
+```
+
+#### 5. **Zero Application Code Changes**
+
+The beauty of Ephemos is that **identity enforcement is transparent**:
+
+```go
+// Your service code remains clean - no auth logic needed:
+func (s *EchoService) Echo(ctx context.Context, message string) (string, error) {
+    // No need to check API keys, validate tokens, or verify certificates
+    // If this function is called, identity authentication already succeeded
+    
+    return fmt.Sprintf("Echo: %s", message), nil
+}
+
+// Authentication enforcement happens automatically in:
+// - ephemos.NewIdentityServer() - sets up mTLS server
+// - ephemos.NewIdentityClient() - sets up mTLS client  
+// - client.Connect() - performs identity verification
+```
+
+#### 6. **Authentication Failure Scenarios**
+
+When authentication fails, connections are rejected **before** application code runs:
+
+```bash
+# What happens with invalid/expired certificates:
+
+$ echo-client  # Tries to connect with invalid cert
+❌ Error: transport: authentication handshake failed
+❌ Error: connection error: x509: certificate signed by unknown authority  
+❌ Error: rpc error: code = Unavailable desc = connection error
+
+# Server logs show:
+# "TLS handshake failed: certificate verification failed"
+# 
+# Echo service code is NEVER executed - rejected at transport layer
+```
+
+#### 7. **Automatic Certificate Rotation**
+
+Identity certificates automatically rotate without service downtime:
+
+```go
+// Your service code never changes:
+server := ephemos.NewIdentityServer(ctx, "config.yaml")
+
+// But behind the scenes:
+// - Hour 1: Certificate A (expires 2:00 PM) 
+// - Hour 1.5: SPIRE issues Certificate B (expires 3:00 PM)
+// - Hour 2: Automatic switchover to Certificate B
+// - Service continues running without interruption
+// - Old connections gracefully drain, new connections use new cert
+```
+
+### Security Guarantees
+
+✅ **Cryptographic Authentication**: X.509 certificates, not plaintext secrets  
+✅ **Short-Lived Credentials**: 1-hour expiration limits breach impact  
+✅ **Automatic Rotation**: No manual certificate management  
+✅ **Mutual Authentication**: Both client and server verify each other  
+✅ **Transport-Layer Security**: Authentication before application logic  
+✅ **Service Authorization**: Fine-grained access control  
+✅ **Zero Trust**: Every connection authenticated, nothing assumed  
+
+### Demo: See Authentication in Action
+
+```bash
+make demo  # Watch authentication succeed AND fail in real-time
+```
+
+The demo shows:
+1. **✅ Success**: echo-client authenticates and connects to echo-server
+2. **❌ Failure**: After deregistration, same client is rejected
+3. **🔍 Transparency**: Your application code never changes
+
 ## Development
 
 ```bash

@@ -48,6 +48,20 @@ func NewIdentityClient(ctx context.Context, configPath string) (*IdentityClient,
 		}
 	}
 
+	return NewIdentityClientWithConfig(ctx, cfg)
+}
+
+// NewIdentityClientWithConfig creates a new identity client with pre-validated configuration.
+// This method assumes the configuration has already been loaded and validated.
+func NewIdentityClientWithConfig(_ context.Context, cfg *ports.Configuration) (*IdentityClient, error) {
+	if cfg == nil {
+		return nil, &errors.ValidationError{
+			Field:   "configuration",
+			Value:   nil,
+			Message: "configuration cannot be nil",
+		}
+	}
+
 	spiffeProvider, err := spiffe.NewProvider(cfg.SPIFFE)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SPIFFE provider: %w", err)

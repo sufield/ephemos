@@ -1,3 +1,26 @@
+// Echo Client Example - Demonstrates Identity-Based Authentication Enforcement
+//
+// This example shows how Ephemos automatically enforces client authentication
+// using SPIFFE/SPIRE X.509 certificates during connection establishment.
+//
+// CLIENT AUTHENTICATION ENFORCEMENT:
+// 1. Client obtains SPIFFE identity: spiffe://example.org/echo-client
+// 2. client.Connect() performs mTLS handshake with server
+// 3. Client presents its certificate, server verifies client identity
+// 4. Server also presents certificate, client verifies server identity
+// 5. Connection succeeds ONLY if both authentications pass
+//
+// Authentication Enforcement Points:
+//   - client.Connect(): Transport-layer mTLS handshake occurs here
+//   - If authentication fails, Connect() returns error immediately
+//   - proto.NewEchoServiceClient(): Only runs if authentication succeeded
+//   - client.Echo(): Only runs if connection is authenticated
+//
+// Error Examples (when authentication fails):
+//
+//	❌ "transport: authentication handshake failed"
+//	❌ "connection error: x509: certificate signed by unknown authority"
+//	❌ "rpc error: code = Unavailable desc = connection error"
 package main
 
 import (
@@ -34,9 +57,21 @@ func main() {
 		}
 	}()
 
-	// Connect to the echo server
+	// AUTHENTICATION ENFORCEMENT POINT:
+	// Connect performs mTLS handshake and identity verification.
+	// If this call succeeds, the client has been authenticated successfully!
+	//
+	// What happens during Connect():
+	// 1. Client presents its SPIFFE certificate (spiffe://example.org/echo-client)
+	// 2. Server verifies client certificate against SPIRE trust bundle
+	// 3. Client verifies server certificate (spiffe://example.org/echo-server)
+	// 4. Both certificates must be valid and not expired
+	// 5. Connection established ONLY if mutual authentication succeeds
+	//
+	// If authentication fails, this call returns an error and no connection is made.
 	conn, err := client.Connect(ctx, "echo-server", "localhost:50052")
 	if err != nil {
+		// Authentication failed - connection rejected at transport layer
 		slog.Error("Failed to connect to echo server", "error", err)
 		os.Exit(1)
 	}
