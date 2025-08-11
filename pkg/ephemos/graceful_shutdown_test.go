@@ -36,7 +36,7 @@ type mockClient struct {
 	closeError  error
 }
 
-func (m *mockClient) Connect(_, address string) (ports.Connection, error) {
+func (m *mockClient) Connect(_, _ string) (ports.Connection, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
