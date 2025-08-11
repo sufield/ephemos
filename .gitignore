@@ -49,6 +49,9 @@ bench.out
 # IDE and editor files
 .vscode/
 .idea/
+.claude/
+**/.vscode/
+**/.claude/
 *.swp
 *.swo
 *~
@@ -123,11 +126,47 @@ spire-agent.conf
 *.csr
 *.p12
 
-# Configuration overrides
+# Configuration overrides and production configs
 *local.yaml
 *local.yml
 *.override.yaml
 *.override.yml
+
+# Production configuration security
+*production*.yaml
+*production*.yml
+*prod*.yaml
+*prod*.yml
+*.production.yaml
+*.production.yml
+*.prod.yaml
+*.prod.yml
+config/production/
+config/prod/
+config/*-prod*
+config/*-production*
+
+# Staging configuration security  
+*staging*.yaml
+*staging*.yml
+*.staging.yaml
+*.staging.yml
+config/staging/
+config/*-staging*
+
+# Customer/environment specific configs
+*customer*.yaml
+*customer*.yml
+config/customers/
+config/environments/
+
+# Kubernetes secrets and configs
+*.secret.yaml
+*.secret.yml
+*-secret.yaml
+*-secret.yml
+k8s-secrets/
+kubernetes-secrets/
 
 # Backup files
 *.bak

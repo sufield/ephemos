@@ -4,6 +4,8 @@ package ports
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/sufield/ephemos/internal/core/errors"
@@ -227,4 +229,185 @@ type ConfigurationProvider interface {
 	// GetDefaultConfiguration returns a configuration with sensible defaults.
 	// The context can be used for cancellation during default value computation.
 	GetDefaultConfiguration(ctx context.Context) *Configuration
+}
+
+// Environment variable names for configuration
+const (
+	EnvServiceName          = "EPHEMOS_SERVICE_NAME"
+	EnvTrustDomain         = "EPHEMOS_TRUST_DOMAIN"
+	EnvSPIFFESocket        = "EPHEMOS_SPIFFE_SOCKET"
+	EnvAuthorizedClients   = "EPHEMOS_AUTHORIZED_CLIENTS"
+	EnvTrustedServers      = "EPHEMOS_TRUSTED_SERVERS"
+	EnvRequireAuth         = "EPHEMOS_REQUIRE_AUTHENTICATION"
+	EnvLogLevel            = "EPHEMOS_LOG_LEVEL"
+	EnvBindAddress         = "EPHEMOS_BIND_ADDRESS"
+	EnvTLSMinVersion       = "EPHEMOS_TLS_MIN_VERSION"
+	EnvDebugEnabled        = "EPHEMOS_DEBUG_ENABLED"
+)
+
+// LoadFromEnvironment creates a configuration from environment variables.
+// This is the most secure way to configure Ephemos in production.
+func LoadFromEnvironment() (*Configuration, error) {
+	config := &Configuration{}
+
+	// Required: Service Name
+	serviceName := os.Getenv(EnvServiceName)
+	if serviceName == "" {
+		return nil, &errors.ValidationError{
+			Field:   EnvServiceName,
+			Value:   "",
+			Message: "service name is required via environment variable",
+		}
+	}
+
+	// Optional: Trust Domain
+	trustDomain := os.Getenv(EnvTrustDomain)
+	if trustDomain == "" {
+		trustDomain = "default.local" // Secure default, not example.org
+	}
+
+	config.Service = ServiceConfig{
+		Name:   serviceName,
+		Domain: trustDomain,
+	}
+
+	// SPIFFE Configuration
+	spiffeSocket := os.Getenv(EnvSPIFFESocket)
+	if spiffeSocket == "" {
+		spiffeSocket = "/tmp/spire-agent/public/api.sock" // Default socket path
+	}
+
+	config.SPIFFE = &SPIFFEConfig{
+		SocketPath: spiffeSocket,
+	}
+
+	// Parse comma-separated authorized clients
+	if authorizedClients := os.Getenv(EnvAuthorizedClients); authorizedClients != "" {
+		config.AuthorizedClients = parseCommaSeparatedList(authorizedClients)
+	}
+
+	// Parse comma-separated trusted servers
+	if trustedServers := os.Getenv(EnvTrustedServers); trustedServers != "" {
+		config.TrustedServers = parseCommaSeparatedList(trustedServers)
+	}
+
+	// Validate the configuration
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("environment configuration validation failed: %w", err)
+	}
+
+	// Additional production security validation
+	if err := validateProductionSecurity(config); err != nil {
+		return nil, fmt.Errorf("production security validation failed: %w", err)
+	}
+
+	return config, nil
+}
+
+// MergeWithEnvironment merges file-based configuration with environment variables.
+// Environment variables take precedence over file values.
+func (c *Configuration) MergeWithEnvironment() error {
+	// Override service name if set via environment
+	if serviceName := os.Getenv(EnvServiceName); serviceName != "" {
+		c.Service.Name = serviceName
+	}
+
+	// Override trust domain if set via environment
+	if trustDomain := os.Getenv(EnvTrustDomain); trustDomain != "" {
+		c.Service.Domain = trustDomain
+	}
+
+	// Override SPIFFE socket path if set via environment
+	if spiffeSocket := os.Getenv(EnvSPIFFESocket); spiffeSocket != "" {
+		if c.SPIFFE == nil {
+			c.SPIFFE = &SPIFFEConfig{}
+		}
+		c.SPIFFE.SocketPath = spiffeSocket
+	}
+
+	// Override authorized clients if set via environment
+	if authorizedClients := os.Getenv(EnvAuthorizedClients); authorizedClients != "" {
+		c.AuthorizedClients = parseCommaSeparatedList(authorizedClients)
+	}
+
+	// Override trusted servers if set via environment
+	if trustedServers := os.Getenv(EnvTrustedServers); trustedServers != "" {
+		c.TrustedServers = parseCommaSeparatedList(trustedServers)
+	}
+
+	return c.Validate()
+}
+
+// parseCommaSeparatedList parses a comma-separated string into a slice,
+// trimming whitespace and filtering empty values.
+func parseCommaSeparatedList(value string) []string {
+	var result []string
+	for _, item := range strings.Split(value, ",") {
+		if trimmed := strings.TrimSpace(item); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
+// validateProductionSecurity performs additional security validation for production environments.
+func validateProductionSecurity(config *Configuration) error {
+	var errors []string
+
+	// Check for demo/development values that should not be used in production
+	if strings.Contains(config.Service.Domain, "example.org") {
+		errors = append(errors, "trust domain contains 'example.org' - not suitable for production")
+	}
+
+	if strings.Contains(config.Service.Domain, "localhost") {
+		errors = append(errors, "trust domain contains 'localhost' - not suitable for production")
+	}
+
+	if strings.Contains(config.Service.Domain, "example.com") {
+		errors = append(errors, "trust domain contains 'example.com' - not suitable for production")
+	}
+
+	// Validate service name doesn't contain demo values
+	if strings.Contains(config.Service.Name, "example") || strings.Contains(config.Service.Name, "demo") {
+		errors = append(errors, "service name contains demo/example values - not suitable for production")
+	}
+
+	// Check SPIFFE socket path security
+	socketPath := config.SPIFFE.SocketPath
+	if !strings.HasPrefix(socketPath, "/run/") && !strings.HasPrefix(socketPath, "/var/run/") && !strings.HasPrefix(socketPath, "/tmp/") {
+		errors = append(errors, "SPIFFE socket should be in a secure directory (/run, /var/run, or /tmp)")
+	}
+
+	// Warn about overly permissive authorization (but don't fail)
+	for _, client := range config.AuthorizedClients {
+		if strings.Contains(client, "*") {
+			errors = append(errors, fmt.Sprintf("authorized client contains wildcard: %s - consider more specific authorization", client))
+		}
+	}
+
+	// Check for debug environment variables that shouldn't be enabled in production
+	if debugEnabled := os.Getenv(EnvDebugEnabled); debugEnabled == "true" {
+		errors = append(errors, "debug mode is enabled via EPHEMOS_DEBUG_ENABLED - should be disabled in production")
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("production security issues: %s", strings.Join(errors, "; "))
+	}
+
+	return nil
+}
+
+// IsProductionReady checks if the configuration is suitable for production use.
+func (c *Configuration) IsProductionReady() error {
+	return validateProductionSecurity(c)
+}
+
+// GetBoolEnv returns a boolean environment variable value with a default.
+func GetBoolEnv(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if parsed, err := strconv.ParseBool(value); err == nil {
+			return parsed
+		}
+	}
+	return defaultValue
 }

@@ -1,0 +1,64 @@
+# Kubernetes ConfigMap for Ephemos
+# Contains non-sensitive configuration data
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ephemos-config
+  namespace: production  # Change to your namespace
+  labels:
+    app: ephemos
+    component: config
+data:
+  # Non-sensitive configuration
+  EPHEMOS_SPIFFE_SOCKET: "/run/spire/sockets/api.sock"
+  EPHEMOS_LOG_LEVEL: "warn"
+  EPHEMOS_REQUIRE_AUTHENTICATION: "true"
+  EPHEMOS_DEBUG_ENABLED: "false"
+  EPHEMOS_BIND_ADDRESS: ":8443"
+  EPHEMOS_TLS_MIN_VERSION: "1.3"
+  
+  # Advanced security settings
+  EPHEMOS_CERT_ROTATION_THRESHOLD: "24h"
+  EPHEMOS_CERT_VALIDATION_STRICT: "true"
+  EPHEMOS_REVOCATION_CHECK_ENABLED: "true"
+
+---
+# NetworkPolicy for additional security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ephemos-network-policy
+  namespace: production  # Change to your namespace
+spec:
+  podSelector:
+    matchLabels:
+      app: your-service  # Change to your service label
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    # Allow traffic from authorized services only
+    - podSelector:
+        matchLabels:
+          app: api-gateway
+    - podSelector:
+        matchLabels:
+          app: billing-service
+    ports:
+    - protocol: TCP
+      port: 8443
+  egress:
+  # Allow outbound to SPIRE agent
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 8081  # SPIRE agent port
+  # Allow outbound to your backend services
+  - to:
+    - podSelector:
+        matchLabels:
+          app: database-service
+    ports:
+    - protocol: TCP
+      port: 5432

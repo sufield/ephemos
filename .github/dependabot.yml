@@ -7,7 +7,7 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "02:00"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 10
     assignees:
       - "sufield"
     reviewers:
@@ -18,9 +18,44 @@ updates:
       include: "scope"
     labels:
       - "dependencies"
-      - "go"
+      - "security"
+      - "automated"
+    # Group related updates for 2025
+    groups:
+      grpc-ecosystem:
+        patterns:
+          - "google.golang.org/grpc*"
+          - "google.golang.org/protobuf*"
+          - "google.golang.org/genproto*"
+      spiffe-ecosystem:
+        patterns:
+          - "github.com/spiffe/go-spiffe*"
+      opentelemetry-ecosystem:
+        patterns:
+          - "go.opentelemetry.io/*"
+      security-critical:
+        patterns:
+          - "golang.org/x/crypto*"
+          - "golang.org/x/net*"
+          - "golang.org/x/sys*"
+        update-types:
+          - "security"
+      test-dependencies:
+        patterns:
+          - "github.com/stretchr/testify*"
+          - "*test*"
+    # Enhanced security focus for 2025
+    allow:
+      - dependency-type: "direct"
+        update-type: "security"
+      - dependency-type: "indirect"  
+        update-type: "security"
+      - dependency-type: "direct"
+        update-type: "version-update:semver-patch"
+      - dependency-type: "direct"
+        update-type: "version-update:semver-minor"
     ignore:
-      # Ignore major version updates for critical dependencies
+      # Ignore major version updates for stability
       - dependency-name: "google.golang.org/grpc"
         update-types: ["version-update:semver-major"]
       - dependency-name: "github.com/spiffe/go-spiffe/v2"

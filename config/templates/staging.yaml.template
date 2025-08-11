@@ -1,0 +1,29 @@
+# Ephemos Staging Configuration Template
+# IMPORTANT: This is a template file. Copy and customize for your staging environment.
+# NEVER commit staging secrets to version control.
+#
+# Usage:
+#   1. Copy: cp staging.yaml.template ../staging.yaml
+#   2. Set environment variables for all ${...} references  
+#   3. Add staging.yaml to .gitignore immediately
+
+service:
+  # Required: Service identity for staging
+  name: "${EPHEMOS_SERVICE_NAME}"           # Set via environment variable
+  domain: "${EPHEMOS_TRUST_DOMAIN}"        # Set via environment variable (e.g., "staging.company.com")
+
+spiffe:
+  # SPIFFE/SPIRE agent configuration for staging
+  socketPath: "${EPHEMOS_SPIFFE_SOCKET:-/tmp/spire-agent/public/api.sock}"
+
+# Authorization: Use environment variables for staging client lists
+authorized_clients: "${EPHEMOS_AUTHORIZED_CLIENTS:-}"
+
+# Trusted servers: Use environment variables for staging server lists
+trusted_servers: "${EPHEMOS_TRUSTED_SERVERS:-}"
+
+# Staging Settings (via environment variables):
+# EPHEMOS_REQUIRE_AUTHENTICATION=true
+# EPHEMOS_LOG_LEVEL=info
+# EPHEMOS_DEBUG_ENABLED=false  # Keep debug disabled even in staging
+# EPHEMOS_BIND_ADDRESS=:8443

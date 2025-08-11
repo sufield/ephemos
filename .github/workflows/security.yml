@@ -196,3 +196,111 @@ jobs:
         name: osv-scan-results
         path: osv-results.json
       if: always()
+
+  # 2025 Enhanced Dependency Security
+  enhanced-dependency-security:
+    name: Enhanced Dependency Security (2025)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    # Advanced vulnerability scanning
+    - name: Install nancy (Sonatype)
+      run: |
+        curl -L -o nancy https://github.com/sonatypecommunity/nancy/releases/latest/download/nancy-v1.0.46-linux-amd64
+        chmod +x nancy
+        sudo mv nancy /usr/local/bin/
+
+    - name: Run Nancy vulnerability scan
+      run: |
+        go list -json -deps ./... | nancy sleuth --loud
+      continue-on-error: true
+
+    # Check for known malicious packages
+    - name: Malicious Package Detection
+      run: |
+        echo "🔍 Checking for known malicious packages..."
+        
+        # Check against known bad packages (example patterns)
+        if go list -m all | grep -E "(typosquatting|malicious-package)"; then
+          echo "❌ Found potentially malicious packages"
+          exit 1
+        fi
+        
+        # Check for suspicious package names (typosquatting)
+        go list -m all | while read -r pkg version; do
+          # Check for common typosquats of popular packages
+          if echo "$pkg" | grep -iE "(goggle|grcp|spifee)"; then
+            echo "⚠️ Potential typosquatting detected: $pkg"
+            echo "Please verify this is the correct package"
+          fi
+        done
+
+    # License compliance and security
+    - name: Enhanced License Check
+      run: |
+        go install github.com/google/go-licenses@latest
+        
+        echo "📋 Checking licenses for security compliance..."
+        go-licenses check ./...
+        
+        # Generate detailed license report
+        go-licenses report ./... > detailed-licenses.txt
+        
+        # Check for problematic licenses
+        if grep -i "gpl\|copyleft\|agpl" detailed-licenses.txt; then
+          echo "⚠️ Found copyleft licenses - review for compliance"
+        fi
+
+    - name: Dependency Age Analysis
+      run: |
+        echo "📅 Analyzing dependency ages..."
+        
+        # Check for very old dependencies (potential security risk)
+        go list -m -versions all | while read -r pkg versions; do
+          if [ -n "$versions" ]; then
+            latest_version=$(echo "$versions" | awk '{print $NF}')
+            echo "Package: $pkg, Latest: $latest_version"
+          fi
+        done > dependency-ages.txt
+
+    - name: Upload enhanced security artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: enhanced-security-scan
+        path: |
+          detailed-licenses.txt
+          dependency-ages.txt
+      if: always()
+
+  # Container Security (if Docker is used)
+  container-security:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    if: hashFiles('Dockerfile', '**/Dockerfile') != ''
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'

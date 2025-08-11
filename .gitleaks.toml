@@ -1,0 +1,108 @@
+# Gitleaks configuration for Ephemos
+# Detects secrets, API keys, tokens, and other sensitive data
+
+title = "Ephemos Security Scanning Configuration"
+
+[extend]
+# Use default gitleaks rules as base
+useDefault = true
+
+[[rules]]
+id = "ephemos-spiffe-production"
+description = "Production SPIFFE endpoints in config files"
+regex = '''spiffe://[a-zA-Z0-9.-]+\.(com|net|org|io)/'''
+keywords = ["spiffe://"]
+paths = ["config/*.yaml", "config/*.yml"]
+# Allow example.org domains in demo configs
+allowlist.regexes = ['''spiffe://example\.org/''']
+
+[[rules]]
+id = "ephemos-real-domains"
+description = "Real production domains in config files"
+regex = '''[a-zA-Z0-9.-]+\.(com|net|org|io)'''
+keywords = ["domain:", "trust_domain:"]
+paths = ["config/*.yaml", "config/*.yml"]
+# Allow example.org and test.local domains
+allowlist.regexes = [
+  '''example\.org''',
+  '''test\.local''',
+  '''localhost\.local'''
+]
+
+[[rules]]
+id = "ephemos-socket-paths-production"
+description = "Production socket paths"
+regex = '''/run/spire/sockets/[a-zA-Z0-9.-]+\.sock'''
+keywords = ["socketPath:"]
+paths = ["config/*.yaml", "config/*.yml"]
+# Allow demo/temp socket paths
+allowlist.regexes = ['''/tmp/''']
+
+[[rules]]
+id = "ephemos-kubernetes-secrets"
+description = "Kubernetes secret references that might be real"
+regex = '''name:\s*[a-zA-Z0-9-]+-secret'''
+keywords = ["name:", "secretRef:"]
+paths = ["config/templates/k8s/*.yaml"]
+# Allow template placeholders
+allowlist.regexes = [
+  '''ephemos-secret''',
+  '''<[A-Z_]+>'''
+]
+
+[[rules]]
+id = "ephemos-base64-secrets"
+description = "Base64 encoded values that might be secrets"
+regex = '''[A-Za-z0-9+/]{20,}={0,2}'''
+keywords = ["data:", "EPHEMOS_"]
+paths = ["config/**/*.yaml"]
+# Allow template placeholders
+allowlist.regexes = [
+  '''<BASE64_ENCODED_[A-Z_]+>''',
+  '''BASE64_ENCODED'''
+]
+
+# Custom paths to always scan
+[extend.paths]
+include = [
+  "config/",
+  "**/*.yaml",
+  "**/*.yml", 
+  "**/*.env",
+  ".env*",
+  "**/*.json"
+]
+
+# Paths to exclude from scanning
+exclude = [
+  "**/node_modules/**",
+  "**/vendor/**",
+  "**/*.pb.go",
+  "bin/**",
+  ".git/**"
+]
+
+# Allowlist for false positives
+[allowlist]
+description = "Allowlist for demo and template values"
+commits = []
+paths = []
+regexes = [
+  # Demo values
+  "example\\.org",
+  "demo-service",
+  "test-service", 
+  "/tmp/spire-agent/public/api\\.sock",
+  
+  # Template placeholders
+  "<[A-Z_]+>",
+  "\\$\\{[A-Z_]+\\}",
+  "YOUR_[A-Z_]+",
+  "CHANGE_TO_YOUR_[A-Z_]+",
+  
+  # Common test patterns
+  "localhost",
+  "127\\.0\\.0\\.1",
+  "test\\.local",
+  "localhost\\.local"
+]

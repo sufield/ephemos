@@ -1,0 +1,183 @@
+# GoReleaser configuration for Ephemos
+# Secure release automation with multiple platforms and checksums
+
+version: 1
+
+# Build configuration
+builds:
+  - id: ephemos-cli
+    binary: ephemos
+    main: ./cmd/ephemos-cli
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.Date}}
+      - -buildid=
+    tags:
+      - netgo
+      - osusergo
+
+  - id: config-validator
+    binary: config-validator
+    main: ./cmd/config-validator
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.Date}}
+      - -buildid=
+    tags:
+      - netgo
+      - osusergo
+
+  - id: examples
+    binary: "{{.ProjectName}}-{{.Binary}}"
+    main: "./examples/{{.Binary}}"
+    dir: .
+    goos:
+      - linux
+    goarch:
+      - amd64
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -buildid=
+    targets:
+      - linux_amd64
+
+# Archive configuration
+archives:
+  - id: default
+    builds:
+      - ephemos-cli
+      - config-validator
+    name_template: "{{.ProjectName}}_{{.Version}}_{{.Os}}_{{.Arch}}"
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - docs/**/*
+      - config/templates/**/*
+
+# Checksum configuration
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+# Security: Sign releases
+signs:
+  - cmd: cosign
+    env:
+      - COSIGN_EXPERIMENTAL=1
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - --output-certificate=${certificate}
+      - --output-signature=${signature}
+      - ${artifact}
+      - --yes
+    artifacts: checksum
+
+# Snapcraft (Linux) - disabled for security until reviewed
+# snapcrafts:
+#   - disabled: true
+
+# Docker images - disabled for security until reviewed
+# dockers:
+#   - disabled: true
+
+# Release configuration
+release:
+  github:
+    owner: sufield
+    name: ephemos
+  draft: true  # Create as draft for security review
+  prerelease: auto
+  mode: replace
+  header: |
+    ## Ephemos {{.Version}}
+    
+    **Security Notice**: This release includes enterprise-grade security features.
+    
+    ### Verification
+    
+    Verify the integrity of downloaded files:
+    ```bash
+    # Download checksums and verify
+    wget https://github.com/sufield/ephemos/releases/download/{{.Tag}}/checksums.txt
+    sha256sum -c checksums.txt
+    ```
+    
+    ### Security Features
+    - ✅ SPIFFE/SPIRE identity-based authentication
+    - ✅ mTLS transport encryption
+    - ✅ Production configuration validation
+    - ✅ Comprehensive security scanning
+    
+  footer: |
+    ## Security
+    
+    Report security issues to: security@sufield.com
+    
+    See [Security Policy](.github/SECURITY.md) for details.
+
+# Changelog configuration
+changelog:
+  use: github
+  sort: asc
+  abbrev: 7
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^style:"
+      - "^refactor:"
+      - "^chore:"
+      - "typo"
+  groups:
+    - title: "🔒 Security"
+      regexp: "^.*(security|vulnerability|cve).*"
+      order: 0
+    - title: "🚀 Features"
+      regexp: "^.*feat.*"
+      order: 10
+    - title: "🐛 Bug Fixes"
+      regexp: "^.*fix.*"
+      order: 20
+    - title: "📚 Documentation"
+      regexp: "^.*docs?.*"
+      order: 30
+    - title: "Other"
+      order: 999
+
+# Metadata
+project_name: ephemos
