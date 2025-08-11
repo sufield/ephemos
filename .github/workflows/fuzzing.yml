@@ -187,11 +187,9 @@ jobs:
 
     - name: Install property testing tools
       run: |
-        # Install rapid for property-based testing
-        go install pgregory.net/rapid@latest
-        
-        # Note: We're using Go's native fuzzing, but rapid can complement it
-        echo "✅ Property testing tools installed"
+        # Note: rapid is a library, not a binary - it gets imported in test code
+        # We'll add it to go.mod if/when we create property-based tests
+        echo "✅ Property testing setup ready (rapid will be imported as needed)"
 
     - name: Run property-based tests
       run: |
