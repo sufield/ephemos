@@ -121,8 +121,8 @@ func loadCorePackages(t *testing.T) []*packages.Package {
 		Dir: "../..", // Go up from internal/arch to repo root
 	}
 
-	// Load all core packages (both old structure and new structure).
-	pkgs, err := packages.Load(cfg, "./internal/core/...", "./internal/app/...")
+	// Load all core packages for hexagonal architecture.
+	pkgs, err := packages.Load(cfg, "./internal/core/...")
 	if err != nil {
 		t.Fatalf("packages.Load: %v", err)
 	}
@@ -179,8 +179,9 @@ func formatSingleViolation(b *strings.Builder, imp string, owners []string) {
 func appendRemediation(b *strings.Builder) {
 	b.WriteString("\nRemediation:\n")
 	b.WriteString("  - Move framework usage behind ports in internal/adapters.\n")
-	b.WriteString("  - If you need a capability in core, define an output port in internal/app and implement it in adapters.\n")
+	b.WriteString("  - If you need a capability in core, define an output port in internal/core/ports and implement it in adapters.\n")
 	b.WriteString("  - If a stdlib/framework type leaks into core APIs, introduce a small domain type and map in adapters.\n")
+	b.WriteString("  - Follow hexagonal architecture: Core -> Ports -> Adapters (dependencies flow inward).\n")
 }
 
 func Test_Core_Has_No_Forbidden_Imports(t *testing.T) {
