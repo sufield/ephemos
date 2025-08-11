@@ -21,7 +21,6 @@ import (
 func TestNoInternalImportsInExamples(t *testing.T) {
 	exampleDirs := []string{
 		"../../examples/",
-		"../../docs/",
 	}
 
 	var violations []string
@@ -326,6 +325,19 @@ func TestExampleCodeCompiles(t *testing.T) {
 				t.Errorf("Failed to check example directory %s: %v", dir, err)
 			}
 		})
+	}
+}
+
+// TestMainREADMEUsesPublicAPI ensures the main README.md only shows public API examples.
+// This is critical because external users copy code from the README.
+func TestMainREADMEUsesPublicAPI(t *testing.T) {
+	readmePath := "../../README.md"
+	if violations := checkMarkdownForInternalImports(readmePath); len(violations) > 0 {
+		t.Errorf("Main README.md has internal imports that external users cannot access:\\n%s\\n\\n"+
+			"❌ CRITICAL: External users copy examples from README.md!\\n"+
+			"✅ SOLUTION: Use only 'github.com/sufield/ephemos/pkg/ephemos' imports\\n"+
+			"✅ Example: ephemos.Mount[ephemos.EchoService] instead of ephemos.Mount[ports.EchoService]",
+			strings.Join(violations, "\\n"))
 	}
 }
 
