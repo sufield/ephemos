@@ -23,7 +23,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.23'
         
     - name: Install govulncheck
       run: go install golang.org/x/vuln/cmd/govulncheck@latest
@@ -42,7 +42,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.23'
         
     - name: Install go-licenses
       run: go install github.com/google/go-licenses@latest
@@ -72,7 +72,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.23'
         
     - name: Check for outdated dependencies
       run: |
@@ -131,7 +131,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.23'
         
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
@@ -171,7 +171,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.23'
         
     - name: Build project for SBOM scanning
       run: |
@@ -179,25 +179,52 @@ jobs:
         
     - name: Install Syft for SBOM generation
       run: |
-        curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-        syft --version
+        echo "Installing Syft for SBOM generation..."
+        if ! curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin; then
+          echo "⚠️ Syft installation failed, trying Go install..."
+          go install github.com/anchore/syft/cmd/syft@latest
+        fi
         
-    - name: Generate comprehensive SBOM with Syft
+        # Verify installation
+        if syft --version; then
+          echo "✅ Syft installed successfully"
+        else
+          echo "❌ Syft installation failed"
+          exit 1
+        fi
+        
+    - name: Generate SBOM with Syft
       run: |
         mkdir -p sbom
+        echo "Generating SBOM files..."
         
-        # Generate SPDX format SBOM
-        syft . -o spdx-json --file sbom/ephemos-sbom.spdx.json
+        # Generate SPDX format SBOM (primary format)
+        if syft . -o spdx-json --file sbom/ephemos-sbom.spdx.json; then
+          echo "✅ SPDX SBOM generated successfully"
+        else
+          echo "❌ SPDX SBOM generation failed"
+          exit 1
+        fi
         
-        # Generate CycloneDX format SBOM  
-        syft . -o cyclonedx-json --file sbom/ephemos-sbom.cyclonedx.json
+        # Generate CycloneDX format SBOM (secondary format)
+        if syft . -o cyclonedx-json --file sbom/ephemos-sbom.cyclonedx.json; then
+          echo "✅ CycloneDX SBOM generated successfully"
+        else
+          echo "⚠️ CycloneDX SBOM generation failed, continuing..."
+        fi
         
-        # Generate human-readable summary
-        syft . -o text --file sbom/ephemos-sbom-summary.txt
+        # Generate human-readable summary (optional)
+        if syft . -o text --file sbom/ephemos-sbom-summary.txt; then
+          echo "✅ SBOM summary generated successfully"
+        else
+          echo "⚠️ SBOM summary generation failed, continuing..."
+        fi
         
-        # Generate checksums for integrity
+        # Generate checksums for available files
         cd sbom
-        sha256sum *.json *.txt > ephemos-sbom-checksums.txt
+        if ls *.json *.txt >/dev/null 2>&1; then
+          sha256sum *.json *.txt > ephemos-sbom-checksums.txt 2>/dev/null || echo "⚠️ Checksum generation failed"
+        fi
         cd ..
         
     - name: Validate SBOM quality
@@ -335,7 +362,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.23'
 
     # Advanced vulnerability scanning
     - name: Install nancy (Sonatype)

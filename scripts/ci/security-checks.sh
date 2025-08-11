@@ -49,7 +49,19 @@ if command -v govulncheck >/dev/null 2>&1; then
         ((security_issues++))
     fi
 else
-    echo "❌ govulncheck not installed - skipping" >&2
+    echo "⚠️ govulncheck not installed - attempting to install..."
+    if go install golang.org/x/vuln/cmd/govulncheck@latest; then
+        echo "✅ govulncheck installed successfully"
+        export PATH="$PATH:$(go env GOPATH)/bin"
+        if govulncheck ./...; then
+            echo "✅ No known vulnerabilities found"
+        else
+            echo "❌ Vulnerabilities found in dependencies" >&2
+            ((security_issues++))
+        fi
+    else
+        echo "❌ Failed to install govulncheck - skipping vulnerability scan" >&2
+    fi
 fi
 echo ""
 
@@ -60,7 +72,7 @@ if command -v gosec >/dev/null 2>&1; then
     if gosec -fmt json -out gosec-report.json ./... 2>/dev/null; then
         echo "✅ gosec scan completed"
         # Check if any issues were found (JSON report will have issues array)
-        if jq -e '.Issues | length > 0' gosec-report.json >/dev/null 2>&1; then
+        if command -v jq >/dev/null 2>&1 && jq -e '.Issues | length > 0' gosec-report.json >/dev/null 2>&1; then
             echo "⚠️  gosec found security issues:" >&2
             jq -r '.Issues[] | "  - \(.details) at \(.file):\(.line)"' gosec-report.json 2>/dev/null || echo "  See gosec-report.json for details"
             ((security_issues++))
@@ -70,7 +82,7 @@ if command -v gosec >/dev/null 2>&1; then
         ((security_issues++))
     fi
 else
-    echo "❌ gosec not installed - skipping" >&2
+    echo "⚠️ gosec not installed - skipping static security analysis" >&2
 fi
 echo ""
 

@@ -47,21 +47,35 @@ mkdir -p "$SBOM_DIR"
 if ! command -v syft >/dev/null 2>&1; then
     print_error "Syft is not installed. Installing..."
     
-    # Install Syft
+    # Try Go install first (more reliable in CI)
     print_info "Installing Syft via Go install..."
-    if ! go install github.com/anchore/syft/cmd/syft@latest; then
-        print_error "Failed to install Syft via Go install"
+    if go install github.com/anchore/syft/cmd/syft@latest 2>/dev/null; then
+        # Add Go bin to PATH if not already there
+        export PATH="$PATH:$(go env GOPATH)/bin"
+        if command -v syft >/dev/null 2>&1; then
+            print_success "Syft installed via Go install"
+        else
+            print_warning "Syft installed but not in PATH, trying curl method..."
+        fi
+    fi
+    
+    # Fallback to curl installation if Go install didn't work
+    if ! command -v syft >/dev/null 2>&1; then
         print_info "Attempting to install via curl..."
-        
-        # Fallback to curl installation
-        curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-        
-        if ! command -v syft >/dev/null 2>&1; then
+        if curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin 2>/dev/null; then
+            print_success "Syft installed via curl"
+        else
             print_error "Failed to install Syft. Please install manually:"
             print_error "  Go install: go install github.com/anchore/syft/cmd/syft@latest"
             print_error "  Or visit: https://github.com/anchore/syft#installation"
             exit 1
         fi
+    fi
+    
+    # Final verification
+    if ! command -v syft >/dev/null 2>&1; then
+        print_error "Syft installation failed"
+        exit 1
     fi
     
     print_success "Syft installed successfully"

@@ -4,7 +4,7 @@ inputs:
   go-version:
     description: 'Go version to install'
     required: false
-    default: '1.24'
+    default: '1.23'
   verify-version:
     description: 'Whether to verify the Go version matches expected'
     required: false
@@ -32,7 +32,7 @@ runs:
       run: |
         echo "Expected Go version: ${{ inputs.go-version }}"
         echo "Actual Go version: $(go version)"
-        go version | grep -E "(go1\.(23|24))" || (echo "ERROR: Go version is not 1.23 or 1.24" && exit 1)
+        go version | grep -E "(go1\.(22|23))" || (echo "ERROR: Go version is not 1.22 or 1.23" && exit 1)
         
     - name: Cache Go modules
       uses: actions/cache@v4
