@@ -156,6 +156,7 @@ func TestPublicAPIAccessibility(t *testing.T) {
 }
 
 func testConfigurationTypesAvailable(t *testing.T) {
+	t.Helper()
 	// Test that public configuration types can be imported and used
 	// This simulates what external users would do
 	code := `
@@ -187,6 +188,7 @@ func main() {
 }
 
 func testServiceInterfacesAvailable(t *testing.T) {
+	t.Helper()
 	// Test that service interfaces are available publicly
 	code := `
 package main
@@ -217,6 +219,7 @@ func main() {
 }
 
 func testBuilderPatternsAvailable(t *testing.T) {
+	t.Helper()
 	// Test that builder patterns are available
 	code := `
 package main

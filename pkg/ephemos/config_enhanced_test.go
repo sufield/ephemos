@@ -64,17 +64,8 @@ func TestConfigBuilder_EnvironmentOverrides(t *testing.T) {
 
 	// Set environment variables
 	for key, value := range envVars {
-		if err := os.Setenv(key, value); err != nil {
-			t.Fatalf("Failed to set env var %s: %v", key, err)
-		}
+		t.Setenv(key, value)
 	}
-
-	// Clean up after test
-	defer func() {
-		for key := range envVars {
-			os.Unsetenv(key)
-		}
-	}()
 
 	// Test environment-only configuration
 	config, err := NewConfigBuilder().
