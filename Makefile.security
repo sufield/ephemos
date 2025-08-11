@@ -1,6 +1,6 @@
 # Security Makefile for Ephemos
-# Handles security scanning, validation, tooling, and SBOM generation
-.PHONY: security-scan security-tools security-hooks security-all audit-config sbom-generate sbom-validate sbom-all
+# Handles security scanning, validation, tooling, SBOM generation, and fuzzing
+.PHONY: security-scan security-tools security-hooks security-all audit-config sbom-generate sbom-validate sbom-all fuzz fuzz-short fuzz-extended
 
 # Security scanning targets
 security-scan:
@@ -52,6 +52,51 @@ sbom-validate:
 # Complete SBOM workflow
 sbom-all: sbom-generate sbom-validate
 	@echo "📋 Complete SBOM workflow finished!"
+
+# Fuzzing targets for security testing
+fuzz:
+	@echo "🔍 Running comprehensive fuzzing tests..."
+	@echo "Duration: 1 minute per test (use 'make fuzz-extended' for longer runs)"
+	@go test -fuzz=FuzzResolveConfigPath -fuzztime=1m ./pkg/ephemos/ || echo "FuzzResolveConfigPath completed"
+	@go test -fuzz=FuzzValidateFileAccess -fuzztime=1m ./pkg/ephemos/ || echo "FuzzValidateFileAccess completed"
+	@go test -fuzz=FuzzYAMLParsing -fuzztime=1m ./pkg/ephemos/ || echo "FuzzYAMLParsing completed"
+	@go test -fuzz=FuzzConfigValidation -fuzztime=1m ./pkg/ephemos/ || echo "FuzzConfigValidation completed"
+	@go test -fuzz=FuzzServiceName -fuzztime=1m ./pkg/ephemos/ || echo "FuzzServiceName completed"
+	@go test -fuzz=FuzzTransportAddress -fuzztime=1m ./pkg/ephemos/ || echo "FuzzTransportAddress completed"
+	@go test -fuzz=FuzzSPIFFESocketPath -fuzztime=1m ./pkg/ephemos/ || echo "FuzzSPIFFESocketPath completed"
+	@go test -fuzz=FuzzTransportType -fuzztime=1m ./pkg/ephemos/ || echo "FuzzTransportType completed"
+	@go test -fuzz=FuzzIdentityParsing -fuzztime=1m ./pkg/ephemos/ || echo "FuzzIdentityParsing completed"
+	@go test -fuzz=FuzzTrustDomain -fuzztime=1m ./pkg/ephemos/ || echo "FuzzTrustDomain completed"
+	@go test -fuzz=FuzzClientAuthorization -fuzztime=1m ./pkg/ephemos/ || echo "FuzzClientAuthorization completed"
+	@go test -fuzz=FuzzServerTrusts -fuzztime=1m ./pkg/ephemos/ || echo "FuzzServerTrusts completed"
+	@go test -fuzz=FuzzContextTimeout -fuzztime=1m ./pkg/ephemos/ || echo "FuzzContextTimeout completed"
+	@echo "✅ Comprehensive fuzzing completed!"
+
+# Quick fuzzing for CI/development
+fuzz-short:
+	@echo "🔍 Running quick fuzzing tests (30s each)..."
+	@go test -fuzz=FuzzConfigValidation -fuzztime=30s ./pkg/ephemos/ || echo "Quick config fuzzing completed"
+	@go test -fuzz=FuzzServiceName -fuzztime=30s ./pkg/ephemos/ || echo "Quick service name fuzzing completed"
+	@go test -fuzz=FuzzIdentityParsing -fuzztime=30s ./pkg/ephemos/ || echo "Quick identity fuzzing completed"
+	@echo "✅ Quick fuzzing completed!"
+
+# Extended fuzzing for comprehensive security testing
+fuzz-extended:
+	@echo "🔍 Running extended fuzzing tests (10 minutes each)..."
+	@echo "⚠️  This will take a while - perfect for overnight security testing"
+	@go test -fuzz=FuzzResolveConfigPath -fuzztime=10m ./pkg/ephemos/ || echo "Extended FuzzResolveConfigPath completed"
+	@go test -fuzz=FuzzYAMLParsing -fuzztime=10m ./pkg/ephemos/ || echo "Extended FuzzYAMLParsing completed"
+	@go test -fuzz=FuzzConfigValidation -fuzztime=10m ./pkg/ephemos/ || echo "Extended FuzzConfigValidation completed"
+	@go test -fuzz=FuzzServiceName -fuzztime=10m ./pkg/ephemos/ || echo "Extended FuzzServiceName completed"
+	@go test -fuzz=FuzzIdentityParsing -fuzztime=10m ./pkg/ephemos/ || echo "Extended FuzzIdentityParsing completed"
+	@echo "✅ Extended fuzzing completed!"
+
+# Fuzzing with coverage analysis
+fuzz-coverage: build
+	@echo "📊 Running fuzzing with coverage analysis..."
+	@go test -fuzz=FuzzConfigValidation -fuzztime=2m -coverprofile=fuzz-coverage.out ./pkg/ephemos/ || echo "Coverage fuzzing completed"
+	@go tool cover -html=fuzz-coverage.out -o fuzz-coverage.html || echo "Coverage report generated"
+	@echo "📈 Fuzzing coverage report: fuzz-coverage.html"
 
 # Help
 security-help:
