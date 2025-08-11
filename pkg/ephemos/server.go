@@ -28,6 +28,10 @@ const (
 	TransportTypeHTTP = "http"
 	// DefaultShutdownTimeout is the default timeout for graceful shutdown.
 	DefaultShutdownTimeout = 30 * time.Second
+	// DefaultHTTPAddress is the default address for HTTP transport.
+	DefaultHTTPAddress = ":8080"
+	// DefaultGRPCAddress is the default address for gRPC transport.
+	DefaultGRPCAddress = ":50051"
 )
 
 // TransportServer represents a transport-agnostic service server.
@@ -123,7 +127,14 @@ func (s *TransportServer) ListenAndServe(ctx context.Context) error {
 func (s *TransportServer) resolveAddress() string {
 	addr := s.config.Transport.Address
 	if addr == "" {
-		addr = ":8080" // default
+		switch s.config.Transport.Type {
+		case TransportTypeGRPC:
+			addr = DefaultGRPCAddress
+		case TransportTypeHTTP:
+			addr = DefaultHTTPAddress
+		default:
+			addr = DefaultGRPCAddress // fallback to gRPC default
+		}
 	}
 	return addr
 }
@@ -248,9 +259,9 @@ func loadConfig(ctx context.Context, path string) (*ports.Configuration, error) 
 	if cfg.Transport.Address == "" {
 		switch cfg.Transport.Type {
 		case TransportTypeGRPC:
-			cfg.Transport.Address = ":50051"
+			cfg.Transport.Address = DefaultGRPCAddress
 		case TransportTypeHTTP:
-			cfg.Transport.Address = ":8080"
+			cfg.Transport.Address = DefaultHTTPAddress
 		}
 	}
 
