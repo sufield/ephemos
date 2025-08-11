@@ -70,7 +70,11 @@ if command -v git-secrets >/dev/null 2>&1; then
         while IFS= read -r pattern; do
             # Skip empty lines and comments
             if [[ -n "$pattern" && ! "$pattern" =~ ^# ]]; then
-                git secrets --add --allowed "$pattern" >/dev/null 2>&1 || true
+                # Escape special characters and properly quote the pattern
+                escaped_pattern=$(printf '%q' "$pattern")
+                git secrets --add --allowed "$pattern" >/dev/null 2>&1 || {
+                    echo "Warning: Failed to add pattern: $pattern" >&2
+                }
             fi
         done < .gitallowed
     fi
