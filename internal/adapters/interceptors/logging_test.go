@@ -81,8 +81,8 @@ func TestLoggingInterceptor_UnaryServerInterceptor_ExcludeMethod(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if result != "success" {
-		t.Errorf("Expected 'success', got: %v", result)
+	if result != defaultResultCode {
+		t.Errorf("Expected '%s', got: %v", defaultResultCode, result)
 	}
 
 	// Should not have logged anything for excluded method

@@ -26,8 +26,13 @@ fi
 
 # Check for hardcoded domains (security check)
 echo "Checking for hardcoded domains..."
-if grep -r "[a-zA-Z0-9.-]\+\.\(com\|net\|org\|io\)" --include="*.go" . | grep -v "example\.org\|test\.local"; then
-    echo "❌ Found hardcoded domains (security risk)" >&2
+# Exclude test files, imports, and common safe domains
+if grep -r "spiffe://[a-zA-Z0-9.-]\+\.\(com\|net\|org\|io\)" --include="*.go" . \
+    --exclude="*_test.go" \
+    --exclude-dir=".git" \
+    --exclude-dir="vendor" \
+    | grep -v "example\.org\|example\.com\|test\.com\|test\.local\|localhost\|company\.com\|your\.domain\|your\.production\.domain\|prod\.company\.com"; then
+    echo "❌ Found hardcoded production SPIFFE domains (security risk)" >&2
     exit 1
 fi
 

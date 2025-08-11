@@ -12,8 +12,7 @@ import (
 )
 
 func TestLoadFromEnvironment(t *testing.T) {
-	// Store original environment
-	originalEnv := make(map[string]string)
+	// Clear environment for test
 	for _, env := range []string{
 		ports.EnvServiceName,
 		ports.EnvTrustDomain,
@@ -22,19 +21,8 @@ func TestLoadFromEnvironment(t *testing.T) {
 		ports.EnvTrustedServers,
 		ports.EnvDebugEnabled,
 	} {
-		originalEnv[env] = os.Getenv(env)
-		os.Unsetenv(env)
+		t.Setenv(env, "")
 	}
-	defer func() {
-		// Restore original environment
-		for env, value := range originalEnv {
-			if value != "" {
-				os.Setenv(env, value)
-			} else {
-				os.Unsetenv(env)
-			}
-		}
-	}()
 
 	tests := []struct {
 		name          string
@@ -122,14 +110,8 @@ func TestLoadFromEnvironment(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment variables for test
 			for key, value := range tt.envVars {
-				os.Setenv(key, value)
+				t.Setenv(key, value)
 			}
-			defer func() {
-				// Clean up after test
-				for key := range tt.envVars {
-					os.Unsetenv(key)
-				}
-			}()
 
 			config, err := ports.LoadFromEnvironment()
 
@@ -154,26 +136,14 @@ func TestLoadFromEnvironment(t *testing.T) {
 }
 
 func TestMergeWithEnvironment(t *testing.T) {
-	// Store original environment
-	originalEnv := make(map[string]string)
+	// Clear environment for test
 	for _, env := range []string{
 		ports.EnvServiceName,
 		ports.EnvTrustDomain,
 		ports.EnvAuthorizedClients,
 	} {
-		originalEnv[env] = os.Getenv(env)
-		os.Unsetenv(env)
+		t.Setenv(env, "")
 	}
-	defer func() {
-		// Restore original environment
-		for env, value := range originalEnv {
-			if value != "" {
-				os.Setenv(env, value)
-			} else {
-				os.Unsetenv(env)
-			}
-		}
-	}()
 
 	// Create initial configuration
 	config := &ports.Configuration{

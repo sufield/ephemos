@@ -140,7 +140,7 @@ func setupStreamTestServer(t *testing.T, tt struct {
 	}()
 
 	// Create client
-	conn, err := grpc.Dial("bufnet",
+	conn, err := grpc.NewClient("passthrough:///bufnet",
 		grpc.WithContextDialer(bufDialer(lis)),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
@@ -499,7 +499,7 @@ func TestStreamInterceptor_ErrorHandling(t *testing.T) {
 			}()
 			defer server.Stop()
 
-			conn, err := grpc.Dial("bufnet",
+			conn, err := grpc.NewClient("passthrough:///bufnet",
 				grpc.WithContextDialer(bufDialer(lis)),
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
 			)

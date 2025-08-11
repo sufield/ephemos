@@ -22,45 +22,16 @@ func main() {
 		production = flag.Bool("production", false, "Perform production readiness validation")
 		verbose    = flag.Bool("verbose", false, "Verbose output")
 	)
+
+	setupUsage()
 	flag.Parse()
 
 	fmt.Println("Ephemos Configuration Validator")
 	fmt.Println("==============================")
 	fmt.Println()
 
-	var cfg *ports.Configuration
-	var err error
-
-	// Load configuration based on flags
-	if *envOnly {
-		fmt.Println("🔒 Loading configuration from environment variables (secure mode)")
-		cfg, err = ports.LoadFromEnvironment()
-		if err != nil {
-			fmt.Printf("❌ Failed to load configuration from environment: %v\n", err)
-			os.Exit(1)
-		}
-	} else if *configFile != "" {
-		fmt.Printf("📁 Loading configuration from file: %s\n", *configFile)
-		provider := config.NewFileProvider()
-		cfg, err = provider.LoadConfiguration(context.Background(), *configFile)
-		if err != nil {
-			fmt.Printf("❌ Failed to load configuration file: %v\n", err)
-			os.Exit(1)
-		}
-
-		// Merge with environment variables (environment takes precedence)
-		fmt.Println("🔄 Merging with environment variables (environment overrides file)")
-		if err := cfg.MergeWithEnvironment(); err != nil {
-			fmt.Printf("❌ Failed to merge with environment: %v\n", err)
-			os.Exit(1)
-		}
-	} else {
-		fmt.Println("❌ Either --config or --env-only must be specified")
-		fmt.Println()
-		flag.Usage()
-		os.Exit(1)
-	}
-
+	// Load configuration
+	cfg := loadConfiguration(*envOnly, *configFile)
 	fmt.Println("✅ Configuration loaded successfully")
 	fmt.Println()
 
@@ -70,27 +41,8 @@ func main() {
 		fmt.Println()
 	}
 
-	// Perform basic validation
-	fmt.Println("🔍 Performing basic validation...")
-	if err := cfg.Validate(); err != nil {
-		fmt.Printf("❌ Basic validation failed: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Println("✅ Basic validation passed")
-
-	// Perform production readiness validation if requested
-	if *production {
-		fmt.Println()
-		fmt.Println("🏭 Performing production readiness validation...")
-		if err := cfg.IsProductionReady(); err != nil {
-			fmt.Printf("❌ Production validation failed: %v\n", err)
-			fmt.Println()
-			fmt.Println("💡 Production readiness tips:")
-			printProductionTips(err)
-			os.Exit(1)
-		}
-		fmt.Println("✅ Production validation passed")
-	}
+	// Validate configuration
+	validateConfiguration(cfg, *production)
 
 	// Environment variable recommendations
 	fmt.Println()
@@ -181,7 +133,8 @@ func printSecurityRecommendations(envOnly bool) {
 	fmt.Println("     config/README.md")
 }
 
-func init() {
+// setupUsage configures the custom usage function for flag parsing.
+func setupUsage() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options]\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Validates Ephemos configuration for security and production readiness.\n\n")
@@ -194,5 +147,75 @@ func init() {
 		fmt.Fprintf(os.Stderr, "  %s --config config/production.yaml --production\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  # Verbose validation:\n")
 		fmt.Fprintf(os.Stderr, "  %s --env-only --verbose\n\n", os.Args[0])
+	}
+}
+
+// loadConfiguration loads the configuration based on the provided flags.
+func loadConfiguration(envOnly bool, configFile string) *ports.Configuration {
+	var cfg *ports.Configuration
+	var err error
+
+	switch {
+	case envOnly:
+		fmt.Println("🔒 Loading configuration from environment variables (secure mode)")
+		cfg, err = ports.LoadFromEnvironment()
+		if err != nil {
+			fmt.Printf("❌ Failed to load configuration from environment: %v\n", err)
+			os.Exit(1)
+		}
+	case configFile != "":
+		cfg = loadConfigurationFromFile(configFile)
+	default:
+		fmt.Println("❌ Either --config or --env-only must be specified")
+		fmt.Println()
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	return cfg
+}
+
+// loadConfigurationFromFile loads configuration from a file and merges with environment.
+func loadConfigurationFromFile(configFile string) *ports.Configuration {
+	fmt.Printf("📁 Loading configuration from file: %s\n", configFile)
+	provider := config.NewFileProvider()
+	cfg, err := provider.LoadConfiguration(context.Background(), configFile)
+	if err != nil {
+		fmt.Printf("❌ Failed to load configuration file: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Merge with environment variables (environment takes precedence)
+	fmt.Println("🔄 Merging with environment variables (environment overrides file)")
+	if err := cfg.MergeWithEnvironment(); err != nil {
+		fmt.Printf("❌ Failed to merge with environment: %v\n", err)
+		os.Exit(1)
+	}
+
+	return cfg
+}
+
+// validateConfiguration performs basic and optional production validation.
+func validateConfiguration(cfg *ports.Configuration, production bool) {
+	// Perform basic validation
+	fmt.Println("🔍 Performing basic validation...")
+	if err := cfg.Validate(); err != nil {
+		fmt.Printf("❌ Basic validation failed: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("✅ Basic validation passed")
+
+	// Perform production readiness validation if requested
+	if production {
+		fmt.Println()
+		fmt.Println("🏭 Performing production readiness validation...")
+		if err := cfg.IsProductionReady(); err != nil {
+			fmt.Printf("❌ Production validation failed: %v\n", err)
+			fmt.Println()
+			fmt.Println("💡 Production readiness tips:")
+			printProductionTips(err)
+			os.Exit(1)
+		}
+		fmt.Println("✅ Production validation passed")
 	}
 }
