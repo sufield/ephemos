@@ -112,7 +112,7 @@ jobs:
         chmod +x scripts/debug-ci-build.sh
         ./scripts/debug-ci-build.sh
         # Platform-specific binary testing
-        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+        if [[ "${RUNNER_OS}" == "Windows" ]]; then
           ./bin/ephemos.exe --help || echo "Main binary help not available"
           ./bin/echo-server.exe --help || echo "Server help not available"
         else
