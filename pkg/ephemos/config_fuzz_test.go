@@ -32,7 +32,7 @@ func FuzzResolveConfigPath(f *testing.F) {
 		// Set up temporary directory for test
 		tempDir := t.TempDir()
 		oldWD, _ := os.Getwd()
-		t.Cleanup(func() { os.Chdir(oldWD) })
+		t.Cleanup(func() { t.Chdir(oldWD) })
 		t.Chdir(tempDir)
 
 		// Test should not panic and should handle malicious inputs safely
