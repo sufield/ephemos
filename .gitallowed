@@ -50,6 +50,8 @@ extraheader = AUTHORIZATION: basic \*\*\*
 \s*extraheader = AUTHORIZATION: basic \*\*\*
 \.git/config.*extraheader.*AUTHORIZATION.*\*\*\*
 ^\s*extraheader = AUTHORIZATION: basic \*\*\*$
+extraheader = AUTHORIZATION: basic [A-Za-z0-9+/=]+
+\s+extraheader = AUTHORIZATION: basic \*\*\*
 
 # Test configuration patterns
 AuthorizedClients.*spiffe://
