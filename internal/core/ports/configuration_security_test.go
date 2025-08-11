@@ -37,16 +37,16 @@ func TestLoadFromEnvironment(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name         string
-		envVars      map[string]string
-		expectError  bool
+		name          string
+		envVars       map[string]string
+		expectError   bool
 		errorContains string
 	}{
 		{
 			name: "valid production configuration",
 			envVars: map[string]string{
-				ports.EnvServiceName: "payment-service",
-				ports.EnvTrustDomain: "prod.company.com",
+				ports.EnvServiceName:  "payment-service",
+				ports.EnvTrustDomain:  "prod.company.com",
 				ports.EnvSPIFFESocket: "/run/spire/sockets/api.sock",
 			},
 			expectError: false,
@@ -89,8 +89,8 @@ func TestLoadFromEnvironment(t *testing.T) {
 		{
 			name: "production security - debug enabled",
 			envVars: map[string]string{
-				ports.EnvServiceName: "payment-service",
-				ports.EnvTrustDomain: "prod.company.com",
+				ports.EnvServiceName:  "payment-service",
+				ports.EnvTrustDomain:  "prod.company.com",
 				ports.EnvDebugEnabled: "true",
 			},
 			expectError:   true,
@@ -142,7 +142,7 @@ func TestLoadFromEnvironment(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, config)
-				
+
 				// Verify configuration values
 				assert.Equal(t, tt.envVars[ports.EnvServiceName], config.Service.Name)
 				if domain, ok := tt.envVars[ports.EnvTrustDomain]; ok {
@@ -199,7 +199,7 @@ func TestMergeWithEnvironment(t *testing.T) {
 	assert.Equal(t, "env-service", config.Service.Name)
 	assert.Equal(t, "env.domain.com", config.Service.Domain)
 	assert.Equal(t, []string{"spiffe://env.domain.com/client2", "spiffe://env.domain.com/client3"}, config.AuthorizedClients)
-	
+
 	// Verify file values remain where no environment override
 	assert.Equal(t, "/tmp/file/socket", config.SPIFFE.SocketPath)
 }
@@ -244,12 +244,12 @@ func TestParseCommaSeparatedList(t *testing.T) {
 			os.Setenv(ports.EnvServiceName, "test-service")
 			os.Setenv(ports.EnvTrustDomain, "test.local")
 			os.Setenv(ports.EnvAuthorizedClients, tt.input)
-			
+
 			config, err := ports.LoadFromEnvironment()
 			require.NoError(t, err)
-			
+
 			assert.Equal(t, tt.expected, config.AuthorizedClients)
-			
+
 			os.Unsetenv(ports.EnvServiceName)
 			os.Unsetenv(ports.EnvTrustDomain)
 			os.Unsetenv(ports.EnvAuthorizedClients)
@@ -434,7 +434,7 @@ func TestGetBoolEnv(t *testing.T) {
 		},
 		{
 			name:         "unset uses default",
-			envValue:     "",  // Will be unset
+			envValue:     "", // Will be unset
 			defaultValue: false,
 			expected:     false,
 		},
@@ -457,16 +457,16 @@ func TestGetBoolEnv(t *testing.T) {
 func TestEnvironmentVariableConstants(t *testing.T) {
 	// Verify environment variable names follow consistent naming convention
 	expectedVars := map[string]string{
-		"EPHEMOS_SERVICE_NAME":          ports.EnvServiceName,
-		"EPHEMOS_TRUST_DOMAIN":         ports.EnvTrustDomain,
-		"EPHEMOS_SPIFFE_SOCKET":        ports.EnvSPIFFESocket,
-		"EPHEMOS_AUTHORIZED_CLIENTS":   ports.EnvAuthorizedClients,
-		"EPHEMOS_TRUSTED_SERVERS":      ports.EnvTrustedServers,
+		"EPHEMOS_SERVICE_NAME":           ports.EnvServiceName,
+		"EPHEMOS_TRUST_DOMAIN":           ports.EnvTrustDomain,
+		"EPHEMOS_SPIFFE_SOCKET":          ports.EnvSPIFFESocket,
+		"EPHEMOS_AUTHORIZED_CLIENTS":     ports.EnvAuthorizedClients,
+		"EPHEMOS_TRUSTED_SERVERS":        ports.EnvTrustedServers,
 		"EPHEMOS_REQUIRE_AUTHENTICATION": ports.EnvRequireAuth,
-		"EPHEMOS_LOG_LEVEL":            ports.EnvLogLevel,
-		"EPHEMOS_BIND_ADDRESS":         ports.EnvBindAddress,
-		"EPHEMOS_TLS_MIN_VERSION":      ports.EnvTLSMinVersion,
-		"EPHEMOS_DEBUG_ENABLED":        ports.EnvDebugEnabled,
+		"EPHEMOS_LOG_LEVEL":              ports.EnvLogLevel,
+		"EPHEMOS_BIND_ADDRESS":           ports.EnvBindAddress,
+		"EPHEMOS_TLS_MIN_VERSION":        ports.EnvTLSMinVersion,
+		"EPHEMOS_DEBUG_ENABLED":          ports.EnvDebugEnabled,
 	}
 
 	for expected, actual := range expectedVars {

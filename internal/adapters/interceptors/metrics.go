@@ -6,7 +6,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-const defaultResultCode = "success"
+const (
+	defaultResultCode = "success"
+	failureResultCode = "failure"
+)
 
 // AuthMetricsCollector defines the interface for collecting authentication metrics.
 type AuthMetricsCollector interface {
@@ -27,6 +30,12 @@ type AuthMetricsConfig struct {
 
 	// ServiceName to use in metrics labels
 	ServiceName string
+
+	// EnablePayloadSize enables payload size tracking
+	EnablePayloadSize bool
+
+	// EnableActiveRequests enables active request counting
+	EnableActiveRequests bool
 }
 
 // AuthMetricsInterceptor provides authentication metrics collection for gRPC services.
@@ -50,7 +59,7 @@ func (m *AuthMetricsInterceptor) UnaryServerInterceptor() grpc.UnaryServerInterc
 	return func(
 		ctx context.Context,
 		req interface{},
-		info *grpc.UnaryServerInfo,
+		_ *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
 	) (interface{}, error) {
 		// Call the handler
@@ -60,7 +69,7 @@ func (m *AuthMetricsInterceptor) UnaryServerInterceptor() grpc.UnaryServerInterc
 		if identity, ok := GetIdentityFromContext(ctx); ok {
 			result := defaultResultCode
 			if err != nil {
-				result = "failure"
+				result = failureResultCode
 			}
 			m.config.AuthMetricsCollector.IncAuthenticationTotal(identity.ServiceName, result)
 		}
@@ -74,7 +83,7 @@ func (m *AuthMetricsInterceptor) StreamServerInterceptor() grpc.StreamServerInte
 	return func(
 		srv interface{},
 		ss grpc.ServerStream,
-		info *grpc.StreamServerInfo,
+		_ *grpc.StreamServerInfo,
 		handler grpc.StreamHandler,
 	) error {
 		ctx := ss.Context()
@@ -86,12 +95,64 @@ func (m *AuthMetricsInterceptor) StreamServerInterceptor() grpc.StreamServerInte
 		if identity, ok := GetIdentityFromContext(ctx); ok {
 			result := defaultResultCode
 			if err != nil {
-				result = "failure"
+				result = failureResultCode
 			}
 			m.config.AuthMetricsCollector.IncAuthenticationTotal(identity.ServiceName, result)
 		}
 
 		return err
+	}
+}
+
+// UnaryClientInterceptor returns a gRPC unary client interceptor for authentication metrics collection.
+func (m *AuthMetricsInterceptor) UnaryClientInterceptor() grpc.UnaryClientInterceptor {
+	return func(
+		ctx context.Context,
+		method string,
+		req, reply interface{},
+		cc *grpc.ClientConn,
+		invoker grpc.UnaryInvoker,
+		opts ...grpc.CallOption,
+	) error {
+		// Call the method
+		err := invoker(ctx, method, req, reply, cc, opts...)
+
+		// Track authentication metrics if identity is available
+		if identity, ok := GetIdentityFromContext(ctx); ok {
+			result := defaultResultCode
+			if err != nil {
+				result = failureResultCode
+			}
+			m.config.AuthMetricsCollector.IncAuthenticationTotal(identity.ServiceName, result)
+		}
+
+		return err
+	}
+}
+
+// StreamClientInterceptor returns a gRPC stream client interceptor for authentication metrics collection.
+func (m *AuthMetricsInterceptor) StreamClientInterceptor() grpc.StreamClientInterceptor {
+	return func(
+		ctx context.Context,
+		desc *grpc.StreamDesc,
+		cc *grpc.ClientConn,
+		method string,
+		streamer grpc.Streamer,
+		opts ...grpc.CallOption,
+	) (grpc.ClientStream, error) {
+		// Call the method
+		stream, err := streamer(ctx, desc, cc, method, opts...)
+
+		// Track authentication metrics if identity is available
+		if identity, ok := GetIdentityFromContext(ctx); ok {
+			result := defaultResultCode
+			if err != nil {
+				result = failureResultCode
+			}
+			m.config.AuthMetricsCollector.IncAuthenticationTotal(identity.ServiceName, result)
+		}
+
+		return stream, err
 	}
 }
 
@@ -101,4 +162,20 @@ func DefaultAuthMetricsConfig(serviceName string) *AuthMetricsConfig {
 		AuthMetricsCollector: &DefaultAuthMetricsCollector{},
 		ServiceName:          serviceName,
 	}
+}
+
+// MetricsConfig is an alias for AuthMetricsConfig to maintain backward compatibility.
+type MetricsConfig = AuthMetricsConfig
+
+// MetricsInterceptor is an alias for AuthMetricsInterceptor to maintain backward compatibility.
+type MetricsInterceptor = AuthMetricsInterceptor
+
+// DefaultMetricsConfig returns a default metrics configuration.
+func DefaultMetricsConfig(serviceName string) *MetricsConfig {
+	return DefaultAuthMetricsConfig(serviceName)
+}
+
+// NewMetricsInterceptor creates a new metrics interceptor.
+func NewMetricsInterceptor(config *MetricsConfig) *MetricsInterceptor {
+	return NewAuthMetricsInterceptor(config)
 }

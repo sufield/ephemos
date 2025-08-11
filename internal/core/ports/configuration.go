@@ -233,16 +233,16 @@ type ConfigurationProvider interface {
 
 // Environment variable names for configuration
 const (
-	EnvServiceName          = "EPHEMOS_SERVICE_NAME"
-	EnvTrustDomain         = "EPHEMOS_TRUST_DOMAIN"
-	EnvSPIFFESocket        = "EPHEMOS_SPIFFE_SOCKET"
-	EnvAuthorizedClients   = "EPHEMOS_AUTHORIZED_CLIENTS"
-	EnvTrustedServers      = "EPHEMOS_TRUSTED_SERVERS"
-	EnvRequireAuth         = "EPHEMOS_REQUIRE_AUTHENTICATION"
-	EnvLogLevel            = "EPHEMOS_LOG_LEVEL"
-	EnvBindAddress         = "EPHEMOS_BIND_ADDRESS"
-	EnvTLSMinVersion       = "EPHEMOS_TLS_MIN_VERSION"
-	EnvDebugEnabled        = "EPHEMOS_DEBUG_ENABLED"
+	EnvServiceName       = "EPHEMOS_SERVICE_NAME"
+	EnvTrustDomain       = "EPHEMOS_TRUST_DOMAIN"
+	EnvSPIFFESocket      = "EPHEMOS_SPIFFE_SOCKET"
+	EnvAuthorizedClients = "EPHEMOS_AUTHORIZED_CLIENTS"
+	EnvTrustedServers    = "EPHEMOS_TRUSTED_SERVERS"
+	EnvRequireAuth       = "EPHEMOS_REQUIRE_AUTHENTICATION"
+	EnvLogLevel          = "EPHEMOS_LOG_LEVEL"
+	EnvBindAddress       = "EPHEMOS_BIND_ADDRESS"
+	EnvTLSMinVersion     = "EPHEMOS_TLS_MIN_VERSION"
+	EnvDebugEnabled      = "EPHEMOS_DEBUG_ENABLED"
 )
 
 // LoadFromEnvironment creates a configuration from environment variables.
