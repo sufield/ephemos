@@ -19,7 +19,6 @@ func TestConfigBuilder_PureCodeConfiguration(t *testing.T) {
 		WithAuthorizedClients([]string{"spiffe://test.com/client1", "spiffe://test.com/client2"}).
 		WithTrustedServers([]string{"spiffe://test.com/server1", "spiffe://test.com/server2"}).
 		Build(ctx)
-
 	if err != nil {
 		t.Fatalf("Failed to build pure-code config: %v", err)
 	}
@@ -71,7 +70,6 @@ func TestConfigBuilder_EnvironmentOverrides(t *testing.T) {
 	config, err := NewConfigBuilder().
 		WithSource(ConfigSourceEnvOnly).
 		Build(ctx)
-
 	if err != nil {
 		t.Fatalf("Failed to build env-only config: %v", err)
 	}
@@ -111,7 +109,6 @@ func TestLoadConfigFlexible_PureCode(t *testing.T) {
 		WithService("flexible-service", "flexible.example.com"),
 		WithTransportOption("grpc", ":7070"),
 	)
-
 	if err != nil {
 		t.Fatalf("Failed to load flexible config: %v", err)
 	}
@@ -138,7 +135,6 @@ func TestLoadConfigFlexible_EnvironmentOnly(t *testing.T) {
 	config, err := LoadConfigFlexible(ctx,
 		WithEnvSource("TEST"),
 	)
-
 	if err != nil {
 		t.Fatalf("Failed to load flexible env config: %v", err)
 	}
@@ -156,7 +152,6 @@ func TestConfigBuilder_Defaults(t *testing.T) {
 	config, err := NewConfigBuilder().
 		WithSource(ConfigSourcePureCode).
 		Build(ctx)
-
 	if err != nil {
 		t.Fatalf("Failed to build default config: %v", err)
 	}

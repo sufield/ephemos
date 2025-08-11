@@ -17,6 +17,11 @@ import (
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
+const (
+	// DefaultReadyCheckInterval is the default polling interval for server ready checks.
+	DefaultReadyCheckInterval = 100 * time.Millisecond
+)
+
 // EnhancedServer provides a production-ready server with graceful shutdown.
 type EnhancedServer struct {
 	baseServer      Server
@@ -300,7 +305,7 @@ func (a *netListenerAdapter) Addr() string {
 
 // WaitForReady waits for the server to be ready to accept connections.
 func (s *EnhancedServer) WaitForReady(ctx context.Context) error {
-	ticker := time.NewTicker(100 * time.Millisecond)
+	ticker := time.NewTicker(DefaultReadyCheckInterval)
 	defer ticker.Stop()
 
 	for {

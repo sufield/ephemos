@@ -12,11 +12,11 @@ import (
 type ConfigSource int
 
 const (
-	// ConfigSourceYAML uses YAML file as primary source with env var overrides
+	// ConfigSourceYAML uses YAML file as primary source with env var overrides.
 	ConfigSourceYAML ConfigSource = iota
-	// ConfigSourceEnvOnly uses only environment variables
+	// ConfigSourceEnvOnly uses only environment variables.
 	ConfigSourceEnvOnly
-	// ConfigSourcePureCode uses programmatic configuration
+	// ConfigSourcePureCode uses programmatic configuration.
 	ConfigSourcePureCode
 )
 
