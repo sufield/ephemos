@@ -392,6 +392,25 @@ func CreateClientInterceptors(
 	return unaryInterceptors, streamInterceptors
 }
 
+// Transport-Agnostic API
+//
+// The following functions are defined in server.go and provide a transport-agnostic
+// API where services are written with plain Go types and can run over gRPC, HTTP,
+// or any future transport without code changes.
+//
+// Example usage:
+//
+//	ctx := context.Background()
+//	server, err := ephemos.NewTransportServer(ctx, "config/service.yaml")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer server.Close()
+//
+//	echoService := &MyEchoService{}
+//	ephemos.Mount[ports.EchoService](server, echoService)
+//	server.ListenAndServe(ctx)
+
 // Legacy compatibility functions - deprecated, use New* functions instead
 
 // IdentityServer creates a new identity-aware server instance.
