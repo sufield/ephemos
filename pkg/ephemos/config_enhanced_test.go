@@ -1,8 +1,6 @@
 package ephemos
 
 import (
-	"context"
-	"os"
 	"testing"
 )
 
