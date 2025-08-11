@@ -4,6 +4,7 @@ package ephemos
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -396,4 +397,20 @@ func LoadConfigFromYAML(ctx context.Context, yamlPath string) (*Configuration, e
 		return config, nil
 	}
 	return envConfig, nil
+}
+
+// Common domain service interfaces that users can implement.
+// These use plain Go types and are completely transport-agnostic.
+
+// EchoService demonstrates a simple request-response service.
+type EchoService interface {
+	Echo(ctx context.Context, message string) (string, error)
+	Ping(ctx context.Context) error
+}
+
+// FileService demonstrates binary data handling.
+type FileService interface {
+	Upload(ctx context.Context, filename string, data io.Reader) error
+	Download(ctx context.Context, filename string) (io.Reader, error)
+	List(ctx context.Context, prefix string) ([]string, error)
 }
