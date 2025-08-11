@@ -14,18 +14,17 @@ All applications using Ephemos should use the secure logger:
 import (
     "log/slog"
     "os"
-    "github.com/sufield/ephemos/internal/adapters/logging"
 )
 
 func main() {
-    // Setup secure structured logging
-    baseHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+    // Setup structured logging for development/demo
+    // Note: For production applications, consider implementing 
+    // custom sensitive data redaction if needed
+    slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
         Level: slog.LevelDebug,
-    })
-    secureLogger := logging.NewSecureLogger(baseHandler)
-    slog.SetDefault(secureLogger)
+    })))
     
-    // All subsequent logging will be automatically secured
+    // All subsequent logging will use standard slog
     slog.Info("Server starting", "port", 8080)
 }
 ```

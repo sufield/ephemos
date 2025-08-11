@@ -31,17 +31,14 @@ import (
 	"time"
 
 	"github.com/sufield/ephemos/examples/proto"
-	"github.com/sufield/ephemos/internal/adapters/logging"
 	"github.com/sufield/ephemos/pkg/ephemos"
 )
 
 func main() {
-	// Setup secure structured logging with debug level for troubleshooting
-	baseHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	// Setup structured logging with debug level for troubleshooting
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
-	})
-	secureLogger := logging.NewSecureLogger(baseHandler)
-	slog.SetDefault(secureLogger)
+	})))
 
 	ctx := context.Background()
 
