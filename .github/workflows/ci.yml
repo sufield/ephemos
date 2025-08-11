@@ -93,6 +93,7 @@ jobs:
       
     - name: Build and verify
       run: |
+        go clean -cache
         make ci-build
         ./bin/ephemos --help
         # Platform-specific binary testing
@@ -170,7 +171,9 @@ jobs:
         echo "✅ SPIRE binaries installed successfully"
         
     - name: Build applications
-      run: make ci-build
+      run: |
+        go clean -cache
+        make ci-build
       
     - name: Start SPIRE services
       run: |
@@ -347,6 +350,7 @@ jobs:
         
     - name: Run benchmarks
       run: |
+        go clean -cache
         make ci-setup
         go test -bench=. -benchmem ./... > benchmark.txt 2>&1
         echo "## Benchmark Results" >> $GITHUB_STEP_SUMMARY

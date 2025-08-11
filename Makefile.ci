@@ -4,7 +4,9 @@
 
 # Setup environment for CI
 ci-setup: proto
-	@echo "CI setup completed - protobuf files generated"
+	@echo "Cleaning Go build cache..."
+	go clean -cache
+	@echo "CI setup completed - protobuf files generated and cache cleared"
 
 # Run linting checks
 ci-lint:
