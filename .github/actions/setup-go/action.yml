@@ -30,9 +30,11 @@ runs:
       if: ${{ inputs.verify-version == 'true' }}
       shell: bash
       run: |
-        echo "Expected Go version: ${{ inputs.go-version }}"
+        echo "Expected Go version: ${GO_VERSION}"
         echo "Actual Go version: $(go version)"
         go version | grep -E "(go1\.(22|23))" || (echo "ERROR: Go version is not 1.22 or 1.23" && exit 1)
+      env:
+        GO_VERSION: ${{ inputs.go-version }}
         
     - name: Cache Go modules
       uses: actions/cache@v4
