@@ -57,7 +57,7 @@ func printConnectionConfig(name string, config *transport.ConnectionConfig) {
 	if config.EnablePooling {
 		fmt.Printf("    - Pool Size: %d\n", config.PoolSize)
 	}
-	fmt.Printf("    - Service Config Contains Retry Policy: %v\n", 
+	fmt.Printf("    - Service Config Contains Retry Policy: %v\n",
 		len(config.ServiceConfig) > 0 && contains(config.ServiceConfig, "retryPolicy"))
 }
 
@@ -68,27 +68,27 @@ func createCustomConfig() *transport.ConnectionConfig {
 	// - Deployed in a reliable network environment
 
 	config := transport.DefaultConnectionConfig()
-	
+
 	// Adjust timeouts for moderate traffic scenario
 	config.ConnectTimeout = 15 * time.Second
-	
+
 	// Configure more aggressive backoff for faster recovery
 	config.BackoffConfig.BaseDelay = 500 * time.Millisecond
 	config.BackoffConfig.Multiplier = 2.0
 	config.BackoffConfig.MaxDelay = 30 * time.Second
-	
+
 	// Adjust keepalive for moderate traffic
 	config.KeepaliveParams.Time = 20 * time.Second
 	config.KeepaliveParams.Timeout = 5 * time.Second
-	
+
 	// Enable pooling with moderate pool size
 	config.EnablePooling = true
 	config.PoolSize = 3
-	
+
 	// Set reasonable message sizes (8MB)
 	config.MaxRecvMsgSize = 8 * 1024 * 1024
 	config.MaxSendMsgSize = 8 * 1024 * 1024
-	
+
 	// Custom service configuration with moderate retry policy
 	config.ServiceConfig = `{
 		"methodConfig": [
@@ -105,37 +105,37 @@ func createCustomConfig() *transport.ConnectionConfig {
 			}
 		]
 	}`
-	
+
 	return config
 }
 
 func demonstrateProviderUsage() {
 	// Create a mock SPIFFE provider (in real usage, this would be properly initialized)
 	spiffeProvider := &spiffe.Provider{}
-	
+
 	// Example 1: Default provider
 	fmt.Println("  Creating default provider...")
 	_ = transport.NewGRPCProvider(spiffeProvider)
 	fmt.Println("    ✓ Default provider created with standard configuration")
-	
+
 	// Example 2: Development provider
 	fmt.Println("  Creating development provider...")
 	devConfig := transport.DevelopmentConnectionConfig()
 	_ = transport.NewGRPCProviderWithConfig(spiffeProvider, devConfig)
 	fmt.Println("    ✓ Development provider created with fast timeouts")
-	
+
 	// Example 3: High-throughput provider
 	fmt.Println("  Creating high-throughput provider...")
 	htConfig := transport.HighThroughputConnectionConfig()
 	_ = transport.NewGRPCProviderWithConfig(spiffeProvider, htConfig)
 	fmt.Println("    ✓ High-throughput provider created with connection pooling")
-	
+
 	// Example 4: Custom provider
 	fmt.Println("  Creating custom provider...")
 	customConfig := createCustomConfig()
 	_ = transport.NewGRPCProviderWithConfig(spiffeProvider, customConfig)
 	fmt.Println("    ✓ Custom provider created with tailored configuration")
-	
+
 	// Demonstrate configuration differences
 	defaultConfig := transport.DefaultConnectionConfig()
 	fmt.Println("\n  Configuration Comparison:")
@@ -149,10 +149,10 @@ func demonstrateProviderUsage() {
 // This example demonstrates the configuration concepts and usage patterns
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || 
-		(len(s) > len(substr) && (s[:len(substr)] == substr || 
-		s[len(s)-len(substr):] == substr || 
-		fmt.Sprintf("%s", s)[0:0] != fmt.Sprintf("%s", substr)[0:0]))) // simplified contains check
+	return len(s) >= len(substr) && (s == substr ||
+		(len(s) > len(substr) && (s[:len(substr)] == substr ||
+			s[len(s)-len(substr):] == substr ||
+			fmt.Sprintf("%s", s)[0:0] != fmt.Sprintf("%s", substr)[0:0]))) // simplified contains check
 }
 
 // Additional examples of specific use cases
@@ -161,10 +161,10 @@ func demonstrateUseCase(name string, config *transport.ConnectionConfig, descrip
 	fmt.Printf("\n=== %s ===\n", name)
 	fmt.Println(description)
 	fmt.Println()
-	
+
 	// Show key configuration aspects for this use case
 	fmt.Printf("Key Configuration:\n")
-	fmt.Printf("- Connection Timeout: %v\n", config.ConnectTimeout) 
+	fmt.Printf("- Connection Timeout: %v\n", config.ConnectTimeout)
 	fmt.Printf("- Retry Max Attempts: Configured in service config\n")
 	fmt.Printf("- Connection Pooling: %v\n", config.EnablePooling)
 	if config.EnablePooling {
@@ -177,26 +177,26 @@ func init() {
 	// Additional use case examples
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		
+
 		// E-commerce example
 		ecommerceConfig := transport.HighThroughputConnectionConfig()
 		ecommerceConfig.ConnectTimeout = 5 * time.Second // Fast connection required
 		demonstrateUseCase("E-commerce Platform",
 			ecommerceConfig,
 			"High-volume e-commerce platform requiring fast connections and high throughput for order processing and inventory updates.")
-		
-		// Financial services example  
+
+		// Financial services example
 		financeConfig := transport.DefaultConnectionConfig()
 		financeConfig.BackoffConfig.MaxDelay = 10 * time.Second // Conservative backoff
-		financeConfig.IdleTimeout = 5 * time.Minute // Shorter idle timeout for security
+		financeConfig.IdleTimeout = 5 * time.Minute             // Shorter idle timeout for security
 		demonstrateUseCase("Financial Services",
-			financeConfig, 
+			financeConfig,
 			"Financial trading system requiring reliable connections with conservative retry policies and strict timeout controls.")
-			
+
 		// IoT example
 		iotConfig := transport.DevelopmentConnectionConfig()
 		iotConfig.KeepaliveParams.Time = 60 * time.Second // Less frequent keepalives
-		iotConfig.MaxRecvMsgSize = 1024 * 1024 // Smaller messages
+		iotConfig.MaxRecvMsgSize = 1024 * 1024            // Smaller messages
 		iotConfig.MaxSendMsgSize = 1024 * 1024
 		demonstrateUseCase("IoT Data Collection",
 			iotConfig,

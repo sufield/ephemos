@@ -36,7 +36,7 @@ func (s *ExampleServer) Echo(ctx context.Context, req *proto.EchoRequest) (*prot
 	if requestID, ok := interceptors.GetRequestID(ctx); ok {
 		slog.Info("Processing request", "request_id", requestID)
 	}
-	
+
 	if originalCaller, ok := interceptors.GetOriginalCaller(ctx); ok {
 		slog.Info("Request originated from", "original_caller", originalCaller)
 	}
@@ -89,7 +89,7 @@ func runServerExample(configType string, interceptorConfig *ephemos.InterceptorC
 		return
 	}
 
-	slog.Info("Server configured successfully", 
+	slog.Info("Server configured successfully",
 		"config_type", configType,
 		"auth_enabled", interceptorConfig.EnableAuth,
 		"logging_enabled", interceptorConfig.EnableLogging,
@@ -129,13 +129,13 @@ func createCustomInterceptorConfig() *ephemos.InterceptorConfig {
 
 	return &ephemos.InterceptorConfig{
 		EnableAuth:                true,
-		AuthConfig:               authConfig,
+		AuthConfig:                authConfig,
 		EnableIdentityPropagation: true,
 		IdentityPropagationConfig: nil, // Will use defaults
 		EnableLogging:             true,
-		LoggingConfig:            loggingConfig,
+		LoggingConfig:             loggingConfig,
 		EnableMetrics:             true,
-		MetricsConfig:            metricsConfig,
+		MetricsConfig:             metricsConfig,
 	}
 }
 
@@ -212,9 +212,9 @@ func (c *CustomMetricsCollector) ObservePayloadSize(method, service, direction s
 // customMetricsExample demonstrates using a custom metrics collector.
 func customMetricsExample() *ephemos.InterceptorConfig {
 	config := ephemos.NewDefaultInterceptorConfig()
-	
+
 	// Use custom metrics collector
 	config.MetricsConfig.MetricsCollector = &CustomMetricsCollector{}
-	
+
 	return config
 }

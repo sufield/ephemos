@@ -16,6 +16,9 @@ import (
 // Default configuration constants.
 const defaultMaxCallChainDepth = 10
 
+// RequestIDContextKey is the context key for storing request ID information.
+type RequestIDContextKey struct{}
+
 const (
 	// MetadataKeyOriginalCaller is the metadata key for original caller identity.
 	MetadataKeyOriginalCaller = "x-ephemos-original-caller"
@@ -265,7 +268,7 @@ func (i *IdentityPropagationInterceptor) getOrGenerateRequestID(ctx context.Cont
 	}
 
 	// Check for request ID in context value (set by application)
-	if requestID, ok := ctx.Value("request-id").(string); ok {
+	if requestID, ok := ctx.Value(RequestIDContextKey{}).(string); ok {
 		return requestID
 	}
 

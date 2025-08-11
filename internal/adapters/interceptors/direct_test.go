@@ -19,8 +19,6 @@ import (
 
 // Direct testing of pure functions without mocks
 
-type directTestContextKey string
-
 func TestParseSpiffeID_Direct(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -315,7 +313,7 @@ func TestRequestIDGeneration_Direct(t *testing.T) {
 
 			// Setup context value
 			if tt.contextValue != nil {
-				ctx = context.WithValue(ctx, directTestContextKey(tt.contextKey), tt.contextValue)
+				ctx = context.WithValue(ctx, RequestIDContextKey{}, tt.contextValue)
 			}
 
 			requestID := interceptor.getOrGenerateRequestID(ctx)
