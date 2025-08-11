@@ -6,10 +6,16 @@ echo "🔍 === COMPREHENSIVE CI BUILD DIAGNOSTIC ==="
 echo "Working directory: $(pwd)"
 echo "User: $(whoami)"
 echo "Date: $(date)"
+echo "Platform: $(uname -s 2>/dev/null || echo 'Windows')"
 echo
 
 echo "🗂️ === DIRECTORY STRUCTURE ==="
-ls -la
+if command -v ls >/dev/null 2>&1; then
+    ls -la
+else
+    # Windows/PowerShell fallback
+    dir
+fi
 echo
 
 echo "📁 === PKG/EPHEMOS DIRECTORY ==="
