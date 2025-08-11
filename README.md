@@ -1,15 +1,16 @@
-# Ephemos - Identity-Based Authentication for Go Services
+# Ephemos - Transport-Agnostic Service Framework
 
-Ephemos is a Go library that provides identity-based authentication for backend services using SPIFFE/SPIRE, replacing plaintext API keys with mTLS. It abstracts away all SPIFFE/SPIRE complexity, making identity-based authentication as simple as using API keys.
+Ephemos is a Go library that provides **transport-agnostic services** with identity-based authentication using SPIFFE/SPIRE. Write your services once with plain Go types, and run them over gRPC, HTTP, or any future transport without code changes.
 
 ## Features
 
-- **Simple API**: One-line setup for both servers and clients
-- **No Plaintext API Keys**: No more leaking plaintext secrets
-- **Abstraction**: No SPIFFE/SPIRE terminology exposed to developers
-- **Automatic Certificate Rotation**: Transparent handling of certificate lifecycle
-- **Elegant Architecture**: Hexagonal architecture with proper separation of concerns
-- **Ubuntu 24 Optimized**: Scripts and configurations optimized for Ubuntu 24
+- **🚀 Transport Agnostic**: Same service code runs on gRPC, HTTP, or future transports
+- **🔧 Configuration Driven**: Switch transports via config, not code changes
+- **📦 Domain First**: Write services with plain Go types - no protocol dependencies
+- **🎯 Type Safe**: Generic `Mount[T]` API provides compile-time safety
+- **🔌 Hexagonal Architecture**: Clean separation between domain and transport layers
+- **🛡️ Identity Security**: SPIFFE/SPIRE integration with automatic certificate rotation
+- **⚡ Zero Protocol Lock-in**: Never be tied to a specific transport protocol again
 
 ## Quick Start
 
@@ -27,129 +28,185 @@ go mod download
 make demo
 ```
 
-### Server Usage
+### Server Usage (Transport-Agnostic)
 
 ```go
 import (
 	"context"
-	"net"
+	"log"
+	
+	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/sufield/ephemos/pkg/ephemos"
-	"github.com/sufield/ephemos/examples/proto"
 )
 
-ctx := context.Background()
-
-// Create identity-based server with config
-server, err := ephemos.NewIdentityServer(ctx, "config/echo-server.yaml")
-if err != nil {
-	log.Fatal(err)
+// Your service implementation - pure domain logic, no transport concerns
+type EchoService struct {
+	name string
 }
-defer server.Close()
 
-// Register service using the generic registrar (recommended - no boilerplate)
-serviceRegistrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-	proto.RegisterEchoServiceServer(s, &EchoServer{})
-})
-server.RegisterService(ctx, serviceRegistrar)
+// Plain Go types - no gRPC, no HTTP, no protobuf
+func (e *EchoService) Echo(ctx context.Context, message string) (string, error) {
+	return fmt.Sprintf("[%s] Echo: %s", e.name, message), nil
+}
 
-// Start listening - completely abstracted
-lis, _ := net.Listen("tcp", ":50051")
-server.Serve(ctx, lis)
+func (e *EchoService) Ping(ctx context.Context) error {
+	log.Printf("[%s] Ping received", e.name)
+	return nil
+}
+
+func main() {
+	ctx := context.Background()
+	
+	// Create transport-agnostic server (transport determined by config)
+	server, err := ephemos.NewTransportServer(ctx, "config/service.yaml")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer server.Close()
+
+	// Mount your service - works with gRPC, HTTP, or any transport
+	echoService := &EchoService{name: "my-service"}
+	if err := ephemos.Mount[ports.EchoService](server, echoService); err != nil {
+		log.Fatal(err)
+	}
+
+	// Start server - transport determined by configuration
+	if err := server.ListenAndServe(ctx); err != nil {
+		log.Fatal(err)
+	}
+}
 ```
 
-### Client Usage
+### Configuration (Choose Your Transport)
 
-```go
-import (
-	"context"
-	"github.com/sufield/ephemos/pkg/ephemos"
-	"github.com/sufield/ephemos/examples/proto"
-)
+The same service code works with different transports - just change the config:
 
-// Simple connection with identity
-ctx := context.Background()
-client, err := ephemos.NewIdentityClient(ctx, "config/echo-client.yaml")
-if err != nil {
-	log.Fatal(err)
-}
-defer client.Close()
-
-conn, err := client.Connect(ctx, "echo-server", "localhost:50051")
-if err != nil {
-	log.Fatal(err)
-}
-defer conn.Close() // Always defer Close for proper cleanup
-
-// Create service client - no gRPC details exposed
-echoClient, err := proto.NewEchoClient(conn.GetClientConnection())
-if err != nil {
-	log.Fatal(err)
-}
-defer echoClient.Close()
-```
-
-## Configuration
-
-Create an `ephemos.yaml` file in your project root or use the examples in the `config/` folder:
-
+**gRPC Transport:**
 ```yaml
 service:
-  name: "your-service"
+  name: "my-service"
   domain: "example.org"
 
-# Optional SPIFFE configuration
+transport:
+  type: "grpc"
+  address: ":50051"
+  
 spiffe:
   socket_path: "/tmp/spire-agent/public/api.sock"
-
-# For servers: specify authorized clients
-authorized_clients:
-  - "allowed-client-1"
-  - "allowed-client-2"
-
-# For clients: specify trusted servers (optional)
-trusted_servers:
-  - "trusted-server"
 ```
 
-## Service Registration
+**HTTP Transport:**
+```yaml
+service:
+  name: "my-service"
+  domain: "example.org"
 
-Ephemos offers two approaches for registering your gRPC services:
+transport:
+  type: "http"
+  address: ":8080"
+  
+spiffe:
+  socket_path: "/tmp/spire-agent/public/api.sock"
+```
 
-### Option 1: Generic Registrar (Recommended)
+**The Magic**: Same service code, different transport - just change the config! 🎉
 
-Use the built-in generic registrar - no boilerplate code required:
+## Testing Your Service
+
+### gRPC Transport
+```bash
+# Start your service with gRPC config
+EPHEMOS_CONFIG=config/grpc.yaml go run main.go
+
+# Test with grpc_cli
+grpc_cli call localhost:50051 EchoService.Echo "message: 'Hello gRPC'"
+```
+
+### HTTP Transport  
+```bash
+# Start your service with HTTP config
+EPHEMOS_CONFIG=config/http.yaml go run main.go
+
+# Test with curl
+curl -X POST http://localhost:8080/echoservice/echo \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello HTTP"}'
+```
+
+## Key Benefits
+
+### 🚀 **No Protocol Lock-in**
+Switch from gRPC to HTTP, or add WebSocket support later - **no code changes needed**.
+
+### 🧪 **Easy Testing**
+Test your business logic without transport concerns:
+```go
+func TestEchoService(t *testing.T) {
+    service := &EchoService{name: "test"}
+    result, err := service.Echo(context.Background(), "test message")
+    // Pure domain logic testing - no mocking gRPC or HTTP!
+}
+```
+
+### 📈 **Evolution Ready**
+Future transport support (WebSocket, NATS, etc.) requires no changes to your services.
+
+## Service Implementation
+
+### Domain-First Approach
+
+Write your services using plain Go interfaces - no transport dependencies:
 
 ```go
-// Works for any gRPC service - just one line!
-registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-	proto.RegisterYourServiceServer(s, &YourServiceImpl{})
-})
-server.RegisterService(ctx, registrar)
+// Define your service interface (or use built-in ones)
+type MyCustomService interface {
+    ProcessData(ctx context.Context, data string) (string, error)
+    ValidateInput(ctx context.Context, input string) error
+}
+
+// Implement your service with pure business logic
+type MyCustomServiceImpl struct {
+    validator *SomeValidator
+    processor *SomeProcessor
+}
+
+func (s *MyCustomServiceImpl) ProcessData(ctx context.Context, data string) (string, error) {
+    // Pure business logic - no transport concerns!
+    processed := s.processor.Transform(data)
+    return processed, nil
+}
+
+func (s *MyCustomServiceImpl) ValidateInput(ctx context.Context, input string) error {
+    return s.validator.Validate(input)
+}
+
+// Mount with type safety
+ephemos.Mount[MyCustomService](server, &MyCustomServiceImpl{...})
 ```
 
-### Option 2: Custom Registrar (Advanced)
+### Built-in Service Interfaces
 
-For developers who want more control, you can create service-specific registrars:
+Ephemos provides common service interfaces you can implement:
 
 ```go
-type YourServiceRegistrar struct {
-	server proto.YourServiceServer
+// Echo service for request-response patterns
+type EchoService interface {
+    Echo(ctx context.Context, message string) (string, error)
+    Ping(ctx context.Context) error
 }
 
-func NewYourServiceRegistrar(server proto.YourServiceServer) *YourServiceRegistrar {
-	return &YourServiceRegistrar{server: server}
+// File service for binary data handling
+type FileService interface {
+    Upload(ctx context.Context, filename string, data io.Reader) error
+    Download(ctx context.Context, filename string) (io.Reader, error)
+    List(ctx context.Context, prefix string) ([]string, error)
 }
 
-func (r *YourServiceRegistrar) Register(grpcServer *grpc.Server) {
-	proto.RegisterYourServiceServer(grpcServer, r.server)
+// Health service for monitoring
+type HealthService interface {
+    Check(ctx context.Context, service string) (HealthStatus, error)
 }
-
-// Usage
-registrar := NewYourServiceRegistrar(&YourServiceImpl{})
-server.RegisterService(ctx, registrar)
 ```
-
-**Recommendation**: Use the generic registrar unless you need custom registration logic or validation.
 
 ### Example Configurations
 
@@ -160,34 +217,65 @@ The `config/` folder contains example configurations:
 
 ## Architecture
 
-Ephemos follows the hexagonal architecture:
+Ephemos implements **hexagonal architecture** with **transport adapters**:
 
 ```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Your Service  │    │  Ephemos Core    │    │   Transport     │
+│  (Domain Logic) │    │                  │    │   Adapters      │
+├─────────────────┤    ├──────────────────┤    ├─────────────────┤
+│ • Pure Go types │───▶│ • Mount[T] API   │───▶│ • gRPC Server   │
+│ • No transport  │    │ • Type safety    │    │ • HTTP Handlers │
+│   dependencies  │    │ • Generic design │    │ • Future: NATS  │
+│ • Easy testing  │    │ • Config driven  │    │   WebSocket...  │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+
+Directory Structure:
 ephemos/
-├── internal/
-│   ├── core/           # Domain logic (no external dependencies)
-│   │   ├── domain/     # Business entities
-│   │   ├── ports/      # Interface definitions
-│   │   └── services/   # Domain services
-│   └── adapters/
-│       ├── primary/    # Inbound adapters (API, CLI)
-│       └── secondary/  # Outbound adapters (SPIFFE, gRPC)
-└── pkg/ephemos/        # Public API
+├── pkg/ephemos/              # 🎯 Transport-agnostic public API
+├── internal/core/ports/      # 🔌 Domain service interfaces  
+├── internal/adapters/
+│   ├── grpc/                # 📡 gRPC transport adapter
+│   ├── http/                # 🌐 HTTP transport adapter
+│   └── secondary/           # 🔧 SPIFFE, config adapters
+└── examples/transport-agnostic/ # 📚 Complete examples
 ```
+
+### Key Principles
+
+1. **🎯 Domain First**: Write services with plain Go - no protocols
+2. **🔌 Ports & Adapters**: Clean boundaries between business and transport  
+3. **📦 Single Responsibility**: Each adapter handles one transport protocol
+4. **🎨 Open/Closed**: Add new transports without changing existing code
 
 ## Demo
 
-The included demo shows:
-1. Starting SPIRE server and agent
-2. Registering services with one command
-3. Server starting with identity "echo-server"
-4. Client successfully connecting using mTLS
-5. Authentication failure when registration is removed
-
-Run the complete demo in under 5 minutes:
+Try the **transport-agnostic demo** - same service, different transports:
 
 ```bash
-make demo
+# Run with gRPC transport
+EPHEMOS_CONFIG=config/transport-grpc.yaml go run examples/transport-agnostic/main.go
+
+# Test gRPC
+grpc_cli call localhost:50051 EchoService.Echo "message: 'Hello gRPC'"
+
+# In another terminal, run with HTTP transport  
+EPHEMOS_CONFIG=config/transport-http.yaml go run examples/transport-agnostic/main.go
+
+# Test HTTP
+curl -X POST http://localhost:8080/echoserviceimpl/echo \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello HTTP"}'
+```
+
+**The same service implementation runs on both transports!** 🎉
+
+### Full SPIRE Integration Demo
+
+For complete identity-based authentication with SPIRE:
+
+```bash
+make demo  # Complete SPIRE setup + authentication demo
 ```
 
 ## Development
