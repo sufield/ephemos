@@ -79,8 +79,8 @@ if command -v git-secrets >/dev/null 2>&1; then
         done < .gitallowed
     fi
     
-    # Scan repository (exclude .git directory)
-    if git-secrets --scan --recursive . --exclude=.git; then
+    # Scan repository
+    if git-secrets --scan --recursive .; then
         echo "✅ Git-secrets: No secrets found"
     else
         echo "⚠️  git-secrets found potential secrets (may be false positives)" >&2
