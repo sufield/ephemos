@@ -327,7 +327,7 @@ echo -e "${BOLD}${RED}❌ OLD WORKFLOW: Developer Secret Management Burden${RESE
 echo ""
 show_code "Developer's Traditional Secret Workflow (PAINFUL!)" \
 "1. 🌐 Developer logs into company secrets dashboard
-2. 📋 Developer copies API key: sk-1234567890abcdef
+2. 📋 Developer copies API key: [REDACTED-LONG-SECRET-STRING]
 3. 💾 Developer pastes secret into .env file
 4. 🔄 Developer commits code (hopefully .env is in .gitignore!)
 5. 🐳 Developer copies secret into Docker build args
@@ -358,15 +358,15 @@ show_code "❌ TRADITIONAL INSECURE APPROACH (what we DON'T do)" \
 "// ❌ DEVELOPER NIGHTMARE: Secrets everywhere!
 
 Step 1: Log into dashboard, copy API key
-const API_KEY = \"sk-1234567890abcdef\"  // ❌ Secret in code!
+const API_KEY = \"[COPY-PASTE-SECRET-HERE]\"  // ❌ Secret in code!
 
 Step 2: Put in environment 
 apiKey := os.Getenv(\"API_KEY\")  // ❌ Secret in .env file!
 
 Step 3: Configure deployment
 auth:
-  api_key: sk-1234567890abcdef   # ❌ Secret in YAML!
-  password: mypassword123        # ❌ Another secret!
+  api_key: [PASTE-FROM-DASHBOARD]   # ❌ Secret in YAML!
+  password: [ANOTHER-SECRET]        # ❌ Another secret!
 
 // ❌ DEVELOPER PAIN POINTS:
 // • Dashboard login required every time
