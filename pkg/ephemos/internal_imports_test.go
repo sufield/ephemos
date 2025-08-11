@@ -26,7 +26,7 @@ func TestNoInternalImportsInExamples(t *testing.T) {
 	var violations []string
 
 	for _, dir := range exampleDirs {
-		err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		err := filepath.Walk(dir, func(path string, _ os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
@@ -308,7 +308,7 @@ func TestExampleCodeCompiles(t *testing.T) {
 
 			// For this test, we verify that Go files in the directory don't have internal imports
 			// The actual compilation is tested by the build system
-			err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			err := filepath.Walk(dir, func(path string, _ os.FileInfo, err error) error {
 				if err != nil {
 					return err
 				}
@@ -345,8 +345,8 @@ func TestMainREADMEUsesPublicAPI(t *testing.T) {
 func TestPublicAPIDocumentation(t *testing.T) {
 	// Check that the main package has proper documentation
 	publicPkgPath := "."
-	
-	err := filepath.Walk(publicPkgPath, func(path string, info os.FileInfo, err error) error {
+
+	err := filepath.Walk(publicPkgPath, func(path string, _ os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -361,7 +361,7 @@ func TestPublicAPIDocumentation(t *testing.T) {
 
 			scanner := bufio.NewScanner(file)
 			hasPackageDoc := false
-			
+
 			for scanner.Scan() {
 				line := strings.TrimSpace(scanner.Text())
 				if strings.HasPrefix(line, "// Package ephemos") {
