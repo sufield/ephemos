@@ -32,8 +32,10 @@ dist/
 /ephemos-cli
 echo-server
 echo-client
-ephemos
-ephemos-cli
+/ephemos
+/ephemos-cli
+# Don't ignore source directories
+!/pkg/ephemos/
 
 # Test binaries with any name pattern
 cli.test
