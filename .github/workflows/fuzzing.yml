@@ -148,7 +148,7 @@ jobs:
         language: go
         # Run for shorter time in CI to avoid timeouts
         fuzz-seconds: ${{ github.event_name == 'schedule' && '1800' || '600' }} # 30min scheduled, 10min otherwise
-        mode: 'ci'
+        mode: 'batch'
         report-unreproducible-crashes: false
         output-sarif: true
 

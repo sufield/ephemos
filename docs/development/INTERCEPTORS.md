@@ -169,20 +169,17 @@ func main() {
 For fine-grained control over interceptor behavior:
 
 ```go
-import "github.com/sufield/ephemos/internal/adapters/interceptors"
-
-// Create custom configuration
+// Create custom configuration using public API
 config := &ephemos.InterceptorConfig{
     EnableAuth:                true,
-    AuthConfig:               interceptors.DefaultAuthConfig(),
     EnableIdentityPropagation: true,
     EnableLogging:             true,
-    LoggingConfig:            interceptors.NewSecureLoggingConfig(),
     EnableMetrics:             true,
-    MetricsConfig:            interceptors.DefaultMetricsConfig("my-service"),
+    ServiceName:              "my-service",
 }
 
 // Apply to server (done automatically with RegisterService)
+// Note: Advanced configuration is handled through ephemos public API methods
 serverInterceptors, streamInterceptors := ephemos.CreateServerInterceptors(
     config, identityProvider)
 ```
