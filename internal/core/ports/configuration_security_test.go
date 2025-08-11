@@ -188,9 +188,9 @@ func TestMergeWithEnvironment(t *testing.T) {
 	}
 
 	// Set environment variables that should override
-	os.Setenv(ports.EnvServiceName, "env-service")
-	os.Setenv(ports.EnvTrustDomain, "env.domain.com")
-	os.Setenv(ports.EnvAuthorizedClients, "spiffe://env.domain.com/client2, spiffe://env.domain.com/client3")
+	t.Setenv(ports.EnvServiceName, "env-service")
+	t.Setenv(ports.EnvTrustDomain, "env.domain.com")
+	t.Setenv(ports.EnvAuthorizedClients, "spiffe://env.domain.com/client2, spiffe://env.domain.com/client3")
 
 	err := config.MergeWithEnvironment()
 	assert.NoError(t, err)
@@ -241,9 +241,9 @@ func TestParseCommaSeparatedList(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Use reflection to access private function, or make it public for testing
 			// For now, test through the environment variable loading
-			os.Setenv(ports.EnvServiceName, "test-service")
-			os.Setenv(ports.EnvTrustDomain, "test.local")
-			os.Setenv(ports.EnvAuthorizedClients, tt.input)
+			t.Setenv(ports.EnvServiceName, "test-service")
+			t.Setenv(ports.EnvTrustDomain, "test.local")
+			t.Setenv(ports.EnvAuthorizedClients, tt.input)
 
 			config, err := ports.LoadFromEnvironment()
 			require.NoError(t, err)
@@ -384,7 +384,7 @@ func TestGetBoolEnv(t *testing.T) {
 	originalValue := os.Getenv("TEST_BOOL_ENV")
 	defer func() {
 		if originalValue != "" {
-			os.Setenv("TEST_BOOL_ENV", originalValue)
+			t.Setenv("TEST_BOOL_ENV", originalValue)
 		} else {
 			os.Unsetenv("TEST_BOOL_ENV")
 		}
@@ -443,7 +443,7 @@ func TestGetBoolEnv(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envValue != "" {
-				os.Setenv("TEST_BOOL_ENV", tt.envValue)
+				t.Setenv("TEST_BOOL_ENV", tt.envValue)
 			} else {
 				os.Unsetenv("TEST_BOOL_ENV")
 			}
@@ -480,16 +480,16 @@ func TestProductionSecurityIntegration(t *testing.T) {
 	originalDebug := os.Getenv(ports.EnvDebugEnabled)
 	defer func() {
 		if originalDebug != "" {
-			os.Setenv(ports.EnvDebugEnabled, originalDebug)
+			t.Setenv(ports.EnvDebugEnabled, originalDebug)
 		} else {
 			os.Unsetenv(ports.EnvDebugEnabled)
 		}
 	}()
 
 	// Test that debug mode detection works in production validation
-	os.Setenv(ports.EnvServiceName, "payment-service")
-	os.Setenv(ports.EnvTrustDomain, "prod.company.com")
-	os.Setenv(ports.EnvDebugEnabled, "true")
+	t.Setenv(ports.EnvServiceName, "payment-service")
+	t.Setenv(ports.EnvTrustDomain, "prod.company.com")
+	t.Setenv(ports.EnvDebugEnabled, "true")
 
 	config, err := ports.LoadFromEnvironment()
 	assert.Error(t, err)
@@ -497,7 +497,7 @@ func TestProductionSecurityIntegration(t *testing.T) {
 	assert.Contains(t, err.Error(), "debug mode is enabled")
 
 	// Test that production config works when debug is disabled
-	os.Setenv(ports.EnvDebugEnabled, "false")
+	t.Setenv(ports.EnvDebugEnabled, "false")
 	config, err = ports.LoadFromEnvironment()
 	assert.NoError(t, err)
 	assert.NotNil(t, config)

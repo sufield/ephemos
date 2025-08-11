@@ -69,7 +69,7 @@ func TestLoggingInterceptor_UnaryServerInterceptor_ExcludeMethod(t *testing.T) {
 	interceptor := NewLoggingInterceptor(config)
 
 	handler := func(_ context.Context, _ interface{}) (interface{}, error) {
-		return "success", nil
+		return defaultResultCode, nil
 	}
 
 	info := &grpc.UnaryServerInfo{
