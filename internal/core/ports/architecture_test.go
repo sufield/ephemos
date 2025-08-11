@@ -106,7 +106,8 @@ func TestPublicAPIHasNoDirectProtocolDependencies(t *testing.T) {
 // TestTransportServerIsProtocolAgnostic specifically tests that the new
 // TransportServer implementation doesn't leak protocol details.
 func TestTransportServerIsProtocolAgnostic(t *testing.T) {
-	serverFile := "../../../pkg/ephemos/server.go"
+	// Find the server.go file relative to the module root
+	serverFile := findServerFile(t)
 
 	// Parse the file to check its structure
 	fset := token.NewFileSet()
@@ -132,7 +133,8 @@ func TestTransportServerIsProtocolAgnostic(t *testing.T) {
 // TestMountAPIIsGeneric ensures that the Mount function is truly generic
 // and doesn't have protocol-specific constraints.
 func TestMountAPIIsGeneric(t *testing.T) {
-	serverFile := "../../../pkg/ephemos/server.go"
+	// Find the server.go file relative to the module root
+	serverFile := findServerFile(t)
 
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, serverFile, nil, parser.ParseComments)
@@ -254,4 +256,50 @@ func isProtocolSpecific(name string) bool {
 	return strings.Contains(name, "grpc") ||
 		strings.Contains(name, "http") ||
 		strings.Contains(name, "pb")
+}
+
+// findServerFile locates the server.go file relative to the module root.
+func findServerFile(t *testing.T) string {
+	t.Helper()
+
+	// Try different possible paths relative to the test location
+	candidates := []string{
+		"../../../pkg/ephemos/server.go",
+		"pkg/ephemos/server.go", // From module root
+		"./pkg/ephemos/server.go", // From current dir if it's module root
+	}
+
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+
+	// If none found, try to find it by walking up from current directory
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+
+	// Walk up the directory tree to find go.mod (module root)
+	dir := currentDir
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			// Found module root, server.go should be at pkg/ephemos/server.go
+			serverPath := filepath.Join(dir, "pkg", "ephemos", "server.go")
+			if _, err := os.Stat(serverPath); err == nil {
+				return serverPath
+			}
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Reached filesystem root
+			break
+		}
+		dir = parent
+	}
+
+	t.Fatalf("Could not locate server.go file. Current dir: %s, candidates tried: %v", currentDir, candidates)
+	return ""
 }
