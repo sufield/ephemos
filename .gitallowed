@@ -44,6 +44,9 @@ github\.com/[^/]+/[^/]+.*go\.mod.*
 # Git configuration with redacted tokens (marked with ***)
 AUTHORIZATION:.*\*\*\*
 extraheader.*AUTHORIZATION.*\*\*\*
+extraheader = AUTHORIZATION: basic \*\*\*
+.*AUTHORIZATION: basic \*\*\*
+.*extraheader.*AUTHORIZATION.*basic.*\*\*\*
 
 # Test configuration patterns
 AuthorizedClients.*spiffe://
