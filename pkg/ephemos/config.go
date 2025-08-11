@@ -303,11 +303,13 @@ func IsConfigurationError(err error) bool {
 
 	// Check for domain-specific config errors
 	var configErr *ConfigValidationError
+	var validationErr *ValidationError
 	return errors.Is(err, ErrInvalidConfig) ||
 		errors.Is(err, ErrConfigFileNotFound) ||
 		errors.Is(err, ErrConfigFileUnreadable) ||
 		errors.Is(err, ErrConfigMalformed) ||
-		errors.As(err, &configErr)
+		errors.As(err, &configErr) ||
+		errors.As(err, &validationErr)
 }
 
 // GetConfigValidationError extracts ConfigValidationError from an error chain.
