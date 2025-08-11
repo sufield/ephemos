@@ -1,6 +1,6 @@
 # Security Makefile for Ephemos
-# Handles security scanning, validation, and tooling
-.PHONY: security-scan security-tools security-hooks security-all audit-config
+# Handles security scanning, validation, tooling, and SBOM generation
+.PHONY: security-scan security-tools security-hooks security-all audit-config sbom-generate sbom-validate sbom-all
 
 # Security scanning targets
 security-scan:
@@ -37,6 +37,22 @@ validate-production: build
 	@./scripts/security/validate-production.sh
 	@echo "Production validation completed!"
 
+# SBOM Generation targets
+sbom-generate: build
+	@echo "📋 Generating Software Bill of Materials (SBOM)..."
+	@./scripts/security/generate-sbom.sh
+	@echo "SBOM generation completed!"
+
+# Validate generated SBOMs
+sbom-validate:
+	@echo "✅ Validating SBOM files..."
+	@./scripts/security/validate-sbom.sh
+	@echo "SBOM validation completed!"
+
+# Complete SBOM workflow
+sbom-all: sbom-generate sbom-validate
+	@echo "📋 Complete SBOM workflow finished!"
+
 # Help
 security-help:
 	@echo "Ephemos Security Targets:"
@@ -47,3 +63,8 @@ security-help:
 	@echo "  make security-all      - Complete security setup"
 	@echo "  make audit-config      - Audit configuration files"
 	@echo "  make validate-production - Validate production config"
+	@echo ""
+	@echo "SBOM Generation:"
+	@echo "  make sbom-generate     - Generate SBOM files (SPDX + CycloneDX)"
+	@echo "  make sbom-validate     - Validate generated SBOM files"
+	@echo "  make sbom-all          - Complete SBOM generation and validation"

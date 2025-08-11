@@ -157,10 +157,13 @@ jobs:
         SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
       continue-on-error: true
 
-  # Supply chain security
+  # Supply chain security with enhanced SBOM generation
   supply-chain-security:
-    name: Supply Chain Security
+    name: Supply Chain Security & SBOM
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -170,32 +173,153 @@ jobs:
       with:
         go-version: '1.24'
         
-    - name: Install cyclonedx-gomod
-      run: go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
-      
-    - name: Generate SBOM
+    - name: Build project for SBOM scanning
       run: |
-        cyclonedx-gomod mod -json -output sbom.json
+        make proto build
         
-    - name: Upload SBOM
+    - name: Install Syft for SBOM generation
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+        syft --version
+        
+    - name: Generate comprehensive SBOM with Syft
+      run: |
+        mkdir -p sbom
+        
+        # Generate SPDX format SBOM
+        syft . -o spdx-json --file sbom/ephemos-sbom.spdx.json
+        
+        # Generate CycloneDX format SBOM  
+        syft . -o cyclonedx-json --file sbom/ephemos-sbom.cyclonedx.json
+        
+        # Generate human-readable summary
+        syft . -o text --file sbom/ephemos-sbom-summary.txt
+        
+        # Generate checksums for integrity
+        cd sbom
+        sha256sum *.json *.txt > ephemos-sbom-checksums.txt
+        cd ..
+        
+    - name: Validate SBOM quality
+      run: |
+        # Check SBOM file sizes (ensure they're not empty)
+        for file in sbom/*.json; do
+          if [ -s "$file" ]; then
+            echo "✅ $file: $(wc -c < "$file") bytes"
+          else
+            echo "❌ $file is empty!"
+            exit 1
+          fi
+        done
+        
+        # Validate JSON structure
+        if command -v jq >/dev/null 2>&1; then
+          jq empty sbom/*.json
+          echo "✅ All SBOM JSON files are valid"
+        fi
+        
+    - name: Upload SBOM artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: sbom
-        path: sbom.json
+        name: ephemos-sbom-complete
+        path: sbom/
+        retention-days: 90
         
-    - name: Install osv-scanner
-      run: go install github.com/google/osv-scanner/cmd/osv-scanner@latest
-      
-    - name: Run OSV Scanner
-      run: osv-scanner --format json --output osv-results.json ./...
+    - name: Install vulnerability scanners
+      run: |
+        # Install OSV Scanner
+        go install github.com/google/osv-scanner/cmd/osv-scanner@latest
+        
+        # Install Grype for vulnerability scanning
+        curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+        
+    - name: Run OSV Scanner on SBOM
+      run: |
+        osv-scanner --format json --output osv-results.json ./...
+        
+        # Also scan the SBOM directly
+        osv-scanner --sbom sbom/ephemos-sbom.spdx.json --format json --output osv-sbom-results.json || true
+        
       continue-on-error: true
       
-    - name: Upload OSV results
+    - name: Run Grype vulnerability scan
+      run: |
+        # Scan the built project
+        grype . -o json --file grype-results.json
+        
+        # Scan the SBOM directly
+        grype sbom:sbom/ephemos-sbom.spdx.json -o json --file grype-sbom-results.json
+        
+      continue-on-error: true
+        
+    - name: Generate vulnerability summary
+      run: |
+        echo "# Vulnerability Scan Summary" > vuln-summary.md
+        echo "Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> vuln-summary.md
+        echo "" >> vuln-summary.md
+        
+        if [ -f "osv-results.json" ]; then
+          echo "## OSV Scanner Results" >> vuln-summary.md
+          if command -v jq >/dev/null 2>&1; then
+            vuln_count=$(jq '.results[].packages[].vulnerabilities | length' osv-results.json 2>/dev/null | paste -sd+ | bc 2>/dev/null || echo "0")
+            echo "- Total vulnerabilities found: $vuln_count" >> vuln-summary.md
+          fi
+        fi
+        
+        if [ -f "grype-results.json" ]; then
+          echo "## Grype Scanner Results" >> vuln-summary.md
+          if command -v jq >/dev/null 2>&1; then
+            grype_count=$(jq '.matches | length' grype-results.json 2>/dev/null || echo "0")
+            echo "- Total matches found: $grype_count" >> vuln-summary.md
+          fi
+        fi
+        
+    - name: Upload vulnerability scan results
       uses: actions/upload-artifact@v4
       with:
-        name: osv-scan-results
-        path: osv-results.json
+        name: vulnerability-scan-results
+        path: |
+          osv-results.json
+          osv-sbom-results.json
+          grype-results.json
+          grype-sbom-results.json
+          vuln-summary.md
       if: always()
+      
+    - name: Comment PR with SBOM info
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          let comment = '## 📋 SBOM Generation Results\n\n';
+          
+          // Check if SBOM files were generated
+          const spdxExists = fs.existsSync('sbom/ephemos-sbom.spdx.json');
+          const cyclonDxExists = fs.existsSync('sbom/ephemos-sbom.cyclonedx.json');
+          
+          if (spdxExists && cyclonDxExists) {
+            comment += '✅ SBOM generation successful\n';
+            comment += '- SPDX format: Generated\n';
+            comment += '- CycloneDX format: Generated\n';
+            comment += '- Artifacts uploaded for compliance review\n\n';
+            
+            if (fs.existsSync('vuln-summary.md')) {
+              const vulnSummary = fs.readFileSync('vuln-summary.md', 'utf8');
+              comment += vulnSummary;
+            }
+          } else {
+            comment += '❌ SBOM generation failed\n';
+            comment += 'Check the workflow logs for details.\n';
+          }
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
 
   # 2025 Enhanced Dependency Security
   enhanced-dependency-security:

@@ -423,6 +423,78 @@ jobs:
           GOOS=$OS GOARCH=$ARCH go build -o dist/echo-client-$OS-$ARCH$EXT ./examples/echo-client
         done
         
+    - name: Install Syft for release SBOM
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+        syft --version
+        
+    - name: Generate release SBOM
+      run: |
+        # Get version from tag
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "Generating SBOM for release version: $VERSION"
+        
+        # Generate comprehensive SBOM for the release
+        make sbom-generate
+        
+        # Move SBOM files to dist directory for release
+        if [ -d "sbom" ]; then
+          mkdir -p dist/sbom
+          cp sbom/* dist/sbom/
+          
+          # Rename files to include version
+          cd dist/sbom
+          for file in ephemos-*; do
+            if [[ "$file" != *"$VERSION"* ]]; then
+              mv "$file" "${file/ephemos-/ephemos-v$VERSION-}"
+            fi
+          done
+          cd ../..
+          
+          # Create release-specific summary
+          echo "# Ephemos v$VERSION - Software Bill of Materials" > dist/SBOM_README.md
+          echo "" >> dist/SBOM_README.md
+          echo "This directory contains the Software Bill of Materials (SBOM) for Ephemos v$VERSION." >> dist/SBOM_README.md
+          echo "" >> dist/SBOM_README.md
+          echo "## Files:" >> dist/SBOM_README.md
+          echo "- **SPDX Format**: \`ephemos-v$VERSION-*sbom.spdx.json\`" >> dist/SBOM_README.md
+          echo "- **CycloneDX Format**: \`ephemos-v$VERSION-*sbom.cyclonedx.json\`" >> dist/SBOM_README.md
+          echo "- **Summary**: \`ephemos-v$VERSION-*sbom-summary.txt\`" >> dist/SBOM_README.md
+          echo "- **Checksums**: \`ephemos-v$VERSION-*sbom-checksums.txt\`" >> dist/SBOM_README.md
+          echo "" >> dist/SBOM_README.md
+          echo "## Usage:" >> dist/SBOM_README.md
+          echo "These SBOM files can be used for:" >> dist/SBOM_README.md
+          echo "- Supply chain security analysis" >> dist/SBOM_README.md
+          echo "- Vulnerability scanning" >> dist/SBOM_README.md
+          echo "- Compliance reporting" >> dist/SBOM_README.md
+          echo "- License compliance verification" >> dist/SBOM_README.md
+          echo "" >> dist/SBOM_README.md
+          echo "Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> dist/SBOM_README.md
+        fi
+        
+    - name: Validate release artifacts
+      run: |
+        echo "🔍 Validating release artifacts..."
+        ls -la dist/
+        
+        # Validate SBOM files exist
+        if [ -d "dist/sbom" ]; then
+          echo "✅ SBOM directory present"
+          ls -la dist/sbom/
+          
+          # Validate SBOM file sizes
+          for file in dist/sbom/*.json; do
+            if [ -s "$file" ]; then
+              echo "✅ $file: $(wc -c < "$file") bytes"
+            else
+              echo "❌ $file is empty or missing!"
+              exit 1
+            fi
+          done
+        else
+          echo "⚠️ SBOM directory not found - SBOM generation may have failed"
+        fi
+        
     - name: Create Release
       uses: softprops/action-gh-release@v2
       env:
@@ -430,5 +502,23 @@ jobs:
       with:
         files: |
           dist/*
+          dist/sbom/*
+        body: |
+          ## Release Notes
+          
+          This release includes compiled binaries for multiple platforms and comprehensive Software Bill of Materials (SBOM) for supply chain security.
+          
+          ### 📋 Supply Chain Security
+          - SBOM files included in both SPDX and CycloneDX formats
+          - All dependencies tracked and verified
+          - Checksums provided for integrity verification
+          
+          ### 🛡️ Security Features
+          - Zero plaintext secrets architecture
+          - SPIFFE/SPIRE integration for ephemeral certificates
+          - mTLS authentication for all service communication
+          - Transport-agnostic security framework
+          
+          See `SBOM_README.md` for details on using the included SBOM files.
         draft: false
         prerelease: false

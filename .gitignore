@@ -203,3 +203,10 @@ scripts/demo/*.pid
 .env
 .env.local
 .env.*.local
+
+# SBOM generated files (CI/CD artifacts, not source controlled)
+sbom/
+*.spdx.json
+*.cyclonedx.json
+*-sbom*.txt
+*-checksums.txt
