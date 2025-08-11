@@ -1,0 +1,49 @@
+# Security Makefile for Ephemos
+# Handles security scanning, validation, and tooling
+.PHONY: security-scan security-tools security-hooks security-all audit-config
+
+# Security scanning targets
+security-scan:
+	@echo "🔍 Running security scans..."
+	@./scripts/security/scan-secrets.sh
+	@./scripts/security/scan-vulnerabilities.sh
+	@echo "Security scans completed!"
+
+# Install security tools (requires script validation)
+security-tools:
+	@echo "🛠️ Installing security tools..."
+	@./scripts/security/install-tools.sh
+	@echo "Security tools installed!"
+
+# Setup Git security hooks
+security-hooks:
+	@echo "🪝 Setting up Git security hooks..."
+	@./scripts/security/setup-hooks.sh
+	@echo "Security hooks installed!"
+
+# Complete security setup
+security-all: security-tools security-hooks security-scan
+	@echo "🔒 Complete security setup finished!"
+
+# Audit configuration files
+audit-config:
+	@echo "📋 Auditing configuration files..."
+	@./scripts/security/audit-config.sh
+	@echo "Configuration audit completed!"
+
+# Validate production configuration
+validate-production: build
+	@echo "🏭 Validating production configuration..."
+	@./scripts/security/validate-production.sh
+	@echo "Production validation completed!"
+
+# Help
+help:
+	@echo "Ephemos Security Targets:"
+	@echo ""
+	@echo "  make security-scan     - Run all security scans"
+	@echo "  make security-tools    - Install security tools"
+	@echo "  make security-hooks    - Setup Git security hooks"
+	@echo "  make security-all      - Complete security setup"
+	@echo "  make audit-config      - Audit configuration files"
+	@echo "  make validate-production - Validate production config"

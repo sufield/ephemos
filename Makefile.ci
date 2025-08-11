@@ -1,0 +1,47 @@
+# CI/CD Makefile for Ephemos
+# Handles continuous integration and deployment tasks
+.PHONY: ci-setup ci-lint ci-test ci-security ci-build ci-all
+
+# Setup environment for CI
+ci-setup: proto
+	@echo "CI setup completed - protobuf files generated"
+
+# Run linting checks
+ci-lint:
+	@echo "Running linting checks..."
+	go fmt ./...
+	go vet ./...
+	@./scripts/ci/lint.sh
+	@echo "Linting checks completed!"
+
+# Run all tests with coverage
+ci-test:
+	@echo "Running tests with coverage..."
+	go test -race -coverprofile=coverage.out -covermode=atomic ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Tests completed! Coverage report: coverage.html"
+
+# Run security checks
+ci-security:
+	@echo "Running security checks..."
+	@./scripts/ci/security-checks.sh
+	@echo "Security checks completed!"
+
+# Build all targets
+ci-build: build examples
+	@echo "All builds completed successfully!"
+
+# Run all CI checks
+ci-all: ci-lint ci-test ci-security ci-build
+	@echo "All CI checks completed successfully!"
+
+# Help
+help:
+	@echo "Ephemos CI/CD Targets:"
+	@echo ""
+	@echo "  make ci-setup     - Setup CI environment"
+	@echo "  make ci-lint      - Run linting checks"
+	@echo "  make ci-test      - Run tests with coverage"
+	@echo "  make ci-security  - Run security checks"
+	@echo "  make ci-build     - Build all targets"
+	@echo "  make ci-all       - Run all CI checks"

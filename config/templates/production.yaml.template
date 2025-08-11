@@ -1,0 +1,34 @@
+# Ephemos Production Configuration Template
+# IMPORTANT: This is a template file. Copy and customize for your environment.
+# NEVER commit production secrets to version control.
+#
+# Usage:
+#   1. Copy: cp production.yaml.template ../production.yaml
+#   2. Set environment variables for all ${...} references
+#   3. Add production.yaml to .gitignore immediately
+#
+# Security: All sensitive values MUST use environment variable references
+
+service:
+  # Required: Service identity
+  name: "${EPHEMOS_SERVICE_NAME}"           # Set via environment variable
+  domain: "${EPHEMOS_TRUST_DOMAIN}"        # Set via environment variable (e.g., "prod.company.com")
+
+spiffe:
+  # SPIFFE/SPIRE agent configuration
+  socketPath: "${EPHEMOS_SPIFFE_SOCKET:-/run/spire/sockets/api.sock}"
+
+# Authorization: Comma-separated SPIFFE IDs via environment variables
+# Example: EPHEMOS_AUTHORIZED_CLIENTS="spiffe://prod.company.com/api-gateway,spiffe://prod.company.com/billing"
+authorized_clients: "${EPHEMOS_AUTHORIZED_CLIENTS:-}"
+
+# Trusted servers: Comma-separated SPIFFE IDs via environment variables  
+# Example: EPHEMOS_TRUSTED_SERVERS="spiffe://prod.company.com/database,spiffe://prod.company.com/cache"
+trusted_servers: "${EPHEMOS_TRUSTED_SERVERS:-}"
+
+# Production Security Settings (via environment variables):
+# EPHEMOS_REQUIRE_AUTHENTICATION=true
+# EPHEMOS_LOG_LEVEL=warn
+# EPHEMOS_DEBUG_ENABLED=false
+# EPHEMOS_BIND_ADDRESS=:8443
+# EPHEMOS_TLS_MIN_VERSION=1.3

@@ -1,0 +1,46 @@
+# Renovate Alternative Configuration
+# Provides additional dependency update capabilities beyond Dependabot
+
+name: Renovate Dependencies
+
+on:
+  schedule:
+    # Run weekly on Sundays at 4 AM UTC (complementing Dependabot's Monday schedule)
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+    inputs:
+      log_level:
+        description: 'Renovate log level'
+        required: false
+        default: 'info'
+        type: choice
+        options:
+          - 'debug'
+          - 'info'
+          - 'warn'
+          - 'error'
+
+jobs:
+  renovate:
+    name: Renovate Dependencies
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Self-hosted Renovate
+      uses: renovatebot/github-action@v40.3.11
+      with:
+        configurationFile: .github/renovate.json5
+        token: ${{ secrets.GITHUB_TOKEN }}
+      env:
+        LOG_LEVEL: ${{ inputs.log_level || 'info' }}
+        RENOVATE_REPOSITORIES: ${{ github.repository }}
+        # Additional security configurations
+        RENOVATE_REQUIRE_CONFIG: 'required'
+        RENOVATE_IGNORE_UNSTABLE: 'true'
+        RENOVATE_RESPECT_LATEST: 'true'
