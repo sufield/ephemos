@@ -53,7 +53,6 @@ func TestNoInternalImportsInExamples(t *testing.T) {
 
 			return nil
 		})
-
 		if err != nil {
 			t.Fatalf("Failed to walk directory %s: %v", dir, err)
 		}
@@ -275,13 +274,13 @@ func compileTestCode(code string) error {
 	// Create a temporary file
 	tmpFile, err := os.CreateTemp("", "ephemos_test_*.go")
 	if err != nil {
-		return fmt.Errorf("failed to create temp file: %v", err)
+		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 	defer os.Remove(tmpFile.Name())
 
 	// Write the test code
 	if _, err := tmpFile.WriteString(code); err != nil {
-		return fmt.Errorf("failed to write test code: %v", err)
+		return fmt.Errorf("failed to write test code: %w", err)
 	}
 	tmpFile.Close()
 
@@ -324,7 +323,6 @@ func TestExampleCodeCompiles(t *testing.T) {
 				}
 				return nil
 			})
-
 			if err != nil {
 				t.Errorf("Failed to check example directory %s: %v", dir, err)
 			}
@@ -384,7 +382,6 @@ func TestPublicAPIDocumentation(t *testing.T) {
 		}
 		return nil
 	})
-
 	if err != nil {
 		t.Errorf("Failed to check public API documentation: %v", err)
 	}

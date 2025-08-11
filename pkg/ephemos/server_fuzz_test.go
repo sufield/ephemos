@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// FuzzServiceName tests service name validation with random inputs
+// FuzzServiceName tests service name validation with random inputs.
 func FuzzServiceName(f *testing.F) {
 	// Seed with valid and invalid service names
 	f.Add("valid-service")
@@ -46,7 +46,7 @@ transport:
 spiffe:
   socket_path: /nonexistent/socket`
 
-		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
 			return
 		}
 
@@ -65,7 +65,7 @@ spiffe:
 	})
 }
 
-// FuzzTransportAddress tests transport address parsing with random inputs
+// FuzzTransportAddress tests transport address parsing with random inputs.
 func FuzzTransportAddress(f *testing.F) {
 	// Seed with valid and invalid addresses
 	f.Add(":50051")
@@ -99,7 +99,7 @@ transport:
 spiffe:
   socket_path: /nonexistent/socket`
 
-		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
 			return
 		}
 
@@ -124,7 +124,7 @@ spiffe:
 	})
 }
 
-// FuzzSPIFFESocketPath tests SPIFFE socket path validation
+// FuzzSPIFFESocketPath tests SPIFFE socket path validation.
 func FuzzSPIFFESocketPath(f *testing.F) {
 	// Seed with valid and invalid socket paths
 	f.Add("/tmp/spire-agent/public/api.sock")
@@ -155,7 +155,7 @@ transport:
 spiffe:
   socket_path: "` + strings.ReplaceAll(socketPath, `"`, `\"`) + `"`
 
-		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
 			return
 		}
 
@@ -173,7 +173,7 @@ spiffe:
 	})
 }
 
-// FuzzTransportType tests transport type validation
+// FuzzTransportType tests transport type validation.
 func FuzzTransportType(f *testing.F) {
 	// Seed with valid and invalid transport types
 	f.Add("grpc")
@@ -203,7 +203,7 @@ transport:
 spiffe:
   socket_path: /tmp/spire-agent/public/api.sock`
 
-		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
 			return
 		}
 
@@ -226,7 +226,7 @@ spiffe:
 	})
 }
 
-// FuzzGenericServiceRegistrar tests service registrar with random function inputs
+// FuzzGenericServiceRegistrar tests service registrar with random function inputs.
 func FuzzGenericServiceRegistrar(f *testing.F) {
 	f.Add(true)  // Valid function
 	f.Add(false) // Nil function
@@ -259,7 +259,7 @@ func FuzzGenericServiceRegistrar(f *testing.F) {
 	})
 }
 
-// Benchmark to ensure fuzzing doesn't introduce performance regressions
+// Benchmark to ensure fuzzing doesn't introduce performance regressions.
 func BenchmarkConfigValidation(b *testing.B) {
 	tempDir := b.TempDir()
 	configFile := tempDir + "/bench.yaml"
@@ -273,7 +273,7 @@ transport:
 spiffe:
   socket_path: /tmp/spire-agent/public/api.sock`
 
-	os.WriteFile(configFile, []byte(configContent), 0644)
+	os.WriteFile(configFile, []byte(configContent), 0o644)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

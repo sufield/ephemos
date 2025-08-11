@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// FuzzIdentityParsing tests SPIFFE ID and trust domain parsing
+// FuzzIdentityParsing tests SPIFFE ID and trust domain parsing.
 func FuzzIdentityParsing(f *testing.F) {
 	// Seed with various SPIFFE URI patterns
 	f.Add("spiffe://example.org/service/myservice")
@@ -48,7 +48,7 @@ spiffe:
 authorized_clients:
   - "` + strings.ReplaceAll(spiffeID, `"`, `\"`) + `"`
 
-		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
 			return
 		}
 
@@ -70,7 +70,7 @@ authorized_clients:
 	})
 }
 
-// FuzzTrustDomain tests trust domain validation
+// FuzzTrustDomain tests trust domain validation.
 func FuzzTrustDomain(f *testing.F) {
 	// Seed with valid and invalid trust domains
 	f.Add("example.org")
@@ -107,7 +107,7 @@ transport:
 spiffe:
   socket_path: /tmp/spire-agent/public/api.sock`
 
-		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
 			return
 		}
 
@@ -127,7 +127,7 @@ spiffe:
 	})
 }
 
-// FuzzClientAuthorization tests client authorization list handling
+// FuzzClientAuthorization tests client authorization list handling.
 func FuzzClientAuthorization(f *testing.F) {
 	// Seed with various client patterns
 	f.Add("single-client")
@@ -167,7 +167,7 @@ spiffe:
 authorized_clients:
 ` + clientsYAML
 
-		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
 			return
 		}
 
@@ -188,7 +188,7 @@ authorized_clients:
 	})
 }
 
-// FuzzServerTrusts tests trusted servers list handling
+// FuzzServerTrusts tests trusted servers list handling.
 func FuzzServerTrusts(f *testing.F) {
 	// Seed with various server patterns
 	f.Add("spiffe://example.org/server")
@@ -225,7 +225,7 @@ spiffe:
 trusted_servers:
 ` + serversYAML
 
-		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
 			return
 		}
 
@@ -245,7 +245,7 @@ trusted_servers:
 	})
 }
 
-// FuzzContextTimeout tests context handling with various timeouts
+// FuzzContextTimeout tests context handling with various timeouts.
 func FuzzContextTimeout(f *testing.F) {
 	// Seed with different timeout patterns
 	f.Add(int64(0))              // No timeout
@@ -268,7 +268,7 @@ transport:
 spiffe:
   socket_path: /tmp/spire-agent/public/api.sock`
 
-		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
 			return
 		}
 
@@ -303,7 +303,7 @@ spiffe:
 	})
 }
 
-// Benchmark identity operations
+// Benchmark identity operations.
 func BenchmarkIdentityValidation(b *testing.B) {
 	tempDir := b.TempDir()
 	configFile := tempDir + "/bench.yaml"
@@ -323,7 +323,7 @@ trusted_servers:
   - "spiffe://example.org/server1"
   - "spiffe://example.org/server2"`
 
-	os.WriteFile(configFile, []byte(configContent), 0644)
+	os.WriteFile(configFile, []byte(configContent), 0o644)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
