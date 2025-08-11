@@ -6,8 +6,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
-	"strings"
 
 	"google.golang.org/grpc"
 
@@ -147,9 +145,42 @@ type Client interface {
 	Close() error
 }
 
-// NewIdentityServer creates a new identity-aware server instance.
+// NewIdentityServer creates a new identity-aware server instance with automatic authentication enforcement.
+//
+// IDENTITY AUTHENTICATION ENFORCEMENT:
+// This function sets up transport-layer authentication using SPIFFE/SPIRE X.509 certificates.
+// Authentication is enforced automatically at the TLS handshake level, NOT in application code.
+//
+// How Authentication Works:
+// 1. Server obtains its SPIFFE identity certificate from SPIRE (e.g., spiffe://example.org/echo-server)
+// 2. All incoming connections MUST present valid client certificates with SPIFFE IDs
+// 3. Server verifies client certificates against SPIRE trust bundle during TLS handshake
+// 4. Only authenticated clients with valid certificates can establish connections
+// 5. Unauthorized clients are rejected before any application code runs
+//
+// Configuration-Based Authorization:
+// The server enforces service-level authorization via the 'authorized_clients' config:
+//
+//	authorized_clients:
+//	  - "echo-client"      # ✅ This service can connect
+//	  - "payment-service"  # ✅ This service can connect
+//	  # Any other services are automatically rejected
+//
+// Security Guarantees:
+// - X.509 certificate authentication (not API keys)
+// - Mutual TLS (both client and server authenticate each other)
+// - Short-lived certificates (1-hour expiration, auto-rotated by SPIRE)
+// - Transport-layer enforcement (authentication happens before app logic)
+// - Zero Trust model (every connection authenticated)
+//
+// Authentication Failure Behavior:
+// When authentication fails, clients receive transport-layer errors:
+// - "transport: authentication handshake failed"
+// - "x509: certificate signed by unknown authority"
+// - "rpc error: code = Unavailable desc = connection error"
+// The server's application code (your service methods) is never executed.
+//
 // It reads configuration from the EPHEMOS_CONFIG environment variable or uses defaults.
-// The server will automatically handle mTLS authentication using SPIFFE/SPIRE.
 // Returns an error if server creation fails, allowing callers to handle failures gracefully.
 //
 // Example:
@@ -177,12 +208,18 @@ func NewIdentityServer(ctx context.Context, configPath string) (Server, error) {
 		}
 	}
 
-	validConfigPath, err := validateConfigPath(configPath)
+	// EARLY CONFIG VALIDATION INTEGRATION:
+	// Load and validate configuration transparently during API call.
+	// This prevents partial setups and provides immediate feedback if config is invalid.
+	// Developers get clear error messages without needing to call separate validation functions.
+	config, err := loadAndValidateConfig(ctx, configPath)
 	if err != nil {
-		return nil, fmt.Errorf("invalid config path: %w", err)
+		// Return domain-specific errors that developers can handle with standard Go error handling
+		return nil, fmt.Errorf("server initialization failed: %w", err)
 	}
 
-	server, err := api.NewIdentityServer(ctx, validConfigPath)
+	// Create server with validated configuration
+	server, err := api.NewIdentityServerWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity server: %w", err)
 	}
@@ -190,9 +227,48 @@ func NewIdentityServer(ctx context.Context, configPath string) (Server, error) {
 	return server, nil
 }
 
-// NewIdentityClient creates a new identity-aware client instance.
+// NewIdentityClient creates a new identity-aware client instance with automatic authentication.
+//
+// IDENTITY AUTHENTICATION ENFORCEMENT:
+// This function sets up transport-layer authentication using SPIFFE/SPIRE X.509 certificates.
+// The client automatically presents its identity certificate during TLS handshakes.
+//
+// How Client Authentication Works:
+// 1. Client obtains its SPIFFE identity certificate from SPIRE (e.g., spiffe://example.org/echo-client)
+// 2. During client.Connect(), client presents its certificate to the server
+// 3. Server verifies client's certificate against SPIRE trust bundle
+// 4. Client also verifies server's certificate for mutual authentication
+// 5. Connection succeeds ONLY if both client and server authenticate successfully
+//
+// Authentication Enforcement Points:
+// - client.Connect("service-name", "address") performs the mTLS handshake
+// - If authentication fails, Connect() returns transport-layer errors
+// - Application code never runs if authentication fails
+//
+// Client Identity Verification:
+// The client verifies servers via configuration-based trust:
+//
+//	trusted_servers:
+//	  - "echo-server"     # ✅ This client will connect to this server
+//	  - "payment-api"     # ✅ This client will connect to this server
+//	  # Connections to unlisted servers may be rejected
+//
+// Security Guarantees:
+// - Client presents X.509 certificate (not API keys or tokens)
+// - Mutual TLS authentication (client verifies server identity too)
+// - Short-lived certificates (1-hour expiration, auto-rotated)
+// - Transport-layer security (authentication happens before app requests)
+// - Connection-level enforcement (failed auth = no connection)
+//
+// Authentication Failure Behavior:
+// When authentication fails during Connect(), client receives errors like:
+// - "transport: authentication handshake failed"
+// - "connection error: desc = transport: Error while dialing"
+// - "x509: certificate signed by unknown authority"
+// - "rpc error: code = Unavailable desc = connection error"
+// No application RPC calls are made if authentication fails.
+//
 // It reads configuration from the EPHEMOS_CONFIG environment variable or uses defaults.
-// The client will automatically handle mTLS authentication using SPIFFE/SPIRE.
 // Returns an error if client creation fails, allowing callers to handle failures gracefully.
 //
 // Example:
@@ -220,43 +296,23 @@ func NewIdentityClient(ctx context.Context, configPath string) (Client, error) {
 		}
 	}
 
-	validConfigPath, err := validateConfigPath(configPath)
+	// EARLY CONFIG VALIDATION INTEGRATION:
+	// Load and validate configuration transparently during API call.
+	// This prevents partial setups and provides immediate feedback if config is invalid.
+	// Developers get clear error messages without needing to call separate validation functions.
+	config, err := loadAndValidateConfig(ctx, configPath)
 	if err != nil {
-		return nil, fmt.Errorf("invalid config path: %w", err)
+		// Return domain-specific errors that developers can handle with standard Go error handling
+		return nil, fmt.Errorf("client initialization failed: %w", err)
 	}
 
-	client, err := api.NewIdentityClient(ctx, validConfigPath)
+	// Create client with validated configuration
+	client, err := api.NewIdentityClientWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity client: %w", err)
 	}
 
 	return client, nil
-}
-
-// validateConfigPath validates and returns a proper config path.
-// If configPath is empty, it checks EPHEMOS_CONFIG environment variable.
-// Returns an error if validation fails.
-func validateConfigPath(configPath string) (string, error) {
-	// If explicitly provided, validate it
-	if configPath != "" {
-		if strings.TrimSpace(configPath) == "" {
-			return "", &errors.ValidationError{
-				Field:   "configPath",
-				Value:   configPath,
-				Message: "config path cannot be whitespace only",
-			}
-		}
-		return strings.TrimSpace(configPath), nil
-	}
-
-	// Check environment variable
-	envConfig := os.Getenv("EPHEMOS_CONFIG")
-	if envConfig != "" {
-		return strings.TrimSpace(envConfig), nil
-	}
-
-	// Return empty string to use defaults
-	return "", nil
 }
 
 // Built-in Interceptors

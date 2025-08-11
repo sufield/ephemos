@@ -1,5 +1,38 @@
-// Package transport provides gRPC transport implementations for secure communication with
-// advanced connection management, backoff strategies, and retry policies.
+// Package transport provides gRPC transport implementations that enforce identity-based authentication.
+//
+// AUTHENTICATION ENFORCEMENT IN TRANSPORT LAYER:
+// This package implements the transport-layer authentication enforcement for Ephemos.
+// Authentication happens at the gRPC/TLS level, NOT in application code.
+//
+// How Authentication is Enforced:
+// 1. SPIFFE/SPIRE INTEGRATION:
+//   - Uses go-spiffe library to obtain X.509-SVID certificates from SPIRE
+//   - Certificates contain SPIFFE IDs in Subject Alternative Name (SAN) extension
+//   - Automatic certificate rotation (1-hour validity, renewed by SPIRE)
+//
+// 2. mTLS TRANSPORT CONFIGURATION:
+//   - tlsconfig.MTLSClientConfig(): Configures client mTLS with SPIFFE certs
+//   - tlsconfig.MTLSServerConfig(): Configures server mTLS with SPIFFE certs
+//   - gRPC configured with credentials.NewTLS() using SPIFFE TLS config
+//
+// 3. AUTHENTICATION ENFORCEMENT POINTS:
+//   - CLIENT: grpc.Dial() with mTLS credentials performs certificate exchange
+//   - SERVER: grpc.Server with mTLS credentials verifies client certificates
+//   - TLS handshake MUST succeed or connection is refused
+//
+// 4. IDENTITY VERIFICATION:
+//   - Client certificates verified against SPIRE trust bundle
+//   - Server certificates verified against SPIRE trust bundle
+//   - SPIFFE IDs extracted and validated from certificate SANs
+//   - Only services with valid SPIFFE identities can establish connections
+//
+// Security Enforcement:
+// - Transport-layer rejection: Failed authentication prevents connection establishment
+// - Zero application impact: Service methods never called if authentication fails
+// - Automatic rotation: Certificates renewed transparently by SPIRE
+// - Mutual verification: Both client and server authenticate each other
+//
+// It provides advanced connection management, backoff strategies, and retry policies.
 package transport
 
 import (

@@ -1,3 +1,24 @@
+// Echo Server Example - Demonstrates Identity-Based Authentication Enforcement
+//
+// This example shows how Ephemos automatically enforces transport-layer authentication
+// using SPIFFE/SPIRE X.509 certificates WITHOUT any changes to your service code.
+//
+// IDENTITY AUTHENTICATION ENFORCEMENT IN ACTION:
+// 1. Server obtains SPIFFE identity: spiffe://example.org/echo-server
+// 2. All client connections MUST present valid SPIFFE certificates
+// 3. Authentication happens at TLS handshake - BEFORE Echo() method runs
+// 4. Unauthorized clients are rejected automatically by transport layer
+// 5. Your Echo service code runs only for authenticated clients
+//
+// Authentication Flow:
+//
+//	Client connects → mTLS handshake → certificate verification → Echo() method runs
+//	If ANY step fails, connection is rejected and Echo() is never called
+//
+// To see authentication enforcement:
+//
+//	✅ Run with valid client: successful Echo responses
+//	❌ Run with invalid client: "transport: authentication handshake failed"
 package main
 
 import (
@@ -25,7 +46,18 @@ type EchoServer struct {
 }
 
 // Echo implements the Echo method of the EchoServiceServer interface.
-// This is the actual business logic of the service.
+//
+// AUTHENTICATION ENFORCEMENT POINT:
+// If this method is called, it means the client has ALREADY been authenticated!
+// Ephemos performed mTLS authentication at the transport layer before this code runs.
+//
+// Authentication verifications that already occurred:
+// ✅ Client presented valid X.509 certificate with SPIFFE ID
+// ✅ Certificate was verified against SPIRE trust bundle
+// ✅ Certificate is not expired (1-hour validity)
+// ✅ Client SPIFFE ID is authorized in server configuration
+//
+// This is your clean business logic - no authentication code needed!
 func (s *EchoServer) Echo(ctx context.Context, req *proto.EchoRequest) (*proto.EchoResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil")

@@ -28,6 +28,7 @@ type IdentityServer struct {
 
 // NewIdentityServer creates a new identity server with the given configuration.
 func NewIdentityServer(ctx context.Context, configPath string) (*IdentityServer, error) {
+	// Legacy method - load config via file path
 	configProvider := config.NewFileProvider()
 
 	var cfg *ports.Configuration
@@ -43,8 +44,22 @@ func NewIdentityServer(ctx context.Context, configPath string) (*IdentityServer,
 			return nil, &errors.ValidationError{
 				Field:   "configuration",
 				Value:   nil,
-				Message: "no configuration provided and no default configuration available",
+				Message: "failed to get default configuration",
 			}
+		}
+	}
+
+	return NewIdentityServerWithConfig(ctx, cfg)
+}
+
+// NewIdentityServerWithConfig creates a new identity server with pre-validated configuration.
+// This method assumes the configuration has already been loaded and validated.
+func NewIdentityServerWithConfig(_ context.Context, cfg *ports.Configuration) (*IdentityServer, error) {
+	if cfg == nil {
+		return nil, &errors.ValidationError{
+			Field:   "configuration",
+			Value:   nil,
+			Message: "configuration cannot be nil",
 		}
 	}
 
@@ -66,7 +81,7 @@ func NewIdentityServer(ctx context.Context, configPath string) (*IdentityServer,
 
 	return &IdentityServer{
 		identityService: identityService,
-		configProvider:  configProvider,
+		configProvider:  config.NewFileProvider(), // Create new provider for the server instance
 		serviceName:     cfg.Service.Name,
 	}, nil
 }

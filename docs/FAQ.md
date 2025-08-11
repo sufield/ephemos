@@ -236,6 +236,57 @@ trusted_servers:
   - "trusted-server"
 ```
 
+### Does Ephemos automatically register itself with SPIRE?
+
+**No, Ephemos does NOT automatically register itself with SPIRE.** Services must be explicitly registered before they can obtain identities.
+
+**Why No Auto-Registration?**
+- **Security**: Prevents unauthorized services from self-registering with SPIRE
+- **Control**: Administrators control which services get which identities
+- **SPIRE Design**: SPIRE requires explicit registration entries for security compliance
+
+**What Ephemos Provides:**
+
+1. **Manual Registration Tool**: 
+   ```bash
+   # Register a service with SPIRE (one-time setup)
+   ephemos register --name echo-server --domain example.org
+   ```
+
+2. **Automatic Identity Retrieval** (after registration):
+   ```go
+   // Once registered, these automatically retrieve SPIFFE identities:
+   server := ephemos.NewIdentityServer(ctx, "config.yaml") 
+   client := ephemos.NewIdentityClient(ctx, "config.yaml")
+   ```
+
+**Registration Workflow:**
+```bash
+# Step 1: MANUAL - Register the service with SPIRE
+ephemos register --config service.yaml
+
+# Step 2: AUTOMATIC - Service retrieves its identity when started
+server := ephemos.NewIdentityServer(ctx, "service.yaml")  # Gets registered identity
+client := ephemos.NewIdentityClient(ctx, "client.yaml")   # Gets registered identity
+```
+
+**Demo Script Registration:**
+The demo script handles registration manually using SPIRE CLI:
+```bash
+# Demo does this for you:
+sudo spire-server entry create \
+    -spiffeID spiffe://example.org/echo-server \
+    -parentID spiffe://example.org/spire-agent \
+    -selector unix:uid:1000 \
+    -ttl 3600
+```
+
+**Summary:**
+- ✅ **Registration**: Manual (required first step)
+- ✅ **Identity Retrieval**: Automatic (after registration)
+- ✅ **Certificate Rotation**: Automatic (handled by SPIRE)
+- ✅ **mTLS Authentication**: Automatic (handled by Ephemos)
+
 ### How do I register services?
 
 Use the Ephemos CLI for one-time registration:
@@ -246,6 +297,179 @@ ephemos register --config ephemos.yaml
 ```
 
 This creates the necessary SPIRE registration entries for the service.
+
+### Does Ephemos provide only CLI for registering services? Does Ephemos need to register itself with SPIRE?
+
+**Ephemos provides a CLI for service registration, but Ephemos itself does NOT need to register as a workload with SPIRE.**
+
+#### Registration Architecture Overview
+
+**Ephemos is a framework/library, not a separate service:**
+- Ephemos code runs **within your service process**
+- Each **developer service** needs its own SPIRE registration
+- **No separate Ephemos daemon** requiring registration
+- Ephemos provides tools to **help register your services**
+
+#### What Ephemos Provides for Registration
+
+**1. CLI Registration Tool**
+
+Ephemos includes a production CLI (`cmd/ephemos-cli`) with registration commands:
+
+```bash
+# Register using config file (recommended)
+ephemos register --config service.yaml
+
+# Register using command-line flags
+ephemos register --name payment-service --domain prod.company.com
+ephemos register --name echo-server --domain example.org --selector unix:uid:1000
+```
+
+**CLI Components:**
+- **Binary**: `cmd/ephemos-cli/main.go` - Production CLI tool
+- **Register Command**: `internal/cli/register.go` - Registration interface
+- **Registrar Logic**: `internal/adapters/primary/cli/registrar.go` - Core implementation
+
+**2. Programmatic Registration**
+
+The CLI uses the `internal/adapters/primary/cli/registrar.go` component that can also be used programmatically:
+
+```go
+// For advanced use cases or custom tooling
+registrar := cli.NewRegistrar(configProvider, registrarConfig)
+err := registrar.RegisterService(ctx, "service.yaml")
+```
+
+#### Registration Process Detail
+
+**Manual Registration (Security-Required, One-Time):**
+```bash
+# Step 1: Administrator or developer runs this
+ephemos register --name payment-service --domain prod.company.com
+
+# What happens under the hood:
+# - CLI validates service name and domain
+# - Calls: spire-server entry create \
+#     -spiffeID spiffe://prod.company.com/payment-service \
+#     -parentID spiffe://prod.company.com/spire-agent \
+#     -selector unix:uid:1000 \
+#     -ttl 3600
+```
+
+**Automatic Identity Retrieval (Runtime):**
+```go
+// Step 2: Service code automatically retrieves registered identity
+server := ephemos.NewIdentityServer(ctx, "config.yaml")
+// - Connects to SPIRE Agent via Unix socket
+// - Gets X.509-SVID certificate for spiffe://prod.company.com/payment-service
+// - Sets up mTLS with automatic certificate rotation
+// - Ready to authenticate clients
+```
+
+#### Why No Auto-Registration?
+
+**Security by Design:**
+- **Prevents rogue services** from self-registering with SPIRE
+- **Administrative control** - only authorized personnel decide service identities
+- **SPIRE compliance** - SPIRE requires explicit registration for security
+- **Zero Trust principle** - no automatic trust is granted
+
+**SPIFFE/SPIRE Standard:**
+- Registration must be **explicit and authorized**
+- Follows **principle of least privilege**
+- Supports **audit trails** for identity management
+- Enables **policy enforcement** before service deployment
+
+#### Complete Registration Workflow
+
+| Step | Component | Action | Method |
+|------|-----------|--------|---------|
+| 1 | **Admin/Developer** | Register service identity | `ephemos register --config service.yaml` |
+| 2 | **Service Runtime** | Retrieve identity automatically | `ephemos.NewIdentityServer(ctx, "config.yaml")` |
+| 3 | **SPIRE Agent** | Provide certificates | Automatic (background) |
+| 4 | **Authentication** | mTLS between services | Automatic (transparent) |
+
+#### Registration Requirements by Component
+
+| Component | Registration Required | Method |
+|-----------|----------------------|---------|
+| **Your Services** (payment-service, user-service, etc.) | ✅ **Yes** | `ephemos register --config service.yaml` |
+| **Ephemos Framework** | ❌ **No** | (Library code - runs in your services) |
+| **SPIRE Server** | ❌ **No** | (Infrastructure component) |
+| **SPIRE Agent** | ❌ **No** | (Infrastructure component) |
+
+#### Example: Complete Service Registration
+
+**1. Service Configuration (`payment-service.yaml`):**
+```yaml
+service:
+  name: payment-service
+  domain: prod.company.com
+
+spiffe:
+  socket_path: /run/spire/sockets/agent.sock
+
+authorized_clients:
+  - order-service
+  - billing-service
+```
+
+**2. Registration (One-Time):**
+```bash
+# Creates SPIRE entry for payment-service
+ephemos register --config payment-service.yaml
+```
+
+**3. Service Code (Runtime):**
+```go
+// payment-service main.go
+func main() {
+    ctx := context.Background()
+    
+    // Automatically gets spiffe://prod.company.com/payment-service identity
+    server, err := ephemos.NewIdentityServer(ctx, "payment-service.yaml")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer server.Close()
+    
+    // Register your gRPC service
+    registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
+        pb.RegisterPaymentServiceServer(s, &paymentService{})
+    })
+    server.RegisterService(ctx, registrar)
+    
+    // Start with automatic mTLS authentication
+    lis, _ := net.Listen("tcp", ":50051")
+    server.Serve(ctx, lis) // Only authorized clients can connect
+}
+```
+
+**4. Client Usage:**
+```go
+// order-service connecting to payment-service
+client, err := ephemos.NewIdentityClient(ctx, "order-service.yaml")
+if err != nil {
+    log.Fatal(err)
+}
+defer client.Close()
+
+// Automatic mTLS authentication using registered identities
+conn, err := client.Connect(ctx, "payment-service", "payment-svc:50051")
+if err != nil {
+    log.Fatal(err) // Fails if order-service not in payment-service's authorized_clients
+}
+
+paymentClient := pb.NewPaymentServiceClient(conn.GetClientConnection())
+```
+
+#### Summary
+
+- ✅ **Service Registration**: Manual (required security step via CLI)
+- ✅ **Identity Retrieval**: Automatic (handled by Ephemos APIs)
+- ✅ **Certificate Rotation**: Automatic (handled by SPIRE)
+- ✅ **mTLS Authentication**: Automatic (handled by Ephemos)
+- ❌ **Ephemos Self-Registration**: Not needed (it's a library, not a service)
 
 ### Where should I put the config file?
 
