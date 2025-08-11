@@ -17,17 +17,14 @@ github\.com/[^/]+/[^/]+.*h1:.*
 github\.com/[^/]+/[^/]+.*go\.mod.*
 
 # Git configuration with redacted tokens (marked with ***)
-AUTHORIZATION: basic \*\*\*
+AUTHORIZATION:.*\*\*\*
 
 # Test configuration patterns
 AuthorizedClients.*spiffe://
 AllowedServices.*spiffe://
 
-# Documentation examples with SPIFFE patterns
-- "spiffe://[^"]*"
-
-# Test patterns in direct_test.go
-pattern:\s+"spiffe://[^"]*"
+# Test patterns in direct_test.go  
+pattern:.*spiffe://
 
 # Configuration test patterns
 ports\.Env.*spiffe://
