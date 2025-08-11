@@ -30,12 +30,12 @@ func FuzzIdentityParsing(f *testing.F) {
 	f.Add("spiffe://domain//double-slash/service")
 	f.Add("spiffe://./relative/domain/service")
 	f.Add("spiffe://256.256.256.256/service") // Invalid IP
-	
+
 	f.Fuzz(func(t *testing.T, spiffeID string) {
 		// Test SPIFFE ID parsing through service configuration
 		tempDir := t.TempDir()
 		configFile := tempDir + "/config.yaml"
-		
+
 		// Create config that might use this SPIFFE ID in authorized clients
 		configContent := `service:
   name: test-service
@@ -47,21 +47,21 @@ spiffe:
   socket_path: /tmp/spire-agent/public/api.sock
 authorized_clients:
   - "` + strings.ReplaceAll(spiffeID, `"`, `\"`) + `"`
-		
+
 		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 			return
 		}
-		
+
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
-		
+
 		_, err := loadAndValidateConfig(ctx, configFile)
-		
+
 		// Test that malformed SPIFFE IDs are rejected
-		if !strings.HasPrefix(spiffeID, "spiffe://") || 
-		   strings.Contains(spiffeID, "\x00") ||
-		   strings.Contains(spiffeID, "\n") ||
-		   strings.Contains(spiffeID, "\t") {
+		if !strings.HasPrefix(spiffeID, "spiffe://") ||
+			strings.Contains(spiffeID, "\x00") ||
+			strings.Contains(spiffeID, "\n") ||
+			strings.Contains(spiffeID, "\t") {
 			// Should produce validation error for malformed IDs
 			if err == nil {
 				t.Logf("Potentially invalid SPIFFE ID accepted: %q", spiffeID)
@@ -90,14 +90,14 @@ func FuzzTrustDomain(f *testing.F) {
 	f.Add("hyphen-.com")
 	f.Add("-starts-with-hyphen.com")
 	f.Add("256.256.256.256") // Invalid IP as domain
-	f.Add("domain:8080") // Port in domain
+	f.Add("domain:8080")     // Port in domain
 	f.Add("../../../etc/passwd")
 	f.Add("unicode-域名.org")
-	
+
 	f.Fuzz(func(t *testing.T, trustDomain string) {
 		tempDir := t.TempDir()
 		configFile := tempDir + "/config.yaml"
-		
+
 		configContent := `service:
   name: test-service
   domain: "` + strings.ReplaceAll(trustDomain, `"`, `\"`) + `"
@@ -106,20 +106,20 @@ transport:
   address: :50051
 spiffe:
   socket_path: /tmp/spire-agent/public/api.sock`
-		
+
 		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 			return
 		}
-		
+
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
-		
+
 		_, err := loadAndValidateConfig(ctx, configFile)
-		
+
 		// Test domain validation
 		if strings.Contains(trustDomain, "\x00") ||
-		   strings.ContainsAny(trustDomain, "\n\t :") ||
-		   strings.Contains(trustDomain, "..") {
+			strings.ContainsAny(trustDomain, "\n\t :") ||
+			strings.Contains(trustDomain, "..") {
 			if err == nil {
 				t.Errorf("Expected validation error for trust domain: %q", trustDomain)
 			}
@@ -141,11 +141,11 @@ func FuzzClientAuthorization(f *testing.F) {
 	f.Add("../../../malicious/path")
 	f.Add("DROP TABLE clients;")
 	f.Add("unicode-クライアント")
-	
+
 	f.Fuzz(func(t *testing.T, clientPattern string) {
 		tempDir := t.TempDir()
 		configFile := tempDir + "/config.yaml"
-		
+
 		// Split pattern into individual clients (simple comma split)
 		clients := strings.Split(clientPattern, ",")
 		clientsYAML := ""
@@ -155,7 +155,7 @@ func FuzzClientAuthorization(f *testing.F) {
 				clientsYAML += `  - "` + strings.ReplaceAll(client, `"`, `\"`) + `"` + "\n"
 			}
 		}
-		
+
 		configContent := `service:
   name: test-service
   domain: example.org
@@ -166,16 +166,16 @@ spiffe:
   socket_path: /tmp/spire-agent/public/api.sock
 authorized_clients:
 ` + clientsYAML
-		
+
 		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 			return
 		}
-		
+
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
-		
+
 		config, err := loadAndValidateConfig(ctx, configFile)
-		
+
 		// Should handle various client patterns gracefully
 		if err == nil && config != nil {
 			// Verify that malicious patterns don't end up in config
@@ -188,11 +188,11 @@ authorized_clients:
 	})
 }
 
-// FuzzServerTrusts tests trusted servers list handling  
+// FuzzServerTrusts tests trusted servers list handling
 func FuzzServerTrusts(f *testing.F) {
 	// Seed with various server patterns
 	f.Add("spiffe://example.org/server")
-	f.Add("server1,server2") 
+	f.Add("server1,server2")
 	f.Add("")
 	f.Add("malicious\x00server")
 	f.Add("server\nwith\nnewlines")
@@ -200,11 +200,11 @@ func FuzzServerTrusts(f *testing.F) {
 	f.Add("../../../etc/passwd")
 	f.Add("'; DROP TABLE servers; --")
 	f.Add("unicode-サーバー")
-	
+
 	f.Fuzz(func(t *testing.T, serverPattern string) {
 		tempDir := t.TempDir()
 		configFile := tempDir + "/config.yaml"
-		
+
 		servers := strings.Split(serverPattern, ",")
 		serversYAML := ""
 		for _, server := range servers {
@@ -213,7 +213,7 @@ func FuzzServerTrusts(f *testing.F) {
 				serversYAML += `  - "` + strings.ReplaceAll(server, `"`, `\"`) + `"` + "\n"
 			}
 		}
-		
+
 		configContent := `service:
   name: test-service
   domain: example.org
@@ -224,16 +224,16 @@ spiffe:
   socket_path: /tmp/spire-agent/public/api.sock
 trusted_servers:
 ` + serversYAML
-		
+
 		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 			return
 		}
-		
+
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
-		
+
 		config, err := loadAndValidateConfig(ctx, configFile)
-		
+
 		// Verify security of trusted servers list
 		if err == nil && config != nil {
 			for _, server := range config.TrustedServers {
@@ -248,17 +248,17 @@ trusted_servers:
 // FuzzContextTimeout tests context handling with various timeouts
 func FuzzContextTimeout(f *testing.F) {
 	// Seed with different timeout patterns
-	f.Add(int64(0))      // No timeout
-	f.Add(int64(1))      // 1 nanosecond
-	f.Add(int64(1000))   // 1 microsecond  
-	f.Add(int64(1000000)) // 1 millisecond
-	f.Add(int64(-1))     // Negative timeout
+	f.Add(int64(0))              // No timeout
+	f.Add(int64(1))              // 1 nanosecond
+	f.Add(int64(1000))           // 1 microsecond
+	f.Add(int64(1000000))        // 1 millisecond
+	f.Add(int64(-1))             // Negative timeout
 	f.Add(int64(86400000000000)) // 1 day in nanoseconds
-	
+
 	f.Fuzz(func(t *testing.T, timeoutNs int64) {
 		tempDir := t.TempDir()
 		configFile := tempDir + "/config.yaml"
-		
+
 		configContent := `service:
   name: test-service
   domain: example.org
@@ -267,15 +267,15 @@ transport:
   address: :50051
 spiffe:
   socket_path: /tmp/spire-agent/public/api.sock`
-		
+
 		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 			return
 		}
-		
+
 		// Create context with fuzzing timeout
 		var ctx context.Context
 		var cancel context.CancelFunc
-		
+
 		if timeoutNs > 0 {
 			timeout := time.Duration(timeoutNs)
 			if timeout > time.Hour {
@@ -286,10 +286,10 @@ spiffe:
 			ctx, cancel = context.WithCancel(context.Background())
 		}
 		defer cancel()
-		
+
 		// Test config loading with various timeouts
 		_, err := loadAndValidateConfig(ctx, configFile)
-		
+
 		// Very short timeouts might cause context cancellation
 		if timeoutNs > 0 && timeoutNs < 1000000 { // Less than 1ms
 			// Might timeout, which is acceptable
@@ -307,7 +307,7 @@ spiffe:
 func BenchmarkIdentityValidation(b *testing.B) {
 	tempDir := b.TempDir()
 	configFile := tempDir + "/bench.yaml"
-	
+
 	configContent := `service:
   name: benchmark-service
   domain: example.org
@@ -322,12 +322,12 @@ authorized_clients:
 trusted_servers:
   - "spiffe://example.org/server1"
   - "spiffe://example.org/server2"`
-	
+
 	os.WriteFile(configFile, []byte(configContent), 0644)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx := context.Background()
+		ctx := b.Context()
 		_, _ = loadAndValidateConfig(ctx, configFile)
 	}
 }

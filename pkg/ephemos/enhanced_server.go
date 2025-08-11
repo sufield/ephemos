@@ -144,7 +144,10 @@ func NewEnhancedIdentityServer(ctx context.Context, opts *ServerOptions) (*Enhan
 
 // RegisterService delegates to the base server.
 func (s *EnhancedServer) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
-	return s.baseServer.RegisterService(ctx, serviceRegistrar)
+	if err := s.baseServer.RegisterService(ctx, serviceRegistrar); err != nil {
+		return fmt.Errorf("failed to register service: %w", err)
+	}
+	return nil
 }
 
 // Serve starts the server with graceful shutdown support.
@@ -277,11 +280,18 @@ type netListenerAdapter struct {
 }
 
 func (a *netListenerAdapter) Accept() (interface{}, error) {
-	return a.listener.Accept()
+	conn, err := a.listener.Accept()
+	if err != nil {
+		return nil, fmt.Errorf("listener accept failed: %w", err)
+	}
+	return conn, nil
 }
 
 func (a *netListenerAdapter) Close() error {
-	return a.listener.Close()
+	if err := a.listener.Close(); err != nil {
+		return fmt.Errorf("listener close failed: %w", err)
+	}
+	return nil
 }
 
 func (a *netListenerAdapter) Addr() string {

@@ -277,7 +277,7 @@ spiffe:
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx := context.Background()
+		ctx := b.Context()
 		_, _ = loadAndValidateConfig(ctx, configFile)
 	}
 }

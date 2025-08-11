@@ -355,7 +355,7 @@ func TestPublicAPIDocumentation(t *testing.T) {
 			// Ensure files have package documentation
 			file, err := os.Open(path)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to open file %s: %w", path, err)
 			}
 			defer file.Close()
 
