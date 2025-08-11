@@ -1,6 +1,28 @@
 #!/bin/bash
 set -e
 
+# Function to handle sudo commands with proper error handling
+run_sudo_cmd() {
+    local cmd="$1"
+    local description="$2"
+    
+    echo "Running: $cmd"
+    if eval "$cmd"; then
+        return 0
+    else
+        local exit_code=$?
+        echo "⚠️ Command failed: $description (exit code: $exit_code)"
+        
+        # Check if it's a permission error
+        if [ $exit_code -eq 1 ]; then
+            echo "This might be a permission issue. Make sure you have sudo privileges."
+            echo "If prompted for password, please enter your sudo password."
+        fi
+        
+        return $exit_code
+    fi
+}
+
 # Cleanup function to gracefully shutdown all components
 cleanup_demo() {
     echo ""
@@ -79,10 +101,39 @@ sleep 1
 
 # Build examples
 echo "Building example applications..."
-cd ../..
+# Ensure we're in the project root directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$PROJECT_ROOT"
 go build -o bin/echo-server ./examples/echo-server || { echo "ERROR: Failed to build echo-server"; exit 1; }
 # Always rebuild client to ensure it has the correct port
 go build -o bin/echo-client ./examples/echo-client || { echo "ERROR: Failed to build echo-client"; exit 1; }
+
+# Check and start SPIRE services if needed
+echo "Checking SPIRE services..."
+if ! pgrep -f "spire-server.*run" > /dev/null || ! pgrep -f "spire-agent.*run" > /dev/null; then
+    echo "SPIRE services not running. Starting SPIRE server and agent..."
+    echo "This requires sudo privileges. You may be prompted for your password."
+    
+    # Change to demo directory to run start script
+    CURRENT_DIR=$(pwd)
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR"
+    
+    # Start SPIRE services
+    if ! ./start-spire.sh; then
+        echo "❌ Failed to start SPIRE services. Demo cannot continue."
+        echo "Please ensure you have sudo privileges and SPIRE is properly installed."
+        exit 1
+    fi
+    
+    # Return to project root
+    cd "$CURRENT_DIR"
+    
+    echo "✅ SPIRE services started successfully"
+else
+    echo "✅ SPIRE services are already running"
+fi
 
 # Register SPIRE entries before starting services
 echo "Registering SPIRE entries..."
@@ -93,28 +144,62 @@ echo "Services will run as user: $ACTUAL_USER (UID: $ACTUAL_UID)"
 
 # Register echo-server with correct UID
 echo "Registering echo-server with unix:uid:$ACTUAL_UID selector..."
-if sudo spire-server entry create \
+echo "🔍 DEBUG: Running: sudo spire-server entry create -socketPath /tmp/spire-server/private/api.sock -spiffeID spiffe://example.org/echo-server -parentID spiffe://example.org/spire-agent -selector unix:uid:$ACTUAL_UID -ttl 3600"
+
+# Use temporary disable of set -e for this command
+set +e
+SERVER_ENTRY_OUTPUT=$(sudo spire-server entry create \
     -socketPath /tmp/spire-server/private/api.sock \
     -spiffeID spiffe://example.org/echo-server \
     -parentID spiffe://example.org/spire-agent \
     -selector unix:uid:$ACTUAL_UID \
-    -ttl 3600 2>/dev/null; then
+    -ttl 3600 2>&1)
+SERVER_ENTRY_EXIT_CODE=$?
+set -e
+
+echo "🔍 DEBUG: echo-server entry creation exit code: $SERVER_ENTRY_EXIT_CODE"
+echo "🔍 DEBUG: echo-server entry creation output:"
+echo "$SERVER_ENTRY_OUTPUT" | sed 's/^/[SERVER-ENTRY] /'
+
+if [ $SERVER_ENTRY_EXIT_CODE -eq 0 ]; then
     echo "✓ Echo-server entry created successfully"
 else
-    echo "✓ Echo-server entry already exists or creation failed, continuing..."
+    echo "⚠️ Echo-server entry creation failed or already exists"
+    if echo "$SERVER_ENTRY_OUTPUT" | grep -q "already exists"; then
+        echo "🔍 DEBUG: Entry already exists - this is normal"
+    else
+        echo "🔍 DEBUG: Actual error occurred during entry creation"
+    fi
 fi
 
 # Register echo-client with correct UID
 echo "Registering echo-client with unix:uid:$ACTUAL_UID selector..."
-if sudo spire-server entry create \
+echo "🔍 DEBUG: Running: sudo spire-server entry create -socketPath /tmp/spire-server/private/api.sock -spiffeID spiffe://example.org/echo-client -parentID spiffe://example.org/spire-agent -selector unix:uid:$ACTUAL_UID -ttl 3600"
+
+# Use temporary disable of set -e for this command
+set +e
+CLIENT_ENTRY_OUTPUT=$(sudo spire-server entry create \
     -socketPath /tmp/spire-server/private/api.sock \
     -spiffeID spiffe://example.org/echo-client \
     -parentID spiffe://example.org/spire-agent \
     -selector unix:uid:$ACTUAL_UID \
-    -ttl 3600 2>/dev/null; then
+    -ttl 3600 2>&1)
+CLIENT_ENTRY_EXIT_CODE=$?
+set -e
+
+echo "🔍 DEBUG: echo-client entry creation exit code: $CLIENT_ENTRY_EXIT_CODE"
+echo "🔍 DEBUG: echo-client entry creation output:"
+echo "$CLIENT_ENTRY_OUTPUT" | sed 's/^/[CLIENT-ENTRY] /'
+
+if [ $CLIENT_ENTRY_EXIT_CODE -eq 0 ]; then
     echo "✓ Echo-client entry created successfully"
 else
-    echo "✓ Echo-client entry already exists or creation failed, continuing..."
+    echo "⚠️ Echo-client entry creation failed or already exists"
+    if echo "$CLIENT_ENTRY_OUTPUT" | grep -q "already exists"; then
+        echo "🔍 DEBUG: Entry already exists - this is normal"
+    else
+        echo "🔍 DEBUG: Actual error occurred during entry creation"
+    fi
 fi
 
 # Wait for entries to propagate and verify they're available
@@ -123,15 +208,76 @@ sleep 5
 
 # Verify entries are actually registered and available
 echo "Verifying SPIRE entries are available..."
+echo "🔍 DEBUG: Checking SPIRE service status..."
+
+# Check if SPIRE processes are running
+SPIRE_SERVER_RUNNING=$(pgrep -f "spire-server.*run" || echo "")
+SPIRE_AGENT_RUNNING=$(pgrep -f "spire-agent.*run" || echo "")
+
+echo "🔍 DEBUG: SPIRE server process: ${SPIRE_SERVER_RUNNING:-NOT RUNNING}"
+echo "🔍 DEBUG: SPIRE agent process: ${SPIRE_AGENT_RUNNING:-NOT RUNNING}"
+
+# Check if SPIRE sockets exist
+echo "🔍 DEBUG: Checking SPIRE socket files..."
+if [ -S "/tmp/spire-server/private/api.sock" ]; then
+    echo "🔍 DEBUG: SPIRE server socket exists"
+    ls -la /tmp/spire-server/private/api.sock 2>/dev/null || echo "🔍 DEBUG: Cannot access server socket details"
+else
+    echo "🔍 DEBUG: SPIRE server socket NOT FOUND at /tmp/spire-server/private/api.sock"
+fi
+
+if [ -S "/tmp/spire-agent/public/api.sock" ]; then
+    echo "🔍 DEBUG: SPIRE agent socket exists"
+    ls -la /tmp/spire-agent/public/api.sock 2>/dev/null || echo "🔍 DEBUG: Cannot access agent socket details"
+else
+    echo "🔍 DEBUG: SPIRE agent socket NOT FOUND at /tmp/spire-agent/public/api.sock"
+fi
+
+# Check if we can connect to SPIRE server
+echo "🔍 DEBUG: Testing SPIRE server connection..."
+set +e
+sudo spire-server healthcheck -socketPath /tmp/spire-server/private/api.sock 2>/dev/null
+HEALTH_CHECK_CODE=$?
+set -e
+
+if [ $HEALTH_CHECK_CODE -eq 0 ]; then
+    echo "🔍 DEBUG: SPIRE server health check PASSED"
+else
+    echo "🔍 DEBUG: SPIRE server health check FAILED (exit code: $HEALTH_CHECK_CODE)"
+    echo "🔍 DEBUG: Attempting to show SPIRE server error output..."
+    set +e
+    sudo spire-server healthcheck -socketPath /tmp/spire-server/private/api.sock 2>&1 | head -5 | sed 's/^/[SPIRE-ERROR] /'
+    set -e
+fi
+
 RETRY_COUNT=0
 MAX_RETRIES=12  # 12 * 5 seconds = 60 seconds max wait
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if sudo spire-server entry show -socketPath /tmp/spire-server/private/api.sock 2>/dev/null | grep -q "echo-server"; then
+    echo "🔍 DEBUG: Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES - Querying SPIRE entries..."
+    
+    # Show the actual command being run and its output
+    set +e
+    SPIRE_OUTPUT=$(sudo spire-server entry show -socketPath /tmp/spire-server/private/api.sock 2>&1)
+    SPIRE_EXIT_CODE=$?
+    set -e
+    
+    echo "🔍 DEBUG: spire-server entry show exit code: $SPIRE_EXIT_CODE"
+    echo "🔍 DEBUG: spire-server entry show output:"
+    echo "$SPIRE_OUTPUT" | head -10 | sed 's/^/[SPIRE-OUTPUT] /'
+    
+    if echo "$SPIRE_OUTPUT" | grep -q "echo-server"; then
         echo "✅ SPIRE entries verified and ready"
+        echo "🔍 DEBUG: Found echo-server entry in output"
         break
     else
         echo "⏳ Waiting for SPIRE entries to be ready... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
+        if [ $SPIRE_EXIT_CODE -ne 0 ]; then
+            echo "🔍 DEBUG: Command failed with exit code $SPIRE_EXIT_CODE"
+            echo "🔍 DEBUG: This suggests SPIRE server is not running or not accessible"
+        else
+            echo "🔍 DEBUG: Command succeeded but echo-server entry not found in output"
+        fi
         sleep 5
         RETRY_COUNT=$((RETRY_COUNT + 1))
     fi

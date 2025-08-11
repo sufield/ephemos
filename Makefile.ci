@@ -50,7 +50,7 @@ ci-all: ci-lint ci-test ci-security ci-build
 	@echo "All CI checks completed successfully!"
 
 # Help
-help:
+ci-help:
 	@echo "Ephemos CI/CD Targets:"
 	@echo ""
 	@echo "  make ci-setup     - Setup CI environment"

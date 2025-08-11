@@ -4,7 +4,9 @@ echo "Setting up Ephemos demo..."
 
 # Build the CLI first
 echo "Building Ephemos CLI..."
-cd ../..
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$PROJECT_ROOT"
 go build -o ephemos ./cmd/ephemos-cli
 
 # Check for existing entries instead of deleting them

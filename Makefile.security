@@ -38,7 +38,7 @@ validate-production: build
 	@echo "Production validation completed!"
 
 # Help
-help:
+security-help:
 	@echo "Ephemos Security Targets:"
 	@echo ""
 	@echo "  make security-scan     - Run all security scans"
