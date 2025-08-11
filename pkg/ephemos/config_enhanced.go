@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/sufield/ephemos/internal/core/ports"
 )
 
 // ConfigSource represents different configuration sources
@@ -24,7 +22,7 @@ const (
 
 // ConfigBuilder provides a fluent interface for building configurations
 type ConfigBuilder struct {
-	config *ports.Configuration
+	config *Configuration
 	source ConfigSource
 	yamlPath string
 	envPrefix string
@@ -33,7 +31,7 @@ type ConfigBuilder struct {
 // NewConfigBuilder creates a new configuration builder
 func NewConfigBuilder() *ConfigBuilder {
 	return &ConfigBuilder{
-		config: &ports.Configuration{},
+		config: &Configuration{},
 		source: ConfigSourceYAML, // Default to YAML with env overrides
 		envPrefix: "EPHEMOS",
 	}
@@ -72,7 +70,7 @@ func (b *ConfigBuilder) WithServiceDomain(domain string) *ConfigBuilder {
 // WithSPIFFESocket sets the SPIFFE socket path programmatically
 func (b *ConfigBuilder) WithSPIFFESocket(socketPath string) *ConfigBuilder {
 	if b.config.SPIFFE == nil {
-		b.config.SPIFFE = &ports.SPIFFEConfig{}
+		b.config.SPIFFE = &SPIFFEConfig{}
 	}
 	b.config.SPIFFE.SocketPath = socketPath
 	return b
@@ -98,7 +96,7 @@ func (b *ConfigBuilder) WithTrustedServers(servers []string) *ConfigBuilder {
 }
 
 // Build creates the final configuration based on the specified source
-func (b *ConfigBuilder) Build(ctx context.Context) (*ports.Configuration, error) {
+func (b *ConfigBuilder) Build(ctx context.Context) (*Configuration, error) {
 	switch b.source {
 	case ConfigSourceYAML:
 		return b.buildFromYAML(ctx)
@@ -112,15 +110,15 @@ func (b *ConfigBuilder) Build(ctx context.Context) (*ports.Configuration, error)
 }
 
 // buildFromYAML builds configuration from YAML with environment variable overrides
-func (b *ConfigBuilder) buildFromYAML(ctx context.Context) (*ports.Configuration, error) {
-	// Start with YAML configuration (use existing loadAndValidateConfig)
-	yamlConfig, err := loadAndValidateConfig(ctx, b.yamlPath)
+func (b *ConfigBuilder) buildFromYAML(ctx context.Context) (*Configuration, error) {
+	// Start with YAML configuration by loading from file and converting to public type
+	publicConfig, err := LoadConfigFromYAML(ctx, b.yamlPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load YAML config: %w", err)
 	}
 
 	// Apply environment variable overrides
-	config, err := b.applyEnvOverrides(yamlConfig)
+	config, err := b.applyEnvOverrides(publicConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply env overrides: %w", err)
 	}
@@ -130,17 +128,16 @@ func (b *ConfigBuilder) buildFromYAML(ctx context.Context) (*ports.Configuration
 
 	// Validate final configuration
 	if err := config.Validate(); err != nil {
-		return nil, wrapValidationError(err, fmt.Sprintf("final config (YAML + env overrides)"))
+		return nil, fmt.Errorf("final config validation failed: %w", err)
 	}
 
 	return config, nil
 }
 
 // buildFromEnvOnly builds configuration entirely from environment variables
-func (b *ConfigBuilder) buildFromEnvOnly(ctx context.Context) (*ports.Configuration, error) {
+func (b *ConfigBuilder) buildFromEnvOnly(ctx context.Context) (*Configuration, error) {
 	// Start with default configuration
-	provider := &fileProviderCompat{}
-	config := provider.GetDefaultConfiguration(ctx)
+	config := GetDefaultConfiguration()
 
 	// Apply environment variables
 	config, err := b.applyEnvOverrides(config)
@@ -153,25 +150,24 @@ func (b *ConfigBuilder) buildFromEnvOnly(ctx context.Context) (*ports.Configurat
 
 	// Validate final configuration
 	if err := config.Validate(); err != nil {
-		return nil, wrapValidationError(err, "env-only config")
+		return nil, fmt.Errorf("env-only config validation failed: %w", err)
 	}
 
 	return config, nil
 }
 
 // buildFromPureCode builds configuration entirely from programmatic settings
-func (b *ConfigBuilder) buildFromPureCode(ctx context.Context) (*ports.Configuration, error) {
+func (b *ConfigBuilder) buildFromPureCode(ctx context.Context) (*Configuration, error) {
 	// Start with default configuration
-	provider := &fileProviderCompat{}
-	defaultConfig := provider.GetDefaultConfiguration(ctx)
+	defaultConfig := GetDefaultConfiguration()
 
 	// Use builder config as base, falling back to defaults for missing values
-	config := &ports.Configuration{
-		Service: ports.ServiceConfig{
+	config := &Configuration{
+		Service: ServiceConfig{
 			Name:   b.getValueOrDefault(b.config.Service.Name, defaultConfig.Service.Name),
 			Domain: b.getValueOrDefault(b.config.Service.Domain, defaultConfig.Service.Domain),
 		},
-		Transport: ports.TransportConfig{
+		Transport: TransportConfig{
 			Type:    b.getValueOrDefault(b.config.Transport.Type, defaultConfig.Transport.Type),
 			Address: b.getValueOrDefault(b.config.Transport.Address, defaultConfig.Transport.Address),
 		},
@@ -181,7 +177,7 @@ func (b *ConfigBuilder) buildFromPureCode(ctx context.Context) (*ports.Configura
 
 	// Handle SPIFFE config
 	if b.config.SPIFFE != nil || defaultConfig.SPIFFE != nil {
-		config.SPIFFE = &ports.SPIFFEConfig{}
+		config.SPIFFE = &SPIFFEConfig{}
 		if b.config.SPIFFE != nil {
 			config.SPIFFE.SocketPath = b.getValueOrDefault(b.config.SPIFFE.SocketPath, "")
 		}
@@ -192,14 +188,14 @@ func (b *ConfigBuilder) buildFromPureCode(ctx context.Context) (*ports.Configura
 
 	// Validate final configuration
 	if err := config.Validate(); err != nil {
-		return nil, wrapValidationError(err, "pure-code config")
+		return nil, fmt.Errorf("pure-code config validation failed: %w", err)
 	}
 
 	return config, nil
 }
 
 // applyEnvOverrides applies environment variable overrides to configuration
-func (b *ConfigBuilder) applyEnvOverrides(config *ports.Configuration) (*ports.Configuration, error) {
+func (b *ConfigBuilder) applyEnvOverrides(config *Configuration) (*Configuration, error) {
 	envConfig := *config // Copy the config
 
 	// Service configuration overrides
@@ -213,7 +209,7 @@ func (b *ConfigBuilder) applyEnvOverrides(config *ports.Configuration) (*ports.C
 	// SPIFFE configuration overrides
 	if val := os.Getenv(b.envPrefix + "_SPIFFE_SOCKET"); val != "" {
 		if envConfig.SPIFFE == nil {
-			envConfig.SPIFFE = &ports.SPIFFEConfig{}
+			envConfig.SPIFFE = &SPIFFEConfig{}
 		}
 		envConfig.SPIFFE.SocketPath = val
 	}
@@ -248,7 +244,7 @@ func (b *ConfigBuilder) applyEnvOverrides(config *ports.Configuration) (*ports.C
 }
 
 // applyBuilderOverrides applies programmatic overrides from the builder
-func (b *ConfigBuilder) applyBuilderOverrides(config *ports.Configuration) {
+func (b *ConfigBuilder) applyBuilderOverrides(config *Configuration) {
 	// Only override if builder has non-zero values
 	if b.config.Service.Name != "" {
 		config.Service.Name = b.config.Service.Name
@@ -264,7 +260,7 @@ func (b *ConfigBuilder) applyBuilderOverrides(config *ports.Configuration) {
 	}
 	if b.config.SPIFFE != nil && b.config.SPIFFE.SocketPath != "" {
 		if config.SPIFFE == nil {
-			config.SPIFFE = &ports.SPIFFEConfig{}
+			config.SPIFFE = &SPIFFEConfig{}
 		}
 		config.SPIFFE.SocketPath = b.config.SPIFFE.SocketPath
 	}
@@ -294,7 +290,7 @@ func (b *ConfigBuilder) getSliceOrDefault(value, defaultValue []string) []string
 
 // LoadConfigFlexible provides a convenient function for flexible configuration loading
 // This maintains backward compatibility while enabling new configuration patterns
-func LoadConfigFlexible(ctx context.Context, options ...ConfigOption) (*ports.Configuration, error) {
+func LoadConfigFlexible(ctx context.Context, options ...ConfigOption) (*Configuration, error) {
 	builder := NewConfigBuilder()
 	
 	// Apply options
