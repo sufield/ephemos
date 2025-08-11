@@ -80,9 +80,9 @@ sleep 1
 # Build examples
 echo "Building example applications..."
 cd ../..
-go build -o bin/echo-server examples/echo-server/main.go || { echo "ERROR: Failed to build echo-server"; exit 1; }
+go build -o bin/echo-server ./examples/echo-server || { echo "ERROR: Failed to build echo-server"; exit 1; }
 # Always rebuild client to ensure it has the correct port
-go build -o bin/echo-client examples/echo-client/main.go || { echo "ERROR: Failed to build echo-client"; exit 1; }
+go build -o bin/echo-client ./examples/echo-client || { echo "ERROR: Failed to build echo-client"; exit 1; }
 
 # Register SPIRE entries before starting services
 echo "Registering SPIRE entries..."
