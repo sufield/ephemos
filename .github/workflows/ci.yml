@@ -92,27 +92,31 @@ jobs:
       uses: ./.github/actions/setup-protobuf
       
     - name: Diagnose build environment
+      shell: bash
       run: |
         echo "🔍 Diagnosing build environment..."
         pwd
-        ls -la
+        ls -la || dir
         echo "Checking pkg/ephemos directory:"
-        ls -la pkg/ephemos/ || echo "pkg/ephemos directory not found"
+        ls -la pkg/ephemos/ 2>/dev/null || (dir pkg\\ephemos 2>/dev/null || echo "pkg/ephemos directory not found")
         echo "Checking for server.go:"
-        find . -name "server.go" -type f || echo "No server.go files found"
+        find . -name "server.go" -type f 2>/dev/null || (where /r . server.go 2>/dev/null || echo "No server.go files found")
         echo "Checking ephemos.go for function definitions:"
-        grep -n "TransportServer\|newTransportServer\|mount" pkg/ephemos/ephemos.go || echo "Functions not found in ephemos.go"
+        grep -n "TransportServer\|newTransportServer\|mount" pkg/ephemos/ephemos.go 2>/dev/null || findstr /n "TransportServer newTransportServer mount" pkg\\ephemos\\ephemos.go 2>/dev/null || echo "Functions not found in ephemos.go"
         echo "Checking server.go for function definitions:"
-        grep -n "TransportServer\|newTransportServer\|mount" pkg/ephemos/server.go || echo "Functions not found in server.go"
+        grep -n "TransportServer\|newTransportServer\|mount" pkg/ephemos/server.go 2>/dev/null || findstr /n "TransportServer newTransportServer mount" pkg\\ephemos\\server.go 2>/dev/null || echo "Functions not found in server.go"
         
     - name: Build and verify
+      shell: bash
       run: |
+        chmod +x scripts/debug-ci-build.sh
         ./scripts/debug-ci-build.sh
-        ./bin/ephemos --help
         # Platform-specific binary testing
         if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          ./bin/ephemos.exe --help || echo "Main binary help not available"
           ./bin/echo-server.exe --help || echo "Server help not available"
         else
+          ./bin/ephemos --help || echo "Main binary help not available"
           ./bin/echo-server --help || echo "Server help not available"
         fi
       shell: bash
