@@ -2,25 +2,40 @@
 # This file contains regex patterns for legitimate content that should not be flagged as secrets
 
 # SPIFFE URIs in test files and documentation (example.org domain)
-spiffe://example\.org/\*
+spiffe://example\.org/.*
 spiffe://example\.org/[^/]*
 
 # Test SPIFFE patterns with wildcards (for pattern matching tests)
-spiffe://test\.com/\*
-spiffe://other\.com/service
+spiffe://test\.com/.*
+spiffe://test\.local/.*
+spiffe://other\.com/.*
+spiffe://localhost/.*
 
 # Production SPIFFE patterns in documentation (these are examples, not real secrets)
-spiffe://prod\.company\.com/\*
-spiffe://company\.com/[^"]*
-spiffe://production\.company\.com/[^"]*
-spiffe://your-company\.com/[^"]*
-spiffe://ecommerce\.com/[^"]*
-spiffe://auth\.prod\.example\.com/[^"]*
-spiffe://prod\.example\.com/[^"]*
-spiffe://example\.com/[^"]*
-spiffe://env\.domain\.com/[^"]*
-spiffe://other\.org/[^"]*
-spiffe://file\.domain\.com/[^"]*
+spiffe://prod\.company\.com/.*
+spiffe://company\.com/.*
+spiffe://production\.company\.com/.*
+spiffe://your-company\.com/.*
+spiffe://your\.domain/.*
+spiffe://your\.production\.domain/.*
+spiffe://ecommerce\.com/.*
+spiffe://auth\.prod\.example\.com/.*
+spiffe://prod\.example\.com/.*
+spiffe://example\.com/.*
+spiffe://env\.domain\.com/.*
+spiffe://other\.org/.*
+spiffe://file\.domain\.com/.*
+
+# Specific patterns that were flagged
+spiffe://production\.company\.com/echo-server
+
+# SPIFFE annotation patterns in Kubernetes manifests
+spiffe-id: spiffe://.*
+
+# SPIRE/SPIFFE infrastructure references (not secrets)
+spiffe\.io/.*
+gcr\.io/spiffe-io/.*
+spire\.spiffe\.io/.*
 
 # Go module checksums in go.sum (these are public checksums, not secrets)
 github\.com/[^/]+/[^/]+.*h1:.*
