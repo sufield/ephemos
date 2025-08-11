@@ -1,10 +1,5 @@
 name: 'Setup Protocol Buffers'
-description: 'Install protobuf compiler and Go protobuf tools'
-inputs:
-  verify-installation:
-    description: 'Whether to verify protobuf tools are properly installed'
-    required: false
-    default: 'false'
+description: 'Install protobuf compiler, Go protobuf tools, and generate protobuf files'
 runs:
   using: 'composite'
   steps:
@@ -15,7 +10,10 @@ runs:
         echo "Installing protobuf compiler for Ubuntu..."
         sudo apt-get update && sudo apt-get install -y protobuf-compiler
         echo "Verifying protoc installation..."
-        which protoc && protoc --version
+        export PATH="$PATH:/usr/bin"
+        which protoc || (echo "❌ protoc not found" && exit 1)
+        protoc --version || (echo "❌ protoc version check failed" && exit 1)
+        echo "✅ protoc installed at: $(which protoc)"
         
     - name: Install Protocol Buffers compiler (macOS)
       if: runner.os == 'macOS'
@@ -23,6 +21,10 @@ runs:
       run: |
         echo "Installing protobuf compiler for macOS..."
         brew install protobuf
+        echo "Verifying protoc installation..."
+        which protoc || (echo "❌ protoc not found" && exit 1)
+        protoc --version || (echo "❌ protoc version check failed" && exit 1)
+        echo "✅ protoc installed at: $(which protoc)"
         
     - name: Install Protocol Buffers compiler (Windows)
       if: runner.os == 'Windows'
@@ -30,6 +32,10 @@ runs:
       run: |
         echo "Installing protobuf compiler for Windows..."
         choco install protoc
+        echo "Verifying protoc installation..."
+        which protoc || (echo "❌ protoc not found" && exit 1)
+        protoc --version || (echo "❌ protoc version check failed" && exit 1)
+        echo "✅ protoc installed at: $(which protoc)"
         
     - name: Install Go protobuf tools
       shell: bash
@@ -37,24 +43,50 @@ runs:
         echo "Installing Go protobuf tools..."
         go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
         go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-        
-    - name: Verify installation
-      if: ${{ inputs.verify-installation == 'true' }}
-      shell: bash
-      run: |
-        echo "Verifying protoc installation..."
-        which protoc || (echo "❌ protoc not found after installation" && exit 1)
-        protoc --version || (echo "❌ protoc version check failed" && exit 1)
-        echo "✅ protoc installed successfully"
-        
-        echo "Verifying Go protobuf tools..."
+        export PATH="$PATH:$(go env GOPATH)/bin"
+        echo "Go tools installed at: $(go env GOPATH)/bin"
         which protoc-gen-go || (echo "❌ protoc-gen-go not found" && exit 1)
         which protoc-gen-go-grpc || (echo "❌ protoc-gen-go-grpc not found" && exit 1)
-        echo "✅ Go protobuf tools installed successfully"
+        
+    - name: Verify all tools are available
+      shell: bash
+      run: |
+        echo "Final verification of all protobuf tools..."
+        export PATH="$PATH:$(go env GOPATH)/bin:/usr/bin:/usr/local/bin"
+        echo "PATH is: $PATH"
+        
+        echo "Checking protoc..."
+        which protoc || (echo "❌ protoc not found in PATH" && exit 1)
+        protoc --version || (echo "❌ protoc version check failed" && exit 1)
+        
+        echo "Checking protoc-gen-go..."
+        which protoc-gen-go || (echo "❌ protoc-gen-go not found" && exit 1)
+        
+        echo "Checking protoc-gen-go-grpc..."
+        which protoc-gen-go-grpc || (echo "❌ protoc-gen-go-grpc not found" && exit 1)
+        
+        echo "✅ All protobuf tools verified successfully"
         
     - name: Generate protobuf code
       shell: bash
       run: |
-        echo "Generating protobuf code..."
-        make proto
+        echo "Generating protobuf code (REQUIRED for CI/CD)..."
+        export PATH="$PATH:$(go env GOPATH)/bin:/usr/bin:/usr/local/bin"
+        
+        # Force regeneration of protobuf files
+        echo "Removing any existing protobuf files..."
+        rm -f examples/proto/*.pb.go
+        
+        echo "Generating fresh protobuf files..."
+        make proto || (echo "❌ Failed to generate protobuf files" && exit 1)
+        
+        # Verify files were generated
+        if [ ! -f "examples/proto/echo.pb.go" ] || [ ! -f "examples/proto/echo_grpc.pb.go" ]; then
+          echo "❌ Protobuf files were not generated successfully"
+          ls -la examples/proto/
+          exit 1
+        fi
+        
         echo "✅ Protobuf code generated successfully"
+        echo "Generated files:"
+        ls -la examples/proto/*.pb.go

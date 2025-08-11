@@ -1,5 +1,13 @@
 name: CI/CD Pipeline
 
+# IMPORTANT: All jobs require Protocol Buffers (protoc) to be installed
+# The setup-protobuf action MUST be run in every job that builds or tests code
+# This action will:
+# 1. Install protoc compiler
+# 2. Install Go protobuf generation tools (protoc-gen-go, protoc-gen-go-grpc)
+# 3. Generate all required protobuf files (*.pb.go files)
+# 4. Verify all tools are properly installed
+
 on:
   push:
     branches: [ main, develop ]
@@ -26,10 +34,8 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Setup Protocol Buffers
+    - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
-      with:
-        verify-installation: true
         
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v6
@@ -59,10 +65,8 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Setup Protocol Buffers
+    - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
-      with:
-        verify-installation: true
         
     - name: Setup and run security checks
       run: make ci-setup && make ci-security
@@ -84,10 +88,8 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
         
-    - name: Setup Protocol Buffers
+    - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
-      with:
-        verify-installation: true
       
     - name: Build and verify
       run: |
@@ -118,10 +120,8 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
         
-    - name: Setup Protocol Buffers
+    - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
-      with:
-        verify-installation: true
       
     - name: Run tests and generate coverage
       run: make ci-setup && make ci-test
@@ -148,10 +148,8 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Setup Protocol Buffers
+    - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
-      with:
-        verify-installation: true
         
     - name: Install SPIRE
       run: |
@@ -311,10 +309,8 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Setup Protocol Buffers
+    - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
-      with:
-        verify-installation: true
         
     - name: Setup and run dependency checks
       run: |
@@ -346,10 +342,8 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Setup Protocol Buffers
+    - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
-      with:
-        verify-installation: true
         
     - name: Run benchmarks
       run: |
@@ -377,10 +371,8 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Setup Protocol Buffers
+    - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
-      with:
-        verify-installation: true
         
     - name: Install cross-compilation tools
       run: go install github.com/goreleaser/goreleaser@latest
