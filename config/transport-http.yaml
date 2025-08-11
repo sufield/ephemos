@@ -1,0 +1,20 @@
+# Configuration for HTTP transport demo  
+# This config makes the transport-agnostic server use HTTP/REST
+
+service:
+  name: "transport-demo"
+  domain: "example.org"
+
+spiffe:
+  socketPath: "/tmp/spire-agent/public/api.sock"
+
+transport:
+  type: "http"
+  address: ":8080"
+  tls:
+    enabled: false  # For demo purposes - enable in production
+    useSpiffe: false
+
+# For demo - empty auth lists (not recommended for production)
+authorizedClients: []
+trustedServers: []
