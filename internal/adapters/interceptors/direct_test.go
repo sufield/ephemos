@@ -550,8 +550,8 @@ func TestStreamInterceptorCreation_Direct(t *testing.T) {
 	identityConfig := DefaultIdentityPropagationConfig(identityProvider)
 	identityInterceptor := NewIdentityPropagationInterceptor(identityConfig)
 
-	metricsConfig := DefaultMetricsConfig("test")
-	metricsInterceptor := NewMetricsInterceptor(metricsConfig)
+	metricsConfig := DefaultAuthMetricsConfig("test")
+	metricsInterceptor := NewAuthMetricsInterceptor(metricsConfig)
 
 	loggingConfig := NewSecureLoggingConfig()
 	loggingInterceptor := NewLoggingInterceptor(loggingConfig)
@@ -609,10 +609,10 @@ func TestConfigDefaults_Direct(t *testing.T) {
 	assert.Empty(t, authConfig.AllowedServices)
 	assert.Empty(t, authConfig.SkipMethods)
 
-	metricsConfig := DefaultMetricsConfig("test-service")
+	metricsConfig := DefaultAuthMetricsConfig("test-service")
 	assert.NotNil(t, metricsConfig)
 	assert.Equal(t, "test-service", metricsConfig.ServiceName)
-	assert.NotNil(t, metricsConfig.MetricsCollector)
+	assert.NotNil(t, metricsConfig.AuthMetricsCollector)
 
 	loggingConfigSecure := NewSecureLoggingConfig()
 	assert.NotNil(t, loggingConfigSecure)
@@ -740,28 +740,7 @@ func TestIdentityPropagationEdgeCases_Direct(t *testing.T) {
 	assert.Contains(t, err.Error(), "depth limit exceeded")
 }
 
-func TestMetricsInterceptorEdgeCases_Direct(t *testing.T) {
-	// Test metrics interceptor with edge cases
-	collector := &mockMetricsCollector{}
-	config := &MetricsConfig{
-		MetricsCollector:     collector,
-		ServiceName:          "test-service",
-		EnablePayloadSize:    true,
-		EnableActiveRequests: true,
-	}
-
-	interceptor := NewMetricsInterceptor(config)
-	assert.NotNil(t, interceptor)
-
-	// Test nil payload size estimation - should return 0
-	assert.Equal(t, 0, estimatePayloadSize(nil))
-
-	// Test string payload size
-	assert.Greater(t, estimatePayloadSize("hello"), 0)
-
-	// Test byte slice payload
-	assert.Greater(t, estimatePayloadSize([]byte("helloworld")), 0)
-}
+// TestMetricsInterceptorEdgeCases_Direct removed - only authentication metrics are relevant
 
 func TestLoggingInterceptorEdgeCases_Direct(t *testing.T) {
 	// Test logging interceptor edge cases
@@ -816,12 +795,12 @@ func TestAdditionalCoverageTests_Direct(t *testing.T) {
 	assert.True(t, identityConfig.PropagateCallChain)
 	assert.Equal(t, 10, identityConfig.MaxCallChainDepth)
 
-	// Test metrics config with nil collector
-	metricsConfig := &MetricsConfig{
-		MetricsCollector: nil,
-		ServiceName:      "test",
+	// Test auth metrics config with nil collector
+	metricsConfig := &AuthMetricsConfig{
+		AuthMetricsCollector: nil,
+		ServiceName:          "test",
 	}
-	metricsInterceptor := NewMetricsInterceptor(metricsConfig)
+	metricsInterceptor := NewAuthMetricsInterceptor(metricsConfig)
 	assert.NotNil(t, metricsInterceptor)
 }
 

@@ -174,47 +174,22 @@ func clientExample() {
 	slog.Info("Received response", "message", resp.Message, "from", resp.From)
 }
 
-// Example of implementing a custom metrics collector
-type CustomMetricsCollector struct {
+// Example of implementing a custom authentication metrics collector
+type CustomAuthMetricsCollector struct {
 	// Add your metrics backend here (Prometheus, StatsD, etc.)
 }
 
-func (c *CustomMetricsCollector) IncRequestsTotal(method, service, code string) {
-	// Implement your metrics collection logic
-	fmt.Printf("REQUEST: %s %s -> %s\n", service, method, code)
-}
-
-func (c *CustomMetricsCollector) ObserveRequestDuration(method, service, code string, duration time.Duration) {
-	// Implement your metrics collection logic
-	fmt.Printf("DURATION: %s %s -> %s: %v\n", service, method, code, duration)
-}
-
-func (c *CustomMetricsCollector) IncActiveRequests(method, service string) {
-	fmt.Printf("ACTIVE+: %s %s\n", service, method)
-}
-
-func (c *CustomMetricsCollector) DecActiveRequests(method, service string) {
-	fmt.Printf("ACTIVE-: %s %s\n", service, method)
-}
-
-func (c *CustomMetricsCollector) IncStreamMessagesTotal(method, service, direction string) {
-	fmt.Printf("STREAM_MSG: %s %s %s\n", service, method, direction)
-}
-
-func (c *CustomMetricsCollector) IncAuthenticationTotal(service, result string) {
+func (c *CustomAuthMetricsCollector) IncAuthenticationTotal(service, result string) {
+	// Implement your authentication metrics collection logic
 	fmt.Printf("AUTH: %s -> %s\n", service, result)
 }
 
-func (c *CustomMetricsCollector) ObservePayloadSize(method, service, direction string, size int) {
-	fmt.Printf("PAYLOAD_SIZE: %s %s %s -> %d bytes\n", service, method, direction, size)
-}
-
-// customMetricsExample demonstrates using a custom metrics collector.
-func customMetricsExample() *ephemos.InterceptorConfig {
+// customMetricsExample demonstrates using a custom authentication metrics collector.
+func customAuthMetricsExample() *ephemos.InterceptorConfig {
 	config := ephemos.NewDefaultInterceptorConfig()
 
-	// Use custom metrics collector
-	config.MetricsConfig.MetricsCollector = &CustomMetricsCollector{}
+	// Use custom authentication metrics collector
+	config.AuthMetricsConfig.AuthMetricsCollector = &CustomAuthMetricsCollector{}
 
 	return config
 }
