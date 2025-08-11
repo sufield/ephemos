@@ -3,7 +3,7 @@
 [![CI/CD Pipeline](https://github.com/sufield/ephemos/actions/workflows/ci.yml/badge.svg)](https://github.com/sufield/ephemos/actions/workflows/ci.yml)
 [![Security & Dependencies](https://github.com/sufield/ephemos/actions/workflows/security.yml/badge.svg)](https://github.com/sufield/ephemos/actions/workflows/security.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sufield/ephemos)](https://goreportcard.com/report/github.com/sufield/ephemos)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/your-username/ephemos/badge)](https://securityscorecards.dev/viewer/?uri=github.com/your-username/ephemos)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sufield/ephemos/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sufield/ephemos)
 
 Ephemos is a Go library that provides **transport-agnostic services** with identity-based authentication using SPIFFE/SPIRE. Write your services once with plain Go types, and run them over gRPC, HTTP, or any future transport without code changes.
 
