@@ -52,7 +52,7 @@ authorized_clients:
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 		defer cancel()
 
 		_, err := loadAndValidateConfig(ctx, configFile)
@@ -111,7 +111,7 @@ spiffe:
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 		defer cancel()
 
 		_, err := loadAndValidateConfig(ctx, configFile)
@@ -171,7 +171,7 @@ authorized_clients:
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 		defer cancel()
 
 		config, err := loadAndValidateConfig(ctx, configFile)
@@ -229,7 +229,7 @@ trusted_servers:
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 		defer cancel()
 
 		config, err := loadAndValidateConfig(ctx, configFile)
@@ -281,9 +281,9 @@ spiffe:
 			if timeout > time.Hour {
 				timeout = time.Hour // Cap at reasonable max
 			}
-			ctx, cancel = context.WithTimeout(context.Background(), timeout)
+			ctx, cancel = context.WithTimeout(t.Context(), timeout)
 		} else {
-			ctx, cancel = context.WithCancel(context.Background())
+			ctx, cancel = context.WithCancel(t.Context())
 		}
 		defer cancel()
 

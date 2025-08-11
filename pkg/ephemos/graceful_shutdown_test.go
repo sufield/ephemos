@@ -88,7 +88,7 @@ func TestGracefulShutdownManager_BasicShutdown(t *testing.T) {
 	manager.RegisterListener(listener)
 
 	// Perform shutdown
-	ctx := context.Background()
+	ctx := t.Context()
 	err := manager.Shutdown(ctx)
 
 	if err != nil {
@@ -126,7 +126,7 @@ func TestGracefulShutdownManager_ShutdownWithErrors(t *testing.T) {
 	manager.RegisterListener(listener)
 
 	// Perform shutdown
-	ctx := context.Background()
+	ctx := t.Context()
 	err := manager.Shutdown(ctx)
 
 	// Should return an error containing all failures
@@ -160,7 +160,7 @@ func TestGracefulShutdownManager_ShutdownWithTimeout(t *testing.T) {
 	manager.RegisterServer(server)
 
 	// Perform shutdown
-	ctx := context.Background()
+	ctx := t.Context()
 
 	start := time.Now()
 	err := manager.Shutdown(ctx)
@@ -205,7 +205,7 @@ func TestGracefulShutdownManager_CustomCleanupFuncs(t *testing.T) {
 	})
 
 	// Perform shutdown
-	ctx := context.Background()
+	ctx := t.Context()
 	err := manager.Shutdown(ctx)
 
 	// Should have error from cleanup2
@@ -250,7 +250,7 @@ func TestGracefulShutdownManager_Callbacks(t *testing.T) {
 	manager.RegisterServer(server)
 
 	// Perform shutdown
-	ctx := context.Background()
+	ctx := t.Context()
 	err := manager.Shutdown(ctx)
 
 	// Verify callbacks were called
@@ -285,7 +285,7 @@ func TestGracefulShutdownManager_MultipleShutdownCalls(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			ctx := context.Background()
+			ctx := t.Context()
 			errors[idx] = manager.Shutdown(ctx)
 		}(i)
 	}
@@ -315,7 +315,7 @@ func TestGracefulShutdownManager_SPIFFEProviderCleanup(t *testing.T) {
 	manager.RegisterSPIFFEProvider(provider)
 
 	// Perform shutdown
-	ctx := context.Background()
+	ctx := t.Context()
 	err := manager.Shutdown(ctx)
 
 	if err != nil {
@@ -359,7 +359,7 @@ func BenchmarkShutdown_NoResources(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		config := DefaultShutdownConfig()
 		manager := NewGracefulShutdownManager(config)
-		ctx := context.Background()
+		ctx := b.Context()
 		_ = manager.Shutdown(ctx)
 	}
 }
@@ -380,7 +380,7 @@ func BenchmarkShutdown_WithResources(b *testing.B) {
 			manager.RegisterListener(&mockListener{})
 		}
 
-		ctx := context.Background()
+		ctx := b.Context()
 		_ = manager.Shutdown(ctx)
 	}
 }
