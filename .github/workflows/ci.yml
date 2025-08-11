@@ -107,8 +107,7 @@ jobs:
         
     - name: Build and verify
       run: |
-        go clean -cache
-        ./scripts/ci-build-examples.sh
+        ./scripts/debug-ci-build.sh
         ./bin/ephemos --help
         # Platform-specific binary testing
         if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
