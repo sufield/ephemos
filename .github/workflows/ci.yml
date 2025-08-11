@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
     - name: Setup Go Environment
       uses: ./.github/actions/setup-go
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
     - name: Setup Go Environment
       uses: ./.github/actions/setup-go
@@ -81,7 +81,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
     - name: Setup Go Environment
       uses: ./.github/actions/setup-go
@@ -131,7 +131,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
     - name: Setup Go Environment
       uses: ./.github/actions/setup-go
@@ -159,7 +159,7 @@ jobs:
     if: github.event_name != 'schedule'
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
     - name: Setup Go Environment
       uses: ./.github/actions/setup-go
@@ -322,7 +322,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
     - name: Setup Go Environment
       uses: ./.github/actions/setup-go
@@ -355,7 +355,7 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
     - name: Setup Go Environment
       uses: ./.github/actions/setup-go
@@ -383,7 +383,7 @@ jobs:
     needs: [lint, security, build, test]
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       with:
         fetch-depth: 0
         
