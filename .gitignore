@@ -40,7 +40,16 @@ echo-client
 # Test binaries with any name pattern
 cli.test
 interceptors.test
+ports.test
 *.test
+
+# Go build artifacts and executables (any name without extension in project root)
+/config-patterns
+/config-validator
+/transport-agnostic
+examples/*/transport-agnostic
+examples/*/config-patterns
+examples/*/config-validator
 
 # Benchmark files
 benchmark.txt
