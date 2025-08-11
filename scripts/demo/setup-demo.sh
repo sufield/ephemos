@@ -5,7 +5,7 @@ echo "Setting up Ephemos demo..."
 # Build the CLI first
 echo "Building Ephemos CLI..."
 cd ../..
-go build -o ephemos cmd/ephemos-cli/main.go
+go build -o ephemos ./cmd/ephemos-cli
 
 # Check for existing entries instead of deleting them
 echo "Checking for existing SPIRE entries..."
