@@ -59,6 +59,12 @@ lint:
 	@./scripts/build/lint.sh
 	@echo "Linting completed!"
 
+# Format code only (no build validation)
+fmt-only:
+	@echo "Formatting code..."
+	@./scripts/build/lint-format-only.sh
+	@echo "Formatting completed!"
+
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."

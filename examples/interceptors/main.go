@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"time"
 
 	"google.golang.org/grpc"
 
@@ -189,7 +188,7 @@ func customAuthMetricsExample() *ephemos.InterceptorConfig {
 	config := ephemos.NewDefaultInterceptorConfig()
 
 	// Use custom authentication metrics collector
-	config.AuthMetricsConfig.AuthMetricsCollector = &CustomAuthMetricsCollector{}
+	config.MetricsConfig.AuthMetricsCollector = &CustomAuthMetricsCollector{}
 
 	return config
 }

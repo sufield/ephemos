@@ -284,10 +284,10 @@ func createTestAuthInterceptor(tc *integrationTestCase) grpc.UnaryServerIntercep
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		// Simulate auth behavior based on test case expectation
 		if tc.expectAuth {
-			// Inject test identity into context for authenticated scenarios  
+			// Inject test identity into context for authenticated scenarios
 			identity := &AuthenticatedIdentity{
 				SPIFFEID:    "spiffe://example.org/test-service",
-				ServiceName: "test-service", 
+				ServiceName: "test-service",
 				TrustDomain: "example.org",
 			}
 			authenticatedCtx := context.WithValue(ctx, IdentityContextKey{}, identity)
@@ -369,4 +369,3 @@ func validateIntegrationResults(t *testing.T, tc *integrationTestCase, resp *Tes
 		t.Logf("Auth test passed - got response without auth error")
 	}
 }
-
