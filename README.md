@@ -40,7 +40,6 @@ import (
 	"context"
 	"log"
 	
-	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/sufield/ephemos/pkg/ephemos"
 )
 
@@ -71,7 +70,7 @@ func main() {
 
 	// Mount your service - works with gRPC, HTTP, or any transport
 	echoService := &EchoService{name: "my-service"}
-	if err := ephemos.Mount[ports.EchoService](server, echoService); err != nil {
+	if err := ephemos.Mount[ephemos.EchoService](server, echoService); err != nil {
 		log.Fatal(err)
 	}
 
