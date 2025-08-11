@@ -138,7 +138,7 @@ func FuzzYAMLParsing(f *testing.F) {
 	})
 }
 
-// FuzzConfigValidation tests configuration validation with random config values
+// FuzzConfigValidation tests configuration validation with random config values.
 func FuzzConfigValidation(f *testing.F) {
 	// Seed with valid and boundary case configurations
 	validConfigs := []string{
@@ -193,7 +193,7 @@ transport:
 	})
 }
 
-// FuzzEnhanceValidationMessage tests error message generation with random validation errors
+// FuzzEnhanceValidationMessage tests error message generation with random validation errors.
 func FuzzEnhanceValidationMessage(f *testing.F) {
 	// Seed with known field names and values
 	f.Add("service.name", "")
@@ -231,7 +231,7 @@ func FuzzEnhanceValidationMessage(f *testing.F) {
 	})
 }
 
-// FuzzIsConfigurationError tests error type checking with random error values
+// FuzzIsConfigurationError tests error type checking with random error values.
 func FuzzIsConfigurationError(f *testing.F) {
 	f.Add("config error")
 	f.Add("")
@@ -259,7 +259,7 @@ func FuzzIsConfigurationError(f *testing.F) {
 	})
 }
 
-// Benchmark fuzzing to ensure performance doesn't degrade
+// Benchmark fuzzing to ensure performance doesn't degrade.
 func BenchmarkConfigPathResolution(b *testing.B) {
 	paths := []string{
 		"",
