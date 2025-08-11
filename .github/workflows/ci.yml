@@ -91,10 +91,24 @@ jobs:
     - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
       
+    - name: Diagnose build environment
+      run: |
+        echo "🔍 Diagnosing build environment..."
+        pwd
+        ls -la
+        echo "Checking pkg/ephemos directory:"
+        ls -la pkg/ephemos/ || echo "pkg/ephemos directory not found"
+        echo "Checking for server.go:"
+        find . -name "server.go" -type f || echo "No server.go files found"
+        echo "Checking ephemos.go for function definitions:"
+        grep -n "TransportServer\|newTransportServer\|mount" pkg/ephemos/ephemos.go || echo "Functions not found in ephemos.go"
+        echo "Checking server.go for function definitions:"
+        grep -n "TransportServer\|newTransportServer\|mount" pkg/ephemos/server.go || echo "Functions not found in server.go"
+        
     - name: Build and verify
       run: |
         go clean -cache
-        make ci-build
+        ./scripts/ci-build-examples.sh
         ./bin/ephemos --help
         # Platform-specific binary testing
         if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
