@@ -169,16 +169,22 @@ func realWorldExample(ctx context.Context) (*ephemos.EnhancedServer, error) {
 		return nil, fmt.Errorf("failed to load production config: %w", err)
 	}
 
-	// Create server with enhanced configuration
-	server, err := ephemos.NewEnhancedIdentityServer(ctx, &ephemos.ServerOptions{
-		ConfigPath: "", // We already have the config
-		// Alternative: pass config directly if API supports it
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create server: %w", err)
+	// In a real implementation, we would pass the config to the server
+	// For now, we'll simulate server creation (config validation already passed)
+	if config != nil {
+		// Create server with enhanced configuration
+		server, err := ephemos.NewEnhancedIdentityServer(ctx, &ephemos.ServerOptions{
+			ConfigPath: "", // We already have the config
+			// Alternative: pass config directly if API supports it
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create server: %w", err)
+		}
+
+		return server, nil
 	}
 
-	return server, nil
+	return nil, fmt.Errorf("config is nil")
 }
 
 // Example for testing environments
@@ -194,7 +200,10 @@ func testingExample(ctx context.Context) (*ephemos.EnhancedServer, error) {
 	}
 
 	// In a real implementation, we'd need to pass this config to the server
-	_ = config // For now, just validate it loads correctly
+	if config != nil {
+		// Server would use this config
+		return nil, nil
+	}
 
 	return nil, nil
 }
