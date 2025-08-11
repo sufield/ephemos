@@ -231,7 +231,7 @@ type ConfigurationProvider interface {
 	GetDefaultConfiguration(ctx context.Context) *Configuration
 }
 
-// Environment variable names for configuration
+// Environment variable names for configuration.
 const (
 	EnvServiceName       = "EPHEMOS_SERVICE_NAME"
 	EnvTrustDomain       = "EPHEMOS_TRUST_DOMAIN"
@@ -354,35 +354,24 @@ func parseCommaSeparatedList(value string) []string {
 func validateProductionSecurity(config *Configuration) error {
 	var errors []string
 
-	// Check for demo/development values that should not be used in production
-	if strings.Contains(config.Service.Domain, "example.org") {
-		errors = append(errors, "trust domain contains 'example.org' - not suitable for production")
+	// Check domain security
+	if err := validateProductionDomain(config.Service.Domain); err != nil {
+		errors = append(errors, err.Error())
 	}
 
-	if strings.Contains(config.Service.Domain, "localhost") {
-		errors = append(errors, "trust domain contains 'localhost' - not suitable for production")
-	}
-
-	if strings.Contains(config.Service.Domain, "example.com") {
-		errors = append(errors, "trust domain contains 'example.com' - not suitable for production")
-	}
-
-	// Validate service name doesn't contain demo values
-	if strings.Contains(config.Service.Name, "example") || strings.Contains(config.Service.Name, "demo") {
-		errors = append(errors, "service name contains demo/example values - not suitable for production")
+	// Check service name
+	if err := validateProductionServiceName(config.Service.Name); err != nil {
+		errors = append(errors, err.Error())
 	}
 
 	// Check SPIFFE socket path security
-	socketPath := config.SPIFFE.SocketPath
-	if !strings.HasPrefix(socketPath, "/run/") && !strings.HasPrefix(socketPath, "/var/run/") && !strings.HasPrefix(socketPath, "/tmp/") {
-		errors = append(errors, "SPIFFE socket should be in a secure directory (/run, /var/run, or /tmp)")
+	if err := validateSocketPath(config.SPIFFE.SocketPath); err != nil {
+		errors = append(errors, err.Error())
 	}
 
-	// Warn about overly permissive authorization (but don't fail)
-	for _, client := range config.AuthorizedClients {
-		if strings.Contains(client, "*") {
-			errors = append(errors, fmt.Sprintf("authorized client contains wildcard: %s - consider more specific authorization", client))
-		}
+	// Check authorization settings
+	if warnings := checkAuthorizationSettings(config.AuthorizedClients); len(warnings) > 0 {
+		errors = append(errors, warnings...)
 	}
 
 	// Check for debug environment variables that shouldn't be enabled in production
@@ -395,6 +384,47 @@ func validateProductionSecurity(config *Configuration) error {
 	}
 
 	return nil
+}
+
+// validateProductionDomain checks if the domain is suitable for production.
+func validateProductionDomain(domain string) error {
+	demoPatterns := []string{"example.org", "localhost", "example.com"}
+	for _, pattern := range demoPatterns {
+		if strings.Contains(domain, pattern) {
+			return fmt.Errorf("trust domain contains '%s' - not suitable for production", pattern)
+		}
+	}
+	return nil
+}
+
+// validateProductionServiceName checks if the service name is suitable for production.
+func validateProductionServiceName(name string) error {
+	if strings.Contains(name, "example") || strings.Contains(name, "demo") {
+		return fmt.Errorf("service name contains demo/example values - not suitable for production")
+	}
+	return nil
+}
+
+// validateSocketPath checks if the SPIFFE socket path is in a secure location.
+func validateSocketPath(socketPath string) error {
+	secureDirectories := []string{"/run/", "/var/run/", "/tmp/"}
+	for _, dir := range secureDirectories {
+		if strings.HasPrefix(socketPath, dir) {
+			return nil
+		}
+	}
+	return fmt.Errorf("SPIFFE socket should be in a secure directory (/run, /var/run, or /tmp)")
+}
+
+// checkAuthorizationSettings checks for overly permissive authorization settings.
+func checkAuthorizationSettings(authorizedClients []string) []string {
+	var warnings []string
+	for _, client := range authorizedClients {
+		if strings.Contains(client, "*") {
+			warnings = append(warnings, fmt.Sprintf("authorized client contains wildcard: %s - consider more specific authorization", client))
+		}
+	}
+	return warnings
 }
 
 // IsProductionReady checks if the configuration is suitable for production use.

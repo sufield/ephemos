@@ -267,7 +267,7 @@ func setupIntegrationServer(t *testing.T, tc *integrationTestCase) (*grpc.Server
 
 	// Setup client
 	clientOpts := buildIntegrationClientOptions(tc, lis)
-	conn, err := grpc.Dial("bufnet", clientOpts...)
+	conn, err := grpc.NewClient("passthrough:///bufnet", clientOpts...)
 	require.NoError(t, err)
 	client := NewTestServiceClient(conn)
 
