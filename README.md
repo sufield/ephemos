@@ -231,6 +231,19 @@ make clean
    make fmt                # Format code
    ```
 
+## Documentation
+
+The project documentation is organized in the `docs/` directory:
+
+- **[Contributing](docs/contributing/)** - Guidelines for contributing to the project
+- **[Demo](docs/demo/)** - Interactive demos and examples
+- **[Deployment](docs/deployment/)** - Production deployment guides
+- **[Development](docs/development/)** - Development guides and API documentation
+- **[Security](docs/security/)** - Security architecture and threat models
+- **[FAQ](docs/FAQ.md)** - Frequently asked questions
+
+For a complete documentation index, see [docs/README.md](docs/README.md).
+
 ## Requirements
 
 ### System Requirements
