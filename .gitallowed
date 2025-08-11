@@ -11,6 +11,16 @@ spiffe://other\.com/service
 
 # Production SPIFFE patterns in documentation (these are examples, not real secrets)
 spiffe://prod\.company\.com/\*
+spiffe://company\.com/[^"]*
+spiffe://production\.company\.com/[^"]*
+spiffe://your-company\.com/[^"]*
+spiffe://ecommerce\.com/[^"]*
+spiffe://auth\.prod\.example\.com/[^"]*
+spiffe://prod\.example\.com/[^"]*
+spiffe://example\.com/[^"]*
+spiffe://env\.domain\.com/[^"]*
+spiffe://other\.org/[^"]*
+spiffe://file\.domain\.com/[^"]*
 
 # Go module checksums in go.sum (these are public checksums, not secrets)
 github\.com/[^/]+/[^/]+.*h1:.*
@@ -18,6 +28,7 @@ github\.com/[^/]+/[^/]+.*go\.mod.*
 
 # Git configuration with redacted tokens (marked with ***)
 AUTHORIZATION:.*\*\*\*
+extraheader.*AUTHORIZATION.*\*\*\*
 
 # Test configuration patterns
 AuthorizedClients.*spiffe://

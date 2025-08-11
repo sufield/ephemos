@@ -14,6 +14,12 @@ echo ""
 # Change to project directory safely
 cd "$PROJECT_ROOT"
 
+# Fix .secrets file permissions if it exists (Git doesn't preserve exact permissions)
+if [[ -f .secrets ]]; then
+    chmod 600 .secrets
+    echo "Fixed .secrets file permissions to 600"
+fi
+
 # Exit code tracking
 security_issues=0
 
