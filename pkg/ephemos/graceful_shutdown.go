@@ -13,6 +13,15 @@ import (
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
+const (
+	// DefaultGracePeriod is the default maximum time to wait for graceful shutdown.
+	DefaultGracePeriod = 30 * time.Second
+	// DefaultDrainTimeout is the default time to wait for existing requests to complete.
+	DefaultDrainTimeout = 20 * time.Second
+	// DefaultForceTimeout is the default time after which forceful shutdown occurs.
+	DefaultForceTimeout = 45 * time.Second
+)
+
 // ShutdownConfig configures graceful shutdown behavior.
 type ShutdownConfig struct {
 	// GracePeriod is the maximum time to wait for graceful shutdown.
@@ -37,9 +46,9 @@ type ShutdownConfig struct {
 // DefaultShutdownConfig returns sensible shutdown defaults.
 func DefaultShutdownConfig() *ShutdownConfig {
 	return &ShutdownConfig{
-		GracePeriod:  30 * time.Second,
-		DrainTimeout: 20 * time.Second,
-		ForceTimeout: 45 * time.Second,
+		GracePeriod:  DefaultGracePeriod,
+		DrainTimeout: DefaultDrainTimeout,
+		ForceTimeout: DefaultForceTimeout,
 	}
 }
 
@@ -80,7 +89,7 @@ func NewGracefulShutdownManager(config *ShutdownConfig) *GracefulShutdownManager
 func (m *GracefulShutdownManager) RegisterServer(server ShutdownableServer) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if server != nil && !m.isShuttingDown {
 		m.servers = append(m.servers, server)
 	}
@@ -90,7 +99,7 @@ func (m *GracefulShutdownManager) RegisterServer(server ShutdownableServer) {
 func (m *GracefulShutdownManager) RegisterSPIFFEProvider(provider *spiffe.Provider) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if provider != nil && !m.isShuttingDown {
 		m.spiffeProviders = append(m.spiffeProviders, provider)
 	}
@@ -100,7 +109,7 @@ func (m *GracefulShutdownManager) RegisterSPIFFEProvider(provider *spiffe.Provid
 func (m *GracefulShutdownManager) RegisterClient(client ports.Client) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if client != nil && !m.isShuttingDown {
 		m.clients = append(m.clients, client)
 	}
@@ -110,7 +119,7 @@ func (m *GracefulShutdownManager) RegisterClient(client ports.Client) {
 func (m *GracefulShutdownManager) RegisterListener(listener ports.Listener) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if listener != nil && !m.isShuttingDown {
 		m.listeners = append(m.listeners, listener)
 	}
@@ -120,7 +129,7 @@ func (m *GracefulShutdownManager) RegisterListener(listener ports.Listener) {
 func (m *GracefulShutdownManager) RegisterCleanupFunc(fn func() error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if fn != nil && !m.isShuttingDown {
 		m.cleanupFuncs = append(m.cleanupFuncs, fn)
 	}
@@ -129,36 +138,36 @@ func (m *GracefulShutdownManager) RegisterCleanupFunc(fn func() error) {
 // Shutdown performs graceful shutdown of all registered resources.
 func (m *GracefulShutdownManager) Shutdown(ctx context.Context) error {
 	var finalErr error
-	
+
 	m.shutdownOnce.Do(func() {
 		m.mu.Lock()
 		m.isShuttingDown = true
 		m.mu.Unlock()
-		
+
 		// Call shutdown start callback
 		if m.config.OnShutdownStart != nil {
 			m.config.OnShutdownStart()
 		}
-		
+
 		// Create contexts with timeouts
 		graceCtx, graceCancel := context.WithTimeout(ctx, m.config.GracePeriod)
 		defer graceCancel()
-		
+
 		drainCtx, drainCancel := context.WithTimeout(ctx, m.config.DrainTimeout)
 		defer drainCancel()
-		
+
 		forceCtx, forceCancel := context.WithTimeout(ctx, m.config.ForceTimeout)
 		defer forceCancel()
-		
+
 		// Perform shutdown in phases
 		finalErr = m.performShutdown(graceCtx, drainCtx, forceCtx)
-		
+
 		// Call shutdown complete callback
 		if m.config.OnShutdownComplete != nil {
 			m.config.OnShutdownComplete(finalErr)
 		}
 	})
-	
+
 	return finalErr
 }
 
@@ -166,18 +175,18 @@ func (m *GracefulShutdownManager) performShutdown(graceCtx, drainCtx, forceCtx c
 	var wg sync.WaitGroup
 	var errMutex sync.Mutex
 	var collectedErrors []error
-	
+
 	// Helper to safely add errors
 	addError := func(err error) {
 		errMutex.Lock()
 		collectedErrors = append(collectedErrors, err)
 		errMutex.Unlock()
 	}
-	
+
 	slog.Info("Starting graceful shutdown",
 		"grace_period", m.config.GracePeriod,
 		"drain_timeout", m.config.DrainTimeout)
-	
+
 	// Phase 1: Stop accepting new connections (stop servers gracefully)
 	slog.Info("Phase 1: Stopping servers gracefully")
 	for _, server := range m.servers {
@@ -189,7 +198,7 @@ func (m *GracefulShutdownManager) performShutdown(graceCtx, drainCtx, forceCtx c
 			}
 		}(server)
 	}
-	
+
 	// Phase 2: Close listeners (prevent new connections)
 	slog.Info("Phase 2: Closing listeners")
 	for _, listener := range m.listeners {
@@ -201,21 +210,21 @@ func (m *GracefulShutdownManager) performShutdown(graceCtx, drainCtx, forceCtx c
 			}
 		}(listener)
 	}
-	
+
 	// Wait for Phase 1 & 2 with drain timeout
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		slog.Info("Servers and listeners stopped successfully")
 	case <-drainCtx.Done():
 		slog.Warn("Drain timeout exceeded, continuing shutdown")
 	}
-	
+
 	// Phase 3: Close clients and connection pools
 	slog.Info("Phase 3: Closing clients and connections")
 	var clientWg sync.WaitGroup
@@ -229,7 +238,7 @@ func (m *GracefulShutdownManager) performShutdown(graceCtx, drainCtx, forceCtx c
 		}(client)
 	}
 	clientWg.Wait()
-	
+
 	// Phase 4: Close SPIFFE providers (stop SVID watchers)
 	slog.Info("Phase 4: Closing SPIFFE providers and SVID watchers")
 	var spiffeWg sync.WaitGroup
@@ -242,14 +251,14 @@ func (m *GracefulShutdownManager) performShutdown(graceCtx, drainCtx, forceCtx c
 			}
 		}(provider)
 	}
-	
+
 	// Wait for SPIFFE cleanup
 	spiffeDone := make(chan struct{})
 	go func() {
 		spiffeWg.Wait()
 		close(spiffeDone)
 	}()
-	
+
 	select {
 	case <-spiffeDone:
 		slog.Info("SPIFFE providers closed successfully")
@@ -257,7 +266,7 @@ func (m *GracefulShutdownManager) performShutdown(graceCtx, drainCtx, forceCtx c
 		slog.Error("Force timeout exceeded during SPIFFE cleanup")
 		addError(fmt.Errorf("force timeout during SPIFFE cleanup"))
 	}
-	
+
 	// Phase 5: Run custom cleanup functions
 	slog.Info("Phase 5: Running cleanup functions")
 	for _, fn := range m.cleanupFuncs {
@@ -265,30 +274,30 @@ func (m *GracefulShutdownManager) performShutdown(graceCtx, drainCtx, forceCtx c
 			addError(fmt.Errorf("cleanup function error: %w", err))
 		}
 	}
-	
+
 	// Return collected errors
 	errMutex.Lock()
 	defer errMutex.Unlock()
-	
+
 	for _, err := range collectedErrors {
 		slog.Error("Shutdown error", "error", err)
 	}
-	
+
 	if len(collectedErrors) > 0 {
 		return fmt.Errorf("shutdown completed with %d errors: %v", len(collectedErrors), collectedErrors)
 	}
-	
+
 	slog.Info("Graceful shutdown completed successfully")
 	return nil
 }
 
 func (m *GracefulShutdownManager) stopServerWithTimeout(ctx context.Context, server ShutdownableServer) error {
 	done := make(chan error, 1)
-	
+
 	go func() {
 		done <- server.Close()
 	}()
-	
+
 	select {
 	case err := <-done:
 		return err
@@ -299,12 +308,12 @@ func (m *GracefulShutdownManager) stopServerWithTimeout(ctx context.Context, ser
 
 func (m *GracefulShutdownManager) closeSPIFFEProviderWithTimeout(ctx context.Context, provider *spiffe.Provider) error {
 	done := make(chan error, 1)
-	
+
 	go func() {
 		// Close the provider which will close the X509Source and stop SVID watchers
 		done <- provider.Close()
 	}()
-	
+
 	select {
 	case err := <-done:
 		return err
@@ -327,19 +336,19 @@ func NewExtendedIdentityServer(ctx context.Context, configPath string, shutdownC
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity server: %w", err)
 	}
-	
+
 	// Create shutdown manager
 	manager := NewGracefulShutdownManager(shutdownConfig)
-	
+
 	// Create extended server
 	extServer := &ExtendedIdentityServer{
 		IdentityServer:  baseServer,
 		shutdownManager: manager,
 	}
-	
+
 	// Register the server for shutdown
 	manager.RegisterServer(baseServer)
-	
+
 	return extServer, nil
 }
 
