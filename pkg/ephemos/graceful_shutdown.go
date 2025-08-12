@@ -171,23 +171,7 @@ func (m *GracefulShutdownManager) Shutdown(ctx context.Context) error {
 	return finalErr
 }
 
-func (m *GracefulShutdownManager) performShutdown(graceCtx, drainCtx, forceCtx context.Context) error {
-	var wg sync.WaitGroup
-	var errMutex sync.Mutex
-	var collectedErrors []error
-
-	// Helper to safely add errors
-	addError := func(err error) {
-		errMutex.Lock()
-		collectedErrors = append(collectedErrors, err)
-		errMutex.Unlock()
-	}
-
-	slog.Info("Starting graceful shutdown",
-		"grace_period", m.config.GracePeriod,
-		"drain_timeout", m.config.DrainTimeout)
-
-	// Phase 1: Stop accepting new connections (stop servers gracefully)
+func (m *GracefulShutdownManager) shutdownServers(graceCtx context.Context, wg *sync.WaitGroup, addError func(error)) {
 	slog.Info("Phase 1: Stopping servers gracefully")
 	for _, server := range m.servers {
 		wg.Add(1)
@@ -198,8 +182,9 @@ func (m *GracefulShutdownManager) performShutdown(graceCtx, drainCtx, forceCtx c
 			}
 		}(server)
 	}
+}
 
-	// Phase 2: Close listeners (prevent new connections)
+func (m *GracefulShutdownManager) shutdownListeners(wg *sync.WaitGroup, addError func(error)) {
 	slog.Info("Phase 2: Closing listeners")
 	for _, listener := range m.listeners {
 		wg.Add(1)
@@ -210,22 +195,25 @@ func (m *GracefulShutdownManager) performShutdown(graceCtx, drainCtx, forceCtx c
 			}
 		}(listener)
 	}
+}
 
-	// Wait for Phase 1 & 2 with drain timeout
+func (m *GracefulShutdownManager) waitForShutdown(wg *sync.WaitGroup, timeoutCtx context.Context, successMsg, warnMsg string) bool {
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-
 	select {
 	case <-done:
-		slog.Info("Servers and listeners stopped successfully")
-	case <-drainCtx.Done():
-		slog.Warn("Drain timeout exceeded, continuing shutdown")
+		slog.Info(successMsg)
+		return true
+	case <-timeoutCtx.Done():
+		slog.Warn(warnMsg)
+		return false
 	}
+}
 
-	// Phase 3: Close clients and connection pools
+func (m *GracefulShutdownManager) shutdownClients(addError func(error)) {
 	slog.Info("Phase 3: Closing clients and connections")
 	var clientWg sync.WaitGroup
 	for _, client := range m.clients {
@@ -238,8 +226,9 @@ func (m *GracefulShutdownManager) performShutdown(graceCtx, drainCtx, forceCtx c
 		}(client)
 	}
 	clientWg.Wait()
+}
 
-	// Phase 4: Close SPIFFE providers (stop SVID watchers)
+func (m *GracefulShutdownManager) shutdownSpiffeProviders(graceCtx, forceCtx context.Context, addError func(error)) {
 	slog.Info("Phase 4: Closing SPIFFE providers and SVID watchers")
 	var spiffeWg sync.WaitGroup
 	for _, provider := range m.spiffeProviders {
@@ -251,42 +240,52 @@ func (m *GracefulShutdownManager) performShutdown(graceCtx, drainCtx, forceCtx c
 			}
 		}(provider)
 	}
-
-	// Wait for SPIFFE cleanup
-	spiffeDone := make(chan struct{})
-	go func() {
-		spiffeWg.Wait()
-		close(spiffeDone)
-	}()
-
-	select {
-	case <-spiffeDone:
-		slog.Info("SPIFFE providers closed successfully")
-	case <-forceCtx.Done():
-		slog.Error("Force timeout exceeded during SPIFFE cleanup")
+	success := m.waitForShutdown(&spiffeWg, forceCtx, "SPIFFE providers closed successfully", "Force timeout exceeded during SPIFFE cleanup")
+	if !success {
 		addError(fmt.Errorf("force timeout during SPIFFE cleanup"))
 	}
+}
 
-	// Phase 5: Run custom cleanup functions
+func (m *GracefulShutdownManager) runCleanupFunctions(addError func(error)) {
 	slog.Info("Phase 5: Running cleanup functions")
 	for _, fn := range m.cleanupFuncs {
 		if err := fn(); err != nil {
 			addError(fmt.Errorf("cleanup function error: %w", err))
 		}
 	}
+}
 
+func (m *GracefulShutdownManager) performShutdown(graceCtx, drainCtx, forceCtx context.Context) error {
+	var wg sync.WaitGroup
+	var errMutex sync.Mutex
+	var collectedErrors []error
+	// Helper to safely add errors
+	addError := func(err error) {
+		if err != nil {
+			errMutex.Lock()
+			collectedErrors = append(collectedErrors, err)
+			errMutex.Unlock()
+		}
+	}
+	slog.Info("Starting graceful shutdown",
+		"grace_period", m.config.GracePeriod,
+		"drain_timeout", m.config.DrainTimeout)
+	m.shutdownServers(graceCtx, &wg, addError)
+	m.shutdownListeners(&wg, addError)
+	// Wait for Phase 1 & 2 with drain timeout (no error added on timeout, per original logic)
+	m.waitForShutdown(&wg, drainCtx, "Servers and listeners stopped successfully", "Drain timeout exceeded, continuing shutdown")
+	m.shutdownClients(addError)
+	m.shutdownSpiffeProviders(graceCtx, forceCtx, addError)
+	m.runCleanupFunctions(addError)
 	// Return collected errors
 	errMutex.Lock()
 	defer errMutex.Unlock()
-
 	for _, err := range collectedErrors {
 		slog.Error("Shutdown error", "error", err)
 	}
-
 	if len(collectedErrors) > 0 {
 		return fmt.Errorf("shutdown completed with %d errors: %v", len(collectedErrors), collectedErrors)
 	}
-
 	slog.Info("Graceful shutdown completed successfully")
 	return nil
 }
