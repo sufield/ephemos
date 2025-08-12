@@ -16,6 +16,40 @@ runs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ inputs.go-version }}
+        check-latest: true
+    
+    - name: Ensure Go stdlib is present (Windows fix)
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        echo "🔧 Fixing Go standard library on Windows..."
+        echo "Current Go version: $(go version)"
+        echo "GOROOT: $(go env GOROOT)"
+        
+        # Check if stdlib sources are missing
+        if [ ! -d "$(go env GOROOT)/src/context" ]; then
+          echo "⚠️ Standard library sources missing, installing full toolchain..."
+          
+          # Install latest toolchain to ensure stdlib sources
+          go install golang.org/toolchain@latest || true
+          
+          # Force install the specific Go version with stdlib
+          go tool toolchain install go${{ inputs.go-version }} || true
+          
+          # Update environment if toolchain was installed
+          if [ -d "$(go env GOTOOLCHAINPATH)/go${{ inputs.go-version }}" ]; then
+            echo "$(go env GOTOOLCHAINPATH)/go${{ inputs.go-version }}/bin" >> $GITHUB_PATH
+            export PATH="$(go env GOTOOLCHAINPATH)/go${{ inputs.go-version }}/bin:$PATH"
+          fi
+          
+          # Verify the fix
+          echo "After fix - Go version: $(go version)"
+          echo "After fix - GOROOT: $(go env GOROOT)"
+          ls "$(go env GOROOT)/src/context" >/dev/null 2>&1 && echo "✅ context package found" || echo "❌ context package still missing"
+          ls "$(go env GOROOT)/src/crypto" >/dev/null 2>&1 && echo "✅ crypto package found" || echo "❌ crypto package still missing"
+        else
+          echo "✅ Standard library sources already present"
+        fi
     
     - name: Clean conflicting cache directories before restore
       shell: bash

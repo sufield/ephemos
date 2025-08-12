@@ -145,8 +145,17 @@ jobs:
           echo "✅ Basic Go compilation works"
           rm -f test test.exe test.go
         else
-          echo "❌ Basic Go compilation failed - checking detailed error..."
-          go build -x test.go 2>&1 | head -20 || true
+          echo "❌ Basic Go compilation failed - this indicates stdlib issues"
+          echo "Detailed error output:"
+          go build -v test.go 2>&1 | head -20 || true
+          echo ""
+          echo "Go environment debug info:"
+          echo "GOROOT: $(go env GOROOT)"
+          echo "GOPATH: $(go env GOPATH)"
+          echo "GOTOOLCHAIN: $(go env GOTOOLCHAIN)"
+          echo "Contents of GOROOT/src:"
+          ls -la "$(go env GOROOT)/src" 2>/dev/null | head -10 || echo "GOROOT/src directory not accessible"
+          rm -f test.go
           exit 1
         fi
         
