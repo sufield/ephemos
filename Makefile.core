@@ -13,7 +13,7 @@ CLIENT_BINARY := echo-client
 all: proto build examples
 
 # Build library and CLI
-build:
+build: check-deps
 	@echo "Building Ephemos CLI..."
 	@mkdir -p bin
 	go build -v -o "bin/$(CLI_BINARY)" ./cmd/ephemos-cli
@@ -35,7 +35,7 @@ examples: proto
 	@echo "Examples built!"
 
 # Run tests
-test:
+test: check-deps
 	@echo "Running tests..."
 	go test -v ./...
 	@echo "Tests completed!"
@@ -95,7 +95,15 @@ setup: install-deps
 
 check-deps:
 	@echo "🔍 Checking development dependencies..."
-	@./scripts/check-deps.sh
+	@./scripts/check-deps.sh || { \
+		echo ""; \
+		echo "🔧 Missing dependencies detected. Installing Go tools automatically..."; \
+		./scripts/ensure-protoc.sh || { \
+			echo ""; \
+			echo "⚠️  Automatic installation failed. Run 'make setup' for full installation."; \
+			exit 1; \
+		}; \
+	}
 
 install-deps:
 	@echo "🔧 Installing development dependencies..."
