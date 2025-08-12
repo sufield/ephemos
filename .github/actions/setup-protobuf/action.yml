@@ -83,12 +83,24 @@ runs:
         export PATH="$PATH:$GOPATH_BIN:/usr/bin:/usr/local/bin"
         
         echo "Current working directory: $(pwd)"
+        echo "Repository root contents:"
+        ls -la . | head -10
+        echo ""
+        echo "Checking examples directory..."
+        ls -la examples/ || echo "Examples directory not found"
+        echo ""
         echo "Checking proto directory..."
         ls -la examples/proto/ || echo "Proto directory not found"
+        echo ""
+        echo "Git status check for proto file:"
+        git ls-files examples/proto/echo.proto || echo "Proto file not tracked in git"
         
         # Check if proto file exists
         if [ ! -f "examples/proto/echo.proto" ]; then
           echo "❌ Source proto file examples/proto/echo.proto not found"
+          echo "Working directory: $(pwd)"
+          echo "Full directory listing:"
+          find . -name "echo.proto" -o -name "*.proto" 2>/dev/null || echo "No proto files found"
           exit 1
         fi
         
