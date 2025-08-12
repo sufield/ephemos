@@ -1,6 +1,6 @@
 # Core Makefile for Ephemos
 # Handles essential build, test, and development tasks
-.PHONY: build proto examples test clean deps fmt lint help
+.PHONY: build proto examples test clean deps fmt lint help setup check-deps install-deps
 
 # Variables
 PROTO_DIR := examples/proto
@@ -21,7 +21,7 @@ build:
 	@echo "Build completed!"
 
 # Generate protobuf code
-proto:
+proto: check-deps
 	@echo "Generating protobuf code..."
 	@mkdir -p "$(GO_OUT)"
 	@./scripts/build/generate-proto.sh "$(PROTO_DIR)" "$(GO_OUT)"
@@ -77,11 +77,26 @@ core-help:
 	@echo "Core Ephemos Build Targets:"
 	@echo ""
 	@echo "  make build     - Build library and CLI"
+	@echo "  make setup     - Install all development dependencies"
+	@echo "  make check-deps- Check if all dependencies are installed"
 	@echo "  make proto     - Generate protobuf code"
 	@echo "  make examples  - Build example applications"
 	@echo "  make test      - Run tests"
-	@echo "  make deps      - Get/update dependencies"
+	@echo "  make deps      - Get/update Go dependencies"
 	@echo "  make fmt       - Format code"
 	@echo "  make lint      - Lint code"
 	@echo "  make clean     - Clean build artifacts"
 	@echo "  make help      - Show this help"
+
+# Development setup targets
+setup: install-deps
+	@echo "🎉 Development environment setup complete!"
+	@echo "You can now run: make build"
+
+check-deps:
+	@echo "🔍 Checking development dependencies..."
+	@./scripts/check-deps.sh
+
+install-deps:
+	@echo "🔧 Installing development dependencies..."
+	@./scripts/install-deps.sh
