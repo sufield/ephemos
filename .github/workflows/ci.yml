@@ -36,9 +36,10 @@ jobs:
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
     - name: Setup Go Environment
-      uses: ./.github/actions/setup-go
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+        check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
@@ -67,9 +68,10 @@ jobs:
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
     - name: Setup Go Environment
-      uses: ./.github/actions/setup-go
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+        check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
@@ -94,9 +96,10 @@ jobs:
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
     - name: Setup Go Environment
-      uses: ./.github/actions/setup-go
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+        check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
@@ -116,18 +119,20 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
-    - name: Setup Go Environment (Windows - Official Action)
-      if: runner.os == 'Windows'
+    - name: Setup Go Environment
       uses: actions/setup-go@v5
       with:
         go-version: ${{ matrix.go-version }}
         check-latest: true
         
-    - name: Setup Go Environment (Linux/macOS - Custom Action)
-      if: runner.os != 'Windows'
-      uses: ./.github/actions/setup-go
-      with:
-        go-version: ${{ matrix.go-version }}
+    - name: Clean Go environment
+      shell: bash
+      run: |
+        echo "🧹 Cleaning Go environment to prevent cache issues..."
+        go clean -modcache || true
+        go clean -cache || true
+        go clean -testcache || true
+        echo "✅ Go environment cleaned"
         
     - name: Verify Go installation and environment
       shell: bash
@@ -243,9 +248,10 @@ jobs:
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
     - name: Setup Go Environment
-      uses: ./.github/actions/setup-go
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ matrix.go-version }}
+        check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
@@ -289,9 +295,10 @@ jobs:
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
     - name: Setup Go Environment
-      uses: ./.github/actions/setup-go
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+        check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
@@ -452,9 +459,10 @@ jobs:
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
     - name: Setup Go Environment
-      uses: ./.github/actions/setup-go
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+        check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
@@ -485,9 +493,10 @@ jobs:
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
     - name: Setup Go Environment
-      uses: ./.github/actions/setup-go
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+        check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
@@ -521,9 +530,10 @@ jobs:
         fetch-depth: 0
         
     - name: Setup Go Environment
-      uses: ./.github/actions/setup-go
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+        check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
