@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"strconv"
-	"strings"
 )
 
 // Configuration represents the complete configuration for Ephemos services.
@@ -20,10 +19,10 @@ type Configuration struct {
 	SPIFFE *SPIFFEConfig `yaml:"spiffe,omitempty"`
 
 	// AuthorizedClients lists SPIFFE IDs that are allowed to connect to this service.
-	AuthorizedClients []string `yaml:"authorizedClients,omitempty"`
+	AuthorizedClients []string `yaml:"authorizedClients,omitempty" validate:"spiffe_id"`
 
 	// TrustedServers lists SPIFFE IDs of servers this client trusts to connect to.
-	TrustedServers []string `yaml:"trustedServers,omitempty"`
+	TrustedServers []string `yaml:"trustedServers,omitempty" validate:"spiffe_id"`
 
 	// Transport contains the transport layer configuration.
 	Transport TransportConfig `yaml:"transport,omitempty"`
@@ -32,25 +31,25 @@ type Configuration struct {
 // ServiceConfig contains the core service identification settings.
 type ServiceConfig struct {
 	// Name is the unique identifier for this service.
-	Name string `yaml:"name"`
+	Name string `yaml:"name" validate:"required,min=1,max=100,regex=^[a-zA-Z0-9_-]+$" default:"ephemos-service"`
 
 	// Domain is the trust domain for this service.
-	Domain string `yaml:"domain,omitempty"`
+	Domain string `yaml:"domain,omitempty" validate:"domain" default:"default.local"`
 }
 
 // SPIFFEConfig contains SPIFFE/SPIRE integration settings.
 type SPIFFEConfig struct {
 	// SocketPath is the path to the SPIRE agent's Unix domain socket.
-	SocketPath string `yaml:"socketPath"`
+	SocketPath string `yaml:"socketPath" validate:"required,abs_path" default:"/tmp/spire-agent/public/api.sock"`
 }
 
 // TransportConfig contains transport layer configuration.
 type TransportConfig struct {
 	// Type specifies the transport protocol to use.
-	Type string `yaml:"type,omitempty"`
+	Type string `yaml:"type,omitempty" validate:"oneof=grpc|http|tcp" default:"grpc"`
 
 	// Address specifies the network address to bind to.
-	Address string `yaml:"address,omitempty"`
+	Address string `yaml:"address,omitempty" validate:"regex=^(:[0-9]+|[^:]+:[0-9]+)$" default:":50051"`
 
 	// TLS contains TLS configuration for the transport.
 	TLS *TLSConfig `yaml:"tls,omitempty"`
@@ -59,19 +58,21 @@ type TransportConfig struct {
 // TLSConfig contains TLS/SSL configuration settings.
 type TLSConfig struct {
 	// Enabled determines whether TLS is enabled.
-	Enabled bool `yaml:"enabled,omitempty"`
+	Enabled bool `yaml:"enabled,omitempty" default:"true"`
 
 	// CertFile is the path to the TLS certificate file.
-	CertFile string `yaml:"certFile,omitempty"`
+	CertFile string `yaml:"certFile,omitempty" validate:"file_exists"`
 
 	// KeyFile is the path to the TLS private key file.
-	KeyFile string `yaml:"keyFile,omitempty"`
+	KeyFile string `yaml:"keyFile,omitempty" validate:"file_exists"`
 
 	// UseSPIFFE determines whether to use SPIFFE X.509 certificates for TLS.
-	UseSPIFFE bool `yaml:"useSpiffe,omitempty"`
+	UseSPIFFE bool `yaml:"useSpiffe,omitempty" default:"true"`
 }
 
 // Validate checks if the configuration is valid and returns any validation errors.
+// This method uses the new struct tag-based validation engine for comprehensive
+// validation with aggregated error reporting and automatic default value setting.
 func (c *Configuration) Validate() error {
 	if c == nil {
 		return &ValidationError{
@@ -81,155 +82,14 @@ func (c *Configuration) Validate() error {
 		}
 	}
 
-	// Validate service configuration
-	if err := c.validateService(); err != nil {
-		return fmt.Errorf("invalid service configuration: %w", err)
-	}
-
-	// Validate SPIFFE configuration if present
-	if c.SPIFFE != nil {
-		if err := c.validateSPIFFE(); err != nil {
-			return fmt.Errorf("invalid SPIFFE configuration: %w", err)
-		}
-	}
-
-	// Validate authorized clients
-	if err := c.validateSPIFFEIDs(c.AuthorizedClients, "authorized_clients"); err != nil {
-		return fmt.Errorf("invalid authorized clients: %w", err)
-	}
-
-	// Validate trusted servers
-	if err := c.validateSPIFFEIDs(c.TrustedServers, "trusted_servers"); err != nil {
-		return fmt.Errorf("invalid trusted servers: %w", err)
-	}
-
-	return nil
+	// Use the new validation engine for comprehensive validation
+	return ValidateStruct(c)
 }
 
-func (c *Configuration) validateService() error {
-	if err := c.validateServiceName(); err != nil {
-		return err
-	}
-
-	if err := c.validateServiceDomain(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// isValidServiceNameChar checks if a character is valid for service names.
-func isValidServiceNameChar(char rune) bool {
-	return (char >= 'a' && char <= 'z') ||
-		(char >= 'A' && char <= 'Z') ||
-		(char >= '0' && char <= '9') ||
-		char == '-' ||
-		char == '_'
-}
-
-func (c *Configuration) validateServiceName() error {
-	name := strings.TrimSpace(c.Service.Name)
-
-	if name == "" {
-		return &ValidationError{
-			Field:   "service.name",
-			Value:   c.Service.Name,
-			Message: "service name is required and cannot be empty",
-		}
-	}
-
-	// Validate service name format (alphanumeric, hyphens, underscores)
-	for _, char := range name {
-		if !isValidServiceNameChar(char) {
-			return &ValidationError{
-				Field:   "service.name",
-				Value:   c.Service.Name,
-				Message: "service name must contain only alphanumeric characters, hyphens, and underscores",
-			}
-		}
-	}
-
-	return nil
-}
-
-func (c *Configuration) validateServiceDomain() error {
-	// Validate domain format if provided
-	if c.Service.Domain != "" {
-		domain := strings.TrimSpace(c.Service.Domain)
-		if domain == "" {
-			return &ValidationError{
-				Field:   "service.domain",
-				Value:   c.Service.Domain,
-				Message: "service domain cannot be whitespace only",
-			}
-		}
-		// Basic domain validation - contains dots and valid characters
-		if !strings.Contains(domain, ".") {
-			return &ValidationError{
-				Field:   "service.domain",
-				Value:   c.Service.Domain,
-				Message: "service domain must be a valid domain name",
-			}
-		}
-	}
-
-	return nil
-}
-
-func (c *Configuration) validateSPIFFE() error {
-	if strings.TrimSpace(c.SPIFFE.SocketPath) == "" {
-		return &ValidationError{
-			Field:   "spiffe.socket_path",
-			Value:   c.SPIFFE.SocketPath,
-			Message: "SPIFFE socket path is required when SPIFFE config is provided",
-		}
-	}
-
-	// Validate that socket path is absolute
-	socketPath := strings.TrimSpace(c.SPIFFE.SocketPath)
-	if !strings.HasPrefix(socketPath, "/") {
-		return &ValidationError{
-			Field:   "spiffe.socket_path",
-			Value:   c.SPIFFE.SocketPath,
-			Message: "SPIFFE socket path must be an absolute path",
-		}
-	}
-
-	return nil
-}
-
-func (c *Configuration) validateSPIFFEIDs(ids []string, fieldName string) error {
-	for i, id := range ids {
-		id = strings.TrimSpace(id)
-		if id == "" {
-			return &ValidationError{
-				Field:   fmt.Sprintf("%s[%d]", fieldName, i),
-				Value:   ids[i],
-				Message: "SPIFFE ID cannot be empty or whitespace",
-			}
-		}
-
-		// Validate SPIFFE ID format
-		if !strings.HasPrefix(id, "spiffe://") {
-			return &ValidationError{
-				Field:   fmt.Sprintf("%s[%d]", fieldName, i),
-				Value:   ids[i],
-				Message: "SPIFFE ID must start with 'spiffe://' (e.g., 'spiffe://example.org/service')",
-			}
-		}
-
-		// Basic structure validation - must have trust domain and path
-		parts := strings.SplitN(id[9:], "/", 2) // Remove "spiffe://" prefix
-		if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
-			return &ValidationError{
-				Field:   fmt.Sprintf("%s[%d]", fieldName, i),
-				Value:   ids[i],
-				Message: "SPIFFE ID must have format 'spiffe://trust-domain/path' (e.g., 'spiffe://example.org/service')",
-			}
-		}
-	}
-
-	return nil
+// ValidateAndSetDefaults validates the configuration and sets default values.
+// This is a convenience method that combines validation and default setting.
+func (c *Configuration) ValidateAndSetDefaults() error {
+	return ValidateStruct(c)
 }
 
 // ValidationError provides detailed information about configuration validation failures.
@@ -258,38 +118,25 @@ const (
 )
 
 // LoadFromEnvironment creates a configuration from environment variables.
+// This function now uses the new validation engine with automatic default setting.
 func LoadFromEnvironment() (*Configuration, error) {
 	config := &Configuration{}
 
-	// Required: Service Name
-	serviceName := os.Getenv(EnvServiceName)
-	if serviceName == "" {
-		return nil, &ValidationError{
-			Field:   EnvServiceName,
-			Value:   "",
-			Message: "service name is required via environment variable",
-		}
+	// Set values from environment variables if present
+	if serviceName := os.Getenv(EnvServiceName); serviceName != "" {
+		config.Service.Name = serviceName
 	}
 
-	// Optional: Trust Domain
-	trustDomain := os.Getenv(EnvTrustDomain)
-	if trustDomain == "" {
-		trustDomain = "default.local" // Secure default
-	}
-
-	config.Service = ServiceConfig{
-		Name:   serviceName,
-		Domain: trustDomain,
+	if trustDomain := os.Getenv(EnvTrustDomain); trustDomain != "" {
+		config.Service.Domain = trustDomain
 	}
 
 	// SPIFFE Configuration
-	spiffeSocket := os.Getenv(EnvSPIFFESocket)
-	if spiffeSocket == "" {
-		spiffeSocket = "/tmp/spire-agent/public/api.sock" // Default socket path
-	}
-
-	config.SPIFFE = &SPIFFEConfig{
-		SocketPath: spiffeSocket,
+	if spiffeSocket := os.Getenv(EnvSPIFFESocket); spiffeSocket != "" {
+		if config.SPIFFE == nil {
+			config.SPIFFE = &SPIFFEConfig{}
+		}
+		config.SPIFFE.SocketPath = spiffeSocket
 	}
 
 	// Parse comma-separated authorized clients
@@ -302,8 +149,8 @@ func LoadFromEnvironment() (*Configuration, error) {
 		config.TrustedServers = parseCommaSeparatedList(trustedServers)
 	}
 
-	// Validate the configuration
-	if err := config.Validate(); err != nil {
+	// Validate and set defaults using the new validation engine
+	if err := config.ValidateAndSetDefaults(); err != nil {
 		return nil, fmt.Errorf("environment configuration validation failed: %w", err)
 	}
 
@@ -311,6 +158,7 @@ func LoadFromEnvironment() (*Configuration, error) {
 }
 
 // MergeWithEnvironment merges file-based configuration with environment variables.
+// This function now uses the new validation engine with automatic default setting.
 func (c *Configuration) MergeWithEnvironment() error {
 	// Override service name if set via environment
 	if serviceName := os.Getenv(EnvServiceName); serviceName != "" {
@@ -340,7 +188,8 @@ func (c *Configuration) MergeWithEnvironment() error {
 		c.TrustedServers = parseCommaSeparatedList(trustedServers)
 	}
 
-	return c.Validate()
+	// Validate and set defaults using the new validation engine
+	return c.ValidateAndSetDefaults()
 }
 
 // GetBoolEnv returns a boolean environment variable value with a default.
@@ -363,36 +212,45 @@ type ConfigurationProvider interface {
 }
 
 // GetDefaultConfiguration returns a configuration with sensible defaults.
+// This function now uses the new validation engine to automatically set defaults.
 func GetDefaultConfiguration() *Configuration {
-	return &Configuration{
-		Service: ServiceConfig{
-			Name:   "ephemos-service", // Default service name
-			Domain: "default.local",   // Secure default
-		},
-		SPIFFE: &SPIFFEConfig{
-			SocketPath: "/tmp/spire-agent/public/api.sock", // Standard SPIRE socket
-		},
-		Transport: TransportConfig{
-			Type:    "grpc",
-			Address: ":50051", // Default gRPC port
-		},
-		AuthorizedClients: []string{},
-		TrustedServers:    []string{},
+	config := &Configuration{}
+
+	// Use the validation engine to set all defaults automatically
+	if err := config.ValidateAndSetDefaults(); err != nil {
+		// This should never happen with an empty config, but handle gracefully
+		// Fall back to manual defaults if validation fails
+		return &Configuration{
+			Service: ServiceConfig{
+				Name:   "ephemos-service",
+				Domain: "default.local",
+			},
+			SPIFFE: &SPIFFEConfig{
+				SocketPath: "/tmp/spire-agent/public/api.sock",
+			},
+			Transport: TransportConfig{
+				Type:    "grpc",
+				Address: ":50051",
+			},
+			AuthorizedClients: []string{},
+			TrustedServers:    []string{},
+		}
 	}
+
+	return config
 }
 
 // LoadConfigFromYAML loads configuration from a YAML file and returns public Configuration type.
+// This function now uses the new validation engine with automatic default setting.
 func LoadConfigFromYAML(_ context.Context, _ string) (*Configuration, error) {
 	// For now, we'll use environment variables to load config since we're transitioning away from internal types
 	// This is a temporary bridge function during the refactor
 	envConfig, err := LoadFromEnvironment()
 	if err != nil {
 		// If env loading fails, return default config
+		// We're intentionally ignoring the error and returning defaults
 		config := GetDefaultConfiguration()
-		if err := config.Validate(); err != nil {
-			return nil, fmt.Errorf("default configuration validation failed: %w", err)
-		}
-		return config, nil
+		return config, nil //nolint:nilerr // Intentionally ignoring error and returning defaults
 	}
 	return envConfig, nil
 }
