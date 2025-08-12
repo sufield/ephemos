@@ -9,9 +9,9 @@ updates:
       time: "02:00"
     open-pull-requests-limit: 10
     assignees:
-      - "sufield"
+      - "bparanj"
     reviewers:
-      - "sufield"
+      - "bparanj"
     commit-message:
       prefix: "chore"
       prefix-development: "chore"
@@ -39,21 +39,13 @@ updates:
           - "golang.org/x/net*"
           - "golang.org/x/sys*"
         update-types:
-          - "security"
+          - "patch"
+          - "minor"
       test-dependencies:
         patterns:
           - "github.com/stretchr/testify*"
           - "*test*"
     # Enhanced security focus for 2025
-    allow:
-      - dependency-type: "direct"
-        update-type: "security"
-      - dependency-type: "indirect"  
-        update-type: "security"
-      - dependency-type: "direct"
-        update-type: "version-update:semver-patch"
-      - dependency-type: "direct"
-        update-type: "version-update:semver-minor"
     ignore:
       # Ignore major version updates for stability
       - dependency-name: "google.golang.org/grpc"
@@ -70,9 +62,9 @@ updates:
       time: "02:00"
     open-pull-requests-limit: 3
     assignees:
-      - "sufield"
+      - "bparanj"
     reviewers:
-      - "sufield"
+      - "bparanj"
     commit-message:
       prefix: "ci"
       prefix-development: "ci"
