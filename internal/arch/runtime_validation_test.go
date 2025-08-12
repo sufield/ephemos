@@ -7,10 +7,10 @@ import (
 	"github.com/sufield/ephemos/internal/arch"
 )
 
-func TestArchValidator_ValidateCall(t *testing.T) {
+func TestValidator_ValidateCall(t *testing.T) {
 	tests := []struct {
 		name      string
-		validator *arch.ArchValidator
+		validator *arch.Validator
 		operation string
 		wantErr   bool
 	}{
@@ -32,14 +32,14 @@ func TestArchValidator_ValidateCall(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.validator.ValidateCall(tt.operation)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ArchValidator.ValidateCall() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Validator.ValidateCall() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func TestArchValidator_ExtractAdapterType(t *testing.T) {
-	_ = arch.NewValidator(true) // validator - reserved for future testing
+func TestValidator_ExtractAdapterType(t *testing.T) {
+	_ = arch.NewValidator(true)
 
 	tests := []struct {
 		name     string
@@ -143,7 +143,7 @@ func Test_Runtime_Validation_Integration(t *testing.T) {
 	}
 }
 
-// Helper function to test adapter type extraction indirectly
+// Helper function to test adapter type extraction indirectly.
 func extractAdapterTypeHelper(funcName string) string {
 	// This mimics the logic in the unexported extractAdapterType method
 	if !strings.Contains(funcName, "/internal/adapters/") {
@@ -164,7 +164,7 @@ func extractAdapterTypeHelper(funcName string) string {
 	return ""
 }
 
-// Benchmark the validation overhead
+// Benchmark the validation overhead.
 func BenchmarkValidationOverhead(b *testing.B) {
 	validator := arch.NewValidator(true)
 

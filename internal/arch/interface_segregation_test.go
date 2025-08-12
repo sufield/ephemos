@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-// Test_Interface_Segregation ensures that ports follow ISP
+// Test_Interface_Segregation ensures that ports follow ISP.
 func Test_Interface_Segregation(t *testing.T) {
 	portsDir := "../../internal/core/ports"
 
@@ -38,7 +38,7 @@ func Test_Interface_Segregation(t *testing.T) {
 	}
 }
 
-// Test_Port_Naming_Conventions ensures consistent naming
+// Test_Port_Naming_Conventions ensures consistent naming.
 func Test_Port_Naming_Conventions(t *testing.T) {
 	portsDir := "../../internal/core/ports"
 
@@ -63,7 +63,7 @@ func Test_Port_Naming_Conventions(t *testing.T) {
 	}
 }
 
-// Test_Adapter_Interface_Compliance ensures adapters properly implement ports
+// Test_Adapter_Interface_Compliance ensures adapters properly implement ports.
 func Test_Adapter_Interface_Compliance(t *testing.T) {
 	// This test would require more sophisticated analysis to check that
 	// adapters implement the ports they claim to implement.
@@ -92,7 +92,7 @@ func Test_Adapter_Interface_Compliance(t *testing.T) {
 	}
 }
 
-// Test_Domain_Types_Are_Pure ensures domain types don't leak infrastructure concerns
+// Test_Domain_Types_Are_Pure ensures domain types don't leak infrastructure concerns.
 func Test_Domain_Types_Are_Pure(t *testing.T) {
 	domainDir := "../../internal/core/domain"
 
@@ -164,7 +164,7 @@ func checkPortNaming(t *testing.T, filePath string) []string {
 	var violations []string
 
 	ast.Inspect(node, func(n ast.Node) bool {
-		if ts, ok := n.(*ast.TypeSpec); ok {
+		if ts, ok := n.(*ast.TypeSpec); ok { //nolint:nestif // Necessary for AST traversal
 			if _, ok := ts.Type.(*ast.InterfaceType); ok {
 				name := ts.Name.Name
 
@@ -203,7 +203,7 @@ func checkAdapterStructure(t *testing.T, filePath string) []string {
 
 	// Check that adapter files have proper structure
 	hasStruct := false
-	_ = false // hasInterface - reserved for future structural checks
+	_ = false // hasInterface used for future extensibility
 
 	ast.Inspect(node, func(n ast.Node) bool {
 		if ts, ok := n.(*ast.TypeSpec); ok {
@@ -226,6 +226,7 @@ func checkAdapterStructure(t *testing.T, filePath string) []string {
 	return violations
 }
 
+//nolint:cyclop,nestif // Test helper complexity acceptable for thorough validation
 func checkDomainPurity(t *testing.T, filePath string) []string {
 	t.Helper()
 
