@@ -27,7 +27,7 @@ CONFIG_VALIDATOR_BINARY := config-validator
 
 # PHONY targets - all targets that don't create files
 .PHONY: all build proto proto-ci examples test clean deps fmt lint help setup \
-        check-deps install-deps benchmark fmt-only core-help version show-build-info
+        check-deps install-deps install-deps-sudo benchmark fmt-only core-help version show-build-info
 
 # Default target
 all: proto build examples
@@ -135,7 +135,9 @@ core-help:
 	@echo "  make clean          - Clean build artifacts"
 	@echo ""
 	@echo "Development targets:"
-	@echo "  make setup          - Install development dependencies (Go tools only, no sudo)"
+	@echo "  make setup          - Smart setup (checks deps, installs Go tools)"
+	@echo "  make install-deps   - Install Go tools only (no sudo required)"
+	@echo "  make install-deps-sudo - Install all deps including system packages (requires sudo)"
 	@echo "  make check-deps     - Check if all dependencies are installed"
 	@echo "  make test           - Run tests"
 	@echo "  make benchmark      - Run benchmarks"
@@ -154,9 +156,33 @@ core-help:
 	@echo "  make help           - Show this help"
 
 # Development setup targets
-setup: install-deps
-	@echo "🎉 Development environment setup complete!"
-	@echo "You can now run: make build"
+setup:
+	@echo "🔧 Setting up Ephemos development environment..."
+	@echo "==========================================="
+	@if ./scripts/check-deps.sh; then \
+		echo ""; \
+		echo "🎉 All dependencies are already available!"; \
+		echo "You can now run: make build"; \
+	else \
+		echo ""; \
+		echo "🔧 Installing Go tools (no sudo required)..."; \
+		if ./scripts/install-deps.sh; then \
+			echo ""; \
+			if ./scripts/check-deps.sh >/dev/null 2>&1; then \
+				echo "🎉 Development environment setup complete!"; \
+				echo "You can now run: make build"; \
+			else \
+				echo "🔧 Setup partially complete. System packages still needed."; \
+				echo "For system packages (protoc), run: ./scripts/install-deps-sudo.sh"; \
+				echo "Or install manually and run 'make setup' again"; \
+			fi; \
+		else \
+			echo ""; \
+			echo "⚠️  Go tools installation had issues."; \
+			echo "Please check the output above and resolve any errors."; \
+			echo "Then run 'make setup' again"; \
+		fi; \
+	fi
 
 check-deps:
 	@echo "🔍 Checking development dependencies..."
@@ -170,11 +196,20 @@ check-deps:
 		else \
 			echo ""; \
 			echo "⚠️  Some dependencies missing. Build may fail."; \
-			echo "💡 Run 'make setup' for complete installation"; \
-			echo "💡 Or run: ./scripts/install-deps-sudo.sh for system packages"; \
+			if [ "${CI:-}" = "true" ] || [ "${GITHUB_ACTIONS:-}" = "true" ]; then \
+				echo "💡 CI detected: Check setup-protobuf action in GitHub workflow"; \
+			else \
+				echo "💡 Run 'make setup' for smart installation"; \
+				echo "💡 Or run: ./scripts/install-deps-sudo.sh for system packages"; \
+			fi; \
 		fi; \
 	fi
 
 install-deps:
 	@echo "🔧 Installing development dependencies..."
 	@./scripts/install-deps.sh
+
+# Install with sudo for system packages
+install-deps-sudo:
+	@echo "🔧 Installing development dependencies (with sudo)..."
+	@./scripts/install-deps-sudo.sh
