@@ -118,8 +118,19 @@ func (c *Configuration) validateService() error {
 	return nil
 }
 
+// isValidServiceNameChar checks if a character is valid for service names.
+func isValidServiceNameChar(char rune) bool {
+	return (char >= 'a' && char <= 'z') || 
+		(char >= 'A' && char <= 'Z') ||
+		(char >= '0' && char <= '9') || 
+		char == '-' || 
+		char == '_'
+}
+
 func (c *Configuration) validateServiceName() error {
-	if strings.TrimSpace(c.Service.Name) == "" {
+	name := strings.TrimSpace(c.Service.Name)
+	
+	if name == "" {
 		return &ValidationError{
 			Field:   "service.name",
 			Value:   c.Service.Name,
@@ -128,10 +139,8 @@ func (c *Configuration) validateServiceName() error {
 	}
 
 	// Validate service name format (alphanumeric, hyphens, underscores)
-	name := strings.TrimSpace(c.Service.Name)
 	for _, char := range name {
-		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') ||
-			(char >= '0' && char <= '9') || char == '-' || char == '_') {
+		if !isValidServiceNameChar(char) {
 			return &ValidationError{
 				Field:   "service.name",
 				Value:   c.Service.Name,
@@ -334,16 +343,6 @@ func (c *Configuration) MergeWithEnvironment() error {
 	return c.Validate()
 }
 
-// parseCommaSeparatedList parses a comma-separated string into a slice.
-func parseCommaSeparatedList(value string) []string {
-	var result []string
-	for _, item := range strings.Split(value, ",") {
-		if trimmed := strings.TrimSpace(item); trimmed != "" {
-			result = append(result, trimmed)
-		}
-	}
-	return result
-}
 
 // GetBoolEnv returns a boolean environment variable value with a default.
 func GetBoolEnv(key string, defaultValue bool) bool {
