@@ -121,6 +121,35 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
         
+    - name: Verify Go installation and environment
+      shell: bash
+      run: |
+        echo "🔍 Verifying Go installation..."
+        echo "Go version: $(go version)"
+        echo "GOROOT: $(go env GOROOT)"
+        echo "GOPATH: $(go env GOPATH)" 
+        echo "GOPROXY: $(go env GOPROXY)"
+        echo "GOCACHE: $(go env GOCACHE)"
+        echo "GO111MODULE: $(go env GO111MODULE)"
+        
+        echo "🔍 Checking GOROOT/src directory..."
+        ls -la "$(go env GOROOT)/src" 2>/dev/null || echo "❌ GOROOT/src not found"
+        
+        echo "🔍 Checking for standard library packages..."
+        ls "$(go env GOROOT)/src/context" >/dev/null 2>&1 && echo "✅ context package found" || echo "❌ context package missing"
+        ls "$(go env GOROOT)/src/crypto" >/dev/null 2>&1 && echo "✅ crypto package found" || echo "❌ crypto package missing"
+        
+        echo "🔍 Testing basic Go compilation..."
+        echo 'package main; import "context"; func main() { _ = context.Background() }' > test.go
+        if go build test.go; then
+          echo "✅ Basic Go compilation works"
+          rm -f test test.exe test.go
+        else
+          echo "❌ Basic Go compilation failed - checking detailed error..."
+          go build -x test.go 2>&1 | head -20 || true
+          exit 1
+        fi
+        
     - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
       
