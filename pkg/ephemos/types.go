@@ -120,16 +120,16 @@ func (c *Configuration) validateService() error {
 
 // isValidServiceNameChar checks if a character is valid for service names.
 func isValidServiceNameChar(char rune) bool {
-	return (char >= 'a' && char <= 'z') || 
+	return (char >= 'a' && char <= 'z') ||
 		(char >= 'A' && char <= 'Z') ||
-		(char >= '0' && char <= '9') || 
-		char == '-' || 
+		(char >= '0' && char <= '9') ||
+		char == '-' ||
 		char == '_'
 }
 
 func (c *Configuration) validateServiceName() error {
 	name := strings.TrimSpace(c.Service.Name)
-	
+
 	if name == "" {
 		return &ValidationError{
 			Field:   "service.name",
@@ -342,7 +342,6 @@ func (c *Configuration) MergeWithEnvironment() error {
 
 	return c.Validate()
 }
-
 
 // GetBoolEnv returns a boolean environment variable value with a default.
 func GetBoolEnv(key string, defaultValue bool) bool {

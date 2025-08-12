@@ -84,7 +84,7 @@ func createSPIFFEProvider(opts *ServerOptions) *spiffe.Provider {
 	if opts.Config != nil {
 		spiffeConfig = opts.Config.SPIFFE
 	}
-	
+
 	provider, err := spiffe.NewProvider(spiffeConfig)
 	if err != nil {
 		slog.Warn("Failed to create SPIFFE provider", "error", err)
