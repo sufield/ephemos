@@ -56,57 +56,45 @@ type ServerOptions struct {
 	PostShutdownHook func(err error)
 }
 
-// NewEnhancedIdentityServer creates a production-ready identity server with graceful shutdown.
-func NewEnhancedIdentityServer(ctx context.Context, opts *ServerOptions) (*EnhancedServer, error) {
+// initializeServerOptions ensures options are properly initialized.
+func initializeServerOptions(opts *ServerOptions) *ServerOptions {
 	if opts == nil {
 		opts = &ServerOptions{
 			ShutdownConfig:       DefaultShutdownConfig(),
 			EnableSignalHandling: true,
 		}
 	}
-
 	if opts.ShutdownConfig == nil {
 		opts.ShutdownConfig = DefaultShutdownConfig()
 	}
+	return opts
+}
 
-	// Create base server
-	var baseServer *api.IdentityServer
-	var err error
-
+// createBaseServer creates the base identity server.
+func createBaseServer(ctx context.Context, opts *ServerOptions) (*api.IdentityServer, error) {
 	if opts.Config != nil {
-		baseServer, err = api.NewIdentityServerWithConfig(ctx, opts.Config)
-	} else {
-		baseServer, err = api.NewIdentityServer(ctx, opts.ConfigPath)
+		return api.NewIdentityServerWithConfig(ctx, opts.Config)
 	}
+	return api.NewIdentityServer(ctx, opts.ConfigPath)
+}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to create base server: %w", err)
-	}
-
-	// Create SPIFFE provider for the server
+// createSPIFFEProvider creates the SPIFFE provider if configured.
+func createSPIFFEProvider(opts *ServerOptions) *spiffe.Provider {
 	var spiffeConfig *ports.SPIFFEConfig
 	if opts.Config != nil {
 		spiffeConfig = opts.Config.SPIFFE
 	}
-
-	spiffeProvider, err := spiffe.NewProvider(spiffeConfig)
+	
+	provider, err := spiffe.NewProvider(spiffeConfig)
 	if err != nil {
 		slog.Warn("Failed to create SPIFFE provider", "error", err)
-		// Continue without SPIFFE - server might not need it
+		return nil
 	}
+	return provider
+}
 
-	// Create shutdown manager
-	shutdownManager := NewGracefulShutdownManager(opts.ShutdownConfig)
-
-	// Register the base server for shutdown
-	shutdownManager.RegisterServer(baseServer)
-
-	// Register SPIFFE provider if available
-	if spiffeProvider != nil {
-		shutdownManager.RegisterSPIFFEProvider(spiffeProvider)
-	}
-
-	// Set up hooks
+// setupShutdownHooks configures shutdown hooks.
+func setupShutdownHooks(ctx context.Context, opts *ServerOptions) {
 	if opts.PreShutdownHook != nil {
 		originalStart := opts.ShutdownConfig.OnShutdownStart
 		opts.ShutdownConfig.OnShutdownStart = func() {
@@ -128,6 +116,30 @@ func NewEnhancedIdentityServer(ctx context.Context, opts *ServerOptions) (*Enhan
 			}
 		}
 	}
+}
+
+// NewEnhancedIdentityServer creates a production-ready identity server with graceful shutdown.
+func NewEnhancedIdentityServer(ctx context.Context, opts *ServerOptions) (*EnhancedServer, error) {
+	opts = initializeServerOptions(opts)
+
+	// Create base server
+	baseServer, err := createBaseServer(ctx, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create base server: %w", err)
+	}
+
+	// Create SPIFFE provider
+	spiffeProvider := createSPIFFEProvider(opts)
+
+	// Create and configure shutdown manager
+	shutdownManager := NewGracefulShutdownManager(opts.ShutdownConfig)
+	shutdownManager.RegisterServer(baseServer)
+	if spiffeProvider != nil {
+		shutdownManager.RegisterSPIFFEProvider(spiffeProvider)
+	}
+
+	// Set up hooks
+	setupShutdownHooks(ctx, opts)
 
 	server := &EnhancedServer{
 		baseServer:      baseServer,
