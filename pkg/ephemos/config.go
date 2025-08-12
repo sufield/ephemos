@@ -86,11 +86,14 @@ func loadAndValidateConfig(ctx context.Context, configPath string) (*ports.Confi
 	}
 
 	// Step 4: Comprehensive validation with domain-specific error wrapping
-	if err := validateConfigComprehensive(config, resolvedPath); err != nil {
+	// Convert internal config to public config and validate using new engine
+	publicConfig := convertToPublicConfig(config)
+	if err := validateConfigComprehensive(publicConfig, resolvedPath); err != nil {
 		return nil, err
 	}
 
-	return config, nil
+	// Convert back to internal config
+	return convertFromPublicConfig(publicConfig), nil
 }
 
 // resolveConfigPath determines the actual config file path to use.
@@ -209,7 +212,8 @@ func loadConfigFile(ctx context.Context, path string) (*ports.Configuration, err
 }
 
 // validateConfigComprehensive performs comprehensive validation with better error messages.
-func validateConfigComprehensive(config *ports.Configuration, configPath string) error {
+// This function now uses the new struct tag-based validation engine.
+func validateConfigComprehensive(config *Configuration, configPath string) error {
 	if config == nil {
 		return &ConfigValidationError{
 			File:    configPath,
@@ -220,8 +224,8 @@ func validateConfigComprehensive(config *ports.Configuration, configPath string)
 		}
 	}
 
-	// Run the standard validation
-	if err := config.Validate(); err != nil {
+	// Use the new validation engine for comprehensive validation
+	if err := config.ValidateAndSetDefaults(); err != nil {
 		// Wrap validation errors with better context
 		return wrapValidationError(err, configPath)
 	}
@@ -320,4 +324,78 @@ func GetConfigValidationError(err error) *ConfigValidationError {
 		return configErr
 	}
 	return nil
+}
+
+// convertToPublicConfig converts internal ports.Configuration to public Configuration.
+func convertToPublicConfig(internal *ports.Configuration) *Configuration {
+	if internal == nil {
+		return nil
+	}
+
+	config := &Configuration{
+		Service: ServiceConfig{
+			Name:   internal.Service.Name,
+			Domain: internal.Service.Domain,
+		},
+		Transport: TransportConfig{
+			Type:    internal.Transport.Type,
+			Address: internal.Transport.Address,
+		},
+		AuthorizedClients: internal.AuthorizedClients,
+		TrustedServers:    internal.TrustedServers,
+	}
+
+	if internal.SPIFFE != nil {
+		config.SPIFFE = &SPIFFEConfig{
+			SocketPath: internal.SPIFFE.SocketPath,
+		}
+	}
+
+	if internal.Transport.TLS != nil {
+		config.Transport.TLS = &TLSConfig{
+			Enabled:   internal.Transport.TLS.Enabled,
+			CertFile:  internal.Transport.TLS.CertFile,
+			KeyFile:   internal.Transport.TLS.KeyFile,
+			UseSPIFFE: internal.Transport.TLS.UseSPIFFE,
+		}
+	}
+
+	return config
+}
+
+// convertFromPublicConfig converts public Configuration to internal ports.Configuration.
+func convertFromPublicConfig(public *Configuration) *ports.Configuration {
+	if public == nil {
+		return nil
+	}
+
+	config := &ports.Configuration{
+		Service: ports.ServiceConfig{
+			Name:   public.Service.Name,
+			Domain: public.Service.Domain,
+		},
+		Transport: ports.TransportConfig{
+			Type:    public.Transport.Type,
+			Address: public.Transport.Address,
+		},
+		AuthorizedClients: public.AuthorizedClients,
+		TrustedServers:    public.TrustedServers,
+	}
+
+	if public.SPIFFE != nil {
+		config.SPIFFE = &ports.SPIFFEConfig{
+			SocketPath: public.SPIFFE.SocketPath,
+		}
+	}
+
+	if public.Transport.TLS != nil {
+		config.Transport.TLS = &ports.TLSConfig{
+			Enabled:   public.Transport.TLS.Enabled,
+			CertFile:  public.Transport.TLS.CertFile,
+			KeyFile:   public.Transport.TLS.KeyFile,
+			UseSPIFFE: public.Transport.TLS.UseSPIFFE,
+		}
+	}
+
+	return config
 }
