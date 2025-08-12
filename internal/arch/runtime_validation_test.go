@@ -39,8 +39,8 @@ func TestArchValidator_ValidateCall(t *testing.T) {
 }
 
 func TestArchValidator_ExtractAdapterType(t *testing.T) {
-	validator := arch.NewValidator(true)
-	
+	_ = arch.NewValidator(true) // validator - reserved for future testing
+
 	tests := []struct {
 		name     string
 		funcName string
@@ -87,14 +87,14 @@ func TestArchValidator_ExtractAdapterType(t *testing.T) {
 func TestGlobalValidator(t *testing.T) {
 	// Clear any existing violations
 	arch.ClearGlobalViolations()
-	
+
 	// Test enabling/disabling
 	arch.SetGlobalValidationEnabled(false)
 	err := arch.ValidateBoundary("test-disabled")
 	if err != nil {
 		t.Errorf("Expected no error when validation disabled, got: %v", err)
 	}
-	
+
 	arch.SetGlobalValidationEnabled(true)
 	violations := arch.GetGlobalViolations()
 	if len(violations) != 0 {
@@ -104,13 +104,13 @@ func TestGlobalValidator(t *testing.T) {
 
 func TestValidator_GetAndClearViolations(t *testing.T) {
 	validator := arch.NewValidator(true)
-	
+
 	// Initially should have no violations
 	violations := validator.GetViolations()
 	if len(violations) != 0 {
 		t.Errorf("Expected no initial violations, got: %v", violations)
 	}
-	
+
 	// After clearing, should still have no violations
 	validator.ClearViolations()
 	violations = validator.GetViolations()
@@ -123,18 +123,18 @@ func TestValidator_GetAndClearViolations(t *testing.T) {
 // by simulating architectural boundary crossings.
 func Test_Runtime_Validation_Integration(t *testing.T) {
 	validator := arch.NewValidator(true)
-	
+
 	// Test that the validator can be called without panicking
 	err := validator.ValidateCall("integration-test")
 	if err != nil {
 		// It's okay if there's an error, we just don't want panics
 		t.Logf("Validation returned error (expected): %v", err)
 	}
-	
+
 	// Test that violations can be retrieved
 	violations := validator.GetViolations()
 	t.Logf("Violations detected: %d", len(violations))
-	
+
 	// Test clearing violations
 	validator.ClearViolations()
 	afterClear := validator.GetViolations()
@@ -149,25 +149,25 @@ func extractAdapterTypeHelper(funcName string) string {
 	if !strings.Contains(funcName, "/internal/adapters/") {
 		return ""
 	}
-	
+
 	parts := strings.Split(funcName, "/internal/adapters/")
 	if len(parts) < 2 {
 		return ""
 	}
-	
+
 	adapterPath := parts[1]
 	pathParts := strings.Split(adapterPath, "/")
 	if len(pathParts) > 0 {
 		return pathParts[0]
 	}
-	
+
 	return ""
 }
 
 // Benchmark the validation overhead
 func BenchmarkValidationOverhead(b *testing.B) {
 	validator := arch.NewValidator(true)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = validator.ValidateCall("benchmark-test")
@@ -176,7 +176,7 @@ func BenchmarkValidationOverhead(b *testing.B) {
 
 func BenchmarkValidationDisabled(b *testing.B) {
 	validator := arch.NewValidator(false)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = validator.ValidateCall("benchmark-test")

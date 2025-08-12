@@ -39,10 +39,10 @@ func (v *ArchValidator) ValidateCall(operation string) error {
 		if !more {
 			break
 		}
-		
+
 		// Filter out runtime and testing frames
-		if !strings.Contains(frame.File, "runtime/") && 
-		   !strings.Contains(frame.File, "testing/") {
+		if !strings.Contains(frame.File, "runtime/") &&
+			!strings.Contains(frame.File, "testing/") {
 			callStack = append(callStack, frame.Function)
 		}
 	}
@@ -66,7 +66,7 @@ func (v *ArchValidator) checkCallStackViolation(callStack []string, operation st
 				callee := callStack[j]
 				if strings.Contains(callee, "/internal/adapters/") {
 					if v.isDifferentAdapterType(caller, callee) {
-						return fmt.Sprintf("adapter %s directly calls adapter %s during %s", 
+						return fmt.Sprintf("adapter %s directly calls adapter %s during %s",
 							v.extractAdapterType(caller), v.extractAdapterType(callee), operation)
 					}
 				}
@@ -80,7 +80,7 @@ func (v *ArchValidator) checkCallStackViolation(callStack []string, operation st
 			for j := i + 1; j < len(callStack); j++ {
 				callee := callStack[j]
 				if strings.Contains(callee, "/internal/adapters/") {
-					return fmt.Sprintf("domain %s directly calls adapter %s during %s", 
+					return fmt.Sprintf("domain %s directly calls adapter %s during %s",
 						caller, v.extractAdapterType(callee), operation)
 				}
 			}
@@ -102,19 +102,19 @@ func (v *ArchValidator) extractAdapterType(funcName string) string {
 	if !strings.Contains(funcName, "/internal/adapters/") {
 		return ""
 	}
-	
+
 	// Extract path component after /internal/adapters/
 	parts := strings.Split(funcName, "/internal/adapters/")
 	if len(parts) < 2 {
 		return ""
 	}
-	
+
 	adapterPath := parts[1]
 	pathParts := strings.Split(adapterPath, "/")
 	if len(pathParts) > 0 {
 		return pathParts[0] // primary, secondary, grpc, http, etc.
 	}
-	
+
 	return ""
 }
 
