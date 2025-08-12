@@ -22,62 +22,80 @@ import (
 // using the actual in-memory provider implementation.
 func TestIdentityProviderFlow(t *testing.T) {
 	t.Run("CompleteIdentityFlow", func(t *testing.T) {
-		// Step 1: Create service identity
-		identity := domain.NewServiceIdentity("test-service", "example.org")
-		if err := identity.Validate(); err != nil {
-			t.Fatalf("Identity validation failed: %v", err)
-		}
-		t.Logf("✅ Created identity: %s", identity.URI)
-
-		// Step 2: Create identity provider with custom identity
-		provider := memidentity.New().WithIdentity(identity)
+		identity := testCreateServiceIdentity(t)
+		provider := testCreateProvider(t, identity)
 		defer provider.Close()
 
-		// Step 3: Retrieve service identity
-		retrievedIdentity, err := provider.GetServiceIdentity()
-		if err != nil {
-			t.Fatalf("Failed to get service identity: %v", err)
-		}
-
-		if retrievedIdentity.Name != identity.Name {
-			t.Errorf("Expected identity name %s, got %s", identity.Name, retrievedIdentity.Name)
-		}
-		if retrievedIdentity.Domain != identity.Domain {
-			t.Errorf("Expected identity domain %s, got %s", identity.Domain, retrievedIdentity.Domain)
-		}
-		if retrievedIdentity.URI != identity.URI {
-			t.Errorf("Expected identity URI %s, got %s", identity.URI, retrievedIdentity.URI)
-		}
-		t.Logf("✅ Retrieved identity matches: %s", retrievedIdentity.URI)
-
-		// Step 4: Retrieve certificate
-		certificate, err := provider.GetCertificate()
-		if err != nil {
-			t.Fatalf("Failed to get certificate: %v", err)
-		}
-
-		if certificate.Cert == nil {
-			t.Error("Certificate is nil")
-		}
-		if certificate.PrivateKey == nil {
-			t.Error("Private key is nil")
-		}
-		if len(certificate.Chain) == 0 {
-			t.Error("Certificate chain is empty")
-		}
-		t.Logf("✅ Retrieved certificate with %d certificates in chain", len(certificate.Chain))
-
-		// Step 5: Retrieve trust bundle
-		trustBundle, err := provider.GetTrustBundle()
-		if err != nil {
-			t.Fatalf("Failed to get trust bundle: %v", err)
-		}
-
-		if len(trustBundle.Certificates) == 0 {
-			t.Error("Trust bundle is empty")
-		}
-		t.Logf("✅ Retrieved trust bundle with %d certificates", len(trustBundle.Certificates))
+		testValidateRetrievedIdentity(t, provider, identity)
+		testValidateCertificate(t, provider)
+		testValidateTrustBundle(t, provider)
 	})
+}
+
+func testCreateServiceIdentity(t *testing.T) *domain.ServiceIdentity {
+	t.Helper()
+	identity := domain.NewServiceIdentity("test-service", "example.org")
+	if err := identity.Validate(); err != nil {
+		t.Fatalf("Identity validation failed: %v", err)
+	}
+	t.Logf("✅ Created identity: %s", identity.URI)
+	return identity
+}
+
+func testCreateProvider(_ *testing.T, identity *domain.ServiceIdentity) ports.IdentityProvider {
+	provider := memidentity.New().WithIdentity(identity)
+	return provider
+}
+
+func testValidateRetrievedIdentity(t *testing.T, provider ports.IdentityProvider, identity *domain.ServiceIdentity) {
+	t.Helper()
+	retrievedIdentity, err := provider.GetServiceIdentity()
+	if err != nil {
+		t.Fatalf("Failed to get service identity: %v", err)
+	}
+
+	if retrievedIdentity.Name != identity.Name {
+		t.Errorf("Expected identity name %s, got %s", identity.Name, retrievedIdentity.Name)
+	}
+	if retrievedIdentity.Domain != identity.Domain {
+		t.Errorf("Expected identity domain %s, got %s", identity.Domain, retrievedIdentity.Domain)
+	}
+	if retrievedIdentity.URI != identity.URI {
+		t.Errorf("Expected identity URI %s, got %s", identity.URI, retrievedIdentity.URI)
+	}
+	t.Logf("✅ Retrieved identity matches: %s", retrievedIdentity.URI)
+}
+
+func testValidateCertificate(t *testing.T, provider ports.IdentityProvider) {
+	t.Helper()
+	certificate, err := provider.GetCertificate()
+	if err != nil {
+		t.Fatalf("Failed to get certificate: %v", err)
+	}
+
+	if certificate.Cert == nil {
+		t.Error("Certificate is nil")
+	}
+	if certificate.PrivateKey == nil {
+		t.Error("Private key is nil")
+	}
+	if len(certificate.Chain) == 0 {
+		t.Error("Certificate chain is empty")
+	}
+	t.Logf("✅ Retrieved certificate with %d certificates in chain", len(certificate.Chain))
+}
+
+func testValidateTrustBundle(t *testing.T, provider ports.IdentityProvider) {
+	t.Helper()
+	trustBundle, err := provider.GetTrustBundle()
+	if err != nil {
+		t.Fatalf("Failed to get trust bundle: %v", err)
+	}
+
+	if len(trustBundle.Certificates) == 0 {
+		t.Error("Trust bundle is empty")
+	}
+	t.Logf("✅ Retrieved trust bundle with %d certificates", len(trustBundle.Certificates))
 }
 
 // TestAuthenticationPolicyFlow tests authentication policy creation and validation.
@@ -145,238 +163,299 @@ func TestAuthenticationPolicyFlow(t *testing.T) {
 
 // TestConfigurationProviderFlow tests configuration loading and validation.
 func TestConfigurationProviderFlow(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	t.Run("InMemoryConfigProvider", func(t *testing.T) {
-		// Step 1: Create in-memory configuration provider
-		provider := config.NewInMemoryProvider()
-
-		// Step 2: Create test configuration with proper SPIFFE IDs
-		testConfig := &ports.Configuration{
-			Service: ports.ServiceConfig{
-				Name:   "test-service",
-				Domain: "test.example.org",
-			},
-			SPIFFE: &ports.SPIFFEConfig{
-				SocketPath: "/tmp/test-spire-agent/public/api.sock",
-			},
-			AuthorizedClients: []string{"spiffe://test.example.org/client-a", "spiffe://test.example.org/client-b"},
-			TrustedServers:    []string{"spiffe://test.example.org/server-x", "spiffe://test.example.org/server-y"},
-		}
-
-		// Step 3: Set the configuration
-		provider.SetConfiguration("test-config", testConfig)
-		t.Logf("✅ Created and configured in-memory provider")
-
-		// Step 4: Retrieve configuration
-		retrievedConfig, err := provider.LoadConfiguration(ctx, "test-config")
-		if err != nil {
-			t.Fatalf("Failed to load configuration: %v", err)
-		}
-
-		// Step 5: Validate configuration values
-		if retrievedConfig.Service.Name != "test-service" {
-			t.Errorf("Expected service name 'test-service', got '%s'", retrievedConfig.Service.Name)
-		}
-		if retrievedConfig.Service.Domain != "test.example.org" {
-			t.Errorf("Expected trust domain 'test.example.org', got '%s'", retrievedConfig.Service.Domain)
-		}
-
-		// Filter out empty strings that may be added by the config copying logic
-		nonEmptyClients := make([]string, 0)
-		for _, client := range retrievedConfig.AuthorizedClients {
-			if strings.TrimSpace(client) != "" {
-				nonEmptyClients = append(nonEmptyClients, client)
-			}
-		}
-		nonEmptyServers := make([]string, 0)
-		for _, server := range retrievedConfig.TrustedServers {
-			if strings.TrimSpace(server) != "" {
-				nonEmptyServers = append(nonEmptyServers, server)
-			}
-		}
-
-		if len(nonEmptyClients) != 2 {
-			t.Errorf("Expected 2 authorized clients, got %d: %v", len(nonEmptyClients), nonEmptyClients)
-		}
-		if len(nonEmptyServers) != 2 {
-			t.Errorf("Expected 2 trusted servers, got %d: %v", len(nonEmptyServers), nonEmptyServers)
-		}
-
-		t.Logf("✅ Configuration validated successfully")
-		t.Logf("   Service: %s@%s", retrievedConfig.Service.Name, retrievedConfig.Service.Domain)
-		t.Logf("   Authorized clients: %v", retrievedConfig.AuthorizedClients)
-		t.Logf("   Trusted servers: %v", retrievedConfig.TrustedServers)
-
-		// Step 6: Test default configuration
-		defaultConfig := provider.GetDefaultConfiguration(ctx)
-		if defaultConfig == nil {
-			t.Fatal("Default configuration is nil")
-		}
-		if defaultConfig.Service.Name != "default-service" {
-			t.Errorf("Expected default service name 'default-service', got '%s'", defaultConfig.Service.Name)
-		}
-		t.Logf("✅ Default configuration validated")
+		provider, testConfig := testSetupConfigProvider(t)
+		retrievedConfig := testLoadAndValidateConfig(ctx, t, provider, testConfig)
+		testValidateDefaultConfig(ctx, t, provider)
+		_ = retrievedConfig // Use the variable to avoid unused variable warning
 	})
+}
+
+func testSetupConfigProvider(t *testing.T) (*config.InMemoryProvider, *ports.Configuration) {
+	t.Helper()
+	provider := config.NewInMemoryProvider()
+
+	testConfig := &ports.Configuration{
+		Service: ports.ServiceConfig{
+			Name:   "test-service",
+			Domain: "test.example.org",
+		},
+		SPIFFE: &ports.SPIFFEConfig{
+			SocketPath: "/tmp/test-spire-agent/public/api.sock",
+		},
+		AuthorizedClients: []string{"spiffe://test.example.org/client-a", "spiffe://test.example.org/client-b"},
+		TrustedServers:    []string{"spiffe://test.example.org/server-x", "spiffe://test.example.org/server-y"},
+	}
+
+	provider.SetConfiguration("test-config", testConfig)
+	t.Logf("✅ Created and configured in-memory provider")
+	return provider, testConfig
+}
+
+func testLoadAndValidateConfig(
+	ctx context.Context, t *testing.T, provider *config.InMemoryProvider, testConfig *ports.Configuration,
+) *ports.Configuration {
+	t.Helper()
+	retrievedConfig, err := provider.LoadConfiguration(ctx, "test-config")
+	if err != nil {
+		t.Fatalf("Failed to load configuration: %v", err)
+	}
+
+	testValidateServiceConfig(t, retrievedConfig, testConfig)
+	testValidateClientServerLists(t, retrievedConfig)
+	testLogConfigurationDetails(t, retrievedConfig)
+	return retrievedConfig
+}
+
+func testValidateServiceConfig(t *testing.T, retrieved, expected *ports.Configuration) {
+	t.Helper()
+	if retrieved.Service.Name != expected.Service.Name {
+		t.Errorf("Expected service name '%s', got '%s'", expected.Service.Name, retrieved.Service.Name)
+	}
+	if retrieved.Service.Domain != expected.Service.Domain {
+		t.Errorf("Expected trust domain '%s', got '%s'", expected.Service.Domain, retrieved.Service.Domain)
+	}
+}
+
+func testValidateClientServerLists(t *testing.T, config *ports.Configuration) {
+	t.Helper()
+	nonEmptyClients := testFilterEmptyStrings(config.AuthorizedClients)
+	nonEmptyServers := testFilterEmptyStrings(config.TrustedServers)
+
+	if len(nonEmptyClients) != 2 {
+		t.Errorf("Expected 2 authorized clients, got %d: %v", len(nonEmptyClients), nonEmptyClients)
+	}
+	if len(nonEmptyServers) != 2 {
+		t.Errorf("Expected 2 trusted servers, got %d: %v", len(nonEmptyServers), nonEmptyServers)
+	}
+}
+
+func testFilterEmptyStrings(input []string) []string {
+	result := make([]string, 0)
+	for _, item := range input {
+		if strings.TrimSpace(item) != "" {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func testLogConfigurationDetails(t *testing.T, config *ports.Configuration) {
+	t.Helper()
+	t.Logf("✅ Configuration validated successfully")
+	t.Logf("   Service: %s@%s", config.Service.Name, config.Service.Domain)
+	t.Logf("   Authorized clients: %v", config.AuthorizedClients)
+	t.Logf("   Trusted servers: %v", config.TrustedServers)
+}
+
+func testValidateDefaultConfig(ctx context.Context, t *testing.T, provider *config.InMemoryProvider) {
+	t.Helper()
+	defaultConfig := provider.GetDefaultConfiguration(ctx)
+	if defaultConfig == nil {
+		t.Fatal("Default configuration is nil")
+	}
+	if defaultConfig.Service.Name != "default-service" {
+		t.Errorf("Expected default service name 'default-service', got '%s'", defaultConfig.Service.Name)
+	}
+	t.Logf("✅ Default configuration validated")
 }
 
 // TestIdentityServiceIntegration tests the identity service with real components.
 func TestIdentityServiceIntegration(t *testing.T) {
 	t.Run("IdentityServiceWithProviders", func(t *testing.T) {
-		// Step 1: Create service identity
-		identity := domain.NewServiceIdentity("integration-service", "test.example.org")
-
-		// Step 2: Create identity provider
-		provider := memidentity.New().WithIdentity(identity)
+		identity, provider := testSetupIdentityProvider(t)
 		defer provider.Close()
 
-		// Step 3: Test provider directly (service integration)
-		serviceIdentity, err := provider.GetServiceIdentity()
-		if err != nil {
-			t.Fatalf("Failed to get service identity: %v", err)
-		}
-
-		if serviceIdentity.URI != identity.URI {
-			t.Errorf("Expected URI %s, got %s", identity.URI, serviceIdentity.URI)
-		}
-		t.Logf("✅ Identity provider returned correct identity: %s", serviceIdentity.URI)
-
-		// Step 4: Test certificate retrieval through provider
-		certificate, err := provider.GetCertificate()
-		if err != nil {
-			t.Fatalf("Failed to get certificate through provider: %v", err)
-		}
-
-		if certificate == nil {
-			t.Fatal("Certificate is nil")
-		}
-		t.Logf("✅ Identity provider returned valid certificate")
-
-		// Step 5: Test trust bundle retrieval through provider
-		trustBundle, err := provider.GetTrustBundle()
-		if err != nil {
-			t.Fatalf("Failed to get trust bundle through provider: %v", err)
-		}
-
-		if trustBundle == nil || len(trustBundle.Certificates) == 0 {
-			t.Fatal("Trust bundle is empty")
-		}
-		t.Logf("✅ Identity provider returned trust bundle with %d certificates", len(trustBundle.Certificates))
-
-		// Step 6: Test identity service creation (with correct SPIFFE IDs)
-		mockConfig := &ports.Configuration{
-			Service: ports.ServiceConfig{
-				Name:   "integration-service",
-				Domain: "test.example.org",
-			},
-			SPIFFE: &ports.SPIFFEConfig{
-				SocketPath: "/tmp/test-spire-agent/public/api.sock",
-			},
-			AuthorizedClients: []string{"spiffe://test.example.org/test-client"},
-			TrustedServers:    []string{"spiffe://test.example.org/test-server"},
-		}
-
-		// Create a simple transport provider mock for testing
-		mockTransportProvider := &mockTransportProvider{}
-
-		identityService, err := services.NewIdentityService(provider, mockTransportProvider, mockConfig)
-		if err != nil {
-			t.Fatalf("Failed to create identity service: %v", err)
-		}
-
-		if identityService == nil {
-			t.Fatal("Identity service is nil")
-		}
-		t.Logf("✅ Identity service created successfully")
-
-		// Step 7: Test service creation through identity service
-		server, err := identityService.CreateServerIdentity()
-		if err != nil {
-			t.Fatalf("Failed to create server identity: %v", err)
-		}
-		if server == nil {
-			t.Fatal("Server is nil")
-		}
-		t.Logf("✅ Server identity created through service")
-
-		client, err := identityService.CreateClientIdentity()
-		if err != nil {
-			t.Fatalf("Failed to create client identity: %v", err)
-		}
-		if client == nil {
-			t.Fatal("Client is nil")
-		}
-		t.Logf("✅ Client identity created through service")
+		testValidateProviderDirectly(t, provider, identity)
+		identityService := testCreateIdentityService(t, provider)
+		testValidateServiceCreation(t, identityService)
 	})
+}
+
+func testSetupIdentityProvider(t *testing.T) (*domain.ServiceIdentity, ports.IdentityProvider) {
+	t.Helper()
+	identity := domain.NewServiceIdentity("integration-service", "test.example.org")
+	provider := memidentity.New().WithIdentity(identity)
+	return identity, provider
+}
+
+func testValidateProviderDirectly(t *testing.T, provider ports.IdentityProvider, identity *domain.ServiceIdentity) {
+	t.Helper()
+	serviceIdentity, err := provider.GetServiceIdentity()
+	if err != nil {
+		t.Fatalf("Failed to get service identity: %v", err)
+	}
+
+	if serviceIdentity.URI != identity.URI {
+		t.Errorf("Expected URI %s, got %s", identity.URI, serviceIdentity.URI)
+	}
+	t.Logf("✅ Identity provider returned correct identity: %s", serviceIdentity.URI)
+
+	testValidateProviderCertificate(t, provider)
+	testValidateProviderTrustBundle(t, provider)
+}
+
+func testValidateProviderCertificate(t *testing.T, provider ports.IdentityProvider) {
+	t.Helper()
+	certificate, err := provider.GetCertificate()
+	if err != nil {
+		t.Fatalf("Failed to get certificate through provider: %v", err)
+	}
+
+	if certificate == nil {
+		t.Fatal("Certificate is nil")
+	}
+	t.Logf("✅ Identity provider returned valid certificate")
+}
+
+func testValidateProviderTrustBundle(t *testing.T, provider ports.IdentityProvider) {
+	t.Helper()
+	trustBundle, err := provider.GetTrustBundle()
+	if err != nil {
+		t.Fatalf("Failed to get trust bundle through provider: %v", err)
+	}
+
+	if trustBundle == nil || len(trustBundle.Certificates) == 0 {
+		t.Fatal("Trust bundle is empty")
+	}
+	t.Logf("✅ Identity provider returned trust bundle with %d certificates", len(trustBundle.Certificates))
+}
+
+func testCreateIdentityService(t *testing.T, provider ports.IdentityProvider) *services.IdentityService {
+	t.Helper()
+	mockConfig := &ports.Configuration{
+		Service: ports.ServiceConfig{
+			Name:   "integration-service",
+			Domain: "test.example.org",
+		},
+		SPIFFE: &ports.SPIFFEConfig{
+			SocketPath: "/tmp/test-spire-agent/public/api.sock",
+		},
+		AuthorizedClients: []string{"spiffe://test.example.org/test-client"},
+		TrustedServers:    []string{"spiffe://test.example.org/test-server"},
+	}
+
+	mockTransportProvider := &mockTransportProvider{}
+	identityService, err := services.NewIdentityService(provider, mockTransportProvider, mockConfig)
+	if err != nil {
+		t.Fatalf("Failed to create identity service: %v", err)
+	}
+
+	if identityService == nil {
+		t.Fatal("Identity service is nil")
+	}
+	t.Logf("✅ Identity service created successfully")
+	return identityService
+}
+
+func testValidateServiceCreation(t *testing.T, identityService *services.IdentityService) {
+	t.Helper()
+	server, err := identityService.CreateServerIdentity()
+	if err != nil {
+		t.Fatalf("Failed to create server identity: %v", err)
+	}
+	if server == nil {
+		t.Fatal("Server is nil")
+	}
+	t.Logf("✅ Server identity created through service")
+
+	client, err := identityService.CreateClientIdentity()
+	if err != nil {
+		t.Fatalf("Failed to create client identity: %v", err)
+	}
+	if client == nil {
+		t.Fatal("Client is nil")
+	}
+	t.Logf("✅ Client identity created through service")
 }
 
 // TestPublicAPIIntegration tests the public ephemos API integration points.
 func TestPublicAPIIntegration(t *testing.T) {
 	t.Run("InterceptorConfiguration", func(t *testing.T) {
-		// Step 1: Test default interceptor configuration
-		defaultConfig := ephemos.NewDefaultInterceptorConfig()
-		if !defaultConfig.EnableAuth {
-			t.Error("Expected auth to be enabled in default config")
-		}
-		if !defaultConfig.EnableLogging {
-			t.Error("Expected logging to be enabled in default config")
-		}
-		if !defaultConfig.EnableMetrics {
-			t.Error("Expected metrics to be enabled in default config")
-		}
-		if defaultConfig.EnableIdentityPropagation {
-			t.Error("Expected identity propagation to be disabled in default config")
-		}
-		t.Logf("✅ Default interceptor configuration validated")
-
-		// Step 2: Test production interceptor configuration
-		prodConfig := ephemos.NewProductionInterceptorConfig("prod-service")
-		if !prodConfig.EnableAuth {
-			t.Error("Expected auth to be enabled in production config")
-		}
-		if !prodConfig.EnableIdentityPropagation {
-			t.Error("Expected identity propagation to be enabled in production config")
-		}
-		t.Logf("✅ Production interceptor configuration validated")
-
-		// Step 3: Test development interceptor configuration
-		devConfig := ephemos.NewDevelopmentInterceptorConfig("dev-service")
-		if devConfig.EnableAuth {
-			t.Error("Expected auth to be disabled in development config")
-		}
-		if !devConfig.EnableIdentityPropagation {
-			t.Error("Expected identity propagation to be enabled in development config")
-		}
-		t.Logf("✅ Development interceptor configuration validated")
+		testInterceptorConfigurations(t)
 	})
 
 	t.Run("ServiceRegistrarCreation", func(t *testing.T) {
-		// Test service registrar creation
-		var registrationCalled bool
-		registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-			registrationCalled = true
-		})
-
-		if registrar == nil {
-			t.Fatal("Service registrar is nil")
-		}
-
-		// Test registration function is stored and called
-		grpcServer := grpc.NewServer()
-		defer grpcServer.Stop()
-		registrar.Register(grpcServer)
-
-		if !registrationCalled {
-			t.Error("Registration function was not called")
-		}
-		t.Logf("✅ Service registrar created and tested successfully")
+		testServiceRegistrarCreation(t)
 	})
+}
+
+func testInterceptorConfigurations(t *testing.T) {
+	t.Helper()
+	testDefaultInterceptorConfig(t)
+	testProductionInterceptorConfig(t)
+	testDevelopmentInterceptorConfig(t)
+}
+
+func testDefaultInterceptorConfig(t *testing.T) {
+	t.Helper()
+	defaultConfig := ephemos.NewDefaultInterceptorConfig()
+	if !defaultConfig.EnableAuth {
+		t.Error("Expected auth to be enabled in default config")
+	}
+	if !defaultConfig.EnableLogging {
+		t.Error("Expected logging to be enabled in default config")
+	}
+	if !defaultConfig.EnableMetrics {
+		t.Error("Expected metrics to be enabled in default config")
+	}
+	if defaultConfig.EnableIdentityPropagation {
+		t.Error("Expected identity propagation to be disabled in default config")
+	}
+	t.Logf("✅ Default interceptor configuration validated")
+}
+
+func testProductionInterceptorConfig(t *testing.T) {
+	t.Helper()
+	prodConfig := ephemos.NewProductionInterceptorConfig("prod-service")
+	if !prodConfig.EnableAuth {
+		t.Error("Expected auth to be enabled in production config")
+	}
+	if !prodConfig.EnableIdentityPropagation {
+		t.Error("Expected identity propagation to be enabled in production config")
+	}
+	t.Logf("✅ Production interceptor configuration validated")
+}
+
+func testDevelopmentInterceptorConfig(t *testing.T) {
+	t.Helper()
+	devConfig := ephemos.NewDevelopmentInterceptorConfig("dev-service")
+	if devConfig.EnableAuth {
+		t.Error("Expected auth to be disabled in development config")
+	}
+	if !devConfig.EnableIdentityPropagation {
+		t.Error("Expected identity propagation to be enabled in development config")
+	}
+	t.Logf("✅ Development interceptor configuration validated")
+}
+
+func testServiceRegistrarCreation(t *testing.T) {
+	t.Helper()
+	var registrationCalled bool
+	registrar := ephemos.NewServiceRegistrar(func(_ *grpc.Server) {
+		registrationCalled = true
+	})
+
+	if registrar == nil {
+		t.Fatal("Service registrar is nil")
+	}
+
+	grpcServer := grpc.NewServer()
+	defer grpcServer.Stop()
+	registrar.Register(grpcServer)
+
+	if !registrationCalled {
+		t.Error("Registration function was not called")
+	}
+	t.Logf("✅ Service registrar created and tested successfully")
 }
 
 // TestErrorHandlingFlow tests error handling throughout the identity stack.
 func TestErrorHandlingFlow(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	t.Run("IdentityValidationErrors", func(t *testing.T) {
@@ -453,12 +532,12 @@ func TestErrorHandlingFlow(t *testing.T) {
 		t.Logf("✅ Configuration error handling validated: %v", err)
 
 		// Test context cancellation
-		cancelledCtx, cancel := context.WithCancel(ctx)
+		canceledCtx, cancel := context.WithCancel(ctx)
 		cancel()
 
-		_, err = provider.LoadConfiguration(cancelledCtx, "test")
+		_, err = provider.LoadConfiguration(canceledCtx, "test")
 		if err == nil {
-			t.Error("Expected error for cancelled context")
+			t.Error("Expected error for canceled context")
 		}
 		t.Logf("✅ Context cancellation handling validated: %v", err)
 	})
@@ -498,7 +577,7 @@ func TestIdentityLifecycle(t *testing.T) {
 	})
 
 	t.Run("ConfigurationLifecycle", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 		provider := config.NewInMemoryProvider()
 
 		// Step 1: Test default configuration
@@ -529,26 +608,30 @@ func TestIdentityLifecycle(t *testing.T) {
 	})
 }
 
-// Mock transport provider for testing
+// Mock transport provider for testing.
 type mockTransportProvider struct{}
 
-func (m *mockTransportProvider) CreateServer(cert *domain.Certificate, trustBundle *domain.TrustBundle, policy *domain.AuthenticationPolicy) (ports.Server, error) {
+func (m *mockTransportProvider) CreateServer(
+	_ *domain.Certificate, _ *domain.TrustBundle, _ *domain.AuthenticationPolicy,
+) (ports.Server, error) {
 	return &mockServer{}, nil
 }
 
-func (m *mockTransportProvider) CreateClient(cert *domain.Certificate, trustBundle *domain.TrustBundle, policy *domain.AuthenticationPolicy) (ports.Client, error) {
+func (m *mockTransportProvider) CreateClient(
+	_ *domain.Certificate, _ *domain.TrustBundle, _ *domain.AuthenticationPolicy,
+) (ports.Client, error) {
 	return &mockClient{}, nil
 }
 
 type mockServer struct{}
 
-func (m *mockServer) RegisterService(serviceRegistrar ports.ServiceRegistrar) error { return nil }
-func (m *mockServer) Start(listener ports.Listener) error                           { return nil }
-func (m *mockServer) Stop() error                                                   { return nil }
+func (m *mockServer) RegisterService(_ ports.ServiceRegistrar) error { return nil }
+func (m *mockServer) Start(_ ports.Listener) error                   { return nil }
+func (m *mockServer) Stop() error                                    { return nil }
 
 type mockClient struct{}
 
-func (m *mockClient) Connect(serviceName, address string) (ports.Connection, error) {
+func (m *mockClient) Connect(_, _ string) (ports.Connection, error) {
 	return &mockConnection{}, nil
 }
 func (m *mockClient) Close() error { return nil }
