@@ -205,7 +205,9 @@ func Test_Core_Has_No_Forbidden_Imports(t *testing.T) {
 	}
 }
 
-// Test_Adapters_Cannot_Import_Other_Adapters ensures adapters are isolated
+// Test_Adapters_Cannot_Import_Other_Adapters ensures adapters are isolated.
+//
+//nolint:cyclop // Test function complexity acceptable for readability
 func Test_Adapters_Cannot_Import_Other_Adapters(t *testing.T) {
 	mp := modulePath(t)
 	adaptersPrefix := mp + "/internal/adapters"
@@ -260,7 +262,9 @@ func Test_Adapters_Cannot_Import_Other_Adapters(t *testing.T) {
 	}
 }
 
-// Test_Core_Domain_Has_No_External_Dependencies ensures domain is pure
+// Test_Core_Domain_Has_No_External_Dependencies ensures domain is pure.
+//
+//nolint:cyclop // Test function complexity acceptable for readability
 func Test_Core_Domain_Has_No_External_Dependencies(t *testing.T) {
 	mp := modulePath(t)
 
@@ -328,7 +332,7 @@ func Test_Core_Domain_Has_No_External_Dependencies(t *testing.T) {
 	}
 }
 
-// Test_Public_API_Boundary ensures pkg/ephemos doesn't leak internal details
+// Test_Public_API_Boundary ensures pkg/ephemos doesn't leak internal details.
 func Test_Public_API_Boundary(t *testing.T) {
 	mp := modulePath(t)
 	internalPrefix := mp + "/internal/"
@@ -376,7 +380,7 @@ func Test_Public_API_Boundary(t *testing.T) {
 	}
 }
 
-// Test_Circular_Dependencies detects circular import patterns
+// Test_Circular_Dependencies detects circular import patterns.
 func Test_Circular_Dependencies(t *testing.T) {
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedFiles,
@@ -416,7 +420,7 @@ func Test_Circular_Dependencies(t *testing.T) {
 	}
 }
 
-// Test_Layer_Dependencies ensures proper layering (domain <- ports <- services <- adapters)
+// Test_Layer_Dependencies ensures proper layering (domain <- ports <- services <- adapters).
 func Test_Layer_Dependencies(t *testing.T) {
 	mp := modulePath(t)
 
