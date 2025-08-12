@@ -1,6 +1,21 @@
 # Core Makefile for Ephemos
 # Handles essential build, test, and development tasks
-.PHONY: build proto proto-ci examples test clean deps fmt lint help setup check-deps install-deps
+
+# Build variables for reproducible builds
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+COMMIT_HASH ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_TIME ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+BUILD_USER ?= $(shell whoami)
+BUILD_HOST ?= $(shell hostname)
+
+# Go build flags for reproducible builds
+LDFLAGS := -X main.Version=$(VERSION) \
+           -X main.CommitHash=$(COMMIT_HASH) \
+           -X main.BuildTime=$(BUILD_TIME) \
+           -X main.BuildUser=$(BUILD_USER) \
+           -X main.BuildHost=$(BUILD_HOST)
+
+GO_BUILD_FLAGS := -trimpath -ldflags "$(LDFLAGS)"
 
 # Variables
 PROTO_DIR := examples/proto
@@ -8,17 +23,23 @@ GO_OUT := examples/proto
 CLI_BINARY := ephemos
 SERVER_BINARY := echo-server
 CLIENT_BINARY := echo-client
+CONFIG_VALIDATOR_BINARY := config-validator
+
+# PHONY targets - all targets that don't create files
+.PHONY: all build proto proto-ci examples test clean deps fmt lint help setup \
+        check-deps install-deps benchmark fmt-only core-help version show-build-info
 
 # Default target
 all: proto build examples
 
-# Build library and CLI
-build: check-deps
-	@echo "Building Ephemos CLI..."
+# Build library and CLI with reproducible builds
+build: check-deps show-build-info
+	@echo "Building Ephemos CLI with reproducible build flags..."
 	@mkdir -p bin
-	go build -v -o "bin/$(CLI_BINARY)" ./cmd/ephemos-cli
-	go build -v -o bin/config-validator ./cmd/config-validator
+	go build $(GO_BUILD_FLAGS) -v -o "bin/$(CLI_BINARY)" ./cmd/ephemos-cli
+	go build $(GO_BUILD_FLAGS) -v -o "bin/$(CONFIG_VALIDATOR_BINARY)" ./cmd/config-validator
 	@echo "Build completed!"
+	@echo "Binaries built with version: $(VERSION)"
 
 # Generate protobuf code
 proto: check-deps
@@ -37,13 +58,13 @@ proto-ci:
 		exit 0; \
 	}
 
-# Build example applications
+# Build example applications with reproducible builds
 examples: proto
-	@echo "Building example applications..."
+	@echo "Building example applications with reproducible build flags..."
 	@mkdir -p bin
-	go build -v -o "bin/$(SERVER_BINARY)" ./examples/echo-server
-	go build -v -o "bin/$(CLIENT_BINARY)" ./examples/echo-client
-	@echo "Examples built!"
+	go build $(GO_BUILD_FLAGS) -v -o "bin/$(SERVER_BINARY)" ./examples/echo-server
+	go build $(GO_BUILD_FLAGS) -v -o "bin/$(CLIENT_BINARY)" ./examples/echo-client
+	@echo "Examples built with version: $(VERSION)"
 
 # Run tests
 test: check-deps
@@ -88,23 +109,49 @@ clean:
 	rm -f "$(GO_OUT)"/*.pb.go
 	@echo "Clean completed!"
 
+# Show build information
+show-build-info:
+	@echo "Build Information:"
+	@echo "=================="
+	@echo "Version:     $(VERSION)"
+	@echo "Commit:      $(COMMIT_HASH)"
+	@echo "Build Time:  $(BUILD_TIME)"
+	@echo "Build User:  $(BUILD_USER)"
+	@echo "Build Host:  $(BUILD_HOST)"
+	@echo "Go Flags:    $(GO_BUILD_FLAGS)"
+	@echo ""
+
+# Show version only
+version:
+	@echo "$(VERSION)"
+
 # Help
 core-help:
 	@echo "Core Ephemos Build Targets:"
 	@echo ""
-	@echo "  make build     - Build library and CLI"
-	@echo "  make setup     - Install all development dependencies"
-	@echo "  make check-deps- Check if all dependencies are installed"
-	@echo "  make proto     - Generate protobuf code"
-	@echo "  make proto-ci  - Generate protobuf code (CI-friendly, no strict deps)"
-	@echo "  make examples  - Build example applications"
-	@echo "  make test      - Run tests"
-	@echo "  make benchmark - Run benchmarks"
-	@echo "  make deps      - Get/update Go dependencies"
-	@echo "  make fmt       - Format code"
-	@echo "  make lint      - Lint code"
-	@echo "  make clean     - Clean build artifacts"
-	@echo "  make help      - Show this help"
+	@echo "Build targets (with reproducible builds):"
+	@echo "  make build          - Build library and CLI with version info"
+	@echo "  make examples       - Build example applications with version info"
+	@echo "  make clean          - Clean build artifacts"
+	@echo ""
+	@echo "Development targets:"
+	@echo "  make setup          - Install development dependencies (Go tools only, no sudo)"
+	@echo "  make check-deps     - Check if all dependencies are installed"
+	@echo "  make test           - Run tests"
+	@echo "  make benchmark      - Run benchmarks"
+	@echo "  make deps           - Get/update Go dependencies"
+	@echo "  make fmt            - Format code"
+	@echo "  make fmt-only       - Format code only (no validation)"
+	@echo "  make lint           - Lint code"
+	@echo ""
+	@echo "Protobuf targets:"
+	@echo "  make proto          - Generate protobuf code"
+	@echo "  make proto-ci       - Generate protobuf code (CI-friendly)"
+	@echo ""
+	@echo "Information targets:"
+	@echo "  make version        - Show version"
+	@echo "  make show-build-info- Show detailed build information"
+	@echo "  make help           - Show this help"
 
 # Development setup targets
 setup: install-deps
@@ -124,7 +171,7 @@ check-deps:
 			echo ""; \
 			echo "⚠️  Some dependencies missing. Build may fail."; \
 			echo "💡 Run 'make setup' for complete installation"; \
-			echo "💡 Or install protoc manually: sudo apt-get install protobuf-compiler"; \
+			echo "💡 Or run: ./scripts/install-deps-sudo.sh for system packages"; \
 		fi; \
 	fi
 

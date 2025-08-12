@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Development dependencies installation script for Ephemos
-# This script installs all required tools for local development
+# Development dependencies installation script for Ephemos (with sudo)
+# This script installs all required tools for local development using sudo for system packages
 
 set -e
 
@@ -23,7 +23,7 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Function to install for different package managers (non-sudo by default)
+# Function to install for different package managers (with sudo for system packages)
 install_with_manager() {
     local package="$1"
     local manager="$2"
@@ -31,28 +31,16 @@ install_with_manager() {
     echo -e "${YELLOW}Installing $package with $manager...${NC}"
     case "$manager" in
         "apt")
-            echo -e "${YELLOW}⚠️  System package installation requires sudo.${NC}"
-            echo "Please run manually: sudo apt-get update && sudo apt-get install -y $package"
-            echo "Or use the install-deps-sudo.sh script for automatic installation"
-            return 1
+            sudo apt-get update && sudo apt-get install -y "$package"
             ;;
         "yum")
-            echo -e "${YELLOW}⚠️  System package installation requires sudo.${NC}"
-            echo "Please run manually: sudo yum install -y $package"
-            echo "Or use the install-deps-sudo.sh script for automatic installation"
-            return 1
+            sudo yum install -y "$package"
             ;;
         "dnf")
-            echo -e "${YELLOW}⚠️  System package installation requires sudo.${NC}"
-            echo "Please run manually: sudo dnf install -y $package"
-            echo "Or use the install-deps-sudo.sh script for automatic installation"
-            return 1
+            sudo dnf install -y "$package"
             ;;
         "pacman")
-            echo -e "${YELLOW}⚠️  System package installation requires sudo.${NC}"
-            echo "Please run manually: sudo pacman -S --noconfirm $package"
-            echo "Or use the install-deps-sudo.sh script for automatic installation"
-            return 1
+            sudo pacman -S --noconfirm "$package"
             ;;
         "brew")
             brew install "$package"
@@ -139,13 +127,11 @@ else
     esac
     
     # Verify installation
-    # Note: protoc installation may have failed due to sudo requirements
     if command_exists protoc; then
         echo -e "${GREEN}✓ protoc installed successfully${NC}"
     else
-        echo -e "${YELLOW}⚠️  protoc not found after installation attempt${NC}"
-        echo "This is expected when sudo is required for system packages"
-        echo "Continuing with Go tools installation..."
+        echo -e "${RED}✗ protoc installation failed${NC}"
+        INSTALL_ERRORS=1
     fi
 fi
 
@@ -262,8 +248,7 @@ else
 fi
 
 echo -e "\n💡 ${BLUE}Next steps:${NC}"
-echo "1. If protoc installation was skipped, run: ./scripts/install-deps-sudo.sh"
-echo "2. Restart your terminal or run: source ~/.bashrc"
-echo "3. Run: make build"
-echo "4. Run: make test"
-echo "5. Start developing!"
+echo "1. Restart your terminal or run: source ~/.bashrc"
+echo "2. Run: make build"
+echo "3. Run: make test"
+echo "4. Start developing!"
