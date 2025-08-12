@@ -211,7 +211,7 @@ func checkAdapterStructure(t *testing.T, filePath string) []string {
 				hasStruct = true
 			}
 			if _, ok := ts.Type.(*ast.InterfaceType); ok {
-				_ = true // hasInterface for future extensibility
+				_ = true // hasInterface - reserved for future structural checks
 			}
 		}
 		return true

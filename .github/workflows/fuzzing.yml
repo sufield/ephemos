@@ -116,7 +116,8 @@ jobs:
     name: ClusterFuzzLite
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    if: github.event_name == 'schedule' || github.event_name == 'push'
+    # Run on all triggers (push, PR, schedule) to ensure comprehensive security testing
+    if: github.event_name == 'schedule' || github.event_name == 'push' || github.event_name == 'pull_request'
     permissions:
       contents: read
       security-events: write
@@ -140,6 +141,10 @@ jobs:
         mkdir -p .clusterfuzzlite
         mkdir -p build-out
         
+        # Ensure build-out is in the workspace root for ClusterFuzzLite
+        echo "Creating build-out directory structure..."
+        mkdir -p build-out
+        
         # Build the project first to ensure everything compiles
         echo "Building project..."
         make build
@@ -157,15 +162,10 @@ jobs:
         
         import (
           "context"
-          "errors"
-          "os"
-          "path/filepath"
-          "testing"
-          "time"
           "fmt"
+          "time"
         
           "github.com/sufield/ephemos/pkg/ephemos"
-          coreErrors "github.com/sufield/ephemos/internal/core/errors"
         )
         
         func main() {
@@ -174,22 +174,27 @@ jobs:
         }
         
         func FuzzConfigTarget(data []byte) int {
-          // Convert to string for path fuzzing
-          path := string(data)
+          // Convert to string for config path fuzzing
+          configPath := string(data)
           
-          // Test config path resolution
-          ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+          // Create timeout context for fuzzing
+          ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
           defer cancel()
           
           defer func() {
             if r := recover(); r != nil {
-              // Recovered from panic, this might be interesting
+              // Recovered from panic, continue fuzzing
+              // Don't log in production fuzzing to avoid noise
             }
           }()
           
-          // Fuzz the config path resolution
-          if len(path) > 0 && len(path) < 1000 {
-            _ = ephemos.ResolveConfigPath(path)
+          // Fuzz the public API functions with various config paths
+          if len(configPath) > 0 && len(configPath) < 500 {
+            // Test NewIdentityServer with fuzzed config path
+            _, _ = ephemos.NewIdentityServer(ctx, configPath)
+            
+            // Test NewIdentityClient with fuzzed config path  
+            _, _ = ephemos.NewIdentityClient(ctx, configPath)
           }
           
           return 0
@@ -201,8 +206,10 @@ jobs:
         package main
         
         import (
+          "context"
           "fmt"
-          "strings"
+        
+          "github.com/sufield/ephemos/pkg/ephemos"
         )
         
         func main() {
@@ -210,31 +217,29 @@ jobs:
         }
         
         func FuzzServerTarget(data []byte) int {
-          // Convert to string for server input fuzzing
+          // Convert to string for server configuration fuzzing
           input := string(data)
           
           defer func() {
             if r := recover(); r != nil {
-              // Recovered from panic
+              // Recovered from panic, continue fuzzing
             }
           }()
           
-          // Test various server input validation
-          if len(input) > 0 && len(input) < 1000 {
-            // Test service name validation
-            if strings.Contains(input, "service") {
-              // Validate service name format
-              _ = len(strings.TrimSpace(input))
-            }
+          // Test server creation with fuzzed inputs
+          if len(input) > 0 && len(input) < 500 {
+            ctx := context.Background()
             
-            // Test address parsing
-            if strings.Contains(input, ":") {
-              parts := strings.Split(input, ":")
-              if len(parts) == 2 {
-                // Basic port validation
-                _ = parts[1]
-              }
-            }
+            // Test server creation with fuzzed config paths
+            _, _ = ephemos.NewIdentityServer(ctx, input)
+            
+            // Test NewServiceRegistrar with nil function (should not panic)
+            _ = ephemos.NewServiceRegistrar(nil)
+            
+            // Test interceptor configurations
+            _ = ephemos.NewDefaultInterceptorConfig()
+            _ = ephemos.NewProductionInterceptorConfig(input)
+            _ = ephemos.NewDevelopmentInterceptorConfig(input)
           }
           
           return 0
@@ -246,8 +251,10 @@ jobs:
         package main
         
         import (
+          "context"
           "fmt"
-          "strings"
+        
+          "github.com/sufield/ephemos/pkg/ephemos"
         )
         
         func main() {
@@ -255,27 +262,24 @@ jobs:
         }
         
         func FuzzIdentityTarget(data []byte) int {
-          // Convert to string for identity input fuzzing
+          // Convert to string for identity-related fuzzing
           input := string(data)
           
           defer func() {
             if r := recover(); r != nil {
-              // Recovered from panic
+              // Recovered from panic, continue fuzzing
             }
           }()
           
-          // Test identity-related parsing
-          if len(input) > 0 && len(input) < 1000 {
-            // Test SPIFFE ID format
-            if strings.HasPrefix(input, "spiffe://") {
-              parts := strings.Split(input, "/")
-              _ = len(parts)
-            }
+          // Test client creation and identity-related functions
+          if len(input) > 0 && len(input) < 500 {
+            ctx := context.Background()
             
-            // Test trust domain validation
-            if strings.Contains(input, ".") {
-              _ = strings.Split(input, ".")
-            }
+            // Test client creation with fuzzed config paths
+            _, _ = ephemos.NewIdentityClient(ctx, input)
+            
+            // Test transport server creation (if available)
+            _, _ = ephemos.NewTransportServer(ctx, input)
           }
           
           return 0
@@ -286,28 +290,87 @@ jobs:
         echo "Building fuzz target binaries..."
         cd fuzz-targets
         
-        # Build each fuzz target
-        go mod init fuzz-targets
-        go mod tidy
+        # Initialize Go module for fuzz targets
+        if [ ! -f go.mod ]; then
+          echo "Creating go.mod for fuzz targets..."
+          cat > go.mod << 'GOMOD'
+module fuzz-targets
+
+go 1.24
+
+require github.com/sufield/ephemos v0.0.0
+
+replace github.com/sufield/ephemos => ../
+GOMOD
+        fi
         
-        CGO_ENABLED=1 go build -buildmode=c-archive -o ../build-out/config_fuzz config_fuzz_main.go
-        CGO_ENABLED=1 go build -buildmode=c-archive -o ../build-out/server_fuzz server_fuzz_main.go  
-        CGO_ENABLED=1 go build -buildmode=c-archive -o ../build-out/identity_fuzz identity_fuzz_main.go
+        echo "Contents of go.mod:"
+        cat go.mod
+        
+        echo "Running go mod tidy..."
+        go mod tidy -v
+        
+        echo "Checking Go module status..."
+        go list -m all
+        
+        # Build regular binaries (more compatible with ClusterFuzzLite)
+        echo "Building standard Go binaries..."
+        
+        echo "Building config_fuzz..."
+        go build -v -o ../build-out/config_fuzz ./config_fuzz_main.go
+        if [ $? -eq 0 ]; then
+          echo "✅ config_fuzz built successfully"
+        else
+          echo "❌ config_fuzz build failed"
+          exit 1
+        fi
+        
+        echo "Building server_fuzz..."
+        go build -v -o ../build-out/server_fuzz ./server_fuzz_main.go
+        if [ $? -eq 0 ]; then
+          echo "✅ server_fuzz built successfully"
+        else
+          echo "❌ server_fuzz build failed"
+          exit 1
+        fi
+        
+        echo "Building identity_fuzz..."
+        go build -v -o ../build-out/identity_fuzz ./identity_fuzz_main.go
+        if [ $? -eq 0 ]; then
+          echo "✅ identity_fuzz built successfully"
+        else
+          echo "❌ identity_fuzz build failed"
+          exit 1
+        fi
         
         cd ..
         
-        # Also build regular binaries as fallback
-        go build -o build-out/config_fuzz_bin ./fuzz-targets/config_fuzz_main.go
-        go build -o build-out/server_fuzz_bin ./fuzz-targets/server_fuzz_main.go
-        go build -o build-out/identity_fuzz_bin ./fuzz-targets/identity_fuzz_main.go
-        
         # Verify build-out directory has fuzz targets
         echo "Contents of build-out directory:"
-        ls -la build-out/
+        ls -la build-out/ || echo "build-out directory does not exist"
+        
+        # Count the number of binaries created
+        BINARY_COUNT=$(find build-out/ -type f -executable 2>/dev/null | wc -l)
+        echo "Number of executable files found: $BINARY_COUNT"
+        
+        # Check each expected binary
+        for binary in config_fuzz server_fuzz identity_fuzz; do
+          if [ -f "build-out/$binary" ]; then
+            echo "✅ $binary exists and is $(file build-out/$binary)"
+          else
+            echo "❌ $binary is missing"
+          fi
+        done
         
         # Validate that we have fuzz targets
         if [ -z "$(ls -A build-out/ 2>/dev/null)" ]; then
           echo "❌ build-out directory is empty after building fuzz targets"
+          echo "Debugging: Contents of fuzz-targets directory:"
+          ls -la fuzz-targets/
+          echo "Debugging: Go build environment:"
+          cd fuzz-targets
+          go env
+          cd ..
           exit 1
         fi
         

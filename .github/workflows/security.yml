@@ -9,6 +9,13 @@ on:
     paths:
       - 'go.mod'
       - 'go.sum'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'go.mod'
+      - 'go.sum'
+      - '**/*.go'
+      - '.github/workflows/**'
   workflow_dispatch:
 
 jobs:
