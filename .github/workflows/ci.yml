@@ -8,6 +8,11 @@ name: CI/CD Pipeline
 # 3. Generate all required protobuf files (*.pb.go files)
 # 4. Verify all tools are properly installed
 
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+
 on:
   push:
     branches: [ main, develop ]
@@ -411,6 +416,9 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [lint, security, build, test]
+    permissions:
+      contents: write
+      actions: read
     steps:
     - name: Checkout code
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
