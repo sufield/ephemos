@@ -82,16 +82,48 @@ runs:
         GOPATH_BIN="$(go env GOPATH)/bin"
         export PATH="$PATH:$GOPATH_BIN:/usr/bin:/usr/local/bin"
         
+        echo "Current working directory: $(pwd)"
+        echo "Checking proto directory..."
+        ls -la examples/proto/ || echo "Proto directory not found"
+        
+        # Check if proto file exists
+        if [ ! -f "examples/proto/echo.proto" ]; then
+          echo "❌ Source proto file examples/proto/echo.proto not found"
+          exit 1
+        fi
+        
         # Force regeneration of protobuf files
         echo "Removing any existing protobuf files..."
         rm -f examples/proto/*.pb.go
         
         echo "Generating fresh protobuf files..."
-        make proto || (echo "❌ Failed to generate protobuf files" && exit 1)
+        echo "PATH: $PATH"
+        echo "GOPATH: $(go env GOPATH)"
+        echo "Available tools:"
+        which protoc || echo "protoc not found"
+        which protoc-gen-go || echo "protoc-gen-go not found"  
+        which protoc-gen-go-grpc || echo "protoc-gen-go-grpc not found"
+        
+        # Try make proto first
+        if ! make proto; then
+          echo "⚠️ make proto failed, trying direct protoc invocation..."
+          # Fallback to direct protoc call
+          if ! protoc \
+            --go_out=examples/proto \
+            --go_opt=paths=source_relative \
+            --go-grpc_out=examples/proto \
+            --go-grpc_opt=paths=source_relative \
+            -I examples/proto \
+            examples/proto/echo.proto; then
+            echo "❌ Both make proto and direct protoc failed"
+            exit 1
+          fi
+        fi
         
         # Verify files were generated
         if [ ! -f "examples/proto/echo.pb.go" ] || [ ! -f "examples/proto/echo_grpc.pb.go" ]; then
           echo "❌ Protobuf files were not generated successfully"
+          echo "Directory contents:"
           ls -la examples/proto/
           exit 1
         fi
