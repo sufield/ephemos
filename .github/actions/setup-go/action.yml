@@ -17,6 +17,29 @@ runs:
       with:
         go-version: ${{ inputs.go-version }}
     
+    - name: Clean conflicting cache directories before restore
+      shell: bash
+      run: |
+        echo "🧹 Cleaning potential conflicting cache directories..."
+        # Clean cache directories that might conflict with cache restoration
+        rm -rf ~/.cache/go-build || true
+        rm -rf ~/go/pkg/mod || true
+        # Create directories to ensure proper permissions
+        mkdir -p ~/.cache/go-build
+        mkdir -p ~/go/pkg
+        echo "✅ Cache directories cleaned and prepared"
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ inputs.go-version }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ inputs.go-version }}-
+          ${{ runner.os }}-go-
+        
     - name: Clear Go build caches (preserve modules)
       shell: bash
       run: |
@@ -35,17 +58,6 @@ runs:
         go version | grep -E "(go1\.(22|23|24))" || (echo "ERROR: Go version is not 1.22, 1.23, or 1.24" && exit 1)
       env:
         GO_VERSION: ${{ inputs.go-version }}
-        
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ inputs.go-version }}-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-${{ inputs.go-version }}-
-          ${{ runner.os }}-go-
           
     - name: Download dependencies
       shell: bash
