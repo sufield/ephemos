@@ -116,7 +116,8 @@ jobs:
     name: ClusterFuzzLite
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    if: github.event_name == 'schedule' || github.event_name == 'push'
+    # Run on all triggers (push, PR, schedule) to ensure comprehensive security testing
+    if: github.event_name == 'schedule' || github.event_name == 'push' || github.event_name == 'pull_request'
     permissions:
       contents: read
       security-events: write
