@@ -197,7 +197,7 @@ func (m *GracefulShutdownManager) shutdownListeners(wg *sync.WaitGroup, addError
 	}
 }
 
-func (m *GracefulShutdownManager) waitForShutdown(wg *sync.WaitGroup, timeoutCtx context.Context, successMsg, warnMsg string) bool {
+func (m *GracefulShutdownManager) waitForShutdown(timeoutCtx context.Context, wg *sync.WaitGroup, successMsg, warnMsg string) bool {
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
@@ -240,7 +240,7 @@ func (m *GracefulShutdownManager) shutdownSpiffeProviders(graceCtx, forceCtx con
 			}
 		}(provider)
 	}
-	success := m.waitForShutdown(&spiffeWg, forceCtx, "SPIFFE providers closed successfully", "Force timeout exceeded during SPIFFE cleanup")
+	success := m.waitForShutdown(forceCtx, &spiffeWg, "SPIFFE providers closed successfully", "Force timeout exceeded during SPIFFE cleanup")
 	if !success {
 		addError(fmt.Errorf("force timeout during SPIFFE cleanup"))
 	}
@@ -273,7 +273,7 @@ func (m *GracefulShutdownManager) performShutdown(graceCtx, drainCtx, forceCtx c
 	m.shutdownServers(graceCtx, &wg, addError)
 	m.shutdownListeners(&wg, addError)
 	// Wait for Phase 1 & 2 with drain timeout (no error added on timeout, per original logic)
-	m.waitForShutdown(&wg, drainCtx, "Servers and listeners stopped successfully", "Drain timeout exceeded, continuing shutdown")
+	m.waitForShutdown(drainCtx, &wg, "Servers and listeners stopped successfully", "Drain timeout exceeded, continuing shutdown")
 	m.shutdownClients(addError)
 	m.shutdownSpiffeProviders(graceCtx, forceCtx, addError)
 	m.runCleanupFunctions(addError)
