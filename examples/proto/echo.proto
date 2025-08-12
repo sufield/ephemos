@@ -4,7 +4,7 @@ package ephemos.echo;
 
 option go_package = "github.com/sufield/ephemos/examples/proto";
 
-// EchoService provides a simple echo functionality for testing
+// EchoService provides a simple echo functionality for testing.
 // This is an example service definition that developers can use as a template
 // when building their own services with the Ephemos library.
 service EchoService {
