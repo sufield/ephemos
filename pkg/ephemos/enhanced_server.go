@@ -73,9 +73,17 @@ func initializeServerOptions(opts *ServerOptions) *ServerOptions {
 // createBaseServer creates the base identity server.
 func createBaseServer(ctx context.Context, opts *ServerOptions) (*api.IdentityServer, error) {
 	if opts.Config != nil {
-		return api.NewIdentityServerWithConfig(ctx, opts.Config)
+		server, err := api.NewIdentityServerWithConfig(ctx, opts.Config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create server with config: %w", err)
+		}
+		return server, nil
 	}
-	return api.NewIdentityServer(ctx, opts.ConfigPath)
+	server, err := api.NewIdentityServer(ctx, opts.ConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create server from path: %w", err)
+	}
+	return server, nil
 }
 
 // createSPIFFEProvider creates the SPIFFE provider if configured.
