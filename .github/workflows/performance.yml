@@ -28,7 +28,7 @@ jobs:
         
     - name: Clean Go Module Cache
       run: |
-        rm -rf ~/go/pkg/mod
+        sudo rm -rf ~/go/pkg/mod
         rm -rf ~/.cache/go-build
         
     - name: Cache Go modules
