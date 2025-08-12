@@ -30,7 +30,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
       with:
-        go-version: '1.24'
+        go-version: '1.24.x'
         
     - name: Install govulncheck
       run: go install golang.org/x/vuln/cmd/govulncheck@latest
@@ -49,7 +49,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
       with:
-        go-version: '1.24'
+        go-version: '1.24.x'
         
     - name: Install go-licenses
       run: |
@@ -87,7 +87,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
       with:
-        go-version: '1.24'
+        go-version: '1.24.x'
         
     - name: Check for outdated dependencies
       run: |
@@ -159,7 +159,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
       with:
-        go-version: '1.24'
+        go-version: '1.24.x'
         
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
@@ -199,7 +199,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
       with:
-        go-version: '1.24'
+        go-version: '1.24.x'
         
     - name: Build project for SBOM scanning
       run: |
@@ -402,7 +402,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
       with:
-        go-version: '1.24'
+        go-version: '1.24.x'
 
     # Advanced vulnerability scanning
     - name: Install nancy (Sonatype)

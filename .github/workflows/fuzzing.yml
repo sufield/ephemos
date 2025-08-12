@@ -10,7 +10,7 @@ on:
     - cron: '0 2 * * 0'
 
 env:
-  GO_VERSION: '1.24'
+  GO_VERSION: '1.24.x'
 
 jobs:
   # Go native fuzzing
@@ -23,9 +23,10 @@ jobs:
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
     - name: Setup Go Environment
-      uses: ./.github/actions/setup-go
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+        check-latest: true
 
     - name: Set Go proxy for reliable module downloads
       run: go env -w GOPROXY=https://proxy.golang.org,direct
@@ -139,9 +140,10 @@ jobs:
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
     - name: Setup Go Environment
-      uses: ./.github/actions/setup-go
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+        check-latest: true
 
     - name: Set Go proxy for reliable module downloads
       run: go env -w GOPROXY=https://proxy.golang.org,direct
@@ -439,9 +441,10 @@ jobs:
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
     - name: Setup Go Environment
-      uses: ./.github/actions/setup-go
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
+        check-latest: true
 
     - name: Set Go proxy for reliable module downloads
       run: go env -w GOPROXY=https://proxy.golang.org,direct

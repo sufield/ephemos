@@ -4,7 +4,7 @@ inputs:
   go-version:
     description: 'Go version to install'
     required: false
-    default: '1.24'
+    default: '1.24.x'
   verify-version:
     description: 'Whether to verify the Go version matches expected'
     required: false
@@ -18,38 +18,17 @@ runs:
         go-version: ${{ inputs.go-version }}
         check-latest: true
     
-    - name: Ensure Go stdlib is present (Windows fix)
-      if: runner.os == 'Windows'
+    - name: Verify Go installation
       shell: bash
       run: |
-        echo "🔧 Fixing Go standard library on Windows..."
-        echo "Current Go version: $(go version)"
+        echo "🔍 Verifying Go installation..."
+        echo "Go version: $(go version)"
         echo "GOROOT: $(go env GOROOT)"
+        echo "GOPATH: $(go env GOPATH)"
         
-        # Check if stdlib sources are missing
-        if [ ! -d "$(go env GOROOT)/src/context" ]; then
-          echo "⚠️ Standard library sources missing, installing full toolchain..."
-          
-          # Install latest toolchain to ensure stdlib sources
-          go install golang.org/toolchain@latest || true
-          
-          # Force install the specific Go version with stdlib
-          go tool toolchain install go${{ inputs.go-version }} || true
-          
-          # Update environment if toolchain was installed
-          if [ -d "$(go env GOTOOLCHAINPATH)/go${{ inputs.go-version }}" ]; then
-            echo "$(go env GOTOOLCHAINPATH)/go${{ inputs.go-version }}/bin" >> $GITHUB_PATH
-            export PATH="$(go env GOTOOLCHAINPATH)/go${{ inputs.go-version }}/bin:$PATH"
-          fi
-          
-          # Verify the fix
-          echo "After fix - Go version: $(go version)"
-          echo "After fix - GOROOT: $(go env GOROOT)"
-          ls "$(go env GOROOT)/src/context" >/dev/null 2>&1 && echo "✅ context package found" || echo "❌ context package still missing"
-          ls "$(go env GOROOT)/src/crypto" >/dev/null 2>&1 && echo "✅ crypto package found" || echo "❌ crypto package still missing"
-        else
-          echo "✅ Standard library sources already present"
-        fi
+        # Verify key stdlib packages exist
+        go list std | grep -E "^(context|crypto)$" || (echo "❌ Standard library packages missing" && exit 1)
+        echo "✅ Go installation verified"
     
     - name: Clean conflicting cache directories before restore
       shell: bash
@@ -89,7 +68,7 @@ runs:
       run: |
         echo "Expected Go version: ${GO_VERSION}"
         echo "Actual Go version: $(go version)"
-        go version | grep -E "(go1\.(22|23|24))" || (echo "ERROR: Go version is not 1.22, 1.23, or 1.24" && exit 1)
+        go version | grep -E "(go1\.24)" || (echo "ERROR: Go version is not 1.24" && exit 1)
       env:
         GO_VERSION: ${{ inputs.go-version }}
           
