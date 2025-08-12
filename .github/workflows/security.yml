@@ -477,12 +477,21 @@ jobs:
   container-security:
     name: Container Security Scan
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('Dockerfile', '**/Dockerfile') != '' }}
     steps:
     - name: Checkout code
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
+    - name: Check for Dockerfiles
+      id: dockerfile-check
+      run: |
+        if find . -name "Dockerfile" -o -name "*.dockerfile" | grep -q .; then
+          echo "has-dockerfile=true" >> $GITHUB_OUTPUT
+        else
+          echo "has-dockerfile=false" >> $GITHUB_OUTPUT
+        fi
+
     - name: Run Trivy vulnerability scanner
+      if: steps.dockerfile-check.outputs.has-dockerfile == 'true'
       uses: aquasecurity/trivy-action@master
       with:
         scan-type: 'fs'
@@ -492,6 +501,6 @@ jobs:
 
     - name: Upload Trivy scan results to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      if: always() && steps.dockerfile-check.outputs.has-dockerfile == 'true'
       with:
         sarif_file: 'trivy-results.sarif'
