@@ -34,7 +34,8 @@ func TestValidationEngine_ValidateAndSetDefaults(t *testing.T) {
 		{
 			name:  "valid config with defaults",
 			input: &Configuration{},
-			validate: func(t *testing.T, result any, err error) {
+			validate: func(t *testing.T, result any, _ error) {
+				t.Helper()
 				config := result.(*Configuration)
 				if config.Service.Name != "ephemos-service" {
 					t.Errorf("expected default service name 'ephemos-service', got '%s'", config.Service.Name)
@@ -86,11 +87,12 @@ func TestValidationEngine_ValidateAndSetDefaults(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			validate: func(t *testing.T, result any, err error) {
+			validate: func(t *testing.T, _ any, err error) {
+				t.Helper()
 				// Should have multiple errors
-				var errCollection *ValidationErrorCollection
+				var errCollection *ValidationCollectionError
 				if !errors.As(err, &errCollection) {
-					t.Fatal("expected ValidationErrorCollection")
+					t.Fatal("expected ValidationErrors")
 				}
 				if len(errCollection.Errors) < 2 {
 					t.Errorf("expected multiple errors, got %d", len(errCollection.Errors))
@@ -102,55 +104,32 @@ func TestValidationEngine_ValidateAndSetDefaults(t *testing.T) {
 	engine := NewValidationEngine()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var err error
-			if tt.input != nil {
-				err = engine.ValidateAndSetDefaults(tt.input)
-			} else {
-				err = engine.ValidateAndSetDefaults(tt.input)
-			}
+			err := engine.ValidateAndSetDefaults(tt.input)
 
-			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error, got nil")
-					return
-				}
-				if tt.errSubstring != "" && !strings.Contains(err.Error(), tt.errSubstring) {
-					t.Errorf("expected error containing '%s', got '%s'", tt.errSubstring, err.Error())
-				}
-				if tt.validate != nil {
-					tt.validate(t, tt.input, err)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-					return
-				}
-				if tt.validate != nil {
-					tt.validate(t, tt.input, nil)
-				}
-			}
+			validateTestResult(t, tt, err)
 		})
 	}
 }
 
-func TestValidationRules(t *testing.T) {
-	type testStruct struct {
-		RequiredField    string   `validate:"required"`
-		MinLengthField   string   `validate:"min=5"`
-		MaxLengthField   string   `validate:"max=10"`
-		ExactLengthField string   `validate:"len=8"`
-		RegexField       string   `validate:"regex=^[A-Z]+$"`
-		OneOfField       string   `validate:"oneof=red|green|blue"`
-		IPField          string   `validate:"ip"`
-		PortField        string   `validate:"port"`
-		SPIFFEIDField    string   `validate:"spiffe_id"`
-		DomainField      string   `validate:"domain"`
-		DurationField    string   `validate:"duration"`
-		AbsPathField     string   `validate:"abs_path"`
-		SliceMinField    []string `validate:"min=2"`
-		SliceMaxField    []string `validate:"max=3"`
-	}
+// testStruct is used for validation rule testing.
+type testStruct struct {
+	RequiredField    string   `validate:"required"`
+	MinLengthField   string   `validate:"min=5"`
+	MaxLengthField   string   `validate:"max=10"`
+	ExactLengthField string   `validate:"len=8"`
+	RegexField       string   `validate:"regex=^[A-Z]+$"`
+	OneOfField       string   `validate:"oneof=red|green|blue"`
+	IPField          string   `validate:"ip"`
+	PortField        string   `validate:"port"`
+	SPIFFEIDField    string   `validate:"spiffe_id"`
+	DomainField      string   `validate:"domain"`
+	DurationField    string   `validate:"duration"`
+	AbsPathField     string   `validate:"abs_path"`
+	SliceMinField    []string `validate:"min=2"`
+	SliceMaxField    []string `validate:"max=3"`
+}
 
+func TestValidationRules(t *testing.T) {
 	tests := []struct {
 		name     string
 		data     testStruct
@@ -309,21 +288,7 @@ func TestValidationRules(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := engine.ValidateAndSetDefaults(&tt.data)
 
-			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error, got nil")
-					return
-				}
-				if tt.errField != "" {
-					if !strings.Contains(err.Error(), tt.errField) {
-						t.Errorf("expected error for field '%s', got '%s'", tt.errField, err.Error())
-					}
-				}
-			} else {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-			}
+			validateRuleTestResult(t, &tt, err)
 		})
 	}
 }
@@ -456,7 +421,7 @@ func TestStopOnFirstError(t *testing.T) {
 		}
 
 		// Should only have one error
-		var errCollection *ValidationErrorCollection
+		var errCollection *ValidationCollectionError
 		if errors.As(err, &errCollection) {
 			if len(errCollection.Errors) != 1 {
 				t.Errorf("expected 1 error with stop on first error, got %d", len(errCollection.Errors))
@@ -476,7 +441,7 @@ func TestStopOnFirstError(t *testing.T) {
 		}
 
 		// Should have multiple errors
-		var errCollection *ValidationErrorCollection
+		var errCollection *ValidationCollectionError
 		if errors.As(err, &errCollection) {
 			if len(errCollection.Errors) < 3 {
 				t.Errorf("expected 3 errors with collect all errors, got %d", len(errCollection.Errors))
@@ -573,8 +538,8 @@ func TestConfigurationValidation(t *testing.T) {
 	}
 }
 
-func TestValidationErrorCollection(t *testing.T) {
-	collection := &ValidationErrorCollection{}
+func TestValidationErrors(t *testing.T) {
+	collection := &ValidationCollectionError{}
 
 	// Test empty collection
 	if collection.HasErrors() {
@@ -615,7 +580,7 @@ func TestValidationErrorCollection(t *testing.T) {
 func TestValidationHelperFunctions(t *testing.T) {
 	// Test IsValidationError
 	validationErr := &ValidationError{Field: "test", Message: "test error"}
-	collectionErr := &ValidationErrorCollection{
+	collectionErr := &ValidationCollectionError{
 		Errors: []ValidationError{*validationErr},
 	}
 	regularErr := errors.New("regular error")
@@ -624,7 +589,7 @@ func TestValidationHelperFunctions(t *testing.T) {
 		t.Error("should detect ValidationError")
 	}
 	if !IsValidationError(collectionErr) {
-		t.Error("should detect ValidationErrorCollection")
+		t.Error("should detect ValidationErrors")
 	}
 	if IsValidationError(regularErr) {
 		t.Error("should not detect regular error as validation error")
@@ -650,7 +615,7 @@ func TestValidationHelperFunctions(t *testing.T) {
 	}
 }
 
-// Benchmark tests for performance
+// Benchmark tests for performance.
 func BenchmarkValidationEngine_ValidateAndSetDefaults(b *testing.B) {
 	engine := NewValidationEngine()
 
@@ -686,7 +651,7 @@ func BenchmarkValidationEngine_AggregatedErrors(b *testing.B) {
 	}
 }
 
-// Helper function to create temporary files for testing file validation
+// Helper function to create temporary files for testing file validation.
 func createTempFile(t *testing.T, content string) (string, func()) {
 	t.Helper()
 
@@ -865,3 +830,67 @@ func TestEdgeCases(t *testing.T) {
 	})
 }
 
+// validateTestResult is a helper function to reduce nested complexity in tests.
+func validateTestResult(t *testing.T, tt struct {
+	name         string
+	input        any
+	wantErr      bool
+	errSubstring string
+	validate     func(t *testing.T, result any, err error)
+}, err error,
+) {
+	t.Helper()
+
+	if !tt.wantErr {
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			return
+		}
+		if tt.validate != nil {
+			tt.validate(t, tt.input, nil)
+		}
+		return
+	}
+
+	// tt.wantErr is true
+	if err == nil {
+		t.Error("expected error, got nil")
+		return
+	}
+
+	if tt.errSubstring != "" && !strings.Contains(err.Error(), tt.errSubstring) {
+		t.Errorf("expected error containing '%s', got '%s'", tt.errSubstring, err.Error())
+	}
+
+	if tt.validate != nil {
+		tt.validate(t, tt.input, err)
+	}
+}
+
+// validateRuleTestResult is a helper function to reduce nested complexity in rule tests.
+func validateRuleTestResult(t *testing.T, tt *struct {
+	name     string
+	data     testStruct
+	wantErr  bool
+	errField string
+}, err error,
+) {
+	t.Helper()
+
+	if !tt.wantErr {
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		return
+	}
+
+	// tt.wantErr is true
+	if err == nil {
+		t.Error("expected error, got nil")
+		return
+	}
+
+	if tt.errField != "" && !strings.Contains(err.Error(), tt.errField) {
+		t.Errorf("expected error for field '%s', got '%s'", tt.errField, err.Error())
+	}
+}
