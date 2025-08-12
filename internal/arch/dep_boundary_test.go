@@ -2,13 +2,7 @@ package arch_test
 
 import (
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
-	"os"
-	"path/filepath"
 	"runtime/debug"
-	"sort"
 	"strings"
 	"testing"
 
@@ -211,11 +205,13 @@ func Test_Core_Has_No_Forbidden_Imports(t *testing.T) {
 	}
 }
 
-// Test_Adapters_Cannot_Import_Other_Adapters ensures adapters are isolated
+// Test_Adapters_Cannot_Import_Other_Adapters ensures adapters are isolated.
+//
+//nolint:cyclop // Test function complexity acceptable for readability
 func Test_Adapters_Cannot_Import_Other_Adapters(t *testing.T) {
 	mp := modulePath(t)
 	adaptersPrefix := mp + "/internal/adapters"
-	
+
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedFiles,
 		Dir:  "../..",
@@ -239,7 +235,7 @@ func Test_Adapters_Cannot_Import_Other_Adapters(t *testing.T) {
 				// Extract adapter types
 				ownerAdapter := extractAdapterType(pkg.PkgPath, adaptersPrefix)
 				importedAdapter := extractAdapterType(importPath, adaptersPrefix)
-				
+
 				// Only flag if they're different adapter types
 				if ownerAdapter != importedAdapter && ownerAdapter != "" && importedAdapter != "" {
 					violations[importPath] = append(violations[importPath], pkg.PkgPath)
@@ -266,10 +262,12 @@ func Test_Adapters_Cannot_Import_Other_Adapters(t *testing.T) {
 	}
 }
 
-// Test_Core_Domain_Has_No_External_Dependencies ensures domain is pure
+// Test_Core_Domain_Has_No_External_Dependencies ensures domain is pure.
+//
+//nolint:cyclop // Test function complexity acceptable for readability
 func Test_Core_Domain_Has_No_External_Dependencies(t *testing.T) {
 	mp := modulePath(t)
-	
+
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedFiles,
 		Dir:  "../..",
@@ -286,12 +284,12 @@ func Test_Core_Domain_Has_No_External_Dependencies(t *testing.T) {
 
 	violations := make(map[string][]string)
 	allowedPrefixes := []string{
-		"",           // stdlib
-		"context",    // context is allowed
-		"time",       // time is allowed
-		"fmt",        // fmt is allowed for errors
-		"errors",     // errors is allowed
-		"strings",    // strings is allowed
+		"",                           // stdlib
+		"context",                    // context is allowed
+		"time",                       // time is allowed
+		"fmt",                        // fmt is allowed for errors
+		"errors",                     // errors is allowed
+		"strings",                    // strings is allowed
 		mp + "/internal/core/domain", // self-imports within domain
 	}
 
@@ -310,7 +308,7 @@ func Test_Core_Domain_Has_No_External_Dependencies(t *testing.T) {
 					break
 				}
 			}
-			
+
 			if !allowed {
 				violations[importPath] = append(violations[importPath], pkg.PkgPath)
 			}
@@ -334,11 +332,11 @@ func Test_Core_Domain_Has_No_External_Dependencies(t *testing.T) {
 	}
 }
 
-// Test_Public_API_Boundary ensures pkg/ephemos doesn't leak internal details
+// Test_Public_API_Boundary ensures pkg/ephemos doesn't leak internal details.
 func Test_Public_API_Boundary(t *testing.T) {
 	mp := modulePath(t)
 	internalPrefix := mp + "/internal/"
-	
+
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedFiles,
 		Dir:  "../..",
@@ -382,7 +380,7 @@ func Test_Public_API_Boundary(t *testing.T) {
 	}
 }
 
-// Test_Circular_Dependencies detects circular import patterns
+// Test_Circular_Dependencies detects circular import patterns.
 func Test_Circular_Dependencies(t *testing.T) {
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedFiles,
@@ -422,10 +420,10 @@ func Test_Circular_Dependencies(t *testing.T) {
 	}
 }
 
-// Test_Layer_Dependencies ensures proper layering (domain <- ports <- services <- adapters)
+// Test_Layer_Dependencies ensures proper layering (domain <- ports <- services <- adapters).
 func Test_Layer_Dependencies(t *testing.T) {
 	mp := modulePath(t)
-	
+
 	layerHierarchy := map[string]int{
 		mp + "/internal/core/domain":   0, // Bottom layer
 		mp + "/internal/core/errors":   0,
@@ -449,10 +447,10 @@ func Test_Layer_Dependencies(t *testing.T) {
 
 	for _, pkg := range pkgs {
 		pkgLayer := getLayerLevel(pkg.PkgPath, layerHierarchy)
-		
+
 		for importPath := range pkg.Imports {
 			importLayer := getLayerLevel(importPath, layerHierarchy)
-			
+
 			// Check if import violates layer hierarchy (higher layer importing lower layer is violation)
 			if importLayer != -1 && pkgLayer != -1 && pkgLayer < importLayer {
 				violations[pkg.PkgPath] = append(violations[pkg.PkgPath], importPath)
@@ -484,7 +482,7 @@ func extractAdapterType(path, adaptersPrefix string) string {
 	if !strings.HasPrefix(path, adaptersPrefix) {
 		return ""
 	}
-	
+
 	remainder := strings.TrimPrefix(path, adaptersPrefix+"/")
 	parts := strings.Split(remainder, "/")
 	if len(parts) > 0 {
@@ -519,12 +517,12 @@ func findCycles(graph map[string][]string) [][]string {
 					current = path[current]
 				}
 				cycle = append(cycle, neighbor) // Complete the cycle
-				
+
 				// Reverse to get correct order
 				for i, j := 0, len(cycle)-1; i < j; i, j = i+1, j-1 {
 					cycle[i], cycle[j] = cycle[j], cycle[i]
 				}
-				
+
 				cycles = append(cycles, cycle)
 				return true
 			}
@@ -549,7 +547,7 @@ func getLayerLevel(pkgPath string, hierarchy map[string]int) int {
 	// Find the most specific match
 	bestMatch := ""
 	bestLevel := -1
-	
+
 	for prefix, level := range hierarchy {
 		if strings.HasPrefix(pkgPath, prefix) {
 			if len(prefix) > len(bestMatch) {
@@ -558,6 +556,6 @@ func getLayerLevel(pkgPath string, hierarchy map[string]int) int {
 			}
 		}
 	}
-	
+
 	return bestLevel
 }
