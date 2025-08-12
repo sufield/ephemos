@@ -105,7 +105,7 @@ runs:
           # Create a minimal fallback proto file
           echo "⚠️ Creating fallback echo.proto file for CI..."
           mkdir -p examples/proto
-          cat > examples/proto/echo.proto << 'PROTO_EOF'
+          cat > examples/proto/echo.proto <<'PROTO_EOF'
 syntax = "proto3";
 
 package ephemos.echo;

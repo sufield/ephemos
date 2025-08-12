@@ -24,15 +24,15 @@ const (
 
 // ManagedIdentityServer provides a production-ready identity server with graceful shutdown.
 type ManagedIdentityServer struct {
-	baseServer      Server
+	baseServer          *api.WorkloadServer
 	shutdownCoordinator *ShutdownCoordinator
-	spiffeProvider  *spiffe.Provider
-	config          *ports.Configuration
-	listeners       []net.Listener
-	clients         []ports.Client
-	mu              sync.RWMutex
-	isRunning       bool
-	shutdownChan    chan struct{}
+	spiffeProvider      *spiffe.Provider
+	config              *ports.Configuration
+	listeners           []net.Listener
+	clients             []ports.Client
+	mu                  sync.RWMutex
+	isRunning           bool
+	shutdownChan        chan struct{}
 }
 
 // ServerOptions configures the identity server.
@@ -150,13 +150,13 @@ func NewManagedIdentityServer(ctx context.Context, opts *ServerOptions) (*Manage
 	setupShutdownHooks(ctx, opts)
 
 	server := &ManagedIdentityServer{
-		baseServer:      baseServer,
+		baseServer:          baseServer,
 		shutdownCoordinator: shutdownCoordinator,
-		spiffeProvider:  spiffeProvider,
-		config:          opts.Config,
-		listeners:       make([]net.Listener, 0),
-		clients:         make([]ports.Client, 0),
-		shutdownChan:    make(chan struct{}),
+		spiffeProvider:      spiffeProvider,
+		config:              opts.Config,
+		listeners:           make([]net.Listener, 0),
+		clients:             make([]ports.Client, 0),
+		shutdownChan:        make(chan struct{}),
 	}
 
 	// Set up signal handling if enabled
