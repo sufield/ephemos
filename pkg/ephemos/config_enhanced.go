@@ -118,10 +118,7 @@ func (b *ConfigBuilder) buildFromYAML(ctx context.Context) (*Configuration, erro
 	}
 
 	// Apply environment variable overrides
-	config, err := b.applyEnvOverrides(publicConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to apply env overrides: %w", err)
-	}
+	config := b.applyEnvOverrides(publicConfig)
 
 	// Apply any programmatic overrides from builder
 	b.applyBuilderOverrides(config)
@@ -140,10 +137,7 @@ func (b *ConfigBuilder) buildFromEnvOnly(_ context.Context) (*Configuration, err
 	config := GetDefaultConfiguration()
 
 	// Apply environment variables
-	config, err := b.applyEnvOverrides(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build from env vars: %w", err)
-	}
+	config = b.applyEnvOverrides(config)
 
 	// Apply any programmatic overrides from builder
 	b.applyBuilderOverrides(config)
@@ -224,7 +218,7 @@ func parseCommaSeparatedList(value string) []string {
 }
 
 // applyEnvOverrides applies environment variable overrides to configuration.
-func (b *ConfigBuilder) applyEnvOverrides(config *Configuration) (*Configuration, error) {
+func (b *ConfigBuilder) applyEnvOverrides(config *Configuration) *Configuration {
 	envConfig := *config // Copy the config
 
 	// Apply service overrides
@@ -251,7 +245,7 @@ func (b *ConfigBuilder) applyEnvOverrides(config *Configuration) (*Configuration
 		envConfig.TrustedServers = parseCommaSeparatedList(val)
 	}
 
-	return &envConfig, nil
+	return &envConfig
 }
 
 // applyBuilderOverrides applies programmatic overrides from the builder.
