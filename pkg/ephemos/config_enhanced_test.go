@@ -31,7 +31,7 @@ func TestConfigBuilder_PureCodeConfiguration(t *testing.T) {
 	if config.SPIFFE.SocketPath != "/custom/spiffe/socket" {
 		t.Errorf("Expected SPIFFE socket '/custom/spiffe/socket', got '%s'", config.SPIFFE.SocketPath)
 	}
-	if config.Transport.Type != "grpc" {
+	if config.Transport.Type != TransportTypeGRPC {
 		t.Errorf("Expected transport type 'grpc', got '%s'", config.Transport.Type)
 	}
 	if config.Transport.Address != ":8080" {

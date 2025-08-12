@@ -250,7 +250,7 @@ func LoadConfigFromYAML(_ context.Context, _ string) (*Configuration, error) {
 		// If env loading fails, return default config
 		// We're intentionally ignoring the error and returning defaults
 		config := GetDefaultConfiguration()
-		return config, nil
+		return config, nil //nolint:nilerr // Intentionally ignoring error and returning defaults
 	}
 	return envConfig, nil
 }

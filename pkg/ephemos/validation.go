@@ -14,6 +14,15 @@ import (
 	"time"
 )
 
+// Validation rule constants.
+const (
+	validationRuleMin      = "min"
+	validationRuleMax      = "max"
+	validationRuleLen      = "len"
+	validationRuleRequired = "required"
+	unknownRuleError       = "unknown rule"
+)
+
 // ValidationEngine provides struct tag-based validation with defaults and aggregated errors.
 type ValidationEngine struct {
 	// TagName is the struct tag name to use for validation rules (default: "validate")
@@ -33,13 +42,13 @@ func NewValidationEngine() *ValidationEngine {
 	}
 }
 
-// ValidationErrorCollection aggregates multiple validation errors.
-type ValidationErrorCollection struct {
+// ValidationCollectionError aggregates multiple validation errors.
+type ValidationCollectionError struct {
 	Errors []ValidationError
 }
 
 // Error implements the error interface, returning a summary of all validation errors.
-func (vec *ValidationErrorCollection) Error() string {
+func (vec *ValidationCollectionError) Error() string {
 	if len(vec.Errors) == 0 {
 		return "no validation errors"
 	}
@@ -57,7 +66,7 @@ func (vec *ValidationErrorCollection) Error() string {
 }
 
 // Add appends a validation error to the collection.
-func (vec *ValidationErrorCollection) Add(field, message string, value any) {
+func (vec *ValidationCollectionError) Add(field, message string, value any) {
 	vec.Errors = append(vec.Errors, ValidationError{
 		Field:   field,
 		Message: message,
@@ -66,12 +75,12 @@ func (vec *ValidationErrorCollection) Add(field, message string, value any) {
 }
 
 // HasErrors returns true if there are any validation errors.
-func (vec *ValidationErrorCollection) HasErrors() bool {
+func (vec *ValidationCollectionError) HasErrors() bool {
 	return len(vec.Errors) > 0
 }
 
 // GetFieldErrors returns all errors for a specific field.
-func (vec *ValidationErrorCollection) GetFieldErrors(field string) []ValidationError {
+func (vec *ValidationCollectionError) GetFieldErrors(field string) []ValidationError {
 	var fieldErrors []ValidationError
 	for _, err := range vec.Errors {
 		if err.Field == field {
@@ -110,7 +119,7 @@ func (ve *ValidationEngine) ValidateAndSetDefaults(v any) error {
 		}
 	}
 
-	errCollection := &ValidationErrorCollection{}
+	errCollection := &ValidationCollectionError{}
 	ve.validateStruct(elem, elem.Type(), "", errCollection)
 
 	if errCollection.HasErrors() {
@@ -121,7 +130,7 @@ func (ve *ValidationEngine) ValidateAndSetDefaults(v any) error {
 }
 
 // validateStruct recursively validates a struct and its nested structs.
-func (ve *ValidationEngine) validateStruct(val reflect.Value, typ reflect.Type, prefix string, errCollection *ValidationErrorCollection) {
+func (ve *ValidationEngine) validateStruct(val reflect.Value, typ reflect.Type, prefix string, errCollection *ValidationCollectionError) {
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
 		fieldVal := val.Field(i)
@@ -131,69 +140,172 @@ func (ve *ValidationEngine) validateStruct(val reflect.Value, typ reflect.Type, 
 			continue
 		}
 
-		fieldName := ve.buildFieldName(prefix, field)
+		fieldName := ve.buildFieldName(prefix, &field)
 
-		// Set defaults first
-		ve.setDefaults(fieldVal, field, fieldName, errCollection)
-
-		// Validate field
-		ve.validateField(fieldVal, field, fieldName, errCollection)
+		// Validate and process this field
+		ve.validateStructField(fieldVal, &field, fieldName, errCollection)
 
 		// Stop early if configured to do so and we have errors
 		if ve.StopOnFirstError && errCollection.HasErrors() {
 			return
 		}
+	}
+}
 
-		// Recursively validate nested structs
-		if fieldVal.Kind() == reflect.Struct {
-			ve.validateStruct(fieldVal, fieldVal.Type(), fieldName, errCollection)
-		} else if fieldVal.Kind() == reflect.Ptr && !fieldVal.IsNil() && fieldVal.Elem().Kind() == reflect.Struct {
-			ve.validateStruct(fieldVal.Elem(), fieldVal.Elem().Type(), fieldName, errCollection)
-		} else if fieldVal.Kind() == reflect.Slice {
-			ve.validateSlice(fieldVal, field, fieldName, errCollection)
-		}
+// validateStructField validates a single field within a struct.
+func (ve *ValidationEngine) validateStructField(
+	fieldVal reflect.Value,
+	field *reflect.StructField,
+	fieldName string,
+	errCollection *ValidationCollectionError,
+) {
+	// Set defaults first
+	ve.setDefaults(fieldVal, field, fieldName, errCollection)
+
+	// Validate field
+	ve.validateField(fieldVal, field, fieldName, errCollection)
+
+	// Recursively validate nested types
+	ve.validateNestedType(fieldVal, field, fieldName, errCollection)
+}
+
+// validateNestedType handles recursive validation of nested types.
+func (ve *ValidationEngine) validateNestedType(
+	fieldVal reflect.Value,
+	field *reflect.StructField,
+	fieldName string,
+	errCollection *ValidationCollectionError,
+) {
+	switch fieldVal.Kind() {
+	case reflect.Struct:
+		ve.validateStruct(fieldVal, fieldVal.Type(), fieldName, errCollection)
+	case reflect.Ptr:
+		ve.validatePointerField(fieldVal, fieldName, errCollection)
+	case reflect.Slice:
+		ve.validateSlice(fieldVal, field, fieldName, errCollection)
+	case reflect.Invalid, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128, reflect.Array,
+		reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.String, reflect.UnsafePointer:
+		// No special handling needed for primitive types
+	default:
+		// No special handling needed for unknown types
+	}
+}
+
+// validatePointerField validates pointer fields that may contain structs.
+func (ve *ValidationEngine) validatePointerField(
+	fieldVal reflect.Value,
+	fieldName string,
+	errCollection *ValidationCollectionError,
+) {
+	if !fieldVal.IsNil() && fieldVal.Elem().Kind() == reflect.Struct {
+		ve.validateStruct(fieldVal.Elem(), fieldVal.Elem().Type(), fieldName, errCollection)
 	}
 }
 
 // validateSlice validates slice and its elements.
-func (ve *ValidationEngine) validateSlice(val reflect.Value, field reflect.StructField, fieldName string, errCollection *ValidationErrorCollection) {
+func (ve *ValidationEngine) validateSlice(
+	val reflect.Value,
+	field *reflect.StructField,
+	fieldName string,
+	errCollection *ValidationCollectionError,
+) {
 	// First validate the slice itself (length constraints)
-	validateTag := field.Tag.Get(ve.TagName)
-	if validateTag != "" {
-		rules := ve.parseValidationRules(validateTag)
-
-		// Apply slice-level validation rules
-		sliceRules := make(map[string]string)
-		for rule, param := range rules {
-			switch rule {
-			case "min", "max", "len", "required":
-				sliceRules[rule] = param
-			}
-		}
-
-		if len(sliceRules) > 0 {
-			ve.applyValidationRules(val, sliceRules, fieldName, errCollection)
-		}
-	}
+	ve.validateSliceSelf(val, field, fieldName, errCollection)
 
 	// Then validate each element
+	ve.validateSliceElements(val, field, fieldName, errCollection)
+}
+
+// validateSliceSelf validates slice-level constraints (length, etc.).
+func (ve *ValidationEngine) validateSliceSelf(
+	val reflect.Value,
+	field *reflect.StructField,
+	fieldName string,
+	errCollection *ValidationCollectionError,
+) {
+	validateTag := field.Tag.Get(ve.TagName)
+	if validateTag == "" {
+		return
+	}
+
+	rules := ve.parseValidationRules(validateTag)
+	sliceRules := ve.extractSliceRules(rules)
+
+	if len(sliceRules) > 0 {
+		ve.applyValidationRules(val, sliceRules, fieldName, errCollection)
+	}
+}
+
+// extractSliceRules extracts validation rules that apply to the slice itself.
+func (ve *ValidationEngine) extractSliceRules(rules map[string]string) map[string]string {
+	sliceRules := make(map[string]string)
+	for rule, param := range rules {
+		switch rule {
+		case validationRuleMin, validationRuleMax, validationRuleLen, validationRuleRequired:
+			sliceRules[rule] = param
+		}
+	}
+	return sliceRules
+}
+
+// validateSliceElements validates individual slice elements.
+func (ve *ValidationEngine) validateSliceElements(
+	val reflect.Value,
+	field *reflect.StructField,
+	fieldName string,
+	errCollection *ValidationCollectionError,
+) {
 	for i := 0; i < val.Len(); i++ {
 		elem := val.Index(i)
 		elemFieldName := fmt.Sprintf("%s[%d]", fieldName, i)
+		ve.validateSliceElementByType(elem, field, elemFieldName, errCollection)
+	}
+}
 
-		if elem.Kind() == reflect.Struct {
-			ve.validateStruct(elem, elem.Type(), elemFieldName, errCollection)
-		} else if elem.Kind() == reflect.Ptr && !elem.IsNil() && elem.Elem().Kind() == reflect.Struct {
-			ve.validateStruct(elem.Elem(), elem.Elem().Type(), elemFieldName, errCollection)
-		} else {
-			// Validate slice element using element-specific rules
-			ve.validateSliceElement(elem, field, elemFieldName, errCollection)
-		}
+// validateSliceElementByType validates a single slice element based on its type.
+func (ve *ValidationEngine) validateSliceElementByType(
+	elem reflect.Value,
+	field *reflect.StructField,
+	elemFieldName string,
+	errCollection *ValidationCollectionError,
+) {
+	switch elem.Kind() {
+	case reflect.Struct:
+		ve.validateStruct(elem, elem.Type(), elemFieldName, errCollection)
+	case reflect.Ptr:
+		ve.validateSlicePointerElement(elem, elemFieldName, errCollection)
+	case reflect.Invalid, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128, reflect.Array,
+		reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Slice, reflect.String, reflect.UnsafePointer:
+		// All other types use element-specific validation rules
+		ve.validateSliceElement(elem, field, elemFieldName, errCollection)
+	default:
+		// All other types use element-specific validation rules
+		ve.validateSliceElement(elem, field, elemFieldName, errCollection)
+	}
+}
+
+// validateSlicePointerElement validates pointer elements in slices.
+func (ve *ValidationEngine) validateSlicePointerElement(
+	elem reflect.Value,
+	elemFieldName string,
+	errCollection *ValidationCollectionError,
+) {
+	if !elem.IsNil() && elem.Elem().Kind() == reflect.Struct {
+		ve.validateStruct(elem.Elem(), elem.Elem().Type(), elemFieldName, errCollection)
 	}
 }
 
 // validateSliceElement validates individual slice elements.
-func (ve *ValidationEngine) validateSliceElement(val reflect.Value, field reflect.StructField, fieldName string, errCollection *ValidationErrorCollection) {
+func (ve *ValidationEngine) validateSliceElement(
+	val reflect.Value,
+	field *reflect.StructField,
+	fieldName string,
+	errCollection *ValidationCollectionError,
+) {
 	validateTag := field.Tag.Get(ve.TagName)
 	if validateTag == "" {
 		return
@@ -206,7 +318,7 @@ func (ve *ValidationEngine) validateSliceElement(val reflect.Value, field reflec
 	elementRules := make(map[string]string)
 	for rule, param := range rules {
 		switch rule {
-		case "min", "max", "len": // These apply to slice length, not elements
+		case validationRuleMin, validationRuleMax, validationRuleLen: // These apply to slice length, not elements
 			continue
 		default:
 			elementRules[rule] = param
@@ -219,7 +331,12 @@ func (ve *ValidationEngine) validateSliceElement(val reflect.Value, field reflec
 }
 
 // setDefaults sets default values for fields that have default tags.
-func (ve *ValidationEngine) setDefaults(val reflect.Value, field reflect.StructField, fieldName string, errCollection *ValidationErrorCollection) {
+func (ve *ValidationEngine) setDefaults(
+	val reflect.Value,
+	field *reflect.StructField,
+	fieldName string,
+	errCollection *ValidationCollectionError,
+) {
 	defaultTag := field.Tag.Get(ve.DefaultTagName)
 	if defaultTag == "" {
 		return
@@ -236,7 +353,12 @@ func (ve *ValidationEngine) setDefaults(val reflect.Value, field reflect.StructF
 }
 
 // validateField validates a single field using its validation tags.
-func (ve *ValidationEngine) validateField(val reflect.Value, field reflect.StructField, fieldName string, errCollection *ValidationErrorCollection) {
+func (ve *ValidationEngine) validateField(
+	val reflect.Value,
+	field *reflect.StructField,
+	fieldName string,
+	errCollection *ValidationCollectionError,
+) {
 	validateTag := field.Tag.Get(ve.TagName)
 	if validateTag == "" {
 		return
@@ -250,7 +372,7 @@ func (ve *ValidationEngine) validateField(val reflect.Value, field reflect.Struc
 		sliceRules := make(map[string]string)
 		for rule, param := range rules {
 			switch rule {
-			case "min", "max", "len", "required":
+			case validationRuleMin, validationRuleMax, validationRuleLen, validationRuleRequired:
 				sliceRules[rule] = param
 			}
 		}
@@ -293,7 +415,12 @@ func (ve *ValidationEngine) parseValidationRules(tag string) map[string]string {
 }
 
 // applyValidationRules applies validation rules to a field value.
-func (ve *ValidationEngine) applyValidationRules(val reflect.Value, rules map[string]string, fieldName string, errCollection *ValidationErrorCollection) {
+func (ve *ValidationEngine) applyValidationRules(
+	val reflect.Value,
+	rules map[string]string,
+	fieldName string,
+	errCollection *ValidationCollectionError,
+) {
 	for rule, param := range rules {
 		if err := ve.validateRule(val, rule, param, fieldName); err != nil {
 			errCollection.Add(fieldName, err.Error(), val.Interface())
@@ -307,19 +434,67 @@ func (ve *ValidationEngine) applyValidationRules(val reflect.Value, rules map[st
 
 // validateRule validates a single rule against a field value.
 func (ve *ValidationEngine) validateRule(val reflect.Value, rule, param, fieldName string) error {
+	// Handle basic validation rules
+	if err := ve.validateBasicRule(val, rule, param, fieldName); err != nil {
+		if err.Error() != unknownRuleError {
+			return err
+		}
+	} else {
+		return nil
+	}
+
+	// Handle parameter-based validation rules
+	if err := ve.validateParameterRule(val, rule, param, fieldName); err != nil {
+		if err.Error() != unknownRuleError {
+			return err
+		}
+	} else {
+		return nil
+	}
+
+	// Handle field-based validation rules
+	if err := ve.validateFieldRule(val, rule, fieldName); err != nil {
+		if err.Error() != unknownRuleError {
+			return err
+		}
+	} else {
+		return nil
+	}
+
+	return fmt.Errorf("unknown validation rule: %s", rule)
+}
+
+// validateBasicRule handles basic validation rules.
+func (ve *ValidationEngine) validateBasicRule(val reflect.Value, rule, param, fieldName string) error {
 	switch rule {
-	case "required":
+	case validationRuleRequired:
 		return ve.validateRequired(val, fieldName)
-	case "min":
+	case validationRuleMin:
 		return ve.validateMin(val, param, fieldName)
-	case "max":
+	case validationRuleMax:
 		return ve.validateMax(val, param, fieldName)
-	case "len":
+	case validationRuleLen:
 		return ve.validateLen(val, param, fieldName)
+	default:
+		return errors.New(unknownRuleError)
+	}
+}
+
+// validateParameterRule handles validation rules that require parameters.
+func (ve *ValidationEngine) validateParameterRule(val reflect.Value, rule, param, fieldName string) error {
+	switch rule {
 	case "regex":
 		return ve.validateRegex(val, param, fieldName)
 	case "oneof":
 		return ve.validateOneOf(val, param, fieldName)
+	default:
+		return errors.New(unknownRuleError)
+	}
+}
+
+// validateFieldRule handles validation rules that only need the field value.
+func (ve *ValidationEngine) validateFieldRule(val reflect.Value, rule, fieldName string) error {
+	switch rule {
 	case "ip":
 		return ve.validateIP(val, fieldName)
 	case "port":
@@ -337,78 +512,109 @@ func (ve *ValidationEngine) validateRule(val reflect.Value, rule, param, fieldNa
 	case "abs_path":
 		return ve.validateAbsolutePath(val, fieldName)
 	default:
-		return fmt.Errorf("unknown validation rule: %s", rule)
+		return errors.New(unknownRuleError)
 	}
 }
 
 // Validation rule implementations
 
-func (ve *ValidationEngine) validateRequired(val reflect.Value, fieldName string) error {
+func (ve *ValidationEngine) validateRequired(val reflect.Value, _ string) error {
 	if ve.isZeroValue(val) {
 		return fmt.Errorf("field is required")
 	}
 	return nil
 }
 
-func (ve *ValidationEngine) validateMin(val reflect.Value, param, fieldName string) error {
+func (ve *ValidationEngine) validateMin(val reflect.Value, param, _ string) error {
 	minVal, err := strconv.Atoi(param)
 	if err != nil {
 		return fmt.Errorf("invalid min parameter: %s", param)
 	}
-
-	switch val.Kind() {
-	case reflect.String:
-		if len(val.String()) < minVal {
-			return fmt.Errorf("must be at least %d characters long", minVal)
-		}
-	case reflect.Slice, reflect.Array:
-		if val.Len() < minVal {
-			return fmt.Errorf("must have at least %d elements", minVal)
-		}
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if val.Int() < int64(minVal) {
-			return fmt.Errorf("must be at least %d", minVal)
-		}
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		if val.Uint() < uint64(minVal) {
-			return fmt.Errorf("must be at least %d", minVal)
-		}
-	default:
-		return fmt.Errorf("min validation not supported for type %s", val.Kind())
-	}
-	return nil
+	return ve.validateMinMax(val, minVal, true)
 }
 
-func (ve *ValidationEngine) validateMax(val reflect.Value, param, fieldName string) error {
+func (ve *ValidationEngine) validateMax(val reflect.Value, param, _ string) error {
 	maxVal, err := strconv.Atoi(param)
 	if err != nil {
 		return fmt.Errorf("invalid max parameter: %s", param)
 	}
+	return ve.validateMinMax(val, maxVal, false)
+}
 
+// validateMinMax is a shared helper for min/max validation to avoid code duplication.
+func (ve *ValidationEngine) validateMinMax(val reflect.Value, limit int, isMin bool) error {
 	switch val.Kind() {
 	case reflect.String:
-		if len(val.String()) > maxVal {
-			return fmt.Errorf("must be at most %d characters long", maxVal)
-		}
+		return ve.validateStringMinMax(val.String(), limit, isMin, "characters long")
 	case reflect.Slice, reflect.Array:
-		if val.Len() > maxVal {
-			return fmt.Errorf("must have at most %d elements", maxVal)
-		}
+		return ve.validateLenMinMax(val.Len(), limit, isMin, "elements")
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if val.Int() > int64(maxVal) {
-			return fmt.Errorf("must be at most %d", maxVal)
-		}
+		return ve.validateIntMinMax(val.Int(), int64(limit), isMin)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		if val.Uint() > uint64(maxVal) {
-			return fmt.Errorf("must be at most %d", maxVal)
+		return ve.validateUintMinMax(val.Uint(), uint64(limit), isMin)
+	case reflect.Invalid, reflect.Bool, reflect.Uintptr, reflect.Float32, reflect.Float64,
+		reflect.Complex64, reflect.Complex128, reflect.Chan, reflect.Func, reflect.Interface,
+		reflect.Map, reflect.Ptr, reflect.Struct, reflect.UnsafePointer:
+		validationType := "min"
+		if !isMin {
+			validationType = validationRuleMax
 		}
+		return fmt.Errorf("%s validation not supported for type %s", validationType, val.Kind())
 	default:
-		return fmt.Errorf("max validation not supported for type %s", val.Kind())
+		validationType := "min"
+		if !isMin {
+			validationType = validationRuleMax
+		}
+		return fmt.Errorf("%s validation not supported for type %s", validationType, val.Kind())
+	}
+}
+
+// validateStringMinMax validates string length against min/max limit.
+func (ve *ValidationEngine) validateStringMinMax(str string, limit int, isMin bool, unit string) error {
+	actualLen := len(str)
+	if isMin && actualLen < limit {
+		return fmt.Errorf("must be at least %d %s", limit, unit)
+	}
+	if !isMin && actualLen > limit {
+		return fmt.Errorf("must be at most %d %s", limit, unit)
 	}
 	return nil
 }
 
-func (ve *ValidationEngine) validateLen(val reflect.Value, param, fieldName string) error {
+// validateLenMinMax validates length against min/max limit.
+func (ve *ValidationEngine) validateLenMinMax(actualLen, limit int, isMin bool, unit string) error {
+	if isMin && actualLen < limit {
+		return fmt.Errorf("must have at least %d %s", limit, unit)
+	}
+	if !isMin && actualLen > limit {
+		return fmt.Errorf("must have at most %d %s", limit, unit)
+	}
+	return nil
+}
+
+// validateIntMinMax validates signed integer against min/max limit.
+func (ve *ValidationEngine) validateIntMinMax(actualVal, limitVal int64, isMin bool) error {
+	if isMin && actualVal < limitVal {
+		return fmt.Errorf("must be at least %d", limitVal)
+	}
+	if !isMin && actualVal > limitVal {
+		return fmt.Errorf("must be at most %d", limitVal)
+	}
+	return nil
+}
+
+// validateUintMinMax validates unsigned integer against min/max limit.
+func (ve *ValidationEngine) validateUintMinMax(actualVal, limitVal uint64, isMin bool) error {
+	if isMin && actualVal < limitVal {
+		return fmt.Errorf("must be at least %d", limitVal)
+	}
+	if !isMin && actualVal > limitVal {
+		return fmt.Errorf("must be at most %d", limitVal)
+	}
+	return nil
+}
+
+func (ve *ValidationEngine) validateLen(val reflect.Value, param, _ string) error {
 	expectedLen, err := strconv.Atoi(param)
 	if err != nil {
 		return fmt.Errorf("invalid len parameter: %s", param)
@@ -423,13 +629,18 @@ func (ve *ValidationEngine) validateLen(val reflect.Value, param, fieldName stri
 		if val.Len() != expectedLen {
 			return fmt.Errorf("must have exactly %d elements", expectedLen)
 		}
+	case reflect.Invalid, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128, reflect.Chan, reflect.Func,
+		reflect.Interface, reflect.Map, reflect.Ptr, reflect.Struct, reflect.UnsafePointer:
+		return fmt.Errorf("len validation not supported for type %s", val.Kind())
 	default:
 		return fmt.Errorf("len validation not supported for type %s", val.Kind())
 	}
 	return nil
 }
 
-func (ve *ValidationEngine) validateRegex(val reflect.Value, param, fieldName string) error {
+func (ve *ValidationEngine) validateRegex(val reflect.Value, param, _ string) error {
 	if val.Kind() != reflect.String {
 		return fmt.Errorf("regex validation only supported for strings")
 	}
@@ -445,7 +656,7 @@ func (ve *ValidationEngine) validateRegex(val reflect.Value, param, fieldName st
 	return nil
 }
 
-func (ve *ValidationEngine) validateOneOf(val reflect.Value, param, fieldName string) error {
+func (ve *ValidationEngine) validateOneOf(val reflect.Value, param, _ string) error {
 	options := strings.Split(param, "|")
 	value := fmt.Sprintf("%v", val.Interface())
 
@@ -458,7 +669,7 @@ func (ve *ValidationEngine) validateOneOf(val reflect.Value, param, fieldName st
 	return fmt.Errorf("must be one of: %s", strings.Join(options, ", "))
 }
 
-func (ve *ValidationEngine) validateIP(val reflect.Value, fieldName string) error {
+func (ve *ValidationEngine) validateIP(val reflect.Value, _ string) error {
 	if val.Kind() != reflect.String {
 		return fmt.Errorf("IP validation only supported for strings")
 	}
@@ -470,7 +681,7 @@ func (ve *ValidationEngine) validateIP(val reflect.Value, fieldName string) erro
 	return nil
 }
 
-func (ve *ValidationEngine) validatePort(val reflect.Value, fieldName string) error {
+func (ve *ValidationEngine) validatePort(val reflect.Value, _ string) error {
 	var port int
 
 	switch val.Kind() {
@@ -486,6 +697,10 @@ func (ve *ValidationEngine) validatePort(val reflect.Value, fieldName string) er
 		port = int(val.Int())
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		port = int(val.Uint())
+	case reflect.Invalid, reflect.Bool, reflect.Uintptr, reflect.Float32, reflect.Float64,
+		reflect.Complex64, reflect.Complex128, reflect.Array, reflect.Chan, reflect.Func,
+		reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice, reflect.Struct, reflect.UnsafePointer:
+		return fmt.Errorf("port validation not supported for type %s", val.Kind())
 	default:
 		return fmt.Errorf("port validation not supported for type %s", val.Kind())
 	}
@@ -496,7 +711,7 @@ func (ve *ValidationEngine) validatePort(val reflect.Value, fieldName string) er
 	return nil
 }
 
-func (ve *ValidationEngine) validateFileExists(val reflect.Value, fieldName string) error {
+func (ve *ValidationEngine) validateFileExists(val reflect.Value, _ string) error {
 	if val.Kind() != reflect.String {
 		return fmt.Errorf("file_exists validation only supported for strings")
 	}
@@ -511,7 +726,7 @@ func (ve *ValidationEngine) validateFileExists(val reflect.Value, fieldName stri
 		if os.IsNotExist(err) {
 			return fmt.Errorf("file does not exist: %s", path)
 		}
-		return fmt.Errorf("cannot access file: %v", err)
+		return fmt.Errorf("cannot access file: %w", err)
 	}
 
 	if info.IsDir() {
@@ -521,7 +736,7 @@ func (ve *ValidationEngine) validateFileExists(val reflect.Value, fieldName stri
 	return nil
 }
 
-func (ve *ValidationEngine) validateDirExists(val reflect.Value, fieldName string) error {
+func (ve *ValidationEngine) validateDirExists(val reflect.Value, _ string) error {
 	if val.Kind() != reflect.String {
 		return fmt.Errorf("dir_exists validation only supported for strings")
 	}
@@ -536,7 +751,7 @@ func (ve *ValidationEngine) validateDirExists(val reflect.Value, fieldName strin
 		if os.IsNotExist(err) {
 			return fmt.Errorf("directory does not exist: %s", path)
 		}
-		return fmt.Errorf("cannot access directory: %v", err)
+		return fmt.Errorf("cannot access directory: %w", err)
 	}
 
 	if !info.IsDir() {
@@ -546,7 +761,7 @@ func (ve *ValidationEngine) validateDirExists(val reflect.Value, fieldName strin
 	return nil
 }
 
-func (ve *ValidationEngine) validateSPIFFEID(val reflect.Value, fieldName string) error {
+func (ve *ValidationEngine) validateSPIFFEID(val reflect.Value, _ string) error {
 	if val.Kind() != reflect.String {
 		return fmt.Errorf("spiffe_id validation only supported for strings")
 	}
@@ -570,7 +785,7 @@ func (ve *ValidationEngine) validateSPIFFEID(val reflect.Value, fieldName string
 	return nil
 }
 
-func (ve *ValidationEngine) validateDomain(val reflect.Value, fieldName string) error {
+func (ve *ValidationEngine) validateDomain(val reflect.Value, _ string) error {
 	if val.Kind() != reflect.String {
 		return fmt.Errorf("domain validation only supported for strings")
 	}
@@ -594,7 +809,7 @@ func (ve *ValidationEngine) validateDomain(val reflect.Value, fieldName string) 
 	return nil
 }
 
-func (ve *ValidationEngine) validateDuration(val reflect.Value, fieldName string) error {
+func (ve *ValidationEngine) validateDuration(val reflect.Value, _ string) error {
 	if val.Kind() != reflect.String {
 		return fmt.Errorf("duration validation only supported for strings")
 	}
@@ -612,7 +827,7 @@ func (ve *ValidationEngine) validateDuration(val reflect.Value, fieldName string
 	return nil
 }
 
-func (ve *ValidationEngine) validateAbsolutePath(val reflect.Value, fieldName string) error {
+func (ve *ValidationEngine) validateAbsolutePath(val reflect.Value, _ string) error {
 	if val.Kind() != reflect.String {
 		return fmt.Errorf("abs_path validation only supported for strings")
 	}
@@ -631,7 +846,7 @@ func (ve *ValidationEngine) validateAbsolutePath(val reflect.Value, fieldName st
 
 // Helper functions
 
-func (ve *ValidationEngine) buildFieldName(prefix string, field reflect.StructField) string {
+func (ve *ValidationEngine) buildFieldName(prefix string, field *reflect.StructField) string {
 	// Use yaml tag name if available, otherwise use field name
 	yamlTag := field.Tag.Get("yaml")
 	if yamlTag != "" && yamlTag != "-" {
@@ -668,15 +883,19 @@ func (ve *ValidationEngine) isZeroValue(val reflect.Value) bool {
 		return val.Float() == 0
 	case reflect.Ptr, reflect.Interface, reflect.Slice, reflect.Map, reflect.Chan, reflect.Func:
 		return val.IsNil()
-	case reflect.Array:
-		zero := reflect.Zero(val.Type())
-		return reflect.DeepEqual(val.Interface(), zero.Interface())
-	case reflect.Struct:
-		zero := reflect.Zero(val.Type())
-		return reflect.DeepEqual(val.Interface(), zero.Interface())
+	case reflect.Array, reflect.Struct:
+		return ve.isZeroCompoundValue(val)
+	case reflect.Invalid, reflect.Uintptr, reflect.Complex64, reflect.Complex128, reflect.UnsafePointer:
+		return false
 	default:
 		return false
 	}
+}
+
+// isZeroCompoundValue checks if compound values (arrays, structs) are zero.
+func (ve *ValidationEngine) isZeroCompoundValue(val reflect.Value) bool {
+	zero := reflect.Zero(val.Type())
+	return reflect.DeepEqual(val.Interface(), zero.Interface())
 }
 
 func (ve *ValidationEngine) setDefaultValue(val reflect.Value, defaultValue, fieldName string) error {
@@ -688,42 +907,18 @@ func (ve *ValidationEngine) setDefaultValue(val reflect.Value, defaultValue, fie
 	case reflect.String:
 		val.SetString(defaultValue)
 	case reflect.Bool:
-		boolVal, err := strconv.ParseBool(defaultValue)
-		if err != nil {
-			return fmt.Errorf("invalid bool default value '%s': %v", defaultValue, err)
-		}
-		val.SetBool(boolVal)
+		return ve.setBoolDefault(val, defaultValue)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		intVal, err := strconv.ParseInt(defaultValue, 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid int default value '%s': %v", defaultValue, err)
-		}
-		val.SetInt(intVal)
+		return ve.setIntDefault(val, defaultValue)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		uintVal, err := strconv.ParseUint(defaultValue, 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid uint default value '%s': %v", defaultValue, err)
-		}
-		val.SetUint(uintVal)
+		return ve.setUintDefault(val, defaultValue)
 	case reflect.Float32, reflect.Float64:
-		floatVal, err := strconv.ParseFloat(defaultValue, 64)
-		if err != nil {
-			return fmt.Errorf("invalid float default value '%s': %v", defaultValue, err)
-		}
-		val.SetFloat(floatVal)
+		return ve.setFloatDefault(val, defaultValue)
 	case reflect.Slice:
-		// Handle comma-separated values for slices
-		if defaultValue != "" {
-			parts := strings.Split(defaultValue, ",")
-			slice := reflect.MakeSlice(val.Type(), len(parts), len(parts))
-			for i, part := range parts {
-				elem := slice.Index(i)
-				if err := ve.setDefaultValue(elem, strings.TrimSpace(part), fmt.Sprintf("%s[%d]", fieldName, i)); err != nil {
-					return err
-				}
-			}
-			val.Set(slice)
-		}
+		return ve.setSliceDefault(val, defaultValue, fieldName)
+	case reflect.Invalid, reflect.Uintptr, reflect.Complex64, reflect.Complex128, reflect.Array,
+		reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Struct, reflect.UnsafePointer:
+		return fmt.Errorf("default value setting not supported for type %s", val.Kind())
 	default:
 		return fmt.Errorf("default value setting not supported for type %s", val.Kind())
 	}
@@ -731,7 +926,67 @@ func (ve *ValidationEngine) setDefaultValue(val reflect.Value, defaultValue, fie
 	return nil
 }
 
+// setBoolDefault sets a boolean default value.
+func (ve *ValidationEngine) setBoolDefault(val reflect.Value, defaultValue string) error {
+	boolVal, err := strconv.ParseBool(defaultValue)
+	if err != nil {
+		return fmt.Errorf("invalid bool default value '%s': %w", defaultValue, err)
+	}
+	val.SetBool(boolVal)
+	return nil
+}
+
+// setIntDefault sets an integer default value.
+func (ve *ValidationEngine) setIntDefault(val reflect.Value, defaultValue string) error {
+	intVal, err := strconv.ParseInt(defaultValue, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid int default value '%s': %w", defaultValue, err)
+	}
+	val.SetInt(intVal)
+	return nil
+}
+
+// setUintDefault sets an unsigned integer default value.
+func (ve *ValidationEngine) setUintDefault(val reflect.Value, defaultValue string) error {
+	uintVal, err := strconv.ParseUint(defaultValue, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid uint default value '%s': %w", defaultValue, err)
+	}
+	val.SetUint(uintVal)
+	return nil
+}
+
+// setFloatDefault sets a float default value.
+func (ve *ValidationEngine) setFloatDefault(val reflect.Value, defaultValue string) error {
+	floatVal, err := strconv.ParseFloat(defaultValue, 64)
+	if err != nil {
+		return fmt.Errorf("invalid float default value '%s': %w", defaultValue, err)
+	}
+	val.SetFloat(floatVal)
+	return nil
+}
+
+// setSliceDefault sets a slice default value from comma-separated string.
+func (ve *ValidationEngine) setSliceDefault(val reflect.Value, defaultValue, fieldName string) error {
+	if defaultValue == "" {
+		return nil
+	}
+
+	parts := strings.Split(defaultValue, ",")
+	slice := reflect.MakeSlice(val.Type(), len(parts), len(parts))
+	for i, part := range parts {
+		elem := slice.Index(i)
+		if err := ve.setDefaultValue(elem, strings.TrimSpace(part), fmt.Sprintf("%s[%d]", fieldName, i)); err != nil {
+			return err
+		}
+	}
+	val.Set(slice)
+	return nil
+}
+
 // GlobalValidationEngine provides a default validation engine instance.
+//
+//nolint:gochecknoglobals // Global instance for convenience
 var GlobalValidationEngine = NewValidationEngine()
 
 // ValidateStruct is a convenience function that uses the global validation engine.
@@ -747,14 +1002,14 @@ func ValidateStructWithEngine(v any, engine *ValidationEngine) error {
 // IsValidationError checks if an error is a validation error.
 func IsValidationError(err error) bool {
 	var validationErr *ValidationError
-	var collectionErr *ValidationErrorCollection
+	var collectionErr *ValidationCollectionError
 	return errors.As(err, &validationErr) || errors.As(err, &collectionErr)
 }
 
 // GetValidationErrors extracts all validation errors from an error.
 func GetValidationErrors(err error) []ValidationError {
 	var validationErr *ValidationError
-	var collectionErr *ValidationErrorCollection
+	var collectionErr *ValidationCollectionError
 
 	if errors.As(err, &collectionErr) {
 		return collectionErr.Errors
@@ -766,4 +1021,3 @@ func GetValidationErrors(err error) []ValidationError {
 
 	return nil
 }
-
