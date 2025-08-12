@@ -41,7 +41,16 @@ runs:
       shell: bash
       run: |
         echo "Installing Go protobuf tools..."
+        
+        # Ensure Go is working properly
+        go version
+        go env GOPATH
+        
+        # Install protobuf tools
+        echo "Installing protoc-gen-go..."
         go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        
+        echo "Installing protoc-gen-go-grpc..."
         go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
         
         # Add Go bin to PATH for current and future steps
@@ -50,8 +59,26 @@ runs:
         echo "$GOPATH_BIN" >> $GITHUB_PATH
         
         echo "Go tools installed at: $GOPATH_BIN"
-        which protoc-gen-go || (echo "❌ protoc-gen-go not found" && exit 1)
-        which protoc-gen-go-grpc || (echo "❌ protoc-gen-go-grpc not found" && exit 1)
+        echo "Current PATH: $PATH"
+        
+        # Verify installations with explicit path
+        echo "Verifying protoc-gen-go installation..."
+        if [ -f "$GOPATH_BIN/protoc-gen-go" ]; then
+          echo "✅ protoc-gen-go found at $GOPATH_BIN/protoc-gen-go"
+        else
+          echo "❌ protoc-gen-go not found at $GOPATH_BIN/protoc-gen-go"
+          ls -la "$GOPATH_BIN/" || echo "Go bin directory not found"
+          exit 1
+        fi
+        
+        echo "Verifying protoc-gen-go-grpc installation..."
+        if [ -f "$GOPATH_BIN/protoc-gen-go-grpc" ]; then
+          echo "✅ protoc-gen-go-grpc found at $GOPATH_BIN/protoc-gen-go-grpc"
+        else
+          echo "❌ protoc-gen-go-grpc not found at $GOPATH_BIN/protoc-gen-go-grpc"
+          ls -la "$GOPATH_BIN/" || echo "Go bin directory not found"
+          exit 1
+        fi
         
     - name: Verify all tools are available
       shell: bash
@@ -105,27 +132,27 @@ runs:
           # Create a minimal fallback proto file
           echo "⚠️ Creating fallback echo.proto file for CI..."
           mkdir -p examples/proto
-          cat > examples/proto/echo.proto <<'PROTO_EOF'
-          syntax = "proto3";
-          
-          package ephemos.echo;
-          
-          option go_package = "github.com/sufield/ephemos/examples/proto";
-          
-          // EchoService provides a simple echo functionality for testing.
-          service EchoService {
-            rpc Echo(EchoRequest) returns (EchoResponse);
-          }
-          
-          message EchoRequest {
-            string message = 1;
-          }
-          
-          message EchoResponse {
-            string message = 1;
-            string from = 2;
-          }
-          PROTO_EOF
+          {
+            echo 'syntax = "proto3";'
+            echo ''
+            echo 'package ephemos.echo;'
+            echo ''
+            echo 'option go_package = "github.com/sufield/ephemos/examples/proto";'
+            echo ''
+            echo '// EchoService provides a simple echo functionality for testing.'
+            echo 'service EchoService {'
+            echo '  rpc Echo(EchoRequest) returns (EchoResponse);'
+            echo '}'
+            echo ''
+            echo 'message EchoRequest {'
+            echo '  string message = 1;'
+            echo '}'
+            echo ''
+            echo 'message EchoResponse {'
+            echo '  string message = 1;'
+            echo '  string from = 2;'
+            echo '}'
+          } > examples/proto/echo.proto
           echo "✅ Fallback echo.proto created"
         fi
         
