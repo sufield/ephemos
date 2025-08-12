@@ -319,15 +319,15 @@ jobs:
         # Initialize Go module for fuzz targets
         if [ ! -f go.mod ]; then
           echo "Creating go.mod for fuzz targets..."
-          cat > go.mod << 'GOMOD'
-          module fuzz-targets
-          
-          go 1.24
-          
-          require github.com/sufield/ephemos v0.0.0
-          
-          replace github.com/sufield/ephemos => ../
-          GOMOD
+          {
+            echo "module fuzz-targets"
+            echo ""
+            echo "go 1.24"
+            echo ""
+            echo "require github.com/sufield/ephemos v0.0.0"
+            echo ""
+            echo "replace github.com/sufield/ephemos => ../"
+          } > go.mod
         fi
         
         echo "Contents of go.mod:"
