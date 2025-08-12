@@ -9,7 +9,7 @@ import (
 	"github.com/sufield/ephemos/internal/adapters/primary/api"
 )
 
-func TestIdentityServer_NewIdentityServer(t *testing.T) {
+func TestWorkloadServer_NewWorkloadServer(t *testing.T) {
 	tests := []struct {
 		name       string
 		configPath string
@@ -30,21 +30,21 @@ func TestIdentityServer_NewIdentityServer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			server, err := api.NewIdentityServer(ctx, tt.configPath)
+			server, err := api.NewWorkloadServer(ctx, tt.configPath)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("api.NewIdentityServer() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("api.NewWorkloadServer() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && server == nil {
-				t.Error("api.NewIdentityServer() returned nil server")
+				t.Error("api.NewWorkloadServer() returned nil server")
 			}
 		})
 	}
 }
 
-func TestIdentityServer_RegisterService(t *testing.T) {
+func TestWorkloadServer_RegisterService(t *testing.T) {
 	ctx := t.Context()
-	server, err := api.NewIdentityServer(ctx, "")
+	server, err := api.NewWorkloadServer(ctx, "")
 	if err != nil {
 		t.Skip("Skipping RegisterService tests - could not create server:", err)
 	}
@@ -62,9 +62,9 @@ func TestIdentityServer_RegisterService(t *testing.T) {
 	}
 }
 
-func TestIdentityServer_Serve(t *testing.T) {
+func TestWorkloadServer_Serve(t *testing.T) {
 	ctx := t.Context()
-	server, err := api.NewIdentityServer(ctx, "")
+	server, err := api.NewWorkloadServer(ctx, "")
 	if err != nil {
 		t.Skip("Skipping Serve tests - could not create server:", err)
 	}
@@ -112,9 +112,9 @@ func TestIdentityServer_Serve(t *testing.T) {
 	})
 }
 
-func TestIdentityServer_Close(t *testing.T) {
+func TestWorkloadServer_Close(t *testing.T) {
 	ctx := t.Context()
-	server, err := api.NewIdentityServer(ctx, "")
+	server, err := api.NewWorkloadServer(ctx, "")
 	if err != nil {
 		t.Skip("Skipping Close test - could not create server:", err)
 	}
@@ -133,9 +133,9 @@ func TestIdentityServer_Close(t *testing.T) {
 // TestServiceRegistrar is now defined in test_helpers.go
 // It provides a real implementation instead of a mock
 
-func TestIdentityServer_RegisterService_WithRealService(t *testing.T) {
+func TestWorkloadServer_RegisterService_WithRealService(t *testing.T) {
 	ctx := t.Context()
-	server, err := api.NewIdentityServer(ctx, "")
+	server, err := api.NewWorkloadServer(ctx, "")
 	if err != nil {
 		t.Skip("Skipping RegisterService test - could not create server:", err)
 	}
