@@ -215,7 +215,7 @@ type ConfigurationProvider interface {
 // This function now uses the new validation engine to automatically set defaults.
 func GetDefaultConfiguration() *Configuration {
 	config := &Configuration{}
-	
+
 	// Use the validation engine to set all defaults automatically
 	if err := config.ValidateAndSetDefaults(); err != nil {
 		// This should never happen with an empty config, but handle gracefully
@@ -236,7 +236,7 @@ func GetDefaultConfiguration() *Configuration {
 			TrustedServers:    []string{},
 		}
 	}
-	
+
 	return config
 }
 
@@ -247,7 +247,8 @@ func LoadConfigFromYAML(_ context.Context, _ string) (*Configuration, error) {
 	// This is a temporary bridge function during the refactor
 	envConfig, err := LoadFromEnvironment()
 	if err != nil {
-		// If env loading fails, return default config with new validation
+		// If env loading fails, return default config
+		// We're intentionally ignoring the error and returning defaults
 		config := GetDefaultConfiguration()
 		return config, nil
 	}

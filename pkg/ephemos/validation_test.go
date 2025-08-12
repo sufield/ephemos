@@ -77,7 +77,7 @@ func TestValidationEngine_ValidateAndSetDefaults(t *testing.T) {
 			name: "multiple validation errors",
 			input: &Configuration{
 				Service: ServiceConfig{
-					Name:   "", // Required field missing
+					Name:   "",               // Required field missing
 					Domain: "invalid-domain", // Invalid domain format
 				},
 				Transport: TransportConfig{
@@ -308,7 +308,7 @@ func TestValidationRules(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := engine.ValidateAndSetDefaults(&tt.data)
-			
+
 			if tt.wantErr {
 				if err == nil {
 					t.Error("expected error, got nil")
@@ -330,18 +330,18 @@ func TestValidationRules(t *testing.T) {
 
 func TestDefaultValues(t *testing.T) {
 	type testStruct struct {
-		StringField  string   `default:"default-value"`
-		BoolField    bool     `default:"true"`
-		IntField     int      `default:"42"`
-		UintField    uint     `default:"100"`
-		FloatField   float64  `default:"3.14"`
-		SliceField   []string `default:"one,two,three"`
+		StringField    string   `default:"default-value"`
+		BoolField      bool     `default:"true"`
+		IntField       int      `default:"42"`
+		UintField      uint     `default:"100"`
+		FloatField     float64  `default:"3.14"`
+		SliceField     []string `default:"one,two,three"`
 		NoDefaultField string
 	}
 
 	data := &testStruct{}
 	engine := NewValidationEngine()
-	
+
 	err := engine.ValidateAndSetDefaults(data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -377,10 +377,10 @@ func TestNestedStructValidation(t *testing.T) {
 	}
 
 	type parentStruct struct {
-		Nested       nestedStruct  `validate:"required"`
-		NestedPtr    *nestedStruct
-		NestedSlice  []nestedStruct `validate:"min=1"`
-		ParentField  string         `validate:"required"`
+		Nested      nestedStruct `validate:"required"`
+		NestedPtr   *nestedStruct
+		NestedSlice []nestedStruct `validate:"min=1"`
+		ParentField string         `validate:"required"`
 	}
 
 	// Test with valid nested struct
@@ -559,7 +559,7 @@ func TestConfigurationValidation(t *testing.T) {
 			}
 
 			err := tt.config.ValidateAndSetDefaults()
-			
+
 			if tt.wantErr {
 				if err == nil {
 					t.Error("expected error, got nil")
@@ -653,7 +653,7 @@ func TestValidationHelperFunctions(t *testing.T) {
 // Benchmark tests for performance
 func BenchmarkValidationEngine_ValidateAndSetDefaults(b *testing.B) {
 	engine := NewValidationEngine()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Create a fresh copy for each iteration
@@ -668,13 +668,13 @@ func BenchmarkValidationEngine_ValidateAndSetDefaults(b *testing.B) {
 
 func BenchmarkValidationEngine_AggregatedErrors(b *testing.B) {
 	engine := NewValidationEngine()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Create a fresh copy for each iteration with multiple errors
 		testConfig := &Configuration{
 			Service: ServiceConfig{
-				Name:   "", // Missing required
+				Name:   "",               // Missing required
 				Domain: "invalid-domain", // Invalid format
 			},
 			Transport: TransportConfig{
@@ -689,12 +689,12 @@ func BenchmarkValidationEngine_AggregatedErrors(b *testing.B) {
 // Helper function to create temporary files for testing file validation
 func createTempFile(t *testing.T, content string) (string, func()) {
 	t.Helper()
-	
-	tmpFile, err := os.CreateTemp("", "validation_test_*.txt")
+
+	tmpFile, err := os.CreateTemp(t.TempDir(), "validation_test_*.txt")
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
-	
+
 	if content != "" {
 		if _, err := tmpFile.WriteString(content); err != nil {
 			tmpFile.Close()
@@ -702,9 +702,9 @@ func createTempFile(t *testing.T, content string) (string, func()) {
 			t.Fatalf("failed to write to temp file: %v", err)
 		}
 	}
-	
+
 	tmpFile.Close()
-	
+
 	return tmpFile.Name(), func() {
 		os.Remove(tmpFile.Name())
 	}
@@ -722,11 +722,7 @@ func TestFileValidation(t *testing.T) {
 	tmpFile, cleanupFile := createTempFile(t, "test content")
 	defer cleanupFile()
 
-	tmpDir, err := os.MkdirTemp("", "validation_test_dir_*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	tests := []struct {
 		name    string
@@ -783,7 +779,7 @@ func TestFileValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := engine.ValidateAndSetDefaults(&tt.data)
-			
+
 			if tt.wantErr {
 				if err == nil {
 					t.Error("expected error, got nil")
@@ -868,3 +864,4 @@ func TestEdgeCases(t *testing.T) {
 		}
 	})
 }
+
