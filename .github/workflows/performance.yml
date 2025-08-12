@@ -93,7 +93,7 @@ jobs:
         
         # Save current benchmark as new baseline (only on main branch)
         if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
-          cp benchmark-new.txt benchmark-baseline.txt
+          cp benchmark-new.txt benchmark-baseline.txt || echo "Could not update baseline"
         fi
         
     - name: Upload benchmark results
