@@ -116,7 +116,15 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       
-    - name: Setup Go Environment
+    - name: Setup Go Environment (Windows - Official Action)
+      if: runner.os == 'Windows'
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+        check-latest: true
+        
+    - name: Setup Go Environment (Linux/macOS - Custom Action)
+      if: runner.os != 'Windows'
       uses: ./.github/actions/setup-go
       with:
         go-version: ${{ matrix.go-version }}
@@ -135,9 +143,17 @@ jobs:
         echo "🔍 Checking GOROOT/src directory..."
         ls -la "$(go env GOROOT)/src" 2>/dev/null || echo "❌ GOROOT/src not found"
         
-        echo "🔍 Checking for standard library packages..."
-        ls "$(go env GOROOT)/src/context" >/dev/null 2>&1 && echo "✅ context package found" || echo "❌ context package missing"
-        ls "$(go env GOROOT)/src/crypto" >/dev/null 2>&1 && echo "✅ crypto package found" || echo "❌ crypto package missing"
+        echo "🔍 Verifying Go standard library presence..."
+        if [ ! -d "$(go env GOROOT)/src/context" ] || [ ! -d "$(go env GOROOT)/src/crypto" ]; then
+          echo "❌ CRITICAL: Go standard library not present in GOROOT/src"
+          echo "This indicates an incomplete or corrupted Go installation"
+          echo "Missing packages:"
+          [ ! -d "$(go env GOROOT)/src/context" ] && echo "  - context package missing"
+          [ ! -d "$(go env GOROOT)/src/crypto" ] && echo "  - crypto package missing"
+          exit 1
+        else
+          echo "✅ Go standard library packages verified present"
+        fi
         
         echo "🔍 Testing basic Go compilation..."
         echo 'package main; import "context"; func main() { _ = context.Background() }' > test.go
