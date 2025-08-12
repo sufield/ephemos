@@ -83,6 +83,7 @@ func (c *Configuration) Validate() error {
 	}
 
 	// Use the new validation engine for comprehensive validation
+	// Note: ValidateStruct is defined in validation.go in the same package
 	return ValidateStruct(c)
 }
 
@@ -141,11 +142,13 @@ func LoadFromEnvironment() (*Configuration, error) {
 
 	// Parse comma-separated authorized clients
 	if authorizedClients := os.Getenv(EnvAuthorizedClients); authorizedClients != "" {
+		// Note: parseCommaSeparatedList is defined in config_enhanced.go in the same package
 		config.AuthorizedClients = parseCommaSeparatedList(authorizedClients)
 	}
 
 	// Parse comma-separated trusted servers
 	if trustedServers := os.Getenv(EnvTrustedServers); trustedServers != "" {
+		// Note: parseCommaSeparatedList is defined in config_enhanced.go in the same package
 		config.TrustedServers = parseCommaSeparatedList(trustedServers)
 	}
 
@@ -180,11 +183,13 @@ func (c *Configuration) MergeWithEnvironment() error {
 
 	// Override authorized clients if set via environment
 	if authorizedClients := os.Getenv(EnvAuthorizedClients); authorizedClients != "" {
+		// Note: parseCommaSeparatedList is defined in config_enhanced.go in the same package
 		c.AuthorizedClients = parseCommaSeparatedList(authorizedClients)
 	}
 
 	// Override trusted servers if set via environment
 	if trustedServers := os.Getenv(EnvTrustedServers); trustedServers != "" {
+		// Note: parseCommaSeparatedList is defined in config_enhanced.go in the same package
 		c.TrustedServers = parseCommaSeparatedList(trustedServers)
 	}
 
