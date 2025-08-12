@@ -9,9 +9,9 @@ updates:
       time: "02:00"
     open-pull-requests-limit: 10
     assignees:
-      - "sufield"
+      - "bparanj"
     reviewers:
-      - "sufield"
+      - "bparanj"
     commit-message:
       prefix: "chore"
       prefix-development: "chore"
@@ -70,9 +70,9 @@ updates:
       time: "02:00"
     open-pull-requests-limit: 3
     assignees:
-      - "sufield"
+      - "bparanj"
     reviewers:
-      - "sufield"
+      - "bparanj"
     commit-message:
       prefix: "ci"
       prefix-development: "ci"

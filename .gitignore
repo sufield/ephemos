@@ -239,4 +239,4 @@ sbom/
 *.spdx.json
 *.cyclonedx.json
 *-sbom*.txt
-*-checksums.txt
+*-checksums.txtbin/
