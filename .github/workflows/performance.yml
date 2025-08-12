@@ -36,9 +36,15 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-bench-
           
+    - name: Install dependencies
+      run: make setup
+
     - name: Run benchmarks
       run: |
-        go test -bench=. -benchmem -run=^$ ./... > benchmark-new.txt 2>&1
+        # Use our clean benchmark script that reduces log noise
+        ./scripts/benchmark.sh
+        # Copy results for workflow compatibility  
+        cp benchmark-results.txt benchmark-new.txt
         
     - name: Download previous benchmark data
       uses: actions/cache@v4

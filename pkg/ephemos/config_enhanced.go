@@ -118,10 +118,7 @@ func (b *ConfigBuilder) buildFromYAML(ctx context.Context) (*Configuration, erro
 	}
 
 	// Apply environment variable overrides
-	config, err := b.applyEnvOverrides(publicConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to apply env overrides: %w", err)
-	}
+	config := b.applyEnvOverrides(publicConfig)
 
 	// Apply any programmatic overrides from builder
 	b.applyBuilderOverrides(config)
@@ -140,10 +137,7 @@ func (b *ConfigBuilder) buildFromEnvOnly(_ context.Context) (*Configuration, err
 	config := GetDefaultConfiguration()
 
 	// Apply environment variables
-	config, err := b.applyEnvOverrides(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build from env vars: %w", err)
-	}
+	config = b.applyEnvOverrides(config)
 
 	// Apply any programmatic overrides from builder
 	b.applyBuilderOverrides(config)
@@ -194,19 +188,43 @@ func (b *ConfigBuilder) buildFromPureCode(_ context.Context) (*Configuration, er
 	return config, nil
 }
 
-// applyEnvOverrides applies environment variable overrides to configuration.
-func (b *ConfigBuilder) applyEnvOverrides(config *Configuration) (*Configuration, error) {
-	envConfig := *config // Copy the config
-
-	// Service configuration overrides
+// applyServiceEnvOverrides applies service-related environment overrides.
+func (b *ConfigBuilder) applyServiceEnvOverrides(config *Configuration) {
 	if val := os.Getenv(b.envPrefix + "_SERVICE_NAME"); val != "" {
-		envConfig.Service.Name = val
+		config.Service.Name = val
 	}
 	if val := os.Getenv(b.envPrefix + "_SERVICE_DOMAIN"); val != "" {
-		envConfig.Service.Domain = val
+		config.Service.Domain = val
 	}
+}
 
-	// SPIFFE configuration overrides
+// applyTransportEnvOverrides applies transport-related environment overrides.
+func (b *ConfigBuilder) applyTransportEnvOverrides(config *Configuration) {
+	if val := os.Getenv(b.envPrefix + "_TRANSPORT_TYPE"); val != "" {
+		config.Transport.Type = val
+	}
+	if val := os.Getenv(b.envPrefix + "_TRANSPORT_ADDRESS"); val != "" {
+		config.Transport.Address = val
+	}
+}
+
+// parseCommaSeparatedList parses and trims a comma-separated environment variable.
+func parseCommaSeparatedList(value string) []string {
+	items := strings.Split(value, ",")
+	for i, item := range items {
+		items[i] = strings.TrimSpace(item)
+	}
+	return items
+}
+
+// applyEnvOverrides applies environment variable overrides to configuration.
+func (b *ConfigBuilder) applyEnvOverrides(config *Configuration) *Configuration {
+	envConfig := *config // Copy the config
+
+	// Apply service overrides
+	b.applyServiceEnvOverrides(&envConfig)
+
+	// SPIFFE configuration override
 	if val := os.Getenv(b.envPrefix + "_SPIFFE_SOCKET"); val != "" {
 		if envConfig.SPIFFE == nil {
 			envConfig.SPIFFE = &SPIFFEConfig{}
@@ -214,33 +232,20 @@ func (b *ConfigBuilder) applyEnvOverrides(config *Configuration) (*Configuration
 		envConfig.SPIFFE.SocketPath = val
 	}
 
-	// Transport configuration overrides
-	if val := os.Getenv(b.envPrefix + "_TRANSPORT_TYPE"); val != "" {
-		envConfig.Transport.Type = val
-	}
-	if val := os.Getenv(b.envPrefix + "_TRANSPORT_ADDRESS"); val != "" {
-		envConfig.Transport.Address = val
-	}
+	// Apply transport overrides
+	b.applyTransportEnvOverrides(&envConfig)
 
-	// Authorized clients override (comma-separated list)
+	// Authorized clients override
 	if val := os.Getenv(b.envPrefix + "_AUTHORIZED_CLIENTS"); val != "" {
-		envConfig.AuthorizedClients = strings.Split(val, ",")
-		// Trim whitespace from each client
-		for i, client := range envConfig.AuthorizedClients {
-			envConfig.AuthorizedClients[i] = strings.TrimSpace(client)
-		}
+		envConfig.AuthorizedClients = parseCommaSeparatedList(val)
 	}
 
-	// Trusted servers override (comma-separated list)
+	// Trusted servers override
 	if val := os.Getenv(b.envPrefix + "_TRUSTED_SERVERS"); val != "" {
-		envConfig.TrustedServers = strings.Split(val, ",")
-		// Trim whitespace from each server
-		for i, server := range envConfig.TrustedServers {
-			envConfig.TrustedServers[i] = strings.TrimSpace(server)
-		}
+		envConfig.TrustedServers = parseCommaSeparatedList(val)
 	}
 
-	return &envConfig, nil
+	return &envConfig
 }
 
 // applyBuilderOverrides applies programmatic overrides from the builder.

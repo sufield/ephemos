@@ -16,6 +16,44 @@ import (
 	"testing"
 )
 
+// fileChecker processes a single file and returns violations.
+type fileChecker func(path string) []string
+
+// shouldSkipGoFile determines if a Go file should be skipped.
+func shouldSkipGoFile(path string) bool {
+	return !strings.HasSuffix(path, ".go") ||
+		strings.Contains(path, "_test.go") ||
+		strings.Contains(path, ".pb.go") ||
+		strings.Contains(path, "_grpc.pb.go")
+}
+
+// processFile handles file checking based on type.
+func processFile(path string) []string {
+	if strings.HasSuffix(path, ".md") {
+		return checkMarkdownForInternalImports(path)
+	}
+	if !shouldSkipGoFile(path) {
+		return checkGoFileForInternalImports(path)
+	}
+	return nil
+}
+
+// walkDirectory walks a directory and checks files for violations.
+func walkDirectory(dir string, checker fileChecker) ([]string, error) {
+	var violations []string
+	err := filepath.Walk(dir, func(path string, _ os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		violations = append(violations, checker(path)...)
+		return nil
+	})
+	if err != nil {
+		return violations, fmt.Errorf("failed to walk directory: %w", err)
+	}
+	return violations, nil
+}
+
 // TestNoInternalImportsInExamples ensures all example code uses only public APIs.
 // This is critical because external users cannot import internal packages.
 func TestNoInternalImportsInExamples(t *testing.T) {
@@ -23,41 +61,21 @@ func TestNoInternalImportsInExamples(t *testing.T) {
 		"../../examples/",
 	}
 
-	var violations []string
-
+	var allViolations []string
 	for _, dir := range exampleDirs {
-		err := filepath.Walk(dir, func(path string, _ os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-
-			// Skip non-Go files and test files
-			if !strings.HasSuffix(path, ".go") || strings.Contains(path, "_test.go") {
-				// Also check markdown files for code examples
-				if strings.HasSuffix(path, ".md") {
-					if errs := checkMarkdownForInternalImports(path); len(errs) > 0 {
-						violations = append(violations, errs...)
-					}
-				}
-				return nil
-			}
-
-			// Skip generated protobuf files
-			if strings.Contains(path, ".pb.go") || strings.Contains(path, "_grpc.pb.go") {
-				return nil
-			}
-
-			if errs := checkGoFileForInternalImports(path); len(errs) > 0 {
-				violations = append(violations, errs...)
-			}
-
-			return nil
-		})
+		violations, err := walkDirectory(dir, processFile)
 		if err != nil {
 			t.Fatalf("Failed to walk directory %s: %v", dir, err)
 		}
+		allViolations = append(allViolations, violations...)
 	}
 
+	reportViolations(t, allViolations)
+}
+
+// reportViolations reports import violations if any exist.
+func reportViolations(t *testing.T, violations []string) {
+	t.Helper()
 	if len(violations) > 0 {
 		t.Errorf("Found %d violations of internal import policy:\n\n%s\n\n"+
 			"❌ CRITICAL: External users cannot import internal packages!\n"+
@@ -77,25 +95,9 @@ func checkGoFileForInternalImports(filePath string) []string {
 	}
 	defer file.Close()
 
-	var violations []string
-	scanner := bufio.NewScanner(file)
-	lineNumber := 0
-
-	// Regex to match internal imports
-	internalImportRegex := regexp.MustCompile(`"github\.com/sufield/ephemos/internal/`)
-
-	for scanner.Scan() {
-		lineNumber++
-		line := strings.TrimSpace(scanner.Text())
-
-		if internalImportRegex.MatchString(line) {
-			violations = append(violations, fmt.Sprintf(
-				"❌ %s:%d - INTERNAL IMPORT: %s",
-				filePath, lineNumber, line))
-		}
-	}
-
-	return violations
+	return scanFileForPattern(file, filePath,
+		regexp.MustCompile(`"github\.com/sufield/ephemos/internal/`),
+		"INTERNAL IMPORT")
 }
 
 // checkMarkdownForInternalImports scans markdown files for internal imports in code blocks.
@@ -106,13 +108,34 @@ func checkMarkdownForInternalImports(filePath string) []string {
 	}
 	defer file.Close()
 
+	return scanMarkdownForPattern(file, filePath,
+		regexp.MustCompile(`"github\.com/sufield/ephemos/internal/`))
+}
+
+// scanFileForPattern scans a file for a regex pattern and returns violations.
+func scanFileForPattern(file *os.File, filePath string, pattern *regexp.Regexp, violationType string) []string {
+	var violations []string
+	scanner := bufio.NewScanner(file)
+	lineNumber := 0
+
+	for scanner.Scan() {
+		lineNumber++
+		line := strings.TrimSpace(scanner.Text())
+		if pattern.MatchString(line) {
+			violations = append(violations, fmt.Sprintf(
+				"❌ %s:%d - %s: %s",
+				filePath, lineNumber, violationType, line))
+		}
+	}
+	return violations
+}
+
+// scanMarkdownForPattern scans markdown code blocks for a pattern.
+func scanMarkdownForPattern(file *os.File, filePath string, pattern *regexp.Regexp) []string {
 	var violations []string
 	scanner := bufio.NewScanner(file)
 	lineNumber := 0
 	inCodeBlock := false
-
-	// Regex to match internal imports in code blocks
-	internalImportRegex := regexp.MustCompile(`"github\.com/sufield/ephemos/internal/`)
 	codeBlockRegex := regexp.MustCompile("^```")
 
 	for scanner.Scan() {
@@ -126,13 +149,12 @@ func checkMarkdownForInternalImports(filePath string) []string {
 		}
 
 		// Only check imports inside code blocks
-		if inCodeBlock && internalImportRegex.MatchString(line) {
+		if inCodeBlock && pattern.MatchString(line) {
 			violations = append(violations, fmt.Sprintf(
 				"❌ %s:%d - INTERNAL IMPORT IN DOCS: %s",
 				filePath, lineNumber, line))
 		}
 	}
-
 	return violations
 }
 
@@ -160,21 +182,19 @@ func testConfigurationTypesAvailable(t *testing.T) {
 	// This simulates what external users would do
 	code := `
 package main
-
 import "github.com/sufield/ephemos/pkg/ephemos"
-
 func main() {
 	// These types must be accessible to external users
 	config := &ephemos.Configuration{
 		Service: ephemos.ServiceConfig{
-			Name:   "test-service",
+			Name: "test-service",
 			Domain: "example.com",
 		},
 		SPIFFE: &ephemos.SPIFFEConfig{
 			SocketPath: "/tmp/spire-agent/public/api.sock",
 		},
 		Transport: ephemos.TransportConfig{
-			Type:    "grpc",
+			Type: "grpc",
 			Address: ":50051",
 		},
 	}
@@ -191,22 +211,18 @@ func testServiceInterfacesAvailable(t *testing.T) {
 	// Test that service interfaces are available publicly
 	code := `
 package main
-
 import (
 	"context"
 	"io"
 	"github.com/sufield/ephemos/pkg/ephemos"
 )
-
 type MyEchoService struct{}
 func (m *MyEchoService) Echo(ctx context.Context, message string) (string, error) { return message, nil }
 func (m *MyEchoService) Ping(ctx context.Context) error { return nil }
-
 type MyFileService struct{}
 func (m *MyFileService) Upload(ctx context.Context, filename string, data io.Reader) error { return nil }
 func (m *MyFileService) Download(ctx context.Context, filename string) (io.Reader, error) { return nil, nil }
 func (m *MyFileService) List(ctx context.Context, prefix string) ([]string, error) { return nil, nil }
-
 func main() {
 	var _ ephemos.EchoService = &MyEchoService{}
 	var _ ephemos.FileService = &MyFileService{}
@@ -222,22 +238,18 @@ func testBuilderPatternsAvailable(t *testing.T) {
 	// Test that builder patterns are available
 	code := `
 package main
-
 import (
 	"context"
 	"github.com/sufield/ephemos/pkg/ephemos"
 )
-
 func main() {
 	ctx := context.Background()
 	builder := ephemos.NewConfigBuilder()
-	
 	config, err := builder.
 		WithServiceName("test").
 		WithServiceDomain("example.com").
 		WithSource(ephemos.ConfigSourcePureCode).
 		Build(ctx)
-	
 	if err != nil || config == nil {
 		panic("builder not working")
 	}
@@ -253,9 +265,7 @@ func testPresetConfigurationsAvailable(t *testing.T) {
 	// Test that preset configurations are available
 	code := `
 package main
-
 import "github.com/sufield/ephemos/pkg/ephemos"
-
 func main() {
 	_ = ephemos.NewDevelopmentInterceptorConfig("test-service")
 	_ = ephemos.NewProductionInterceptorConfig("test-service")
@@ -290,6 +300,38 @@ func compileTestCode(code string) error {
 	return nil
 }
 
+// checkExampleDirectory checks a single example directory for violations.
+func checkExampleDirectory(t *testing.T, dir string) {
+	t.Helper()
+	// Check if directory exists
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		t.Skipf("Example directory %s does not exist", dir)
+		return
+	}
+
+	violations, err := walkDirectory(dir, func(path string) []string {
+		if isValidExampleFile(path) {
+			return checkGoFileForInternalImports(path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Errorf("Failed to check example directory %s: %v", dir, err)
+		return
+	}
+
+	if len(violations) > 0 {
+		t.Errorf("Example %s has internal imports:\n%s", dir, strings.Join(violations, "\n"))
+	}
+}
+
+// isValidExampleFile checks if a file should be validated.
+func isValidExampleFile(path string) bool {
+	return strings.HasSuffix(path, ".go") &&
+		!strings.Contains(path, "_test.go") &&
+		!strings.Contains(path, ".pb.go")
+}
+
 // TestExampleCodeCompiles ensures all example directories compile successfully.
 // This catches cases where examples use unavailable internal APIs.
 func TestExampleCodeCompiles(t *testing.T) {
@@ -303,29 +345,7 @@ func TestExampleCodeCompiles(t *testing.T) {
 
 	for _, dir := range exampleDirs {
 		t.Run(filepath.Base(dir), func(t *testing.T) {
-			// Check if directory exists
-			if _, err := os.Stat(dir); os.IsNotExist(err) {
-				t.Skipf("Example directory %s does not exist", dir)
-				return
-			}
-
-			// For this test, we verify that Go files in the directory don't have internal imports
-			// The actual compilation is tested by the build system
-			err := filepath.Walk(dir, func(path string, _ os.FileInfo, err error) error {
-				if err != nil {
-					return err
-				}
-
-				if strings.HasSuffix(path, ".go") && !strings.Contains(path, "_test.go") && !strings.Contains(path, ".pb.go") {
-					if violations := checkGoFileForInternalImports(path); len(violations) > 0 {
-						t.Errorf("Example %s has internal imports:\n%s", dir, strings.Join(violations, "\n"))
-					}
-				}
-				return nil
-			})
-			if err != nil {
-				t.Errorf("Failed to check example directory %s: %v", dir, err)
-			}
+			checkExampleDirectory(t, dir)
 		})
 	}
 }
@@ -335,17 +355,47 @@ func TestExampleCodeCompiles(t *testing.T) {
 func TestMainREADMEUsesPublicAPI(t *testing.T) {
 	readmePath := "../../README.md"
 	if violations := checkMarkdownForInternalImports(readmePath); len(violations) > 0 {
-		t.Errorf("Main README.md has internal imports that external users cannot access:\\n%s\\n\\n"+
-			"❌ CRITICAL: External users copy examples from README.md!\\n"+
-			"✅ SOLUTION: Use only 'github.com/sufield/ephemos/pkg/ephemos' imports\\n"+
+		t.Errorf("Main README.md has internal imports that external users cannot access:\n%s\n\n"+
+			"❌ CRITICAL: External users copy examples from README.md!\n"+
+			"✅ SOLUTION: Use only 'github.com/sufield/ephemos/pkg/ephemos' imports\n"+
 			"✅ Example: ephemos.Mount[ephemos.EchoService] instead of ephemos.Mount[ports.EchoService]",
-			strings.Join(violations, "\\n"))
+			strings.Join(violations, "\n"))
+	}
+}
+
+// hasPackageDocumentation checks if a file has package documentation.
+func hasPackageDocumentation(file *os.File) bool {
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "// Package ephemos") {
+			return true
+		}
+		// Stop at first non-comment line
+		if line != "" && !strings.HasPrefix(line, "//") {
+			break
+		}
+	}
+	return false
+}
+
+// checkFileDocumentation checks a single file for documentation.
+func checkFileDocumentation(t *testing.T, path string) {
+	t.Helper()
+	file, err := os.Open(path)
+	if err != nil {
+		t.Errorf("Failed to open file %s: %v", path, err)
+		return
+	}
+	defer file.Close()
+
+	if !hasPackageDocumentation(file) && filepath.Base(path) != "config.go" {
+		t.Logf("INFO: %s might benefit from package documentation", path)
 	}
 }
 
 // TestPublicAPIDocumentation ensures public API is properly documented.
 func TestPublicAPIDocumentation(t *testing.T) {
-	// Check that the main package has proper documentation
 	publicPkgPath := "."
 
 	err := filepath.Walk(publicPkgPath, func(path string, _ os.FileInfo, err error) error {
@@ -354,31 +404,7 @@ func TestPublicAPIDocumentation(t *testing.T) {
 		}
 
 		if strings.HasSuffix(path, ".go") && !strings.Contains(path, "_test.go") {
-			// Ensure files have package documentation
-			file, err := os.Open(path)
-			if err != nil {
-				return fmt.Errorf("failed to open file %s: %w", path, err)
-			}
-			defer file.Close()
-
-			scanner := bufio.NewScanner(file)
-			hasPackageDoc := false
-
-			for scanner.Scan() {
-				line := strings.TrimSpace(scanner.Text())
-				if strings.HasPrefix(line, "// Package ephemos") {
-					hasPackageDoc = true
-					break
-				}
-				// Stop at first non-comment line
-				if line != "" && !strings.HasPrefix(line, "//") {
-					break
-				}
-			}
-
-			if !hasPackageDoc && filepath.Base(path) != "config.go" { // config.go might not have package doc
-				t.Logf("INFO: %s might benefit from package documentation", path)
-			}
+			checkFileDocumentation(t, path)
 		}
 		return nil
 	})

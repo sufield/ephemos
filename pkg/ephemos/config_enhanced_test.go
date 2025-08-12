@@ -45,6 +45,39 @@ func TestConfigBuilder_PureCodeConfiguration(t *testing.T) {
 	}
 }
 
+// verifyServiceConfig checks service configuration fields.
+func verifyServiceConfig(t *testing.T, config *Configuration, expectedName, expectedDomain string) {
+	t.Helper()
+	if config.Service.Name != expectedName {
+		t.Errorf("Expected service name '%s', got '%s'", expectedName, config.Service.Name)
+	}
+	if config.Service.Domain != expectedDomain {
+		t.Errorf("Expected service domain '%s', got '%s'", expectedDomain, config.Service.Domain)
+	}
+}
+
+// verifyTransportConfig checks transport configuration fields.
+func verifyTransportConfig(t *testing.T, config *Configuration, expectedType, expectedAddress string) {
+	t.Helper()
+	if config.Transport.Type != expectedType {
+		t.Errorf("Expected transport type '%s', got '%s'", expectedType, config.Transport.Type)
+	}
+	if config.Transport.Address != expectedAddress {
+		t.Errorf("Expected transport address '%s', got '%s'", expectedAddress, config.Transport.Address)
+	}
+}
+
+// verifyListConfig checks list configuration fields.
+func verifyListConfig(t *testing.T, config *Configuration, expectedClients, expectedServers int) {
+	t.Helper()
+	if len(config.AuthorizedClients) != expectedClients {
+		t.Errorf("Expected %d authorized clients, got %d", expectedClients, len(config.AuthorizedClients))
+	}
+	if len(config.TrustedServers) != expectedServers {
+		t.Errorf("Expected %d trusted servers, got %d", expectedServers, len(config.TrustedServers))
+	}
+}
+
 func TestConfigBuilder_EnvironmentOverrides(t *testing.T) {
 	ctx := t.Context()
 
@@ -72,30 +105,19 @@ func TestConfigBuilder_EnvironmentOverrides(t *testing.T) {
 		t.Fatalf("Failed to build env-only config: %v", err)
 	}
 
-	// Verify configuration from environment
-	if config.Service.Name != "env-service" {
-		t.Errorf("Expected service name 'env-service', got '%s'", config.Service.Name)
-	}
-	if config.Service.Domain != "env.example.com" {
-		t.Errorf("Expected service domain 'env.example.com', got '%s'", config.Service.Domain)
-	}
+	// Verify configuration using helper functions
+	verifyServiceConfig(t, config, "env-service", "env.example.com")
+	verifyTransportConfig(t, config, "http", ":9090")
+	verifyListConfig(t, config, 3, 2)
+
+	// Verify SPIFFE socket
 	if config.SPIFFE.SocketPath != "/env/spiffe/socket" {
 		t.Errorf("Expected SPIFFE socket '/env/spiffe/socket', got '%s'", config.SPIFFE.SocketPath)
 	}
-	if config.Transport.Type != "http" {
-		t.Errorf("Expected transport type 'http', got '%s'", config.Transport.Type)
-	}
-	if config.Transport.Address != ":9090" {
-		t.Errorf("Expected transport address ':9090', got '%s'", config.Transport.Address)
-	}
-	if len(config.AuthorizedClients) != 3 {
-		t.Errorf("Expected 3 authorized clients, got %d", len(config.AuthorizedClients))
-	}
+
+	// Verify first client
 	if config.AuthorizedClients[0] != "spiffe://env.com/client1" {
 		t.Errorf("Expected first client 'spiffe://env.com/client1', got '%s'", config.AuthorizedClients[0])
-	}
-	if len(config.TrustedServers) != 2 {
-		t.Errorf("Expected 2 trusted servers, got %d", len(config.TrustedServers))
 	}
 }
 
