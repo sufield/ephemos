@@ -26,6 +26,11 @@ jobs:
       with:
         go-version: '1.24'
         
+    - name: Clean Go Module Cache
+      run: |
+        rm -rf ~/go/pkg/mod
+        rm -rf ~/.cache/go-build
+        
     - name: Cache Go modules
       uses: actions/cache@v4
       with:
