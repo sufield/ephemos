@@ -52,6 +52,12 @@ jobs:
         # Copy results for workflow compatibility  
         cp benchmark-results.txt benchmark-new.txt
         
+    - name: Debug benchmark files
+      run: ls -lh benchmark-*.txt || true
+        
+    - name: Ensure benchcmp in PATH
+      run: echo "$HOME/go/bin" >> $GITHUB_PATH
+        
     - name: Download previous benchmark data
       uses: actions/cache@v4
       with:
@@ -73,7 +79,8 @@ jobs:
           go install golang.org/x/tools/cmd/benchcmp@latest
           
           # Compare benchmarks, but don't fail the job on benchcmp errors
-          if ! benchcmp benchmark-baseline.txt benchmark-new.txt >> $GITHUB_STEP_SUMMARY; then
+          # Use explicit path to ensure benchcmp is found
+          if ! $HOME/go/bin/benchcmp benchmark-baseline.txt benchmark-new.txt >> $GITHUB_STEP_SUMMARY; then
             echo "Benchmark comparison failed" >> $GITHUB_STEP_SUMMARY
           fi
           echo '```' >> $GITHUB_STEP_SUMMARY
