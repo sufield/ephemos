@@ -51,6 +51,11 @@ test: check-deps
 	go test -v ./...
 	@echo "Tests completed!"
 
+# Run benchmarks
+benchmark: check-deps
+	@echo "Running benchmarks..."
+	@./scripts/benchmark.sh
+
 # Get dependencies
 deps:
 	@echo "Getting dependencies..."
@@ -94,6 +99,7 @@ core-help:
 	@echo "  make proto-ci  - Generate protobuf code (CI-friendly, no strict deps)"
 	@echo "  make examples  - Build example applications"
 	@echo "  make test      - Run tests"
+	@echo "  make benchmark - Run benchmarks"
 	@echo "  make deps      - Get/update Go dependencies"
 	@echo "  make fmt       - Format code"
 	@echo "  make lint      - Lint code"
