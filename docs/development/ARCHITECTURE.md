@@ -294,6 +294,295 @@ go mod graph | grep internal/
 go list -f '{{join .Deps "\n"}}' ./internal/... | sort | uniq -c | sort -rn
 ```
 
+## Sequence Diagrams
+
+### Server Boot Sequence (SVID Fetch & mTLS Setup)
+
+```mermaid
+sequenceDiagram
+    participant App as Application
+    participant SvcPort as Service Port
+    participant SvcCore as Core Service
+    participant ConfigPort as Config Port
+    participant IdentPort as Identity Port
+    participant TransPort as Transport Port
+    participant SpiffeAdapter as SPIFFE Adapter
+    participant SpireAgent as SPIRE Agent
+    participant GrpcAdapter as gRPC Adapter
+    
+    Note over App, GrpcAdapter: Server Initialization Phase
+    
+    App->>+SvcPort: NewServer(configPath)
+    SvcPort->>+SvcCore: CreateService()
+    
+    Note over SvcCore, ConfigPort: Configuration Loading
+    SvcCore->>+ConfigPort: LoadConfig(configPath)
+    ConfigPort->>ConfigPort: ValidateConfig()
+    ConfigPort-->>-SvcCore: Config{Service, Transport, SPIFFE}
+    
+    Note over SvcCore, IdentPort: Identity Bootstrap
+    SvcCore->>+IdentPort: InitializeIdentity(spiffeConfig)
+    IdentPort->>+SpiffeAdapter: Connect()
+    
+    SpiffeAdapter->>+SpireAgent: Workload API Connection
+    SpireAgent-->>-SpiffeAdapter: Connection Established
+    
+    SpiffeAdapter->>+SpireAgent: FetchJWTSVID()
+    SpireAgent->>SpireAgent: Validate Workload
+    SpireAgent-->>-SpiffeAdapter: JWT-SVID + Private Key
+    
+    SpiffeAdapter->>+SpireAgent: FetchX509SVID()
+    SpireAgent-->>-SpiffeAdapter: X.509-SVID + Private Key + Bundle
+    
+    SpiffeAdapter-->>-IdentPort: Identity{SVID, PrivateKey, TrustBundle}
+    IdentPort-->>-SvcCore: Identity Ready
+    
+    Note over SvcCore, TransPort: Transport Setup
+    SvcCore->>+TransPort: InitializeTransport(identity, config)
+    TransPort->>+GrpcAdapter: CreateServer(tlsConfig)
+    
+    GrpcAdapter->>GrpcAdapter: Configure mTLS
+    Note right of GrpcAdapter: - Server cert from X.509-SVID<br/>- Client CA from trust bundle<br/>- Require client certs
+    
+    GrpcAdapter-->>-TransPort: Server{Listener, TLSConfig}
+    TransPort-->>-SvcCore: Transport Ready
+    
+    SvcCore-->>-SvcPort: Service Ready
+    SvcPort-->>-App: Server Instance
+    
+    Note over App, GrpcAdapter: Server Start Phase
+    App->>SvcPort: Start()
+    SvcPort->>SvcCore: StartServices()
+    SvcCore->>TransPort: Listen()
+    TransPort->>GrpcAdapter: Serve()
+    
+    Note over GrpcAdapter: Server accepting mTLS connections
+    GrpcAdapter-->>App: Server Running
+```
+
+### Client Connect Sequence
+
+```mermaid
+sequenceDiagram
+    participant Client as Client App
+    participant ClientSvc as Client Service
+    participant IdentPort as Identity Port
+    participant TransPort as Transport Port
+    participant SpiffeAdapter as SPIFFE Adapter
+    participant SpireAgent as SPIRE Agent (Client)
+    participant GrpcAdapter as gRPC Adapter
+    participant Server as Server Process
+    participant SpireAgentSrv as SPIRE Agent (Server)
+    
+    Note over Client, SpireAgentSrv: Client Connection Establishment
+    
+    Client->>+ClientSvc: NewClient(configPath)
+    
+    Note over ClientSvc, IdentPort: Client Identity Setup
+    ClientSvc->>+IdentPort: GetIdentity()
+    IdentPort->>+SpiffeAdapter: FetchCurrentIdentity()
+    
+    SpiffeAdapter->>+SpireAgent: FetchX509SVID()
+    SpireAgent->>SpireAgent: Validate Client Workload
+    SpireAgent-->>-SpiffeAdapter: X.509-SVID + Key + Bundle
+    
+    SpiffeAdapter-->>-IdentPort: ClientIdentity{SVID, Key, Bundle}
+    IdentPort-->>-ClientSvc: Identity Ready
+    
+    Note over ClientSvc, TransPort: Connection Setup
+    ClientSvc->>+TransPort: Connect(serverAddress, identity)
+    TransPort->>+GrpcAdapter: CreateConnection(tlsConfig)
+    
+    Note right of GrpcAdapter: Client TLS Config:<br/>- Client cert from X.509-SVID<br/>- Server CA from trust bundle<br/>- SPIFFE ID verification
+    
+    GrpcAdapter->>+Server: TLS Handshake
+    
+    Note over Server, SpireAgentSrv: Server-side Validation
+    Server->>Server: Validate Client Certificate
+    Server->>Server: Extract SPIFFE ID
+    Server->>Server: Check Authorized Clients List
+    
+    alt Client Authorized
+        Server-->>GrpcAdapter: TLS Handshake Complete
+        GrpcAdapter-->>-TransPort: Secure Connection Established
+        TransPort-->>-ClientSvc: Connection Ready
+        ClientSvc-->>-Client: Client Ready
+        
+        Note over Client, Server: Secure mTLS Communication
+        Client->>+ClientSvc: MakeRequest(data)
+        ClientSvc->>TransPort: Send(encryptedData)
+        TransPort->>GrpcAdapter: gRPC Call
+        GrpcAdapter->>+Server: Authenticated Request
+        Server->>Server: Process Request
+        Server-->>-GrpcAdapter: Response
+        GrpcAdapter-->>TransPort: gRPC Response
+        TransPort-->>ClientSvc: DecryptedResponse
+        ClientSvc-->>-Client: Result
+        
+    else Client Not Authorized
+        Server-->>GrpcAdapter: TLS Handshake Failed
+        GrpcAdapter-->>-TransPort: Connection Rejected
+        TransPort-->>-ClientSvc: AuthorizationError
+        ClientSvc-->>-Client: Connection Failed
+    end
+```
+
+### Certificate Rotation Sequence
+
+```mermaid
+sequenceDiagram
+    participant App as Application
+    participant IdentWatcher as Identity Watcher
+    participant SpiffeAdapter as SPIFFE Adapter
+    participant SpireAgent as SPIRE Agent
+    participant TransService as Transport Service
+    participant GrpcServer as gRPC Server
+    participant ActiveConns as Active Connections
+    participant NewConns as New Connections
+    
+    Note over App, NewConns: Automatic Certificate Rotation
+    
+    Note over IdentWatcher, SpireAgent: Background Identity Monitoring
+    IdentWatcher->>+SpiffeAdapter: WatchIdentity()
+    SpiffeAdapter->>+SpireAgent: StreamSVIDs()
+    
+    loop Every 30 seconds (configurable)
+        SpireAgent->>SpireAgent: Check Certificate Expiry
+        
+        alt Certificate Near Expiry (< 1/3 lifetime)
+            SpireAgent->>SpireAgent: Generate New X.509-SVID
+            SpireAgent-->>SpiffeAdapter: NewSVID{Cert, Key, Bundle}
+            SpiffeAdapter-->>-IdentWatcher: IdentityUpdated Event
+            
+            Note over IdentWatcher, TransService: Hot Certificate Reload
+            IdentWatcher->>+TransService: UpdateIdentity(newSVID)
+            
+            TransService->>TransService: Create New TLS Config
+            TransService->>+GrpcServer: UpdateTLSConfig(newConfig)
+            
+            Note over GrpcServer, ActiveConns: Graceful Certificate Transition
+            
+            GrpcServer->>GrpcServer: Update Server Certificate
+            
+            Note right of GrpcServer: New connections use new cert<br/>Old connections continue with old cert<br/>until natural termination
+            
+            GrpcServer->>+NewConns: Use New Certificate
+            NewConns-->>-GrpcServer: TLS with New Cert
+            
+            Note over ActiveConns: Existing connections remain active<br/>with old certificate until they close naturally
+            
+            GrpcServer-->>-TransService: Certificate Updated
+            TransService-->>-IdentWatcher: Update Complete
+            
+            Note over IdentWatcher: Log Certificate Rotation Success
+            IdentWatcher->>IdentWatcher: Log: Certificate rotated successfully
+            
+        else Certificate Still Valid
+            SpireAgent-->>SpiffeAdapter: No Update Needed
+            SpiffeAdapter-->>-IdentWatcher: Identity Current
+        end
+        
+        Note over IdentWatcher, SpireAgent: Wait for next check interval
+    end
+    
+    Note over App, NewConns: Zero-Downtime Certificate Management
+    
+    rect rgb(240, 255, 240)
+        Note over ActiveConns, NewConns: Benefits of This Approach:<br/>• No connection drops during rotation<br/>• No service interruption<br/>• Automatic certificate lifecycle management<br/>• Configurable rotation timing<br/>• Observability through logging
+    end
+```
+
+### Certificate Rotation Error Handling
+
+```mermaid
+sequenceDiagram
+    participant IdentWatcher as Identity Watcher  
+    participant SpiffeAdapter as SPIFFE Adapter
+    participant SpireAgent as SPIRE Agent
+    participant TransService as Transport Service
+    participant AlertSvc as Alert Service
+    participant HealthCheck as Health Check
+    
+    Note over IdentWatcher, HealthCheck: Certificate Rotation Failure Scenarios
+    
+    IdentWatcher->>+SpiffeAdapter: WatchIdentity()
+    SpiffeAdapter->>+SpireAgent: StreamSVIDs()
+    
+    alt SPIRE Agent Unavailable
+        SpireAgent-->>SpiffeAdapter: Connection Error
+        SpiffeAdapter-->>IdentWatcher: SPIRE Agent Unreachable
+        
+        IdentWatcher->>+AlertSvc: Alert(SPIRE_AGENT_DOWN)
+        AlertSvc-->>-IdentWatcher: Alert Sent
+        
+        IdentWatcher->>+HealthCheck: SetUnhealthy("SPIRE connection lost")
+        HealthCheck-->>-IdentWatcher: Health Status Updated
+        
+        Note over IdentWatcher: Continue using current certificate<br/>until SPIRE agent recovers
+        
+    else Certificate Fetch Failure
+        SpireAgent->>SpireAgent: Certificate Generation Failed
+        SpireAgent-->>SpiffeAdapter: SVID Fetch Error
+        SpiffeAdapter-->>IdentWatcher: Certificate Update Failed
+        
+        IdentWatcher->>IdentWatcher: Retry with Exponential Backoff
+        
+        loop Max 5 retries
+            IdentWatcher->>SpiffeAdapter: RetryFetchSVID()
+            SpiffeAdapter->>SpireAgent: FetchX509SVID()
+            
+            alt Retry Successful
+                SpireAgent-->>SpiffeAdapter: New SVID
+                SpiffeAdapter-->>IdentWatcher: Certificate Updated
+                IdentWatcher->>IdentWatcher: Reset Retry Counter
+                
+            else Retry Failed
+                SpireAgent-->>SpiffeAdapter: Still Failing
+                SpiffeAdapter-->>IdentWatcher: Retry Failed
+                IdentWatcher->>IdentWatcher: Increment Retry Counter
+            end
+        end
+        
+        alt All Retries Exhausted
+            IdentWatcher->>+AlertSvc: Alert(CERTIFICATE_ROTATION_FAILED)
+            AlertSvc-->>-IdentWatcher: Critical Alert Sent
+            
+            IdentWatcher->>+HealthCheck: SetDegraded("Certificate rotation failing")
+            HealthCheck-->>-IdentWatcher: Health Status Updated
+        end
+        
+    else TLS Config Update Failure  
+        SpireAgent-->>SpiffeAdapter: New SVID Available
+        SpiffeAdapter-->>IdentWatcher: New Certificate
+        IdentWatcher->>+TransService: UpdateIdentity(newSVID)
+        
+        TransService->>TransService: TLS Config Creation Failed
+        TransService-->>IdentWatcher: Config Update Error
+        
+        IdentWatcher->>+AlertSvc: Alert(TLS_CONFIG_UPDATE_FAILED)
+        AlertSvc-->>-IdentWatcher: Alert Sent
+        
+        Note over IdentWatcher: Keep using previous working certificate<br/>Do not disrupt service
+        
+    else Certificate Near Expiry With No Rotation
+        IdentWatcher->>IdentWatcher: Monitor Certificate Expiry Time
+        
+        alt Certificate < 10% lifetime remaining
+            IdentWatcher->>+AlertSvc: Alert(CERTIFICATE_EXPIRY_WARNING)
+            AlertSvc-->>-IdentWatcher: Warning Alert Sent
+            
+        else Certificate < 1% lifetime remaining  
+            IdentWatcher->>+AlertSvc: Alert(CERTIFICATE_EXPIRY_CRITICAL)
+            AlertSvc-->>-IdentWatcher: Critical Alert Sent
+            
+            IdentWatcher->>+HealthCheck: SetUnhealthy("Certificate expiring soon")
+            HealthCheck-->>-IdentWatcher: Health Status Updated
+        end
+    end
+    
+    Note over IdentWatcher, HealthCheck: Rotation Monitoring & Recovery
+```
+
 ---
 
 *Last Updated: December 2024*
