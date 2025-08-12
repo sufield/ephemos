@@ -15,7 +15,7 @@ We take the security of Ephemos seriously. If you have discovered a security vul
 
 ### How to Report
 
-Please report security vulnerabilities by emailing the maintainers directly or by opening a private security advisory on GitHub:
+Please report security vulnerabilities by emailing **bparanj@zepho.com** or by opening a private security advisory on GitHub:
 
 1. Go to the "Security" tab of this repository
 2. Click on "Report a vulnerability"
