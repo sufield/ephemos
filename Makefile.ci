@@ -4,14 +4,20 @@
 
 # Setup environment for CI
 ci-setup: proto
-	@echo "Cleaning Go build cache (aggressive)..."
+	@echo "🧹 Cleaning Go build cache (aggressive)..."
 	go clean -cache
 	go clean -modcache || true
 	go clean -testcache
-	@echo "Setting Go module proxy for reliable downloads..."
+	@echo "🔧 Setting Go module proxy for reliable downloads..."
 	go env -w GOPROXY=https://proxy.golang.org,direct || true
+	@echo "📦 Refreshing module dependencies..."
 	go mod download
-	@echo "CI setup completed - protobuf files generated and cache cleared"
+	go mod verify
+	@echo "🔍 Verifying package compilation..."
+	@# Test compile all packages to catch early issues
+	@go build ./pkg/ephemos || (echo "❌ pkg/ephemos compilation failed" && exit 1)
+	@go build ./internal/... || (echo "❌ internal packages compilation failed" && exit 1)
+	@echo "✅ CI setup completed - protobuf files generated, cache cleared, and packages verified"
 
 # Run linting checks
 ci-lint:
@@ -56,10 +62,14 @@ ci-build: clean-cache build examples
 
 # Clean all caches before building
 clean-cache:
-	@echo "Cleaning all Go caches before build..."
+	@echo "🧹 Cleaning all Go caches before build..."
 	go clean -cache
 	go clean -testcache
 	go clean -modcache || true
+	@echo "🗑️  Removing additional cache directories..."
+	rm -rf ~/.cache/go-build 2>/dev/null || true
+	rm -rf $(go env GOCACHE) 2>/dev/null || true
+	@echo "✅ All caches cleared"
 
 # Run all CI checks
 ci-all: ci-lint ci-test ci-security ci-build
