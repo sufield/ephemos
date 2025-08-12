@@ -20,7 +20,6 @@ updates:
       - "dependencies"
       - "security"
       - "automated"
-    # Group related updates for 2025
     groups:
       grpc-ecosystem:
         patterns:
