@@ -28,7 +28,7 @@ CONFIG_VALIDATOR_BINARY := config-validator
 # PHONY targets - all targets that don't create files
 .PHONY: all build proto proto-ci examples test clean deps fmt lint help setup \
         check-deps install-deps install-deps-sudo benchmark fmt-only core-help version show-build-info \
-        fuzz fuzz-build
+        arch-test arch-guard fuzz fuzz-build
 
 # Default target
 all: proto build examples
@@ -214,6 +214,21 @@ install-deps:
 install-deps-sudo:
 	@echo "🔧 Installing development dependencies (with sudo)..."
 	@./scripts/install-deps-sudo.sh
+
+# Architectural boundary tests
+arch-test: check-deps
+	@echo "🏗️ Running comprehensive architectural boundary tests..."
+	@echo "Testing import boundaries..."
+	go test -v ./internal/arch/...
+	@echo "Testing port architecture..."
+	go test -v ./internal/core/ports/...
+	@echo "✅ All architectural tests passed"
+
+# Quick architectural guard tests (for pre-commit)
+arch-guard: check-deps
+	@echo "🛡️ Running architectural guard tests..."
+	go test -run "Test_Core_Has_No_Forbidden_Imports|Test_Public_API_Boundary|Test_Circular_Dependencies" ./internal/arch/...
+	@echo "✅ Architectural boundaries are secure"
 
 # Fuzzing targets
 fuzz: check-deps
