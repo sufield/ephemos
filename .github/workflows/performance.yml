@@ -46,6 +46,7 @@ jobs:
 
     - name: Run benchmarks
       run: |
+        set -euo pipefail
         # Use our clean benchmark script that reduces log noise
         ./scripts/benchmark.sh
         # Copy results for workflow compatibility  
@@ -62,6 +63,7 @@ jobs:
     - name: Compare benchmarks
       id: benchmark-comparison
       run: |
+        set -euo pipefail
         if [[ -f benchmark-baseline.txt ]]; then
           echo "## Benchmark Comparison" >> $GITHUB_STEP_SUMMARY
           echo "### Current vs Baseline" >> $GITHUB_STEP_SUMMARY
@@ -70,8 +72,10 @@ jobs:
           # Install benchcmp if not available
           go install golang.org/x/tools/cmd/benchcmp@latest
           
-          # Compare benchmarks
-          benchcmp benchmark-baseline.txt benchmark-new.txt >> $GITHUB_STEP_SUMMARY || echo "Benchmark comparison failed" >> $GITHUB_STEP_SUMMARY
+          # Compare benchmarks, but don't fail the job on benchcmp errors
+          if ! benchcmp benchmark-baseline.txt benchmark-new.txt >> $GITHUB_STEP_SUMMARY; then
+            echo "Benchmark comparison failed" >> $GITHUB_STEP_SUMMARY
+          fi
           echo '```' >> $GITHUB_STEP_SUMMARY
         else
           echo "## Benchmark Results (Baseline)" >> $GITHUB_STEP_SUMMARY
