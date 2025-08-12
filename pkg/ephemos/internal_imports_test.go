@@ -48,7 +48,10 @@ func walkDirectory(dir string, checker fileChecker) ([]string, error) {
 		violations = append(violations, checker(path)...)
 		return nil
 	})
-	return violations, err
+	if err != nil {
+		return violations, fmt.Errorf("failed to walk directory: %w", err)
+	}
+	return violations, nil
 }
 
 // TestNoInternalImportsInExamples ensures all example code uses only public APIs.
@@ -57,7 +60,7 @@ func TestNoInternalImportsInExamples(t *testing.T) {
 	exampleDirs := []string{
 		"../../examples/",
 	}
-	
+
 	var allViolations []string
 	for _, dir := range exampleDirs {
 		violations, err := walkDirectory(dir, processFile)
@@ -66,12 +69,13 @@ func TestNoInternalImportsInExamples(t *testing.T) {
 		}
 		allViolations = append(allViolations, violations...)
 	}
-	
+
 	reportViolations(t, allViolations)
 }
 
 // reportViolations reports import violations if any exist.
 func reportViolations(t *testing.T, violations []string) {
+	t.Helper()
 	if len(violations) > 0 {
 		t.Errorf("Found %d violations of internal import policy:\n\n%s\n\n"+
 			"❌ CRITICAL: External users cannot import internal packages!\n"+
@@ -90,8 +94,8 @@ func checkGoFileForInternalImports(filePath string) []string {
 		return []string{fmt.Sprintf("ERROR: Cannot read %s: %v", filePath, err)}
 	}
 	defer file.Close()
-	
-	return scanFileForPattern(file, filePath, 
+
+	return scanFileForPattern(file, filePath,
 		regexp.MustCompile(`"github\.com/sufield/ephemos/internal/`),
 		"INTERNAL IMPORT")
 }
@@ -103,7 +107,7 @@ func checkMarkdownForInternalImports(filePath string) []string {
 		return []string{fmt.Sprintf("ERROR: Cannot read %s: %v", filePath, err)}
 	}
 	defer file.Close()
-	
+
 	return scanMarkdownForPattern(file, filePath,
 		regexp.MustCompile(`"github\.com/sufield/ephemos/internal/`))
 }
@@ -113,7 +117,7 @@ func scanFileForPattern(file *os.File, filePath string, pattern *regexp.Regexp, 
 	var violations []string
 	scanner := bufio.NewScanner(file)
 	lineNumber := 0
-	
+
 	for scanner.Scan() {
 		lineNumber++
 		line := strings.TrimSpace(scanner.Text())
@@ -133,17 +137,17 @@ func scanMarkdownForPattern(file *os.File, filePath string, pattern *regexp.Rege
 	lineNumber := 0
 	inCodeBlock := false
 	codeBlockRegex := regexp.MustCompile("^```")
-	
+
 	for scanner.Scan() {
 		lineNumber++
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		// Track if we're in a code block
 		if codeBlockRegex.MatchString(line) {
 			inCodeBlock = !inCodeBlock
 			continue
 		}
-		
+
 		// Only check imports inside code blocks
 		if inCodeBlock && pattern.MatchString(line) {
 			violations = append(violations, fmt.Sprintf(
@@ -166,7 +170,7 @@ func TestPublicAPIAccessibility(t *testing.T) {
 		{"Builder Patterns Available", testBuilderPatternsAvailable},
 		{"Preset Configurations Available", testPresetConfigurationsAvailable},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, tt.testFunc)
 	}
@@ -283,13 +287,13 @@ func compileTestCode(code string) error {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 	defer os.Remove(tmpFile.Name())
-	
+
 	// Write the test code
 	if _, err := tmpFile.WriteString(code); err != nil {
 		return fmt.Errorf("failed to write test code: %w", err)
 	}
 	tmpFile.Close()
-	
+
 	// This would normally run `go build` but we'll just check syntax for now
 	// In a real implementation, you might want to run: go build -o /dev/null tmpFile.Name()
 	// For this test, we assume if the imports resolve, the code is accessible
@@ -298,24 +302,24 @@ func compileTestCode(code string) error {
 
 // checkExampleDirectory checks a single example directory for violations.
 func checkExampleDirectory(t *testing.T, dir string) {
+	t.Helper()
 	// Check if directory exists
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		t.Skipf("Example directory %s does not exist", dir)
 		return
 	}
-	
+
 	violations, err := walkDirectory(dir, func(path string) []string {
 		if isValidExampleFile(path) {
 			return checkGoFileForInternalImports(path)
 		}
 		return nil
 	})
-	
 	if err != nil {
 		t.Errorf("Failed to check example directory %s: %v", dir, err)
 		return
 	}
-	
+
 	if len(violations) > 0 {
 		t.Errorf("Example %s has internal imports:\n%s", dir, strings.Join(violations, "\n"))
 	}
@@ -323,8 +327,8 @@ func checkExampleDirectory(t *testing.T, dir string) {
 
 // isValidExampleFile checks if a file should be validated.
 func isValidExampleFile(path string) bool {
-	return strings.HasSuffix(path, ".go") && 
-		!strings.Contains(path, "_test.go") && 
+	return strings.HasSuffix(path, ".go") &&
+		!strings.Contains(path, "_test.go") &&
 		!strings.Contains(path, ".pb.go")
 }
 
@@ -338,7 +342,7 @@ func TestExampleCodeCompiles(t *testing.T) {
 		"../../examples/transport-agnostic",
 		"../../examples/config-patterns",
 	}
-	
+
 	for _, dir := range exampleDirs {
 		t.Run(filepath.Base(dir), func(t *testing.T) {
 			checkExampleDirectory(t, dir)
@@ -377,13 +381,14 @@ func hasPackageDocumentation(file *os.File) bool {
 
 // checkFileDocumentation checks a single file for documentation.
 func checkFileDocumentation(t *testing.T, path string) {
+	t.Helper()
 	file, err := os.Open(path)
 	if err != nil {
 		t.Errorf("Failed to open file %s: %v", path, err)
 		return
 	}
 	defer file.Close()
-	
+
 	if !hasPackageDocumentation(file) && filepath.Base(path) != "config.go" {
 		t.Logf("INFO: %s might benefit from package documentation", path)
 	}
@@ -392,18 +397,17 @@ func checkFileDocumentation(t *testing.T, path string) {
 // TestPublicAPIDocumentation ensures public API is properly documented.
 func TestPublicAPIDocumentation(t *testing.T) {
 	publicPkgPath := "."
-	
+
 	err := filepath.Walk(publicPkgPath, func(path string, _ os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if strings.HasSuffix(path, ".go") && !strings.Contains(path, "_test.go") {
 			checkFileDocumentation(t, path)
 		}
 		return nil
 	})
-	
 	if err != nil {
 		t.Errorf("Failed to check public API documentation: %v", err)
 	}

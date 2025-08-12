@@ -109,12 +109,12 @@ func TestConfigBuilder_EnvironmentOverrides(t *testing.T) {
 	verifyServiceConfig(t, config, "env-service", "env.example.com")
 	verifyTransportConfig(t, config, "http", ":9090")
 	verifyListConfig(t, config, 3, 2)
-	
+
 	// Verify SPIFFE socket
 	if config.SPIFFE.SocketPath != "/env/spiffe/socket" {
 		t.Errorf("Expected SPIFFE socket '/env/spiffe/socket', got '%s'", config.SPIFFE.SocketPath)
 	}
-	
+
 	// Verify first client
 	if config.AuthorizedClients[0] != "spiffe://env.com/client1" {
 		t.Errorf("Expected first client 'spiffe://env.com/client1', got '%s'", config.AuthorizedClients[0])
