@@ -1,4 +1,4 @@
-// Package ephemos provides an enhanced server with comprehensive graceful shutdown.
+// Package ephemos provides an identity server with comprehensive graceful shutdown.
 package ephemos
 
 import (
@@ -22,10 +22,10 @@ const (
 	DefaultReadyCheckInterval = 100 * time.Millisecond
 )
 
-// EnhancedServer provides a production-ready server with graceful shutdown.
-type EnhancedServer struct {
+// ManagedIdentityServer provides a production-ready identity server with graceful shutdown.
+type ManagedIdentityServer struct {
 	baseServer      Server
-	shutdownManager *GracefulShutdownManager
+	shutdownCoordinator *ShutdownCoordinator
 	spiffeProvider  *spiffe.Provider
 	config          *ports.Configuration
 	listeners       []net.Listener
@@ -35,7 +35,7 @@ type EnhancedServer struct {
 	shutdownChan    chan struct{}
 }
 
-// ServerOptions configures the enhanced server.
+// ServerOptions configures the identity server.
 type ServerOptions struct {
 	// Configuration for the server
 	Config *ports.Configuration
@@ -71,15 +71,15 @@ func initializeServerOptions(opts *ServerOptions) *ServerOptions {
 }
 
 // createBaseServer creates the base identity server.
-func createBaseServer(ctx context.Context, opts *ServerOptions) (*api.IdentityServer, error) {
+func createBaseServer(ctx context.Context, opts *ServerOptions) (*api.WorkloadServer, error) {
 	if opts.Config != nil {
-		server, err := api.NewIdentityServerWithConfig(ctx, opts.Config)
+		server, err := api.NewWorkloadServerWithConfig(ctx, opts.Config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create server with config: %w", err)
 		}
 		return server, nil
 	}
-	server, err := api.NewIdentityServer(ctx, opts.ConfigPath)
+	server, err := api.NewWorkloadServer(ctx, opts.ConfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create server from path: %w", err)
 	}
@@ -126,8 +126,8 @@ func setupShutdownHooks(ctx context.Context, opts *ServerOptions) {
 	}
 }
 
-// NewEnhancedIdentityServer creates a production-ready identity server with graceful shutdown.
-func NewEnhancedIdentityServer(ctx context.Context, opts *ServerOptions) (*EnhancedServer, error) {
+// NewManagedIdentityServer creates a production-ready identity server with graceful shutdown.
+func NewManagedIdentityServer(ctx context.Context, opts *ServerOptions) (*ManagedIdentityServer, error) {
 	opts = initializeServerOptions(opts)
 
 	// Create base server
@@ -139,19 +139,19 @@ func NewEnhancedIdentityServer(ctx context.Context, opts *ServerOptions) (*Enhan
 	// Create SPIFFE provider
 	spiffeProvider := createSPIFFEProvider(opts)
 
-	// Create and configure shutdown manager
-	shutdownManager := NewGracefulShutdownManager(opts.ShutdownConfig)
-	shutdownManager.RegisterServer(baseServer)
+	// Create and configure shutdown coordinator
+	shutdownCoordinator := NewShutdownCoordinator(opts.ShutdownConfig)
+	shutdownCoordinator.RegisterServer(baseServer)
 	if spiffeProvider != nil {
-		shutdownManager.RegisterSPIFFEProvider(spiffeProvider)
+		shutdownCoordinator.RegisterSPIFFEProvider(spiffeProvider)
 	}
 
 	// Set up hooks
 	setupShutdownHooks(ctx, opts)
 
-	server := &EnhancedServer{
+	server := &ManagedIdentityServer{
 		baseServer:      baseServer,
-		shutdownManager: shutdownManager,
+		shutdownCoordinator: shutdownCoordinator,
 		spiffeProvider:  spiffeProvider,
 		config:          opts.Config,
 		listeners:       make([]net.Listener, 0),
@@ -168,7 +168,7 @@ func NewEnhancedIdentityServer(ctx context.Context, opts *ServerOptions) (*Enhan
 }
 
 // RegisterService delegates to the base server.
-func (s *EnhancedServer) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
+func (s *ManagedIdentityServer) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
 	if err := s.baseServer.RegisterService(ctx, serviceRegistrar); err != nil {
 		return fmt.Errorf("failed to register service: %w", err)
 	}
@@ -176,11 +176,11 @@ func (s *EnhancedServer) RegisterService(ctx context.Context, serviceRegistrar S
 }
 
 // Serve starts the server with graceful shutdown support.
-func (s *EnhancedServer) Serve(ctx context.Context, listener net.Listener) error {
+func (s *ManagedIdentityServer) Serve(ctx context.Context, listener net.Listener) error {
 	s.mu.Lock()
 	s.isRunning = true
 	s.listeners = append(s.listeners, listener)
-	s.shutdownManager.RegisterListener(&netListenerAdapter{listener})
+	s.shutdownCoordinator.RegisterListener(&netListenerAdapter{listener})
 	s.mu.Unlock()
 
 	// Create a context that will be canceled on shutdown
@@ -210,7 +210,7 @@ func (s *EnhancedServer) Serve(ctx context.Context, listener net.Listener) error
 }
 
 // ServeWithDeadline starts the server with a specific deadline for operation.
-func (s *EnhancedServer) ServeWithDeadline(ctx context.Context, listener net.Listener, deadline time.Time) error {
+func (s *ManagedIdentityServer) ServeWithDeadline(ctx context.Context, listener net.Listener, deadline time.Time) error {
 	deadlineCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 
@@ -218,12 +218,12 @@ func (s *EnhancedServer) ServeWithDeadline(ctx context.Context, listener net.Lis
 }
 
 // Close initiates graceful shutdown.
-func (s *EnhancedServer) Close() error {
+func (s *ManagedIdentityServer) Close() error {
 	return s.Shutdown(context.Background())
 }
 
 // Shutdown performs graceful shutdown with context deadline support.
-func (s *EnhancedServer) Shutdown(ctx context.Context) error {
+func (s *ManagedIdentityServer) Shutdown(ctx context.Context) error {
 	s.mu.Lock()
 	if !s.isRunning {
 		s.mu.Unlock()
@@ -239,22 +239,22 @@ func (s *EnhancedServer) Shutdown(ctx context.Context) error {
 	return s.performShutdown(ctx)
 }
 
-func (s *EnhancedServer) performShutdown(ctx context.Context) error {
+func (s *ManagedIdentityServer) performShutdown(ctx context.Context) error {
 	slog.Info("Initiating graceful shutdown")
 
 	// Create shutdown context with deadline if not already set
 	shutdownCtx := ctx
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
 		var cancel context.CancelFunc
-		shutdownCtx, cancel = context.WithTimeout(ctx, s.shutdownManager.config.ForceTimeout)
+		shutdownCtx, cancel = context.WithTimeout(ctx, s.shutdownCoordinator.config.ForceTimeout)
 		defer cancel()
 	}
 
 	// Perform the shutdown
-	return s.shutdownManager.Shutdown(shutdownCtx)
+	return s.shutdownCoordinator.Shutdown(shutdownCtx)
 }
 
-func (s *EnhancedServer) setupSignalHandling(ctx context.Context) {
+func (s *ManagedIdentityServer) setupSignalHandling(ctx context.Context) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
@@ -263,7 +263,7 @@ func (s *EnhancedServer) setupSignalHandling(ctx context.Context) {
 		slog.Info("Received shutdown signal", "signal", sig)
 
 		// Create context with timeout for shutdown, derived from parent context
-		shutdownCtx, cancel := context.WithTimeout(ctx, s.shutdownManager.config.ForceTimeout)
+		shutdownCtx, cancel := context.WithTimeout(ctx, s.shutdownCoordinator.config.ForceTimeout)
 		defer cancel()
 
 		if err := s.Shutdown(shutdownCtx); err != nil {
@@ -276,26 +276,26 @@ func (s *EnhancedServer) setupSignalHandling(ctx context.Context) {
 }
 
 // RegisterClient registers a client for cleanup during shutdown.
-func (s *EnhancedServer) RegisterClient(client ports.Client) {
+func (s *ManagedIdentityServer) RegisterClient(client ports.Client) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.clients = append(s.clients, client)
-	s.shutdownManager.RegisterClient(client)
+	s.shutdownCoordinator.RegisterClient(client)
 }
 
 // RegisterCleanupFunc registers a custom cleanup function.
-func (s *EnhancedServer) RegisterCleanupFunc(fn func() error) {
-	s.shutdownManager.RegisterCleanupFunc(fn)
+func (s *ManagedIdentityServer) RegisterCleanupFunc(fn func() error) {
+	s.shutdownCoordinator.RegisterCleanupFunc(fn)
 }
 
 // GetSPIFFEProvider returns the SPIFFE provider if available.
-func (s *EnhancedServer) GetSPIFFEProvider() *spiffe.Provider {
+func (s *ManagedIdentityServer) GetSPIFFEProvider() *spiffe.Provider {
 	return s.spiffeProvider
 }
 
 // IsRunning returns whether the server is currently running.
-func (s *EnhancedServer) IsRunning() bool {
+func (s *ManagedIdentityServer) IsRunning() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.isRunning
@@ -326,7 +326,7 @@ func (a *netListenerAdapter) Addr() string {
 }
 
 // WaitForReady waits for the server to be ready to accept connections.
-func (s *EnhancedServer) WaitForReady(ctx context.Context) error {
+func (s *ManagedIdentityServer) WaitForReady(ctx context.Context) error {
 	ticker := time.NewTicker(DefaultReadyCheckInterval)
 	defer ticker.Stop()
 

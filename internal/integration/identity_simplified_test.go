@@ -226,7 +226,7 @@ func TestIdentityServiceIntegration(t *testing.T) {
 	t.Run("IdentityServiceWithProviders", func(t *testing.T) {
 		// Step 1: Create service identity
 		identity := domain.NewServiceIdentity("integration-service", "test.example.org")
-		
+
 		// Step 2: Create identity provider
 		provider := memidentity.New().WithIdentity(identity)
 		defer provider.Close()
@@ -279,12 +279,12 @@ func TestIdentityServiceIntegration(t *testing.T) {
 
 		// Create a simple transport provider mock for testing
 		mockTransportProvider := &mockTransportProvider{}
-		
+
 		identityService, err := services.NewIdentityService(provider, mockTransportProvider, mockConfig)
 		if err != nil {
 			t.Fatalf("Failed to create identity service: %v", err)
 		}
-		
+
 		if identityService == nil {
 			t.Fatal("Identity service is nil")
 		}
@@ -366,7 +366,7 @@ func TestPublicAPIIntegration(t *testing.T) {
 		grpcServer := grpc.NewServer()
 		defer grpcServer.Stop()
 		registrar.Register(grpcServer)
-		
+
 		if !registrationCalled {
 			t.Error("Registration function was not called")
 		}
@@ -444,7 +444,7 @@ func TestErrorHandlingFlow(t *testing.T) {
 
 	t.Run("ConfigurationErrors", func(t *testing.T) {
 		provider := config.NewInMemoryProvider()
-		
+
 		// Test loading non-existent configuration
 		_, err := provider.LoadConfiguration(ctx, "non-existent")
 		if err == nil {
@@ -455,7 +455,7 @@ func TestErrorHandlingFlow(t *testing.T) {
 		// Test context cancellation
 		cancelledCtx, cancel := context.WithCancel(ctx)
 		cancel()
-		
+
 		_, err = provider.LoadConfiguration(cancelledCtx, "test")
 		if err == nil {
 			t.Error("Expected error for cancelled context")
@@ -604,7 +604,7 @@ func BenchmarkIdentityOperations(b *testing.B) {
 	b.Run("PolicyAuthorization", func(b *testing.B) {
 		policy := domain.NewAuthenticationPolicy(identity)
 		policy.AddAuthorizedClient("test-client")
-		
+
 		for i := 0; i < b.N; i++ {
 			_ = policy.IsClientAuthorized("test-client")
 		}
