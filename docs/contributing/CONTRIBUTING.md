@@ -2,33 +2,46 @@
 
 Welcome to Ephemos! This guide will help you set up your development environment and start contributing.
 
-## Quick Setup for Ubuntu 24
+## Quick Setup (Updated December 2024)
 
-### 1. Check System Requirements
+⚠️ **Security Notice**: Always build Ephemos from source. Never use pre-compiled binaries as they cannot be audited and may be compromised.
+
+### 1. Smart Setup (Recommended)
 ```bash
-make check-requirements
+# Clone the repository
+git clone https://github.com/sufield/ephemos.git
+cd ephemos
+
+# Smart setup - automatically detects and installs what's needed
+make setup
 ```
 
-This will verify if you have all necessary tools installed.
+The `make setup` command will:
+- Check what dependencies you already have
+- Install Go tools automatically (no sudo required)
+- Guide you through system package installation if needed
+- Provide different instructions for CI vs local development
 
-### 2. Install Prerequisites (Automated)
+### 2. Alternative Setup Methods
+
+**Option A: Go Tools Only (No Sudo)**
 ```bash
-# Install everything (requires sudo)
-make install-tools
+make install-deps  # Installs Go protobuf tools only
+```
 
-# Or install only user-level tools (no sudo required)
-make install-tools-user
+**Option B: Complete Installation (Requires Sudo)**
+```bash
+./scripts/install-deps-sudo.sh  # Installs system packages + Go tools
+# or
+make install-deps-sudo
 ```
 
 ### 3. Build and Test
 ```bash
-# Get dependencies
-make deps
-
-# Build the project
+# Build the project (with reproducible builds)
 make build
 
-# Run the demo
+# Run the 5-minute demo
 make demo
 ```
 
@@ -178,9 +191,27 @@ make build
 
 **protoc not found:**
 ```bash
-# The project works with pre-generated protobuf code
-# But for development, install protoc:
+# The project requires protoc for development
+# Use our automated setup:
+make setup                           # Smart setup (recommended)
+./scripts/install-deps-sudo.sh      # Full installation with sudo
+# Or install manually:
 sudo apt install protobuf-compiler
+```
+
+**Dependencies missing in CI:**
+```bash
+# CI environments should use GitHub Actions setup-protobuf action
+# Local CI simulation:
+CI=true make setup
+```
+
+**Build system issues:**
+```bash
+# For reproducible builds, use make targets:
+make show-build-info    # Show build information
+make version           # Show version only
+make clean && make build  # Clean rebuild
 ```
 
 ### Getting Help
@@ -223,12 +254,16 @@ Before submitting changes:
 ## Requirements Summary
 
 - **OS**: Ubuntu 24 (optimized, but works on other Linux distros)
-- **Go**: 1.24.5 or later
+- **Go**: 1.23+ (1.24.5+ recommended)
 - **System tools**: git, make, curl, wget, build-essential
 - **Protobuf**: protoc compiler + Go plugins
-- **Optional**: golangci-lint for development
+- **Optional**: golangci-lint, gosec, govulncheck for development
 
-The `make install-tools` target handles all of this automatically!
+### New Security-First Setup
+- `make setup` handles Go dependencies automatically (no sudo required)
+- System packages require manual approval or `./scripts/install-deps-sudo.sh`
+- All binaries built from source with reproducible build flags
+- No pre-compiled executables in repository for security
 
 ## Questions?
 

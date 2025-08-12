@@ -37,8 +37,15 @@ export PATH="$PATH:$(go env GOPATH)/bin"
 if ! command_exists protoc; then
     echo "protoc not found, trying to install..."
     
-    # Try to install protoc with available package managers (without sudo for CI)
-    if command_exists apt-get && sudo -n true 2>/dev/null; then
+    # Try to install protoc with available package managers
+    # Skip sudo attempts in CI environments to avoid breaking builds
+    if [[ "${CI:-}" == "true" ]] || [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+        echo -e "${YELLOW}⚠️  CI environment detected - skipping protoc installation${NC}"
+        echo "CI should handle protoc installation via workflow setup actions"
+    elif command_exists brew; then
+        echo "Installing protoc with brew..."
+        brew install protobuf
+    elif command_exists apt-get && sudo -n true 2>/dev/null; then
         echo "Installing protoc with apt..."
         sudo apt-get update && sudo apt-get install -y protobuf-compiler
     elif command_exists yum && sudo -n true 2>/dev/null; then
@@ -47,9 +54,6 @@ if ! command_exists protoc; then
     elif command_exists dnf && sudo -n true 2>/dev/null; then
         echo "Installing protoc with dnf..."
         sudo dnf install -y protobuf-compiler
-    elif command_exists brew; then
-        echo "Installing protoc with brew..."
-        brew install protobuf
     else
         echo -e "${YELLOW}⚠️  Cannot auto-install protoc without sudo or brew${NC}"
         echo "Please install manually:"
