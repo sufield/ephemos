@@ -113,18 +113,14 @@ package ephemos.echo;
 option go_package = "github.com/sufield/ephemos/examples/proto";
 
 // EchoService provides a simple echo functionality for testing.
-// This is an example service definition that developers can use as a template
-// when building their own services with the Ephemos library.
 service EchoService {
   rpc Echo(EchoRequest) returns (EchoResponse);
 }
 
-// EchoRequest represents an echo request
 message EchoRequest {
   string message = 1;
 }
 
-// EchoResponse represents an echo response
 message EchoResponse {
   string message = 1;
   string from = 2;
