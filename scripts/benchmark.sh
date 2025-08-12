@@ -7,23 +7,36 @@ set -e
 
 echo "🚀 Running Ephemos benchmarks..."
 
+# Environment validation
+command -v go >/dev/null || { echo "❌ Go not installed"; exit 1; }
+test -d ./pkg/ephemos || { echo "❌ ./pkg/ephemos not found"; exit 1; }
+
+# Debug information
+echo "Go version: $(go version)"
+echo "Environment variables:"
+env | grep EPHEMOS || echo "No EPHEMOS environment variables set"
+
 # Set up environment for benchmarks
 export EPHEMOS_LOG_LEVEL=error  # Reduce log noise
 export SPIFFE_ENDPOINT_SOCKET=""  # Disable SPIRE connection attempts
 export EPHEMOS_SPIFFE_ENABLED=false  # Disable SPIFFE features completely
 export EPHEMOS_BENCHMARK_MODE=true  # Signal benchmark mode to skip SPIRE setup
 
+# Ensure dependencies are available
+echo "📦 Downloading Go module dependencies..."
+go mod download
+
 # Run benchmarks with clean output - target only pkg/ephemos to avoid problematic tests
 echo "📊 Executing benchmark suite..."
 
 # Store exit code but continue to process results
 set +e
-go test -bench=. -benchmem -run=^$ -timeout=30s ./pkg/ephemos > benchmark-results.txt 2>&1
+go test -bench=. -benchmem -run=^$ -timeout=5m ./pkg/ephemos > benchmark-results.txt 2>&1
 TEST_EXIT_CODE=$?
 set -e
 
 # Check if benchmarks actually ran and produced results
-if grep -q "^Benchmark.*-[0-9]+" benchmark-results.txt && grep -q "PASS" benchmark-results.txt; then
+if [ $TEST_EXIT_CODE -eq 0 ] && grep -q "^Benchmark.*-[0-9]+" benchmark-results.txt && grep -q "PASS" benchmark-results.txt; then
     echo "✅ Benchmarks completed successfully" 
     echo ""
     echo "📈 Benchmark Results Summary:"
@@ -41,8 +54,8 @@ if grep -q "^Benchmark.*-[0-9]+" benchmark-results.txt && grep -q "PASS" benchma
 else
     echo "❌ Benchmarks failed"
     echo ""
-    echo "🔍 Error details:"
-    tail -50 benchmark-results.txt || true
+    echo "🔍 Full error details:"
+    cat benchmark-results.txt || true
     echo ""
     echo "Test exit code: $TEST_EXIT_CODE"
     exit 1
