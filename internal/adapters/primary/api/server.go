@@ -17,8 +17,8 @@ import (
 	"github.com/sufield/ephemos/internal/core/services"
 )
 
-// IdentityServer provides a secure gRPC server with SPIFFE-based identity management.
-type IdentityServer struct {
+// WorkloadServer provides a secure gRPC server with SPIFFE-based workload identity management.
+type WorkloadServer struct {
 	identityService *services.IdentityService
 	configProvider  ports.ConfigurationProvider
 	serviceName     string
@@ -26,8 +26,8 @@ type IdentityServer struct {
 	mu              sync.Mutex
 }
 
-// NewIdentityServer creates a new identity server with the given configuration.
-func NewIdentityServer(ctx context.Context, configPath string) (*IdentityServer, error) {
+// NewWorkloadServer creates a new workload server with the given configuration.
+func NewWorkloadServer(ctx context.Context, configPath string) (*WorkloadServer, error) {
 	// Legacy method - load config via file path
 	configProvider := config.NewFileProvider()
 
@@ -49,12 +49,12 @@ func NewIdentityServer(ctx context.Context, configPath string) (*IdentityServer,
 		}
 	}
 
-	return NewIdentityServerWithConfig(ctx, cfg)
+	return NewWorkloadServerWithConfig(ctx, cfg)
 }
 
-// NewIdentityServerWithConfig creates a new identity server with pre-validated configuration.
+// NewWorkloadServerWithConfig creates a new workload server with pre-validated configuration.
 // This method assumes the configuration has already been loaded and validated.
-func NewIdentityServerWithConfig(_ context.Context, cfg *ports.Configuration) (*IdentityServer, error) {
+func NewWorkloadServerWithConfig(_ context.Context, cfg *ports.Configuration) (*WorkloadServer, error) {
 	if cfg == nil {
 		return nil, &errors.ValidationError{
 			Field:   "configuration",
@@ -79,7 +79,7 @@ func NewIdentityServerWithConfig(_ context.Context, cfg *ports.Configuration) (*
 		return nil, fmt.Errorf("failed to create identity service: %w", err)
 	}
 
-	return &IdentityServer{
+	return &WorkloadServer{
 		identityService: identityService,
 		configProvider:  config.NewFileProvider(), // Create new provider for the server instance
 		serviceName:     cfg.Service.Name,
@@ -87,7 +87,7 @@ func NewIdentityServerWithConfig(_ context.Context, cfg *ports.Configuration) (*
 }
 
 // RegisterService registers a gRPC service with the identity server.
-func (s *IdentityServer) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
+func (s *WorkloadServer) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
 	// Input validation
 	if serviceRegistrar == nil {
 		return &errors.ValidationError{
@@ -117,7 +117,7 @@ func (s *IdentityServer) RegisterService(ctx context.Context, serviceRegistrar S
 }
 
 // Serve starts the identity server on the provided listener.
-func (s *IdentityServer) Serve(ctx context.Context, listener net.Listener) error {
+func (s *WorkloadServer) Serve(ctx context.Context, listener net.Listener) error {
 	// Input validation
 	if listener == nil {
 		return &errors.ValidationError{
@@ -147,7 +147,7 @@ func (s *IdentityServer) Serve(ctx context.Context, listener net.Listener) error
 }
 
 // Close gracefully shuts down the identity server.
-func (s *IdentityServer) Close() error {
+func (s *WorkloadServer) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -161,7 +161,7 @@ func (s *IdentityServer) Close() error {
 	return nil
 }
 
-func (s *IdentityServer) initializeServer(_ context.Context) error {
+func (s *WorkloadServer) initializeServer(_ context.Context) error {
 	server, err := s.identityService.CreateServerIdentity()
 	if err != nil {
 		return fmt.Errorf("failed to create server identity: %w", err)
