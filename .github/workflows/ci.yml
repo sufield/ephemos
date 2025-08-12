@@ -151,7 +151,15 @@ jobs:
           ./bin/ephemos --help || echo "Main binary help not available"
           ./bin/echo-server --help || echo "Server help not available"
         fi
+        
+    - name: Verify test compilation
       shell: bash
+      run: |
+        echo "🔍 Verifying test files compile..."
+        # Only compile, don't run tests (that's done in test job)
+        go test -c ./pkg/... 2>&1 | head -20 || true
+        go test -c ./internal/... 2>&1 | head -20 || true
+        echo "✅ Test compilation check completed"
 
   # Testing
   test:
@@ -172,6 +180,24 @@ jobs:
         
     - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf
+      
+    - name: Compile test files to catch errors early
+      run: |
+        echo "🔍 Compiling all test files to catch compilation errors..."
+        # Compile tests for all packages (this will fail fast on compilation errors)
+        failed=false
+        for pkg in $(go list ./...); do
+          echo "Compiling tests for $pkg..."
+          if ! go test -c "$pkg" 2>&1 | head -5; then
+            echo "❌ Test compilation failed for $pkg"
+            failed=true
+          fi
+        done
+        if $failed; then
+          echo "❌ Test compilation failed! See errors above."
+          exit 1
+        fi
+        echo "✅ All test files compiled successfully"
       
     - name: Run tests and generate coverage
       run: make ci-setup && make ci-test

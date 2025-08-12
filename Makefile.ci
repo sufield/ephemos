@@ -21,12 +21,28 @@ ci-lint:
 	@./scripts/ci/lint.sh
 	@echo "Linting checks completed!"
 
-# Run all tests with coverage
+# Run all tests with coverage and detailed reporting
 ci-test:
-	@echo "Running tests with coverage..."
-	go test -race -coverprofile=coverage.out -covermode=atomic ./...
-	go tool cover -html=coverage.out -o coverage.html
-	@echo "Tests completed! Coverage report: coverage.html"
+	@echo "🧪 Running tests with coverage and detailed reporting..."
+	@echo "================================================"
+	@echo ""
+	@# Run tests with JSON output for parsing
+	@go test -race -coverprofile=coverage.out -covermode=atomic -json ./... > test-results.json 2>&1 || true
+	@echo ""
+	@echo "📊 TEST SUMMARY"
+	@echo "================================================"
+	@# Parse test results and show summary
+	@go run scripts/test-summary.go test-results.json || \
+		(echo "Using fallback summary..." && \
+		 echo "Total packages tested: $$(go list ./... | wc -l)" && \
+		 echo "Test output:" && tail -20 test-results.json)
+	@echo ""
+	@# Generate coverage report
+	@go tool cover -html=coverage.out -o coverage.html 2>/dev/null || echo "⚠️ Coverage report generation skipped"
+	@echo "✅ Test run completed! Full results in test-results.json"
+	@echo "📈 Coverage report: coverage.html"
+	@# Exit with failure if tests failed
+	@grep -q '"Action":"fail"' test-results.json && exit 1 || exit 0
 
 # Run security checks
 ci-security:
