@@ -1,0 +1,32 @@
+# CodeQL configuration file for Ephemos
+# This configuration enhances the default CodeQL analysis
+
+name: "Ephemos CodeQL Config"
+
+# Specify query suites to run
+queries:
+  - uses: security-extended
+  - uses: security-and-quality
+
+# Define custom query paths if needed
+# query-filters:
+#   - exclude:
+#       id: go/path-injection
+
+# Paths to include/exclude from analysis
+paths:
+  - pkg
+  - internal
+  - examples
+paths-ignore:
+  - vendor
+  - "**/*_test.go"
+  - "**/*.pb.go"
+  - "**/testdata/**"
+  - docs
+
+# Language-specific configuration
+languages:
+  go:
+    # Additional build commands if needed
+    # build-command: make build
