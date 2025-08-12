@@ -1,5 +1,9 @@
 // Package ephemos provides a transport-agnostic service framework with hexagonal architecture.
 // Services can run over gRPC, HTTP, or any future transport without code changes.
+//
+// Architecture: This file contains the transport server implementation, which handles
+// protocol-specific concerns (gRPC, HTTP) and delegates business logic to the identity server.
+// For the production-ready identity server with graceful shutdown, see identity_server.go.
 package ephemos
 
 import (

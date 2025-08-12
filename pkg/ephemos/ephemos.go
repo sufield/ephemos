@@ -219,7 +219,7 @@ func NewIdentityServer(ctx context.Context, configPath string) (Server, error) {
 	}
 
 	// Create server with validated configuration
-	server, err := api.NewIdentityServerWithConfig(ctx, config)
+	server, err := api.NewWorkloadServerWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity server: %w", err)
 	}

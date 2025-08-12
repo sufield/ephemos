@@ -14,8 +14,8 @@ Ephemos provides comprehensive graceful shutdown capabilities that ensure all re
 
 ### Components
 
-1. **GracefulShutdownManager**: Coordinates shutdown of all registered resources
-2. **EnhancedServer**: Production-ready server with built-in graceful shutdown
+1. **ShutdownCoordinator**: Coordinates shutdown of all registered resources
+2. **ManagedIdentityServer**: Production-ready managed identity server with built-in graceful shutdown
 3. **ShutdownConfig**: Configures timeouts and behavior during shutdown
 4. **Resource Registry**: Tracks servers, clients, listeners, and SPIFFE providers
 
@@ -68,7 +68,7 @@ serverOpts := &ephemos.ServerOptions{
     EnableSignalHandling: true,  // Handle SIGINT/SIGTERM
 }
 
-server, err := ephemos.NewEnhancedIdentityServer(ctx, serverOpts)
+server, err := ephemos.NewManagedIdentityServer(ctx, serverOpts)
 if err != nil {
     log.Fatal(err)
 }
@@ -205,7 +205,7 @@ The graceful shutdown properly handles SPIFFE/SPIRE resources:
 ```go
 // SPIFFE provider is automatically registered and cleaned up
 spiffeProvider := server.GetSPIFFEProvider()
-// No manual cleanup needed - handled by shutdown manager
+// No manual cleanup needed - handled by shutdown coordinator
 ```
 
 ## Signal Handling
@@ -249,15 +249,15 @@ func TestGracefulShutdown(t *testing.T) {
         ForceTimeout: 200 * time.Millisecond,
     }
     
-    manager := ephemos.NewGracefulShutdownManager(config)
+    coordinator := ephemos.NewShutdownCoordinator(config)
     
     // Register mock resources
     server := &mockServer{}
-    manager.RegisterServer(server)
+    coordinator.RegisterServer(server)
     
     // Perform shutdown
     ctx := context.Background()
-    err := manager.Shutdown(ctx)
+    err := coordinator.Shutdown(ctx)
     
     assert.NoError(t, err)
     assert.True(t, server.stopCalled)
@@ -399,7 +399,7 @@ func (s *Service) LongOperation(ctx context.Context) error {
 ### SVID Watchers Not Closing
 
 **Cause**: X509Source not properly registered
-**Solution**: Ensure SPIFFE provider is registered with shutdown manager
+**Solution**: Ensure SPIFFE provider is registered with shutdown coordinator
 
 ```go
 spiffeProvider, _ := spiffe.NewProvider(config)
@@ -423,10 +423,10 @@ shutdownConfig.ForceTimeout = 2 * time.Minute
 
 ```go
 // Register all resources
-manager.RegisterServer(server)
-manager.RegisterClient(client)
-manager.RegisterListener(listener)
-manager.RegisterSPIFFEProvider(provider)
+coordinator.RegisterServer(server)
+coordinator.RegisterClient(client)
+coordinator.RegisterListener(listener)
+coordinator.RegisterSPIFFEProvider(provider)
 ```
 
 ## Performance Considerations
