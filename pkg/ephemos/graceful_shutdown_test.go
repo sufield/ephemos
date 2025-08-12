@@ -68,27 +68,27 @@ func (m *mockListener) Addr() string {
 
 // Tests
 
-func TestGracefulShutdownManager_BasicShutdown(t *testing.T) {
+func TestShutdownCoordinator_BasicShutdown(t *testing.T) {
 	config := &ShutdownConfig{
 		GracePeriod:  2 * time.Second,
 		DrainTimeout: 1 * time.Second,
 		ForceTimeout: 3 * time.Second,
 	}
 
-	manager := NewGracefulShutdownManager(config)
+	coordinator := NewShutdownCoordinator(config)
 
 	// Register mock resources
 	server := &mockServer{}
 	client := &mockClient{}
 	listener := &mockListener{address: "test:1234"}
 
-	manager.RegisterServer(server)
-	manager.RegisterClient(client)
-	manager.RegisterListener(listener)
+	coordinator.RegisterServer(server)
+	coordinator.RegisterClient(client)
+	coordinator.RegisterListener(listener)
 
 	// Perform shutdown
 	ctx := t.Context()
-	err := manager.Shutdown(ctx)
+	err := coordinator.Shutdown(ctx)
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
@@ -105,27 +105,27 @@ func TestGracefulShutdownManager_BasicShutdown(t *testing.T) {
 	}
 }
 
-func TestGracefulShutdownManager_ShutdownWithErrors(t *testing.T) {
+func TestShutdownCoordinator_ShutdownWithErrors(t *testing.T) {
 	config := &ShutdownConfig{
 		GracePeriod:  1 * time.Second,
 		DrainTimeout: 500 * time.Millisecond,
 		ForceTimeout: 2 * time.Second,
 	}
 
-	manager := NewGracefulShutdownManager(config)
+	coordinator := NewShutdownCoordinator(config)
 
 	// Register resources that will error
 	server := &mockServer{closeError: errors.New("server close failed")}
 	client := &mockClient{closeError: errors.New("client close failed")}
 	listener := &mockListener{closeError: errors.New("listener close failed")}
 
-	manager.RegisterServer(server)
-	manager.RegisterClient(client)
-	manager.RegisterListener(listener)
+	coordinator.RegisterServer(server)
+	coordinator.RegisterClient(client)
+	coordinator.RegisterListener(listener)
 
 	// Perform shutdown
 	ctx := t.Context()
-	err := manager.Shutdown(ctx)
+	err := coordinator.Shutdown(ctx)
 
 	// Should return an error containing all failures
 	if err == nil {
@@ -144,24 +144,24 @@ func TestGracefulShutdownManager_ShutdownWithErrors(t *testing.T) {
 	}
 }
 
-func TestGracefulShutdownManager_ShutdownWithTimeout(t *testing.T) {
+func TestShutdownCoordinator_ShutdownWithTimeout(t *testing.T) {
 	config := &ShutdownConfig{
 		GracePeriod:  50 * time.Millisecond, // Very short grace period
 		DrainTimeout: 25 * time.Millisecond,
 		ForceTimeout: 100 * time.Millisecond,
 	}
 
-	manager := NewGracefulShutdownManager(config)
+	coordinator := NewShutdownCoordinator(config)
 
 	// Register a slow server that will timeout
 	server := &mockServer{closeDelay: 200 * time.Millisecond} // Takes longer than grace period
-	manager.RegisterServer(server)
+	coordinator.RegisterServer(server)
 
 	// Perform shutdown
 	ctx := t.Context()
 
 	start := time.Now()
-	err := manager.Shutdown(ctx)
+	err := coordinator.Shutdown(ctx)
 	elapsed := time.Since(start)
 
 	// Should complete but with timeout error for the server
@@ -178,16 +178,16 @@ func TestGracefulShutdownManager_ShutdownWithTimeout(t *testing.T) {
 	}
 }
 
-func TestGracefulShutdownManager_CustomCleanupFuncs(t *testing.T) {
+func TestShutdownCoordinator_CustomCleanupFuncs(t *testing.T) {
 	config := DefaultShutdownConfig()
-	manager := NewGracefulShutdownManager(config)
+	coordinator := NewShutdownCoordinator(config)
 
 	var cleanupCalled atomic.Bool
 	var cleanupOrder []string
 	var mu sync.Mutex
 
 	// Register cleanup functions
-	manager.RegisterCleanupFunc(func() error {
+	coordinator.RegisterCleanupFunc(func() error {
 		mu.Lock()
 		cleanupOrder = append(cleanupOrder, "cleanup1")
 		mu.Unlock()
@@ -195,7 +195,7 @@ func TestGracefulShutdownManager_CustomCleanupFuncs(t *testing.T) {
 		return nil
 	})
 
-	manager.RegisterCleanupFunc(func() error {
+	coordinator.RegisterCleanupFunc(func() error {
 		mu.Lock()
 		cleanupOrder = append(cleanupOrder, "cleanup2")
 		mu.Unlock()
@@ -204,7 +204,7 @@ func TestGracefulShutdownManager_CustomCleanupFuncs(t *testing.T) {
 
 	// Perform shutdown
 	ctx := t.Context()
-	err := manager.Shutdown(ctx)
+	err := coordinator.Shutdown(ctx)
 
 	// Should have error from cleanup2
 	if err == nil {
@@ -224,7 +224,7 @@ func TestGracefulShutdownManager_CustomCleanupFuncs(t *testing.T) {
 	mu.Unlock()
 }
 
-func TestGracefulShutdownManager_Callbacks(t *testing.T) {
+func TestShutdownCoordinator_Callbacks(t *testing.T) {
 	var startCalled, completeCalled atomic.Bool
 	var completeErr error
 
@@ -241,15 +241,15 @@ func TestGracefulShutdownManager_Callbacks(t *testing.T) {
 		},
 	}
 
-	manager := NewGracefulShutdownManager(config)
+	coordinator := NewShutdownCoordinator(config)
 
 	// Add a server that will fail
 	server := &mockServer{closeError: errors.New("close failed")}
-	manager.RegisterServer(server)
+	coordinator.RegisterServer(server)
 
 	// Perform shutdown
 	ctx := t.Context()
-	err := manager.Shutdown(ctx)
+	err := coordinator.Shutdown(ctx)
 
 	// Verify callbacks were called
 	if !startCalled.Load() {
@@ -268,12 +268,12 @@ func TestGracefulShutdownManager_Callbacks(t *testing.T) {
 	}
 }
 
-func TestGracefulShutdownManager_MultipleShutdownCalls(t *testing.T) {
+func TestShutdownCoordinator_MultipleShutdownCalls(t *testing.T) {
 	config := DefaultShutdownConfig()
-	manager := NewGracefulShutdownManager(config)
+	coordinator := NewShutdownCoordinator(config)
 
 	server := &mockServer{}
-	manager.RegisterServer(server)
+	coordinator.RegisterServer(server)
 
 	// Call shutdown multiple times concurrently
 	var wg sync.WaitGroup
@@ -284,7 +284,7 @@ func TestGracefulShutdownManager_MultipleShutdownCalls(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 			ctx := t.Context()
-			errors[idx] = manager.Shutdown(ctx)
+			errors[idx] = coordinator.Shutdown(ctx)
 		}(i)
 	}
 
@@ -303,18 +303,18 @@ func TestGracefulShutdownManager_MultipleShutdownCalls(t *testing.T) {
 	}
 }
 
-func TestGracefulShutdownManager_SPIFFEProviderCleanup(t *testing.T) {
+func TestShutdownCoordinator_SPIFFEProviderCleanup(t *testing.T) {
 	config := DefaultShutdownConfig()
-	manager := NewGracefulShutdownManager(config)
+	coordinator := NewShutdownCoordinator(config)
 
 	// Create a mock SPIFFE provider
 	// Note: In real tests, you might want to use a proper mock or test double
 	provider, _ := spiffe.NewProvider(nil)
-	manager.RegisterSPIFFEProvider(provider)
+	coordinator.RegisterSPIFFEProvider(provider)
 
 	// Perform shutdown
 	ctx := t.Context()
-	err := manager.Shutdown(ctx)
+	err := coordinator.Shutdown(ctx)
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
@@ -323,7 +323,7 @@ func TestGracefulShutdownManager_SPIFFEProviderCleanup(t *testing.T) {
 	// This would require access to internal state or a mock
 }
 
-func TestEnhancedServer_ServeWithShutdown(t *testing.T) {
+func TestManagedIdentityServer_ServeWithShutdown(t *testing.T) {
 	// Create a test listener
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -332,7 +332,7 @@ func TestEnhancedServer_ServeWithShutdown(t *testing.T) {
 	defer listener.Close()
 
 	// Note: This test would need proper mocking of the api.IdentityServer
-	// For now, we're testing the shutdown manager independently
+	// For now, we're testing the shutdown coordinator independently
 	t.Skip("Requires proper mocking of api.IdentityServer")
 }
 
@@ -355,9 +355,9 @@ func TestShutdownConfig_Defaults(t *testing.T) {
 func BenchmarkShutdown_NoResources(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		config := DefaultShutdownConfig()
-		manager := NewGracefulShutdownManager(config)
+		coordinator := NewShutdownCoordinator(config)
 		ctx := b.Context()
-		_ = manager.Shutdown(ctx)
+		_ = coordinator.Shutdown(ctx)
 	}
 }
 
@@ -368,16 +368,16 @@ func BenchmarkShutdown_WithResources(b *testing.B) {
 			DrainTimeout: 5 * time.Millisecond,
 			ForceTimeout: 20 * time.Millisecond,
 		}
-		manager := NewGracefulShutdownManager(config)
+		coordinator := NewShutdownCoordinator(config)
 
 		// Register multiple resources
 		for j := 0; j < 10; j++ {
-			manager.RegisterServer(&mockServer{})
-			manager.RegisterClient(&mockClient{})
-			manager.RegisterListener(&mockListener{})
+			coordinator.RegisterServer(&mockServer{})
+			coordinator.RegisterClient(&mockClient{})
+			coordinator.RegisterListener(&mockListener{})
 		}
 
 		ctx := b.Context()
-		_ = manager.Shutdown(ctx)
+		_ = coordinator.Shutdown(ctx)
 	}
 }
