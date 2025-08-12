@@ -2,73 +2,76 @@
 
 ## Supported Versions
 
-We actively support the following versions of Ephemos:
+Currently, we provide security updates for the following versions:
 
 | Version | Supported          |
 | ------- | ------------------ |
 | latest  | :white_check_mark: |
-| < 1.0   | :x:                |
+| < latest| :x:                |
 
 ## Reporting a Vulnerability
 
-**Please do not report security vulnerabilities through public GitHub issues.**
+We take the security of Ephemos seriously. If you have discovered a security vulnerability in our project, we appreciate your help in disclosing it to us responsibly.
 
-Instead, please report security vulnerabilities to us via:
+### How to Report
 
-### Preferred Method: GitHub Security Advisories
-- Go to the [Security Advisories](../../security/advisories) page
-- Click "Report a vulnerability"
-- Fill out the form with details
+Please report security vulnerabilities by emailing the maintainers directly or by opening a private security advisory on GitHub:
 
-### Alternative Method: Email
-Send an email to: **security@[your-domain].com**
+1. Go to the "Security" tab of this repository
+2. Click on "Report a vulnerability"
+3. Fill out the form with details about the vulnerability
 
-Please include the following information:
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Any suggested fixes
+### What to Include
 
-## Response Timeline
+When reporting a vulnerability, please include:
 
-- **Initial Response**: Within 24 hours
-- **Status Update**: Within 72 hours
-- **Fix Timeline**: Critical issues within 7 days, others within 30 days
+- A description of the vulnerability and its potential impact
+- Steps to reproduce the issue
+- Affected versions
+- Any possible mitigations you've identified
 
-## Security Best Practices
+### Response Timeline
 
-When using Ephemos:
+- We will acknowledge receipt of your report within 48 hours
+- We will provide an initial assessment within 7 days
+- We aim to release patches for critical vulnerabilities within 30 days
 
-1. **Keep Dependencies Updated**: Regularly update to the latest version
-2. **Secure Configuration**: Follow our security configuration guide
-3. **Monitor Vulnerabilities**: Use our SBOM files for vulnerability scanning
-4. **Certificate Management**: Ensure SPIRE is properly configured and monitored
+### Security Scanning
 
-## Security Features
+This project uses automated security scanning through:
+
+- **CodeQL**: Static Application Security Testing (SAST) for code vulnerabilities
+- **Dependabot**: Automated dependency vulnerability scanning
+- **GitHub Security Advisories**: Tracking known vulnerabilities
+
+The CodeQL analysis runs on:
+- Every push to main/master/develop branches
+- Every pull request
+- Weekly scheduled scans (Sundays at midnight UTC)
+
+### Best Practices for Contributors
+
+When contributing to this project, please:
+
+1. Never commit secrets, API keys, or credentials
+2. Use environment variables for sensitive configuration
+3. Follow secure coding practices for Go
+4. Keep dependencies up to date
+5. Run security checks locally before submitting PRs
+
+### Security Features in Ephemos
 
 Ephemos includes several built-in security features:
 
-- **Zero Plaintext Secrets**: No secrets stored in code or configuration
-- **Ephemeral Certificates**: Short-lived X.509 certificates (1-hour expiration)
-- **Automatic Rotation**: Certificates rotate every ~30 minutes
-- **mTLS Authentication**: Mutual TLS for all service communication
-- **SPIFFE/SPIRE Integration**: Industry-standard identity management
-- **SBOM Generation**: Complete software bill of materials for supply chain security
+- **mTLS Support**: Mutual TLS authentication via SPIFFE/SPIRE
+- **Authorization**: Fine-grained access control for services
+- **Secure Defaults**: Production-ready security configurations
+- **Audit Logging**: Comprehensive logging for security events
 
-## Vulnerability Disclosure
+## Acknowledgments
 
-We follow responsible disclosure practices:
+We thank the security researchers and contributors who help keep Ephemos secure. Responsible disclosure is greatly appreciated.
 
-1. Security issues are investigated and fixed privately
-2. Fixes are released as soon as possible
-3. CVEs are published after fixes are available
-4. Credit is given to security researchers (with permission)
+## Contact
 
-## Security Auditing
-
-- Regular security audits are performed
-- SAST scanning in CI/CD pipeline
-- Dependency vulnerability monitoring
-- Supply chain security with SBOM generation
-
-For more information about Ephemos security architecture, see our [Security Documentation](docs/security/).
+For sensitive security matters that should not be discussed publicly, please contact the maintainers directly through GitHub's private security advisory feature.
