@@ -17,7 +17,7 @@ import (
 func Test_Interface_Segregation(t *testing.T) {
 	portsDir := "../../internal/core/ports"
 
-	err := filepath.Walk(portsDir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(portsDir, func(path string, _ os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -33,7 +33,6 @@ func Test_Interface_Segregation(t *testing.T) {
 
 		return nil
 	})
-
 	if err != nil {
 		t.Fatalf("Failed to walk ports directory: %v", err)
 	}
@@ -43,7 +42,7 @@ func Test_Interface_Segregation(t *testing.T) {
 func Test_Port_Naming_Conventions(t *testing.T) {
 	portsDir := "../../internal/core/ports"
 
-	err := filepath.Walk(portsDir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(portsDir, func(path string, _ os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -59,7 +58,6 @@ func Test_Port_Naming_Conventions(t *testing.T) {
 
 		return nil
 	})
-
 	if err != nil {
 		t.Fatalf("Failed to walk ports directory: %v", err)
 	}
@@ -73,7 +71,7 @@ func Test_Adapter_Interface_Compliance(t *testing.T) {
 
 	adaptersDir := "../../internal/adapters"
 
-	err := filepath.Walk(adaptersDir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(adaptersDir, func(path string, _ os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -89,7 +87,6 @@ func Test_Adapter_Interface_Compliance(t *testing.T) {
 
 		return nil
 	})
-
 	if err != nil {
 		t.Fatalf("Failed to walk adapters directory: %v", err)
 	}
@@ -99,7 +96,7 @@ func Test_Adapter_Interface_Compliance(t *testing.T) {
 func Test_Domain_Types_Are_Pure(t *testing.T) {
 	domainDir := "../../internal/core/domain"
 
-	err := filepath.Walk(domainDir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(domainDir, func(path string, _ os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -115,7 +112,6 @@ func Test_Domain_Types_Are_Pure(t *testing.T) {
 
 		return nil
 	})
-
 	if err != nil {
 		t.Fatalf("Failed to walk domain directory: %v", err)
 	}
