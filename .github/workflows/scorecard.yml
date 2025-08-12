@@ -31,11 +31,12 @@ jobs:
           persist-credentials: false
 
       - name: "Run analysis"
-        uses: ossf/scorecard-action@62b2cac7ed8198b15735ed49ab1e5cf35480ba46 # v2.4.0
+        uses: ossf/scorecard-action@v2.4.2  # Updated to latest stable version
         with:
           results_file: results.sarif
           results_format: sarif
           # Public repo: Read-only token. Private repo: Fine-grained token.
+          # Token needs repo read access to use GitHub GraphQL API for commit listing
           repo_token: ${{ secrets.SCORECARD_TOKEN }}
           # Publish results to enable badge (requires public repo).
           publish_results: true
