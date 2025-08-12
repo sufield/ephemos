@@ -8,8 +8,8 @@ ci-setup: proto
 	go clean -cache
 	go clean -modcache || true
 	go clean -testcache
-	@echo "Clearing any Go module proxy cache..."
-	go env -w GOPROXY=direct || true
+	@echo "Setting Go module proxy for reliable downloads..."
+	go env -w GOPROXY=https://proxy.golang.org,direct || true
 	go mod download
 	@echo "CI setup completed - protobuf files generated and cache cleared"
 
