@@ -45,13 +45,20 @@ if ! command -v protoc >/dev/null 2>&1; then
     else
         echo "❌ protoc not found and protobuf files don't exist" >&2
         echo "" >&2
-        echo "Install protoc with:" >&2
-        echo "  Ubuntu/Debian: sudo apt-get update && sudo apt-get install -y protobuf-compiler" >&2
-        echo "  CentOS/RHEL: sudo yum install -y protobuf-compiler" >&2
-        echo "  macOS: brew install protobuf" >&2
-        echo "  Windows: choco install protoc" >&2
-        echo "" >&2
-        echo "Or run: make setup" >&2
+        if [[ "${CI:-}" == "true" ]] || [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+            echo "CI environment detected. Protoc should be installed by GitHub Actions." >&2
+            echo "If you see this error in CI, check the setup-protobuf action." >&2
+        else
+            echo "Install protoc with:" >&2
+            echo "  Ubuntu/Debian: sudo apt-get update && sudo apt-get install -y protobuf-compiler" >&2
+            echo "  CentOS/RHEL: sudo yum install -y protobuf-compiler" >&2
+            echo "  macOS: brew install protobuf" >&2
+            echo "  Windows: choco install protoc" >&2
+            echo "" >&2
+            echo "For automated setup:" >&2
+            echo "  make setup          # Smart setup (Go tools only)" >&2
+            echo "  ./scripts/install-deps-sudo.sh  # Full setup (requires sudo)" >&2
+        fi
         exit 1
     fi
 fi
