@@ -10,6 +10,8 @@ echo "🚀 Running Ephemos benchmarks..."
 # Set up environment for benchmarks
 export EPHEMOS_LOG_LEVEL=error  # Reduce log noise
 export SPIFFE_ENDPOINT_SOCKET=""  # Disable SPIRE connection attempts
+export EPHEMOS_SPIFFE_ENABLED=false  # Disable SPIFFE features completely
+export EPHEMOS_BENCHMARK_MODE=true  # Signal benchmark mode to skip SPIRE setup
 
 # Run benchmarks with clean output
 echo "📊 Executing benchmark suite..."
