@@ -20,7 +20,6 @@ updates:
       - "dependencies"
       - "security"
       - "automated"
-    # Group related updates for 2025
     groups:
       grpc-ecosystem:
         patterns:
@@ -45,14 +44,6 @@ updates:
         patterns:
           - "github.com/stretchr/testify*"
           - "*test*"
-    # Enhanced security focus for 2025
-    allow:
-      - dependency-type: "direct"
-        update-type: "version-update:semver-patch"
-      - dependency-type: "direct"
-        update-type: "version-update:semver-minor"
-      - dependency-type: "indirect"
-        update-type: "version-update:semver-patch"
     ignore:
       # Ignore major version updates for stability
       - dependency-name: "google.golang.org/grpc"
