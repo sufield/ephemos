@@ -28,14 +28,33 @@ Ephemos is a Go library that provides **transport-agnostic services** with ident
 git clone https://github.com/sufield/ephemos.git
 cd ephemos
 
-# Install dependencies
-go mod download
+# Smart setup - checks deps and installs what's needed
+make setup
 
 # Build from source (required)
 make build
 
 # Run the 5-minute demo
 make demo
+```
+
+#### Installation Options
+
+**Option 1: Smart Setup (Recommended)**
+```bash
+make setup  # Automatically detects and installs missing dependencies
+```
+
+**Option 2: Go Tools Only (No Sudo Required)**
+```bash
+make install-deps  # Installs Go protobuf tools only
+```
+
+**Option 3: Complete Installation (Requires Sudo)**
+```bash
+./scripts/install-deps-sudo.sh  # Installs system packages + Go tools
+# or
+make install-deps-sudo
 ```
 
 ### Server Usage (Transport-Agnostic)
