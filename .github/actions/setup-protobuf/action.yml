@@ -106,25 +106,25 @@ runs:
           echo "⚠️ Creating fallback echo.proto file for CI..."
           mkdir -p examples/proto
           cat > examples/proto/echo.proto <<'PROTO_EOF'
-syntax = "proto3";
-
-package ephemos.echo;
-
-option go_package = "github.com/sufield/ephemos/examples/proto";
-
-// EchoService provides a simple echo functionality for testing.
-service EchoService {
-  rpc Echo(EchoRequest) returns (EchoResponse);
-}
-
-message EchoRequest {
-  string message = 1;
-}
-
-message EchoResponse {
-  string message = 1;
-  string from = 2;
-}
+ syntax = "proto3";
+ 
+ package ephemos.echo;
+ 
+ option go_package = "github.com/sufield/ephemos/examples/proto";
+ 
+ // EchoService provides a simple echo functionality for testing.
+ service EchoService {
+   rpc Echo(EchoRequest) returns (EchoResponse);
+ }
+ 
+ message EchoRequest {
+   string message = 1;
+ }
+ 
+ message EchoResponse {
+   string message = 1;
+   string from = 2;
+ }
 PROTO_EOF
           echo "✅ Fallback echo.proto created"
         fi
