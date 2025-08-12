@@ -33,29 +33,62 @@ fi
 # Ensure Go bin is in PATH
 export PATH="$PATH:$(go env GOPATH)/bin"
 
+# Try to install protoc if we can
+if ! command_exists protoc; then
+    echo "protoc not found, trying to install..."
+    
+    # Try to install protoc with available package managers (without sudo for CI)
+    if command_exists apt-get && sudo -n true 2>/dev/null; then
+        echo "Installing protoc with apt..."
+        sudo apt-get update && sudo apt-get install -y protobuf-compiler
+    elif command_exists yum && sudo -n true 2>/dev/null; then
+        echo "Installing protoc with yum..."
+        sudo yum install -y protobuf-compiler
+    elif command_exists dnf && sudo -n true 2>/dev/null; then
+        echo "Installing protoc with dnf..."
+        sudo dnf install -y protobuf-compiler
+    elif command_exists brew; then
+        echo "Installing protoc with brew..."
+        brew install protobuf
+    else
+        echo -e "${YELLOW}⚠️  Cannot auto-install protoc without sudo or brew${NC}"
+        echo "Please install manually:"
+        echo "  Ubuntu/Debian: sudo apt-get install -y protobuf-compiler"
+        echo "  CentOS/RHEL: sudo yum install -y protobuf-compiler"
+        echo "  macOS: brew install protobuf"
+    fi
+fi
+
 # Verify tools are available
-if command_exists protoc && command_exists protoc-gen-go && command_exists protoc-gen-go-grpc; then
+MISSING_TOOLS=0
+if ! command_exists protoc; then
+    echo -e "${YELLOW}⚠️  protoc: not available${NC}"
+    MISSING_TOOLS=1
+fi
+
+if ! command_exists protoc-gen-go; then
+    echo -e "${YELLOW}⚠️  protoc-gen-go: not available${NC}"
+    MISSING_TOOLS=1
+fi
+
+if ! command_exists protoc-gen-go-grpc; then
+    echo -e "${YELLOW}⚠️  protoc-gen-go-grpc: not available${NC}"  
+    MISSING_TOOLS=1
+fi
+
+if [ $MISSING_TOOLS -eq 0 ]; then
     echo -e "${GREEN}✅ All protobuf tools are available${NC}"
     echo "protoc: $(which protoc)"
     echo "protoc-gen-go: $(which protoc-gen-go)"
     echo "protoc-gen-go-grpc: $(which protoc-gen-go-grpc)"
     exit 0
 else
-    echo -e "${RED}❌ Some protobuf tools are still missing${NC}"
-    
-    if ! command_exists protoc; then
-        echo -e "${YELLOW}protoc not found. Install with:${NC}"
-        echo "  Ubuntu: sudo apt-get install -y protobuf-compiler"
-        echo "  macOS: brew install protobuf"
+    # In CI environments, continue if we have Go tools even without protoc
+    if command_exists protoc-gen-go && command_exists protoc-gen-go-grpc; then
+        echo -e "${YELLOW}⚠️  protoc missing, but Go tools available. Build may still work if protobuf files are pre-generated.${NC}"
+        exit 0
+    else
+        echo -e "${RED}❌ Critical protobuf tools missing${NC}"
+        exit 1
     fi
-    
-    if ! command_exists protoc-gen-go; then
-        echo -e "${YELLOW}protoc-gen-go not found${NC}"
-    fi
-    
-    if ! command_exists protoc-gen-go-grpc; then
-        echo -e "${YELLOW}protoc-gen-go-grpc not found${NC}"
-    fi
-    
-    exit 1
 fi

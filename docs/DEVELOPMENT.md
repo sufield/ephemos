@@ -106,10 +106,27 @@ make lint
 
 **Problem:** The build fails with protobuf generation errors.
 
-**Solution:** 
-1. Run `make setup` to install all dependencies
-2. Or manually install protoc: `sudo apt-get install protobuf-compiler`
-3. Restart your terminal to refresh PATH
+**Solutions:** 
+1. **Automatic (Recommended)**: Just run any build command - dependencies install automatically
+   ```bash
+   make build    # Auto-installs missing deps
+   ```
+
+2. **Manual Setup**: Run the comprehensive installer
+   ```bash
+   make setup    # Installs all development tools
+   ```
+
+3. **Manual protoc installation**: 
+   ```bash
+   sudo apt-get install protobuf-compiler  # Ubuntu/Debian
+   brew install protobuf                    # macOS
+   ```
+
+4. **CI Environments**: Use CI-friendly build targets
+   ```bash
+   make proto-ci    # Tolerant of missing protoc
+   ```
 
 ### "protoc-gen-go not found"
 

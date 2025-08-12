@@ -44,9 +44,28 @@ if ! command -v protoc >/dev/null 2>&1; then
         exit 0
     else
         echo "❌ protoc not found and protobuf files don't exist" >&2
-        echo "Please install protoc: apt-get install protobuf-compiler" >&2
+        echo "" >&2
+        echo "Install protoc with:" >&2
+        echo "  Ubuntu/Debian: sudo apt-get update && sudo apt-get install -y protobuf-compiler" >&2
+        echo "  CentOS/RHEL: sudo yum install -y protobuf-compiler" >&2
+        echo "  macOS: brew install protobuf" >&2
+        echo "  Windows: choco install protoc" >&2
+        echo "" >&2
+        echo "Or run: make setup" >&2
         exit 1
     fi
+fi
+
+# Check for Go protobuf tools
+export PATH="$PATH:$(go env GOPATH)/bin"
+if ! command -v protoc-gen-go >/dev/null 2>&1; then
+    echo "Warning: protoc-gen-go not found, installing..."
+    go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+fi
+
+if ! command -v protoc-gen-go-grpc >/dev/null 2>&1; then
+    echo "Warning: protoc-gen-go-grpc not found, installing..."
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 fi
 
 echo "Found protoc at: $(which protoc)"
