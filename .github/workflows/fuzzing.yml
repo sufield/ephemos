@@ -136,11 +136,27 @@ jobs:
       run: |
         echo "🔧 Setting up ClusterFuzzLite environment..."
         
-        # Create directory for ClusterFuzzLite
+        # Create directories for ClusterFuzzLite
         mkdir -p .clusterfuzzlite
+        mkdir -p build-out
         
-        # Build the project to ensure everything compiles
+        # Build the project and copy binaries to build-out directory
+        echo "Building project..."
         make build
+        
+        # Copy built binaries to build-out directory for ClusterFuzzLite
+        echo "Copying binaries to build-out directory..."
+        if [ -d "bin" ]; then
+          cp -r bin/* build-out/ 2>/dev/null || true
+        fi
+        
+        # Build fuzz targets specifically for ClusterFuzzLite
+        echo "Building fuzz targets..."
+        go build -o build-out/config-fuzz ./pkg/ephemos/
+        
+        # Verify build-out directory has content
+        echo "Contents of build-out directory:"
+        ls -la build-out/ || echo "build-out directory is empty"
 
     - name: Run ClusterFuzzLite
       uses: google/clusterfuzzlite/actions/run_fuzzers@v1
