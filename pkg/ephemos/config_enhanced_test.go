@@ -1,13 +1,11 @@
 package ephemos
 
 import (
-	"context"
-	"os"
 	"testing"
 )
 
 func TestConfigBuilder_PureCodeConfiguration(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test pure-code configuration
 	config, err := NewConfigBuilder().
@@ -19,7 +17,6 @@ func TestConfigBuilder_PureCodeConfiguration(t *testing.T) {
 		WithAuthorizedClients([]string{"spiffe://test.com/client1", "spiffe://test.com/client2"}).
 		WithTrustedServers([]string{"spiffe://test.com/server1", "spiffe://test.com/server2"}).
 		Build(ctx)
-
 	if err != nil {
 		t.Fatalf("Failed to build pure-code config: %v", err)
 	}
@@ -49,7 +46,7 @@ func TestConfigBuilder_PureCodeConfiguration(t *testing.T) {
 }
 
 func TestConfigBuilder_EnvironmentOverrides(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set up environment variables
 	envVars := map[string]string{
@@ -64,23 +61,13 @@ func TestConfigBuilder_EnvironmentOverrides(t *testing.T) {
 
 	// Set environment variables
 	for key, value := range envVars {
-		if err := os.Setenv(key, value); err != nil {
-			t.Fatalf("Failed to set env var %s: %v", key, err)
-		}
+		t.Setenv(key, value)
 	}
-
-	// Clean up after test
-	defer func() {
-		for key := range envVars {
-			os.Unsetenv(key)
-		}
-	}()
 
 	// Test environment-only configuration
 	config, err := NewConfigBuilder().
 		WithSource(ConfigSourceEnvOnly).
 		Build(ctx)
-
 	if err != nil {
 		t.Fatalf("Failed to build env-only config: %v", err)
 	}
@@ -113,14 +100,13 @@ func TestConfigBuilder_EnvironmentOverrides(t *testing.T) {
 }
 
 func TestLoadConfigFlexible_PureCode(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	config, err := LoadConfigFlexible(ctx,
 		WithPureCodeSource(),
 		WithService("flexible-service", "flexible.example.com"),
 		WithTransportOption("grpc", ":7070"),
 	)
-
 	if err != nil {
 		t.Fatalf("Failed to load flexible config: %v", err)
 	}
@@ -137,20 +123,16 @@ func TestLoadConfigFlexible_PureCode(t *testing.T) {
 }
 
 func TestLoadConfigFlexible_EnvironmentOnly(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set environment variable
-	if err := os.Setenv("TEST_SERVICE_NAME", "test-env-service"); err != nil {
-		t.Fatalf("Failed to set env var: %v", err)
-	}
-	defer os.Unsetenv("TEST_SERVICE_NAME")
+	t.Setenv("TEST_SERVICE_NAME", "test-env-service")
 
 	// Note: WithService is applied AFTER environment variables are loaded,
 	// so it will override the environment. Let's test the environment-only approach.
 	config, err := LoadConfigFlexible(ctx,
 		WithEnvSource("TEST"),
 	)
-
 	if err != nil {
 		t.Fatalf("Failed to load flexible env config: %v", err)
 	}
@@ -162,13 +144,12 @@ func TestLoadConfigFlexible_EnvironmentOnly(t *testing.T) {
 }
 
 func TestConfigBuilder_Defaults(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test that defaults are used when no overrides are provided
 	config, err := NewConfigBuilder().
 		WithSource(ConfigSourcePureCode).
 		Build(ctx)
-
 	if err != nil {
 		t.Fatalf("Failed to build default config: %v", err)
 	}
@@ -186,7 +167,7 @@ func TestConfigBuilder_Defaults(t *testing.T) {
 }
 
 func TestConfigBuilder_Validation(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test that validation still works with invalid configurations
 	// Use an invalid character in service name instead of empty string
