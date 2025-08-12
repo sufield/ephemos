@@ -141,6 +141,10 @@ jobs:
         mkdir -p .clusterfuzzlite
         mkdir -p build-out
         
+        # Ensure build-out is in the workspace root for ClusterFuzzLite
+        echo "Creating build-out directory structure..."
+        mkdir -p build-out
+        
         # Build the project first to ensure everything compiles
         echo "Building project..."
         make build
@@ -287,28 +291,86 @@ jobs:
         cd fuzz-targets
         
         # Initialize Go module for fuzz targets
-        go mod init fuzz-targets 2>/dev/null || echo "Module already exists"
+        if [ ! -f go.mod ]; then
+          echo "Creating go.mod for fuzz targets..."
+          cat > go.mod << 'GOMOD'
+module fuzz-targets
+
+go 1.24
+
+require github.com/sufield/ephemos v0.0.0
+
+replace github.com/sufield/ephemos => ../
+GOMOD
+        fi
         
-        # Add dependency on the main ephemos module
-        echo "require github.com/sufield/ephemos v0.0.0" >> go.mod
-        echo "replace github.com/sufield/ephemos => ../" >> go.mod
-        go mod tidy
+        echo "Contents of go.mod:"
+        cat go.mod
+        
+        echo "Running go mod tidy..."
+        go mod tidy -v
+        
+        echo "Checking Go module status..."
+        go list -m all
         
         # Build regular binaries (more compatible with ClusterFuzzLite)
         echo "Building standard Go binaries..."
-        go build -o ../build-out/config_fuzz ./config_fuzz_main.go
-        go build -o ../build-out/server_fuzz ./server_fuzz_main.go
-        go build -o ../build-out/identity_fuzz ./identity_fuzz_main.go
+        
+        echo "Building config_fuzz..."
+        go build -v -o ../build-out/config_fuzz ./config_fuzz_main.go
+        if [ $? -eq 0 ]; then
+          echo "✅ config_fuzz built successfully"
+        else
+          echo "❌ config_fuzz build failed"
+          exit 1
+        fi
+        
+        echo "Building server_fuzz..."
+        go build -v -o ../build-out/server_fuzz ./server_fuzz_main.go
+        if [ $? -eq 0 ]; then
+          echo "✅ server_fuzz built successfully"
+        else
+          echo "❌ server_fuzz build failed"
+          exit 1
+        fi
+        
+        echo "Building identity_fuzz..."
+        go build -v -o ../build-out/identity_fuzz ./identity_fuzz_main.go
+        if [ $? -eq 0 ]; then
+          echo "✅ identity_fuzz built successfully"
+        else
+          echo "❌ identity_fuzz build failed"
+          exit 1
+        fi
         
         cd ..
         
         # Verify build-out directory has fuzz targets
         echo "Contents of build-out directory:"
-        ls -la build-out/
+        ls -la build-out/ || echo "build-out directory does not exist"
+        
+        # Count the number of binaries created
+        BINARY_COUNT=$(find build-out/ -type f -executable 2>/dev/null | wc -l)
+        echo "Number of executable files found: $BINARY_COUNT"
+        
+        # Check each expected binary
+        for binary in config_fuzz server_fuzz identity_fuzz; do
+          if [ -f "build-out/$binary" ]; then
+            echo "✅ $binary exists and is $(file build-out/$binary)"
+          else
+            echo "❌ $binary is missing"
+          fi
+        done
         
         # Validate that we have fuzz targets
         if [ -z "$(ls -A build-out/ 2>/dev/null)" ]; then
           echo "❌ build-out directory is empty after building fuzz targets"
+          echo "Debugging: Contents of fuzz-targets directory:"
+          ls -la fuzz-targets/
+          echo "Debugging: Go build environment:"
+          cd fuzz-targets
+          go env
+          cd ..
           exit 1
         fi
         
