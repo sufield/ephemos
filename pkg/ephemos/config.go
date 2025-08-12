@@ -91,7 +91,7 @@ func loadAndValidateConfig(ctx context.Context, configPath string) (*ports.Confi
 	if err := validateConfigComprehensive(publicConfig, resolvedPath); err != nil {
 		return nil, err
 	}
-	
+
 	// Convert back to internal config
 	return convertFromPublicConfig(publicConfig), nil
 }

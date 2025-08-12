@@ -43,11 +43,11 @@ func (vec *ValidationErrorCollection) Error() string {
 	if len(vec.Errors) == 0 {
 		return "no validation errors"
 	}
-	
+
 	if len(vec.Errors) == 1 {
 		return vec.Errors[0].Error()
 	}
-	
+
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("validation failed with %d errors:\n", len(vec.Errors)))
 	for i, err := range vec.Errors {
@@ -125,25 +125,25 @@ func (ve *ValidationEngine) validateStruct(val reflect.Value, typ reflect.Type, 
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
 		fieldVal := val.Field(i)
-		
+
 		// Skip unexported fields
 		if !fieldVal.CanSet() {
 			continue
 		}
 
 		fieldName := ve.buildFieldName(prefix, field)
-		
+
 		// Set defaults first
 		ve.setDefaults(fieldVal, field, fieldName, errCollection)
-		
+
 		// Validate field
 		ve.validateField(fieldVal, field, fieldName, errCollection)
-		
+
 		// Stop early if configured to do so and we have errors
 		if ve.StopOnFirstError && errCollection.HasErrors() {
 			return
 		}
-		
+
 		// Recursively validate nested structs
 		if fieldVal.Kind() == reflect.Struct {
 			ve.validateStruct(fieldVal, fieldVal.Type(), fieldName, errCollection)
@@ -161,7 +161,7 @@ func (ve *ValidationEngine) validateSlice(val reflect.Value, field reflect.Struc
 	validateTag := field.Tag.Get(ve.TagName)
 	if validateTag != "" {
 		rules := ve.parseValidationRules(validateTag)
-		
+
 		// Apply slice-level validation rules
 		sliceRules := make(map[string]string)
 		for rule, param := range rules {
@@ -170,17 +170,17 @@ func (ve *ValidationEngine) validateSlice(val reflect.Value, field reflect.Struc
 				sliceRules[rule] = param
 			}
 		}
-		
+
 		if len(sliceRules) > 0 {
 			ve.applyValidationRules(val, sliceRules, fieldName, errCollection)
 		}
 	}
-	
+
 	// Then validate each element
 	for i := 0; i < val.Len(); i++ {
 		elem := val.Index(i)
 		elemFieldName := fmt.Sprintf("%s[%d]", fieldName, i)
-		
+
 		if elem.Kind() == reflect.Struct {
 			ve.validateStruct(elem, elem.Type(), elemFieldName, errCollection)
 		} else if elem.Kind() == reflect.Ptr && !elem.IsNil() && elem.Elem().Kind() == reflect.Struct {
@@ -201,7 +201,7 @@ func (ve *ValidationEngine) validateSliceElement(val reflect.Value, field reflec
 
 	// Only apply validation rules that make sense for individual elements
 	rules := ve.parseValidationRules(validateTag)
-	
+
 	// Filter out rules that should apply to the slice itself, not elements
 	elementRules := make(map[string]string)
 	for rule, param := range rules {
@@ -212,7 +212,7 @@ func (ve *ValidationEngine) validateSliceElement(val reflect.Value, field reflec
 			elementRules[rule] = param
 		}
 	}
-	
+
 	if len(elementRules) > 0 {
 		ve.applyValidationRules(val, elementRules, fieldName, errCollection)
 	}
@@ -243,7 +243,7 @@ func (ve *ValidationEngine) validateField(val reflect.Value, field reflect.Struc
 	}
 
 	rules := ve.parseValidationRules(validateTag)
-	
+
 	// For slices, we need to handle validation differently
 	if val.Kind() == reflect.Slice {
 		// Apply slice-level validation (length constraints)
@@ -254,22 +254,22 @@ func (ve *ValidationEngine) validateField(val reflect.Value, field reflect.Struc
 				sliceRules[rule] = param
 			}
 		}
-		
+
 		if len(sliceRules) > 0 {
 			ve.applyValidationRules(val, sliceRules, fieldName, errCollection)
 		}
-		
+
 		// Element validation is handled in validateSlice function
 		return
 	}
-	
+
 	ve.applyValidationRules(val, rules, fieldName, errCollection)
 }
 
 // parseValidationRules parses validation rules from struct tag.
 func (ve *ValidationEngine) parseValidationRules(tag string) map[string]string {
 	rules := make(map[string]string)
-	
+
 	// Split by comma and parse each rule
 	parts := strings.Split(tag, ",")
 	for _, part := range parts {
@@ -277,7 +277,7 @@ func (ve *ValidationEngine) parseValidationRules(tag string) map[string]string {
 		if part == "" {
 			continue
 		}
-		
+
 		// Check for rule with parameter (e.g., "min=5")
 		if idx := strings.Index(part, "="); idx != -1 {
 			key := strings.TrimSpace(part[:idx])
@@ -288,7 +288,7 @@ func (ve *ValidationEngine) parseValidationRules(tag string) map[string]string {
 			rules[part] = ""
 		}
 	}
-	
+
 	return rules
 }
 
@@ -297,7 +297,7 @@ func (ve *ValidationEngine) applyValidationRules(val reflect.Value, rules map[st
 	for rule, param := range rules {
 		if err := ve.validateRule(val, rule, param, fieldName); err != nil {
 			errCollection.Add(fieldName, err.Error(), val.Interface())
-			
+
 			if ve.StopOnFirstError {
 				return
 			}
@@ -448,13 +448,13 @@ func (ve *ValidationEngine) validateRegex(val reflect.Value, param, fieldName st
 func (ve *ValidationEngine) validateOneOf(val reflect.Value, param, fieldName string) error {
 	options := strings.Split(param, "|")
 	value := fmt.Sprintf("%v", val.Interface())
-	
+
 	for _, option := range options {
 		if strings.TrimSpace(option) == value {
 			return nil
 		}
 	}
-	
+
 	return fmt.Errorf("must be one of: %s", strings.Join(options, ", "))
 }
 
@@ -472,7 +472,7 @@ func (ve *ValidationEngine) validateIP(val reflect.Value, fieldName string) erro
 
 func (ve *ValidationEngine) validatePort(val reflect.Value, fieldName string) error {
 	var port int
-	
+
 	switch val.Kind() {
 	case reflect.String:
 		// Handle port in format ":8080" or "8080"
@@ -755,14 +755,15 @@ func IsValidationError(err error) bool {
 func GetValidationErrors(err error) []ValidationError {
 	var validationErr *ValidationError
 	var collectionErr *ValidationErrorCollection
-	
+
 	if errors.As(err, &collectionErr) {
 		return collectionErr.Errors
 	}
-	
+
 	if errors.As(err, &validationErr) {
 		return []ValidationError{*validationErr}
 	}
-	
+
 	return nil
 }
+
