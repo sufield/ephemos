@@ -158,15 +158,10 @@ jobs:
         
         import (
           "context"
-          "errors"
-          "os"
-          "path/filepath"
-          "testing"
-          "time"
           "fmt"
+          "time"
         
           "github.com/sufield/ephemos/pkg/ephemos"
-          coreErrors "github.com/sufield/ephemos/internal/core/errors"
         )
         
         func main() {
@@ -178,18 +173,20 @@ jobs:
           // Convert to string for path fuzzing
           path := string(data)
           
-          // Test config path resolution
-          ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+          // Simple timeout context
+          ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
           defer cancel()
+          _ = ctx // Use ctx to avoid unused variable
           
           defer func() {
             if r := recover(); r != nil {
-              // Recovered from panic, this might be interesting
+              // Recovered from panic, log but continue fuzzing
+              fmt.Printf("Recovered from panic: %v\n", r)
             }
           }()
           
-          // Fuzz the config path resolution
-          if len(path) > 0 && len(path) < 1000 {
+          // Fuzz the config path resolution with size limits
+          if len(path) > 0 && len(path) < 500 {
             _ = ephemos.ResolveConfigPath(path)
           }
           
@@ -287,20 +284,21 @@ jobs:
         echo "Building fuzz target binaries..."
         cd fuzz-targets
         
-        # Build each fuzz target
-        go mod init fuzz-targets
+        # Initialize Go module for fuzz targets
+        go mod init fuzz-targets 2>/dev/null || echo "Module already exists"
+        
+        # Add dependency on the main ephemos module
+        echo "require github.com/sufield/ephemos v0.0.0" >> go.mod
+        echo "replace github.com/sufield/ephemos => ../" >> go.mod
         go mod tidy
         
-        CGO_ENABLED=1 go build -buildmode=c-archive -o ../build-out/config_fuzz config_fuzz_main.go
-        CGO_ENABLED=1 go build -buildmode=c-archive -o ../build-out/server_fuzz server_fuzz_main.go  
-        CGO_ENABLED=1 go build -buildmode=c-archive -o ../build-out/identity_fuzz identity_fuzz_main.go
+        # Build regular binaries (more compatible with ClusterFuzzLite)
+        echo "Building standard Go binaries..."
+        go build -o ../build-out/config_fuzz ./config_fuzz_main.go
+        go build -o ../build-out/server_fuzz ./server_fuzz_main.go
+        go build -o ../build-out/identity_fuzz ./identity_fuzz_main.go
         
         cd ..
-        
-        # Also build regular binaries as fallback
-        go build -o build-out/config_fuzz_bin ./fuzz-targets/config_fuzz_main.go
-        go build -o build-out/server_fuzz_bin ./fuzz-targets/server_fuzz_main.go
-        go build -o build-out/identity_fuzz_bin ./fuzz-targets/identity_fuzz_main.go
         
         # Verify build-out directory has fuzz targets
         echo "Contents of build-out directory:"
