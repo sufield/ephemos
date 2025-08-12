@@ -8,66 +8,66 @@ import (
 	"strings"
 )
 
-// ConfigSource represents different configuration sources
+// ConfigSource represents different configuration sources.
 type ConfigSource int
 
 const (
-	// ConfigSourceYAML uses YAML file as primary source with env var overrides
+	// ConfigSourceYAML uses YAML file as primary source with env var overrides.
 	ConfigSourceYAML ConfigSource = iota
-	// ConfigSourceEnvOnly uses only environment variables
+	// ConfigSourceEnvOnly uses only environment variables.
 	ConfigSourceEnvOnly
-	// ConfigSourcePureCode uses programmatic configuration
+	// ConfigSourcePureCode uses programmatic configuration.
 	ConfigSourcePureCode
 )
 
-// ConfigBuilder provides a fluent interface for building configurations
+// ConfigBuilder provides a fluent interface for building configurations.
 type ConfigBuilder struct {
-	config *Configuration
-	source ConfigSource
-	yamlPath string
+	config    *Configuration
+	source    ConfigSource
+	yamlPath  string
 	envPrefix string
 }
 
-// NewConfigBuilder creates a new configuration builder
+// NewConfigBuilder creates a new configuration builder.
 func NewConfigBuilder() *ConfigBuilder {
 	return &ConfigBuilder{
-		config: &Configuration{},
-		source: ConfigSourceYAML, // Default to YAML with env overrides
+		config:    &Configuration{},
+		source:    ConfigSourceYAML, // Default to YAML with env overrides
 		envPrefix: "EPHEMOS",
 	}
 }
 
-// WithSource sets the configuration source strategy
+// WithSource sets the configuration source strategy.
 func (b *ConfigBuilder) WithSource(source ConfigSource) *ConfigBuilder {
 	b.source = source
 	return b
 }
 
-// WithYAMLFile sets the YAML file path (for YAML source)
+// WithYAMLFile sets the YAML file path (for YAML source).
 func (b *ConfigBuilder) WithYAMLFile(path string) *ConfigBuilder {
 	b.yamlPath = path
 	return b
 }
 
-// WithEnvPrefix sets the environment variable prefix (default: EPHEMOS)
+// WithEnvPrefix sets the environment variable prefix (default: EPHEMOS).
 func (b *ConfigBuilder) WithEnvPrefix(prefix string) *ConfigBuilder {
 	b.envPrefix = prefix
 	return b
 }
 
-// WithServiceName sets the service name programmatically
+// WithServiceName sets the service name programmatically.
 func (b *ConfigBuilder) WithServiceName(name string) *ConfigBuilder {
 	b.config.Service.Name = name
 	return b
 }
 
-// WithServiceDomain sets the service domain programmatically
+// WithServiceDomain sets the service domain programmatically.
 func (b *ConfigBuilder) WithServiceDomain(domain string) *ConfigBuilder {
 	b.config.Service.Domain = domain
 	return b
 }
 
-// WithSPIFFESocket sets the SPIFFE socket path programmatically
+// WithSPIFFESocket sets the SPIFFE socket path programmatically.
 func (b *ConfigBuilder) WithSPIFFESocket(socketPath string) *ConfigBuilder {
 	if b.config.SPIFFE == nil {
 		b.config.SPIFFE = &SPIFFEConfig{}
@@ -76,26 +76,26 @@ func (b *ConfigBuilder) WithSPIFFESocket(socketPath string) *ConfigBuilder {
 	return b
 }
 
-// WithTransport sets the transport configuration programmatically
+// WithTransport sets the transport configuration programmatically.
 func (b *ConfigBuilder) WithTransport(transportType, address string) *ConfigBuilder {
 	b.config.Transport.Type = transportType
 	b.config.Transport.Address = address
 	return b
 }
 
-// WithAuthorizedClients sets authorized clients programmatically
+// WithAuthorizedClients sets authorized clients programmatically.
 func (b *ConfigBuilder) WithAuthorizedClients(clients []string) *ConfigBuilder {
 	b.config.AuthorizedClients = clients
 	return b
 }
 
-// WithTrustedServers sets trusted servers programmatically
+// WithTrustedServers sets trusted servers programmatically.
 func (b *ConfigBuilder) WithTrustedServers(servers []string) *ConfigBuilder {
 	b.config.TrustedServers = servers
 	return b
 }
 
-// Build creates the final configuration based on the specified source
+// Build creates the final configuration based on the specified source.
 func (b *ConfigBuilder) Build(ctx context.Context) (*Configuration, error) {
 	switch b.source {
 	case ConfigSourceYAML:
@@ -109,7 +109,7 @@ func (b *ConfigBuilder) Build(ctx context.Context) (*Configuration, error) {
 	}
 }
 
-// buildFromYAML builds configuration from YAML with environment variable overrides
+// buildFromYAML builds configuration from YAML with environment variable overrides.
 func (b *ConfigBuilder) buildFromYAML(ctx context.Context) (*Configuration, error) {
 	// Start with YAML configuration by loading from file and converting to public type
 	publicConfig, err := LoadConfigFromYAML(ctx, b.yamlPath)
@@ -134,8 +134,8 @@ func (b *ConfigBuilder) buildFromYAML(ctx context.Context) (*Configuration, erro
 	return config, nil
 }
 
-// buildFromEnvOnly builds configuration entirely from environment variables
-func (b *ConfigBuilder) buildFromEnvOnly(ctx context.Context) (*Configuration, error) {
+// buildFromEnvOnly builds configuration entirely from environment variables.
+func (b *ConfigBuilder) buildFromEnvOnly(_ context.Context) (*Configuration, error) {
 	// Start with default configuration
 	config := GetDefaultConfiguration()
 
@@ -156,8 +156,8 @@ func (b *ConfigBuilder) buildFromEnvOnly(ctx context.Context) (*Configuration, e
 	return config, nil
 }
 
-// buildFromPureCode builds configuration entirely from programmatic settings
-func (b *ConfigBuilder) buildFromPureCode(ctx context.Context) (*Configuration, error) {
+// buildFromPureCode builds configuration entirely from programmatic settings.
+func (b *ConfigBuilder) buildFromPureCode(_ context.Context) (*Configuration, error) {
 	// Start with default configuration
 	defaultConfig := GetDefaultConfiguration()
 
@@ -194,7 +194,7 @@ func (b *ConfigBuilder) buildFromPureCode(ctx context.Context) (*Configuration, 
 	return config, nil
 }
 
-// applyEnvOverrides applies environment variable overrides to configuration
+// applyEnvOverrides applies environment variable overrides to configuration.
 func (b *ConfigBuilder) applyEnvOverrides(config *Configuration) (*Configuration, error) {
 	envConfig := *config // Copy the config
 
@@ -243,7 +243,7 @@ func (b *ConfigBuilder) applyEnvOverrides(config *Configuration) (*Configuration
 	return &envConfig, nil
 }
 
-// applyBuilderOverrides applies programmatic overrides from the builder
+// applyBuilderOverrides applies programmatic overrides from the builder.
 func (b *ConfigBuilder) applyBuilderOverrides(config *Configuration) {
 	// Only override if builder has non-zero values
 	if b.config.Service.Name != "" {
@@ -272,7 +272,7 @@ func (b *ConfigBuilder) applyBuilderOverrides(config *Configuration) {
 	}
 }
 
-// getValueOrDefault returns value if non-empty, otherwise returns default
+// getValueOrDefault returns value if non-empty, otherwise returns default.
 func (b *ConfigBuilder) getValueOrDefault(value, defaultValue string) string {
 	if value != "" {
 		return value
@@ -280,7 +280,7 @@ func (b *ConfigBuilder) getValueOrDefault(value, defaultValue string) string {
 	return defaultValue
 }
 
-// getSliceOrDefault returns slice if non-empty, otherwise returns default
+// getSliceOrDefault returns slice if non-empty, otherwise returns default.
 func (b *ConfigBuilder) getSliceOrDefault(value, defaultValue []string) []string {
 	if len(value) > 0 {
 		return value
@@ -288,25 +288,25 @@ func (b *ConfigBuilder) getSliceOrDefault(value, defaultValue []string) []string
 	return defaultValue
 }
 
-// LoadConfigFlexible provides a convenient function for flexible configuration loading
-// This maintains backward compatibility while enabling new configuration patterns
+// LoadConfigFlexible provides a convenient function for flexible configuration loading.
+// This maintains backward compatibility while enabling new configuration patterns.
 func LoadConfigFlexible(ctx context.Context, options ...ConfigOption) (*Configuration, error) {
 	builder := NewConfigBuilder()
-	
+
 	// Apply options
 	for _, opt := range options {
 		if err := opt(builder); err != nil {
 			return nil, fmt.Errorf("failed to apply config option: %w", err)
 		}
 	}
-	
+
 	return builder.Build(ctx)
 }
 
-// ConfigOption represents a configuration option function
+// ConfigOption represents a configuration option function.
 type ConfigOption func(*ConfigBuilder) error
 
-// WithYAMLSource creates a config option for YAML-based configuration
+// WithYAMLSource creates a config option for YAML-based configuration.
 func WithYAMLSource(yamlPath string) ConfigOption {
 	return func(b *ConfigBuilder) error {
 		b.WithSource(ConfigSourceYAML).WithYAMLFile(yamlPath)
@@ -314,7 +314,7 @@ func WithYAMLSource(yamlPath string) ConfigOption {
 	}
 }
 
-// WithEnvSource creates a config option for environment-only configuration
+// WithEnvSource creates a config option for environment-only configuration.
 func WithEnvSource(envPrefix string) ConfigOption {
 	return func(b *ConfigBuilder) error {
 		b.WithSource(ConfigSourceEnvOnly).WithEnvPrefix(envPrefix)
@@ -322,7 +322,7 @@ func WithEnvSource(envPrefix string) ConfigOption {
 	}
 }
 
-// WithPureCodeSource creates a config option for pure-code configuration
+// WithPureCodeSource creates a config option for pure-code configuration.
 func WithPureCodeSource() ConfigOption {
 	return func(b *ConfigBuilder) error {
 		b.WithSource(ConfigSourcePureCode)
@@ -330,7 +330,7 @@ func WithPureCodeSource() ConfigOption {
 	}
 }
 
-// WithService creates a config option for service configuration
+// WithService creates a config option for service configuration.
 func WithService(name, domain string) ConfigOption {
 	return func(b *ConfigBuilder) error {
 		b.WithServiceName(name).WithServiceDomain(domain)
@@ -338,7 +338,7 @@ func WithService(name, domain string) ConfigOption {
 	}
 }
 
-// WithTransportOption creates a config option for transport configuration
+// WithTransportOption creates a config option for transport configuration.
 func WithTransportOption(transportType, address string) ConfigOption {
 	return func(b *ConfigBuilder) error {
 		b.WithTransport(transportType, address)

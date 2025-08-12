@@ -384,7 +384,7 @@ func GetDefaultConfiguration() *Configuration {
 }
 
 // LoadConfigFromYAML loads configuration from a YAML file and returns public Configuration type.
-func LoadConfigFromYAML(ctx context.Context, yamlPath string) (*Configuration, error) {
+func LoadConfigFromYAML(_ context.Context, _ string) (*Configuration, error) {
 	// For now, we'll use environment variables to load config since we're transitioning away from internal types
 	// This is a temporary bridge function during the refactor
 	envConfig, err := LoadFromEnvironment()

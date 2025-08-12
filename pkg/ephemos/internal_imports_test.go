@@ -26,7 +26,7 @@ func TestNoInternalImportsInExamples(t *testing.T) {
 	var violations []string
 
 	for _, dir := range exampleDirs {
-		err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		err := filepath.Walk(dir, func(path string, _ os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
@@ -53,7 +53,6 @@ func TestNoInternalImportsInExamples(t *testing.T) {
 
 			return nil
 		})
-
 		if err != nil {
 			t.Fatalf("Failed to walk directory %s: %v", dir, err)
 		}
@@ -156,6 +155,7 @@ func TestPublicAPIAccessibility(t *testing.T) {
 }
 
 func testConfigurationTypesAvailable(t *testing.T) {
+	t.Helper()
 	// Test that public configuration types can be imported and used
 	// This simulates what external users would do
 	code := `
@@ -187,6 +187,7 @@ func main() {
 }
 
 func testServiceInterfacesAvailable(t *testing.T) {
+	t.Helper()
 	// Test that service interfaces are available publicly
 	code := `
 package main
@@ -217,6 +218,7 @@ func main() {
 }
 
 func testBuilderPatternsAvailable(t *testing.T) {
+	t.Helper()
 	// Test that builder patterns are available
 	code := `
 package main
@@ -247,6 +249,7 @@ func main() {
 }
 
 func testPresetConfigurationsAvailable(t *testing.T) {
+	t.Helper()
 	// Test that preset configurations are available
 	code := `
 package main
@@ -271,13 +274,13 @@ func compileTestCode(code string) error {
 	// Create a temporary file
 	tmpFile, err := os.CreateTemp("", "ephemos_test_*.go")
 	if err != nil {
-		return fmt.Errorf("failed to create temp file: %v", err)
+		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 	defer os.Remove(tmpFile.Name())
 
 	// Write the test code
 	if _, err := tmpFile.WriteString(code); err != nil {
-		return fmt.Errorf("failed to write test code: %v", err)
+		return fmt.Errorf("failed to write test code: %w", err)
 	}
 	tmpFile.Close()
 
@@ -308,7 +311,7 @@ func TestExampleCodeCompiles(t *testing.T) {
 
 			// For this test, we verify that Go files in the directory don't have internal imports
 			// The actual compilation is tested by the build system
-			err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			err := filepath.Walk(dir, func(path string, _ os.FileInfo, err error) error {
 				if err != nil {
 					return err
 				}
@@ -320,7 +323,6 @@ func TestExampleCodeCompiles(t *testing.T) {
 				}
 				return nil
 			})
-
 			if err != nil {
 				t.Errorf("Failed to check example directory %s: %v", dir, err)
 			}
@@ -345,8 +347,8 @@ func TestMainREADMEUsesPublicAPI(t *testing.T) {
 func TestPublicAPIDocumentation(t *testing.T) {
 	// Check that the main package has proper documentation
 	publicPkgPath := "."
-	
-	err := filepath.Walk(publicPkgPath, func(path string, info os.FileInfo, err error) error {
+
+	err := filepath.Walk(publicPkgPath, func(path string, _ os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -355,13 +357,13 @@ func TestPublicAPIDocumentation(t *testing.T) {
 			// Ensure files have package documentation
 			file, err := os.Open(path)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to open file %s: %w", path, err)
 			}
 			defer file.Close()
 
 			scanner := bufio.NewScanner(file)
 			hasPackageDoc := false
-			
+
 			for scanner.Scan() {
 				line := strings.TrimSpace(scanner.Text())
 				if strings.HasPrefix(line, "// Package ephemos") {
@@ -380,7 +382,6 @@ func TestPublicAPIDocumentation(t *testing.T) {
 		}
 		return nil
 	})
-
 	if err != nil {
 		t.Errorf("Failed to check public API documentation: %v", err)
 	}
