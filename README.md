@@ -21,6 +21,8 @@ Ephemos is a Go library that provides **transport-agnostic services** with ident
 
 ### Installation
 
+⚠️ **Security Notice**: Always build Ephemos from source. Never use pre-compiled binaries from the repository, as they cannot be audited and may be outdated or compromised. The repository only contains source code - any executables must be built locally.
+
 ```bash
 # Clone the repository
 git clone https://github.com/sufield/ephemos.git
@@ -28,6 +30,9 @@ cd ephemos
 
 # Install dependencies
 go mod download
+
+# Build from source (required)
+make build
 
 # Run the 5-minute demo
 make demo
