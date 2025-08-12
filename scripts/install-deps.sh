@@ -31,16 +31,37 @@ install_with_manager() {
     echo -e "${YELLOW}Installing $package with $manager...${NC}"
     case "$manager" in
         "apt")
-            sudo apt-get update && sudo apt-get install -y "$package"
+            if sudo -n true 2>/dev/null; then
+                sudo apt-get update && sudo apt-get install -y "$package"
+            else
+                echo -e "${YELLOW}⚠️  sudo required for apt. Trying without sudo...${NC}"
+                echo "Please run manually: sudo apt-get update && sudo apt-get install -y $package"
+                return 1
+            fi
             ;;
         "yum")
-            sudo yum install -y "$package"
+            if sudo -n true 2>/dev/null; then
+                sudo yum install -y "$package"
+            else
+                echo -e "${YELLOW}⚠️  sudo required for yum. Please run manually: sudo yum install -y $package${NC}"
+                return 1
+            fi
             ;;
         "dnf")
-            sudo dnf install -y "$package"
+            if sudo -n true 2>/dev/null; then
+                sudo dnf install -y "$package"
+            else
+                echo -e "${YELLOW}⚠️  sudo required for dnf. Please run manually: sudo dnf install -y $package${NC}"
+                return 1
+            fi
             ;;
         "pacman")
-            sudo pacman -S --noconfirm "$package"
+            if sudo -n true 2>/dev/null; then
+                sudo pacman -S --noconfirm "$package"
+            else
+                echo -e "${YELLOW}⚠️  sudo required for pacman. Please run manually: sudo pacman -S --noconfirm $package${NC}"
+                return 1
+            fi
             ;;
         "brew")
             brew install "$package"
