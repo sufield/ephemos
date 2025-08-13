@@ -7,23 +7,23 @@ import (
 )
 
 // Error namespace functions for lazy initialization.
-func ephemosNamespace() *errorx.Namespace {
+func ephemosNamespace() errorx.Namespace {
 	return errorx.NewNamespace("ephemos")
 }
 
-func validationNamespace() *errorx.Namespace {
+func validationNamespace() errorx.Namespace {
 	return ephemosNamespace().NewSubNamespace("validation")
 }
 
-func configurationNamespace() *errorx.Namespace {
+func configurationNamespace() errorx.Namespace {
 	return ephemosNamespace().NewSubNamespace("configuration")
 }
 
-func domainNamespace() *errorx.Namespace {
+func domainNamespace() errorx.Namespace {
 	return ephemosNamespace().NewSubNamespace("domain")
 }
 
-func systemNamespace() *errorx.Namespace {
+func systemNamespace() errorx.Namespace {
 	return ephemosNamespace().NewSubNamespace("system")
 }
 
