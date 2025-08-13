@@ -2,6 +2,7 @@ package ephemos
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -14,6 +15,43 @@ import (
 )
 
 // Mock implementations for testing
+
+type mockSPIFFEProvider struct {
+	closeCalled atomic.Bool
+	closeError  error
+}
+
+func (m *mockSPIFFEProvider) GetTLSConfig(ctx context.Context) (*tls.Config, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *mockSPIFFEProvider) GetServiceIdentity() (ServiceIdentity, error) {
+	return &mockServiceIdentity{}, nil
+}
+
+func (m *mockSPIFFEProvider) Close() error {
+	m.closeCalled.Store(true)
+	return m.closeError
+}
+
+// mockServiceIdentity implements ServiceIdentity interface
+type mockServiceIdentity struct{}
+
+func (m *mockServiceIdentity) GetName() string {
+	return "test-service"
+}
+
+func (m *mockServiceIdentity) GetDomain() string {
+	return "test.domain"
+}
+
+func (m *mockServiceIdentity) GetSPIFFEID() string {
+	return "spiffe://test.domain/test-service"
+}
+
+func (m *mockServiceIdentity) Validate() error {
+	return nil
+}
 
 type mockServer struct {
 	closeCalled atomic.Bool
@@ -53,7 +91,7 @@ type mockListener struct {
 	address     string
 }
 
-func (m *mockListener) Accept() (interface{}, error) {
+func (m *mockListener) Accept() (net.Conn, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
@@ -62,7 +100,20 @@ func (m *mockListener) Close() error {
 	return m.closeError
 }
 
-func (m *mockListener) Addr() string {
+func (m *mockListener) Addr() net.Addr {
+	return &mockAddr{address: m.address}
+}
+
+// mockAddr implements net.Addr interface
+type mockAddr struct {
+	address string
+}
+
+func (m *mockAddr) Network() string {
+	return "tcp"
+}
+
+func (m *mockAddr) String() string {
 	return m.address
 }
 
@@ -307,9 +358,8 @@ func TestShutdownCoordinator_SPIFFEProviderCleanup(t *testing.T) {
 	config := DefaultShutdownConfig()
 	coordinator := NewShutdownCoordinator(config)
 
-	// Create a mock SPIFFE provider placeholder - internal dependencies removed
-	// Note: In real tests, you might want to use a proper mock or test double
-	var provider interface{} = nil // spiffe.Provider placeholder
+	// Create a mock SPIFFE provider
+	provider := &mockSPIFFEProvider{}
 	coordinator.RegisterSPIFFEProvider(provider)
 
 	// Perform shutdown
@@ -319,8 +369,10 @@ func TestShutdownCoordinator_SPIFFEProviderCleanup(t *testing.T) {
 		t.Errorf("Expected no error, got: %v", err)
 	}
 
-	// In a real test, you would verify that the X509Source was closed
-	// This would require access to internal state or a mock
+	// Verify the provider was closed
+	if !provider.closeCalled.Load() {
+		t.Error("SPIFFEProvider close was not called")
+	}
 }
 
 func TestIdentityOrchestrator_ServeWithShutdown(t *testing.T) {
