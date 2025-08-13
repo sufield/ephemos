@@ -38,7 +38,7 @@ ci-test:
 	@echo "📊 TEST SUMMARY"
 	@echo "================================================"
 	@# Parse test results and show summary
-	@go run scripts/test-summary.go test-results.json || \
+	@go run scripts/test-summary/main.go test-results.json || \
 		(echo "Using fallback summary..." && \
 		 echo "Total packages tested: $$(go list ./... | wc -l)" && \
 		 echo "Test output:" && tail -20 test-results.json)

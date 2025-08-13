@@ -46,36 +46,46 @@ runs:
         go version
         go env GOPATH
         
-        # Install protobuf tools
+        # Install protobuf tools with explicit PATH management
+        GOPATH_BIN="$(go env GOPATH)/bin"
+        echo "GOPATH_BIN: $GOPATH_BIN"
+        
+        # Ensure Go bin directory exists
+        mkdir -p "$GOPATH_BIN"
+        
         echo "Installing protoc-gen-go..."
-        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        GOBIN="$GOPATH_BIN" go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
         
         echo "Installing protoc-gen-go-grpc..."
-        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+        GOBIN="$GOPATH_BIN" go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
         
         # Add Go bin to PATH for current and future steps
-        GOPATH_BIN="$(go env GOPATH)/bin"
-        export PATH="$PATH:$GOPATH_BIN"
+        export PATH="$GOPATH_BIN:$PATH"
         echo "$GOPATH_BIN" >> $GITHUB_PATH
+        
+        # Verify PATH includes Go bin
+        echo "Updated PATH: $PATH"
         
         echo "Go tools installed at: $GOPATH_BIN"
         echo "Current PATH: $PATH"
         
-        # Verify installations with explicit path
+        # Verify installations using which (respects PATH)
         echo "Verifying protoc-gen-go installation..."
-        if [ -f "$GOPATH_BIN/protoc-gen-go" ]; then
-          echo "✅ protoc-gen-go found at $GOPATH_BIN/protoc-gen-go"
+        if which protoc-gen-go >/dev/null 2>&1; then
+          echo "✅ protoc-gen-go found at: $(which protoc-gen-go)"
         else
-          echo "❌ protoc-gen-go not found at $GOPATH_BIN/protoc-gen-go"
+          echo "❌ protoc-gen-go not found in PATH"
+          echo "PATH: $PATH"
           ls -la "$GOPATH_BIN/" || echo "Go bin directory not found"
           exit 1
         fi
         
         echo "Verifying protoc-gen-go-grpc installation..."
-        if [ -f "$GOPATH_BIN/protoc-gen-go-grpc" ]; then
-          echo "✅ protoc-gen-go-grpc found at $GOPATH_BIN/protoc-gen-go-grpc"
+        if which protoc-gen-go-grpc >/dev/null 2>&1; then
+          echo "✅ protoc-gen-go-grpc found at: $(which protoc-gen-go-grpc)"
         else
-          echo "❌ protoc-gen-go-grpc not found at $GOPATH_BIN/protoc-gen-go-grpc"
+          echo "❌ protoc-gen-go-grpc not found in PATH"
+          echo "PATH: $PATH"
           ls -la "$GOPATH_BIN/" || echo "Go bin directory not found"
           exit 1
         fi
