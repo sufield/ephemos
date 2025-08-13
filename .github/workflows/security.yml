@@ -184,8 +184,32 @@ jobs:
       with:
         go-version: '1.24.x'
         
-    - name: Setup Protocol Buffers (Required for Build)
-      uses: ./.github/actions/setup-protobuf-fixed
+    - name: Install Protocol Buffers tools
+      run: |
+        # Install protoc
+        sudo apt-get update && sudo apt-get install -y protobuf-compiler
+        
+        # Install Go protobuf tools
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+        
+        # Verify installations
+        protoc --version
+        which protoc-gen-go
+        which protoc-gen-go-grpc
+        
+    - name: Generate protobuf files
+      run: |
+        echo "🔧 Generating protobuf files..."
+        
+        # Generate Go code from proto files
+        protoc --go_out=examples/proto --go_opt=paths=source_relative \
+               --go-grpc_out=examples/proto --go-grpc_opt=paths=source_relative \
+               -I examples/proto examples/proto/echo.proto
+        
+        # Verify generated files
+        echo "✅ Generated files:"
+        ls -la examples/proto/*.pb.go
         
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
@@ -286,8 +310,24 @@ jobs:
       with:
         go-version: '1.24.x'
         
-    - name: Setup Protocol Buffers (Required for Build)
-      uses: ./.github/actions/setup-protobuf-fixed
+    - name: Install Protocol Buffers tools
+      run: |
+        # Install protoc
+        sudo apt-get update && sudo apt-get install -y protobuf-compiler
+        
+        # Install Go protobuf tools  
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+        
+    - name: Generate protobuf files
+      run: |
+        # Generate Go code from proto files
+        protoc --go_out=examples/proto --go_opt=paths=source_relative \
+               --go-grpc_out=examples/proto --go-grpc_opt=paths=source_relative \
+               -I examples/proto examples/proto/echo.proto
+        
+        # Verify generated files exist
+        ls -la examples/proto/*.pb.go
         
     - name: Build project for SBOM scanning
       run: |
