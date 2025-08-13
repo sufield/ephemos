@@ -130,103 +130,122 @@ runs:
         
         echo "✅ All protobuf tools verified and ready"
         
-    - name: Generate protobuf code
+    - name: Generate protobuf code with enhanced diagnostics
       shell: bash
       run: |
-        echo "Generating protobuf code (REQUIRED for CI/CD)..."
+        echo "🔧 Generating protobuf code with enhanced diagnostics (CI MODE)..."
+        
+        # Enable verbose diagnostics in CI
+        export EPHEMOS_VERBOSE=1
+        export CI=true
+        export GITHUB_ACTIONS=true
+        
         # Ensure Go bin directory is in PATH with highest priority
-        export GOBIN=$(go env GOPATH)/bin
+        export GOBIN=$(go env GOPATH)/bin  
         export PATH="$GOBIN:$PATH:/usr/bin:/usr/local/bin"
         
-        echo "Debug: PATH for protobuf generation: $PATH"
-        echo "Debug: GOBIN: $GOBIN"
+        echo "🔍 Environment Summary:"
+        echo "  - Working Directory: $(pwd)"
+        echo "  - PATH: $PATH"
+        echo "  - GOBIN: $GOBIN"
+        echo "  - CI: $CI"
+        echo "  - GITHUB_ACTIONS: $GITHUB_ACTIONS"
+        echo "  - EPHEMOS_VERBOSE: $EPHEMOS_VERBOSE"
+        echo ""
         
-        echo "Current working directory: $(pwd)"
-        echo "Repository root contents:"
-        ls -la . | head -10
-        echo ""
-        echo "Checking examples directory..."
-        ls -la examples/ || echo "Examples directory not found"
-        echo ""
-        echo "Checking proto directory..."
-        ls -la examples/proto/ || echo "Proto directory not found"
-        echo ""
-        echo "Git status check for proto file:"
-        git ls-files examples/proto/echo.proto || echo "Proto file not tracked in git"
-        
-        # Check if proto file exists
-        if [ ! -f "examples/proto/echo.proto" ]; then
-          echo "❌ Source proto file examples/proto/echo.proto not found"
-          echo "Working directory: $(pwd)"
-          echo "Full directory listing:"
-          find . -name "echo.proto" -o -name "*.proto" 2>/dev/null || echo "No proto files found"
+        # Check if enhanced generation script exists
+        if [ ! -f "scripts/build/generate-proto.sh" ]; then
+          echo "❌ Enhanced protobuf generation script not found at scripts/build/generate-proto.sh"
+          echo "⚠️ Falling back to legacy generation method..."
           
-          # Create a minimal fallback proto file
-          echo "⚠️ Creating fallback echo.proto file for CI..."
-          mkdir -p examples/proto
-          {
-            echo 'syntax = "proto3";'
-            echo ''
-            echo 'package ephemos.echo;'
-            echo ''
-            echo 'option go_package = "github.com/sufield/ephemos/examples/proto";'
-            echo ''
-            echo '// EchoService provides a simple echo functionality for testing.'
-            echo 'service EchoService {'
-            echo '  rpc Echo(EchoRequest) returns (EchoResponse);'
-            echo '}'
-            echo ''
-            echo 'message EchoRequest {'
-            echo '  string message = 1;'
-            echo '}'
-            echo ''
-            echo 'message EchoResponse {'
-            echo '  string message = 1;'
-            echo '  string from = 2;'
-            echo '}'
-          } > examples/proto/echo.proto
-          echo "✅ Fallback echo.proto created"
-        fi
-        
-        # Force regeneration of protobuf files
-        echo "Removing any existing protobuf files..."
-        rm -f examples/proto/*.pb.go
-        
-        echo "Generating fresh protobuf files..."
-        echo "PATH: $PATH"
-        echo "GOPATH: $(go env GOPATH)"
-        echo "Available tools:"
-        which protoc || echo "protoc not found"
-        which protoc-gen-go || echo "protoc-gen-go not found"  
-        which protoc-gen-go-grpc || echo "protoc-gen-go-grpc not found"
-        
-        # Try make proto first
-        if ! make proto; then
-          echo "⚠️ make proto failed, trying direct protoc invocation..."
-          # Fallback to direct protoc call
+          # Legacy fallback method
+          echo "Checking for proto files..."
+          if [ ! -f "examples/proto/echo.proto" ]; then
+            echo "❌ Source proto file examples/proto/echo.proto not found"
+            # Create fallback proto file
+            echo "⚠️ Creating fallback echo.proto file for CI..."
+            mkdir -p examples/proto
+            {
+              echo 'syntax = "proto3";'
+              echo 'package ephemos.echo;'
+              echo 'option go_package = "github.com/sufield/ephemos/examples/proto";'
+              echo 'service EchoService { rpc Echo(EchoRequest) returns (EchoResponse); }'
+              echo 'message EchoRequest { string message = 1; }'
+              echo 'message EchoResponse { string message = 1; string from = 2; }'
+            } > examples/proto/echo.proto
+            echo "✅ Fallback echo.proto created"
+          fi
+          
+          # Direct protoc generation
+          rm -f examples/proto/*.pb.go
           if ! protoc \
-            --go_out=examples/proto \
-            --go_opt=paths=source_relative \
-            --go-grpc_out=examples/proto \
-            --go-grpc_opt=paths=source_relative \
-            -I examples/proto \
-            examples/proto/echo.proto; then
-            echo "❌ Both make proto and direct protoc failed"
+            --go_out=examples/proto --go_opt=paths=source_relative \
+            --go-grpc_out=examples/proto --go-grpc_opt=paths=source_relative \
+            -I examples/proto examples/proto/echo.proto; then
+            echo "❌ Legacy protobuf generation failed"
             exit 1
+          fi
+        else
+          echo "✅ Enhanced protobuf generation script found"
+          echo "🚀 Using enhanced generation with verbose diagnostics..."
+          
+          # Use the enhanced script with verbose diagnostics
+          if ./scripts/build/generate-proto.sh examples/proto examples/proto; then
+            echo "✅ Enhanced protobuf generation completed successfully"
+          else
+            generation_exit_code=$?
+            echo "❌ Enhanced protobuf generation failed with exit code: $generation_exit_code"
+            echo ""
+            echo "📋 Diagnostic Information:"
+            echo "  - Script Path: scripts/build/generate-proto.sh" 
+            echo "  - Proto Directory: examples/proto"
+            echo "  - Output Directory: examples/proto"
+            echo "  - Verbose Mode: $EPHEMOS_VERBOSE"
+            echo ""
+            echo "🔍 Available Tools Check:"
+            which protoc && protoc --version || echo "  - protoc: NOT FOUND"
+            which protoc-gen-go || echo "  - protoc-gen-go: NOT FOUND"
+            which protoc-gen-go-grpc || echo "  - protoc-gen-go-grpc: NOT FOUND"
+            echo ""
+            echo "📁 Directory Contents:"
+            ls -la examples/proto/ || echo "  Proto directory not accessible"
+            echo ""
+            exit $generation_exit_code
           fi
         fi
         
-        # Verify files were generated
-        if [ ! -f "examples/proto/echo.pb.go" ] || [ ! -f "examples/proto/echo_grpc.pb.go" ]; then
-          echo "❌ Protobuf files were not generated successfully"
-          echo "Directory contents:"
+        # Final verification with detailed reporting
+        echo ""
+        echo "🔍 Final Verification:"
+        missing_files=()
+        
+        if [ ! -f "examples/proto/echo.pb.go" ]; then
+          missing_files+=("echo.pb.go")
+        else
+          pb_size=$(stat -c%s examples/proto/echo.pb.go)
+          echo "✅ echo.pb.go generated ($pb_size bytes)"
+        fi
+        
+        if [ ! -f "examples/proto/echo_grpc.pb.go" ]; then
+          missing_files+=("echo_grpc.pb.go")  
+        else
+          grpc_size=$(stat -c%s examples/proto/echo_grpc.pb.go)
+          echo "✅ echo_grpc.pb.go generated ($grpc_size bytes)"
+        fi
+        
+        if [ ${#missing_files[@]} -gt 0 ]; then
+          echo "❌ Missing protobuf files: ${missing_files[*]}"
+          echo "📁 Directory contents after generation:"
           ls -la examples/proto/
           exit 1
         fi
         
-        echo "✅ Protobuf code generated successfully"
-        echo "Generated files:"
-        ls -la examples/proto/*.pb.go
+        echo ""
+        echo "🎉 Protobuf code generation completed successfully!"
+        echo "📄 Generated Files:"
+        ls -la examples/proto/*.pb.go | while read line; do
+          echo "   $line"
+        done
         
     - name: Clear Go build cache after protobuf generation
       shell: bash  

@@ -123,6 +123,24 @@ func (s *TransportServer) ListenAndServe(ctx context.Context) error {
 	}
 }
 
+// serveOnListener serves on a pre-created listener without signal handling.
+// This is used by the Server interface implementation.
+func (s *TransportServer) serveOnListener(ctx context.Context, listener net.Listener) error {
+	transportType := s.config.Transport.Type
+	if transportType == "" {
+		transportType = TransportTypeGRPC // default
+	}
+
+	switch transportType {
+	case TransportTypeGRPC:
+		return s.serveGRPCOnListener(ctx, listener)
+	case TransportTypeHTTP:
+		return s.serveHTTPOnListener(ctx, listener)
+	default:
+		return fmt.Errorf("unsupported transport type: %s", transportType)
+	}
+}
+
 func (s *TransportServer) resolveAddress() string {
 	addr := s.config.Transport.Address
 	if addr == "" {
@@ -218,6 +236,92 @@ func (s *TransportServer) serveHTTP(ctx, shutdownCtx context.Context, addr strin
 	if err := s.httpServer.Shutdown(shutdownTimeout); err != nil {
 		setServerError(fmt.Errorf("HTTP server shutdown error: %w", err))
 	}
+	wg.Wait()
+
+	errMutex.Lock()
+	defer errMutex.Unlock()
+	return serverErr
+}
+
+// serveGRPCOnListener serves gRPC on a pre-created listener
+func (s *TransportServer) serveGRPCOnListener(ctx context.Context, listener net.Listener) error {
+	defer func() {
+		if closeErr := listener.Close(); closeErr != nil {
+			// Log error but don't override main error
+			_ = closeErr
+		}
+	}()
+
+	var wg sync.WaitGroup
+	var serverErr error
+	var errMutex sync.Mutex
+
+	setServerError := func(err error) {
+		errMutex.Lock()
+		defer errMutex.Unlock()
+		if serverErr == nil && err != nil {
+			serverErr = err
+		}
+	}
+
+	// Start gRPC server in a goroutine
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := s.grpcServer.Serve(listener); err != nil {
+			setServerError(fmt.Errorf("gRPC server error: %w", err))
+		}
+	}()
+
+	// Wait for context cancellation
+	go func() {
+		<-ctx.Done()
+		s.grpcServer.GracefulStop()
+	}()
+
+	wg.Wait()
+
+	errMutex.Lock()
+	defer errMutex.Unlock()
+	return serverErr
+}
+
+// serveHTTPOnListener serves HTTP on a pre-created listener  
+func (s *TransportServer) serveHTTPOnListener(ctx context.Context, listener net.Listener) error {
+	var wg sync.WaitGroup
+	var serverErr error
+	var errMutex sync.Mutex
+
+	setServerError := func(err error) {
+		errMutex.Lock()
+		defer errMutex.Unlock()
+		if serverErr == nil && err != nil {
+			serverErr = err
+		}
+	}
+
+	// Start HTTP server in a goroutine
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := s.httpServer.Serve(listener); err != nil && err != http.ErrServerClosed {
+			setServerError(fmt.Errorf("HTTP server error: %w", err))
+		}
+	}()
+
+	// Wait for context cancellation
+	go func() {
+		<-ctx.Done()
+		
+		// Graceful shutdown for HTTP server
+		shutdownTimeout, shutdownCancel := context.WithTimeout(context.Background(), DefaultShutdownTimeout)
+		defer shutdownCancel()
+
+		if err := s.httpServer.Shutdown(shutdownTimeout); err != nil {
+			setServerError(fmt.Errorf("HTTP server shutdown error: %w", err))
+		}
+	}()
+
 	wg.Wait()
 
 	errMutex.Lock()
