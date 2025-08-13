@@ -81,7 +81,7 @@ filegroup(
 # Security analysis
 sh_test(
     name = "security_scan",
-    srcs = ["tools/security_scan.sh"],
+    srcs = ["//tools:security_scan.sh"],
     data = [":all_binaries"],
     tags = ["security"],
 )
@@ -89,6 +89,6 @@ sh_test(
 # Lint check
 sh_test(
     name = "lint_check",
-    srcs = ["tools/lint_check.sh"],
+    srcs = ["//tools:lint_check.sh"],
     tags = ["lint"],
 )
