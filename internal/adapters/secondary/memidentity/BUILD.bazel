@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "memidentity",
+    srcs = ["provider.go"],
+    importpath = "github.com/sufield/ephemos/internal/adapters/secondary/memidentity",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/core/domain",
+        "//internal/core/ports",
+    ],
+)
+
+go_test(
+    name = "memidentity_test",
+    srcs = ["provider_contract_test.go"],
+    deps = [
+        ":memidentity",
+        "//internal/contract/identityprovider",
+        "//internal/core/ports",
+    ],
+)

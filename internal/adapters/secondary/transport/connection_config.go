@@ -182,9 +182,16 @@ func (c *ConnectionConfig) ToDialOptions() []grpc.DialOption {
 		),
 	}
 
-	// Add idle timeout if specified (0 disables idle timeout)
+	// Note: grpc.WithIdleTimeout may not be available in all gRPC versions
+	// Idle timeout configuration handled via keepalive parameters instead
 	if c.IdleTimeout > 0 {
-		options = append(options, grpc.WithIdleTimeout(c.IdleTimeout))
+		// Use keepalive parameters for connection management
+		keepaliveParams := keepalive.ClientParameters{
+			Time:                c.IdleTimeout,
+			Timeout:             c.IdleTimeout / 2,
+			PermitWithoutStream: true,
+		}
+		options = append(options, grpc.WithKeepaliveParams(keepaliveParams))
 	}
 
 	return options

@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "spiffe",
+    srcs = ["provider.go"],
+    importpath = "github.com/sufield/ephemos/internal/adapters/secondary/spiffe",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/core/domain",
+        "//internal/core/ports",
+        "@com_github_spiffe_go_spiffe_v2//spiffeid",
+        "@com_github_spiffe_go_spiffe_v2//spiffetls/tlsconfig",
+        "@com_github_spiffe_go_spiffe_v2//workloadapi",
+    ],
+)
+
+go_test(
+    name = "spiffe_test",
+    srcs = [
+        "provider_contract_test.go",
+        "provider_test.go",
+    ],
+    deps = [
+        ":spiffe",
+        "//internal/contract/identityprovider",
+        "//internal/core/ports",
+    ],
+)

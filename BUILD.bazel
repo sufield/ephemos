@@ -26,10 +26,10 @@ test_suite(
     tests = [
         "//pkg/ephemos:ephemos_test",
         "//scripts:build_tests",
-        "//scripts/security:security_tests",
-        "//scripts/demo:demo_tests", 
-        "//scripts/utils:utils_tests",
         "//scripts/ci:ci_tests",
+        "//scripts/demo:demo_tests",
+        "//scripts/security:security_tests",
+        "//scripts/utils:utils_tests",
     ],
 )
 
@@ -37,10 +37,10 @@ test_suite(
 filegroup(
     name = "all_binaries",
     srcs = [
-        "//cmd/ephemos-cli:ephemos-cli",
-        "//cmd/config-validator:config-validator", 
-        "//examples/echo-server:echo-server",
-        "//examples/echo-client:echo-client",
+        "//cmd/config-validator",
+        "//cmd/ephemos-cli",
+        "//examples/echo-client",
+        "//examples/echo-server",
     ],
 )
 
@@ -48,22 +48,22 @@ filegroup(
 filegroup(
     name = "build_scripts",
     srcs = [
-        "//scripts:lint",
-        "//scripts:generate_proto",
         "//scripts:benchmark",
         "//scripts:check_deps",
+        "//scripts:generate_proto",
+        "//scripts:lint",
     ],
 )
 
 # Security script targets
 filegroup(
-    name = "security_scripts", 
+    name = "security_scripts",
     srcs = [
-        "//scripts/security:scan_secrets",
-        "//scripts/security:scan_vulnerabilities", 
         "//scripts/security:generate_sbom",
-        "//scripts/security:validate_sbom",
+        "//scripts/security:scan_secrets",
+        "//scripts/security:scan_vulnerabilities",
         "//scripts/security:security_scan_all",
+        "//scripts/security:validate_sbom",
     ],
 )
 
@@ -71,10 +71,10 @@ filegroup(
 filegroup(
     name = "demo_scripts",
     srcs = [
-        "//scripts/demo:setup_demo",
-        "//scripts/demo:run_demo",
         "//scripts/demo:cleanup",
         "//scripts/demo:full_demo",
+        "//scripts/demo:run_demo",
+        "//scripts/demo:setup_demo",
     ],
 )
 
@@ -88,7 +88,7 @@ sh_test(
 
 # Lint check
 sh_test(
-    name = "lint_check", 
+    name = "lint_check",
     srcs = ["tools/lint_check.sh"],
     tags = ["lint"],
 )

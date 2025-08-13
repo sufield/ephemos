@@ -3,46 +3,55 @@
 sh_binary(
     name = "lint",
     srcs = ["lint.sh"],
+    tags = [
+        "ci",
+        "lint",
+    ],
     visibility = ["//visibility:public"],
-    tags = ["ci", "lint"],
 )
 
 sh_binary(
     name = "security_checks",
     srcs = ["security-checks.sh"],
-    visibility = ["//visibility:public"],
-    tags = ["ci", "security"],
     data = [
         "//scripts/security:scan_secrets",
         "//scripts/security:scan_vulnerabilities",
     ],
+    tags = [
+        "ci",
+        "security",
+    ],
+    visibility = ["//visibility:public"],
 )
 
 # CI test targets
 sh_test(
     name = "lint_test",
+    size = "small",
     srcs = ["lint.sh"],
     tags = ["ci"],
-    size = "small",
 )
 
 sh_test(
     name = "security_checks_test",
-    srcs = ["security-checks.sh"],
-    tags = ["ci", "security"],
     size = "medium",
+    srcs = ["security-checks.sh"],
     data = [
         "//scripts/security:scan_secrets",
         "//scripts/security:scan_vulnerabilities",
+    ],
+    tags = [
+        "ci",
+        "security",
     ],
 )
 
 # CI test suite
 test_suite(
     name = "ci_tests",
+    tags = ["ci"],
     tests = [
         ":lint_test",
         ":security_checks_test",
     ],
-    tags = ["ci"],
 )

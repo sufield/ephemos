@@ -5,86 +5,104 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary")
 sh_binary(
     name = "scan_secrets",
     srcs = ["scan-secrets.sh"],
-    visibility = ["//visibility:public"],
     tags = ["security"],
+    visibility = ["//visibility:public"],
 )
 
 sh_binary(
-    name = "scan_vulnerabilities", 
+    name = "scan_vulnerabilities",
     srcs = ["scan-vulnerabilities.sh"],
-    visibility = ["//visibility:public"],
     tags = ["security"],
+    visibility = ["//visibility:public"],
 )
 
 sh_binary(
     name = "generate_sbom",
     srcs = ["generate-sbom.sh"],
+    tags = [
+        "sbom",
+        "security",
+    ],
     visibility = ["//visibility:public"],
-    tags = ["security", "sbom"],
 )
 
 sh_binary(
     name = "validate_sbom",
     srcs = ["validate-sbom.sh"],
+    tags = [
+        "sbom",
+        "security",
+    ],
     visibility = ["//visibility:public"],
-    tags = ["security", "sbom"],
 )
 
 sh_binary(
     name = "install_tools",
     srcs = ["install-tools.sh"],
+    tags = [
+        "security",
+        "setup",
+    ],
     visibility = ["//visibility:public"],
-    tags = ["security", "setup"],
 )
 
 # Combined security scan that runs multiple checks
 sh_binary(
     name = "security_scan_all",
     srcs = ["security-scan-all.sh"],
-    visibility = ["//visibility:public"],
-    tags = ["security"],
     data = [
         ":scan_secrets",
         ":scan_vulnerabilities",
         ":validate_sbom",
     ],
+    tags = ["security"],
+    visibility = ["//visibility:public"],
 )
 
 # Test targets for security scripts
 sh_test(
     name = "scan_secrets_test",
-    srcs = ["scan-secrets.sh"],
-    tags = ["security", "secrets"],
     size = "medium",
+    srcs = ["scan-secrets.sh"],
+    tags = [
+        "secrets",
+        "security",
+    ],
 )
 
 sh_test(
     name = "scan_vulnerabilities_test",
-    srcs = ["scan-vulnerabilities.sh"], 
-    tags = ["security", "vulns"],
     size = "medium",
+    srcs = ["scan-vulnerabilities.sh"],
+    tags = [
+        "security",
+        "vulns",
+    ],
 )
 
 sh_test(
     name = "sbom_generation_test",
-    srcs = ["test-sbom.sh"],
-    tags = ["security", "sbom"],
     size = "small",
+    srcs = ["test-sbom.sh"],
     data = [
         ":generate_sbom",
         ":validate_sbom",
+    ],
+    tags = [
+        "sbom",
+        "security",
     ],
 )
 
 # Security test suite
 test_suite(
     name = "security_tests",
-    tests = [
-        ":scan_secrets_test",
-        ":scan_vulnerabilities_test", 
-        ":sbom_generation_test",
-    ],
     tags = ["security"],
+    tests = [
+        ":sbom_generation_test",
+        ":scan_secrets_test",
+        ":scan_vulnerabilities_test",
+    ],
 )
 
 # Future Go-based security tools

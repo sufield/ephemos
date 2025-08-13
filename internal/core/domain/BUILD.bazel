@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "domain",
+    srcs = ["identity.go"],
+    importpath = "github.com/sufield/ephemos/internal/core/domain",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "domain_test",
+    srcs = ["identity_test.go"],
+    deps = [":domain"],
+)

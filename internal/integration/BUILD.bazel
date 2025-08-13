@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "integration_test",
+    srcs = ["identity_simplified_test.go"],
+    deps = [
+        "//internal/adapters/secondary/config",
+        "//internal/adapters/secondary/memidentity",
+        "//internal/core/domain",
+        "//internal/core/ports",
+        "//internal/core/services",
+        "//pkg/ephemos",
+        "@org_golang_google_grpc//:grpc",
+    ],
+)

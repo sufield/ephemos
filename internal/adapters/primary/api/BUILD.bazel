@@ -1,0 +1,33 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "api",
+    srcs = [
+        "client.go",
+        "server.go",
+        "service_registrar.go",
+        "test_helpers.go",
+    ],
+    importpath = "github.com/sufield/ephemos/internal/adapters/primary/api",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/adapters/secondary/config",
+        "//internal/adapters/secondary/spiffe",
+        "//internal/adapters/secondary/transport",
+        "//internal/core/errors",
+        "//internal/core/ports",
+        "//internal/core/services",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+    ],
+)
+
+go_test(
+    name = "api_test",
+    srcs = [
+        "client_test.go",
+        "server_test.go",
+    ],
+    deps = [":api"],
+)

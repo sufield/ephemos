@@ -1,0 +1,32 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ports",
+    srcs = [
+        "configuration.go",
+        "identity_provider.go",
+        "service.go",
+        "transport.go",
+    ],
+    importpath = "github.com/sufield/ephemos/internal/core/ports",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/core/domain",
+        "//internal/core/errors",
+    ],
+)
+
+go_test(
+    name = "ports_test",
+    srcs = [
+        "architecture_test.go",
+        "configuration_security_test.go",
+        "configuration_test.go",
+        "identity_provider_test.go",
+    ],
+    deps = [
+        ":ports",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "config",
+    srcs = [
+        "inmemory_provider.go",
+        "provider.go",
+    ],
+    importpath = "github.com/sufield/ephemos/internal/adapters/secondary/config",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/core/errors",
+        "//internal/core/ports",
+        "@in_gopkg_yaml_v3//:yaml_v3",
+    ],
+)
+
+go_test(
+    name = "config_test",
+    srcs = ["provider_test.go"],
+    deps = [
+        ":config",
+        "//internal/core/ports",
+    ],
+)
