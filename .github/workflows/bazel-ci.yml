@@ -64,7 +64,7 @@ jobs:
         echo "test --config=ci" >> .bazelrc.local
         echo "coverage --config=ci" >> .bazelrc.local
         
-        # Bzlmod is already enabled in .bazelrc
+        # Note: Bzlmod is disabled in .bazelrc (using WORKSPACE mode)
         
         # Add CI-specific configuration
         cat >> .bazelrc.local << EOF
@@ -130,7 +130,8 @@ jobs:
         # Retry mechanism for rules_cc issues
         for i in {1..3}; do
           echo "Attempt $i/3..."
-          if bazel fetch --all; then
+          # Use specific targets instead of --all (which requires Bzlmod)
+          if bazel fetch //pkg/ephemos:ephemos //examples/...; then
             echo "✅ Dependencies fetched successfully"
             break
           else
