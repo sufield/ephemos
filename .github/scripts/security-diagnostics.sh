@@ -48,7 +48,7 @@ validate_security_tools() {
     declare -A security_tools=(
         ["govulncheck"]="golang.org/x/vuln/cmd/govulncheck@latest"
         ["golangci-lint"]="github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
-        ["gosec"]="github.com/securecodewarrior/gosec/v2/cmd/gosec@latest"
+        ["gosec"]="github.com/securego/gosec/v2/cmd/gosec@latest"
         ["staticcheck"]="honnef.co/go/tools/cmd/staticcheck@latest"
     )
     
@@ -114,7 +114,7 @@ install_security_tools() {
     declare -A tool_packages=(
         ["govulncheck"]="golang.org/x/vuln/cmd/govulncheck@latest"
         ["golangci-lint"]="github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
-        ["gosec"]="github.com/securecodewarrior/gosec/v2/cmd/gosec@latest"
+        ["gosec"]="github.com/securego/gosec/v2/cmd/gosec@latest"
         ["staticcheck"]="honnef.co/go/tools/cmd/staticcheck@latest"
     )
     
