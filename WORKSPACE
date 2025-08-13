@@ -76,14 +76,14 @@ http_archive(
 #     sha256 = "9b04cbbb0fee0632aeba628159938484cfadf4a9d2f5b1c356e8300c56467896",
 # )
 
-# Python rules - Updated to latest version compatible with Bazel 7.x
+# Python rules - Updated to latest stable version compatible with Bazel 7.x
 # This version resolves PyCcLinkParamsProvider issues and provides full Bazel 7 support
 http_archive(
     name = "rules_python",
-    sha256 = "0a8003b044294d7840ac7d9d73eef05d6ceb682d7516781a4ec62eeb34702578",
-    strip_prefix = "rules_python-0.35.0",
+    sha256 = "0a1cefefb4a7b550fb0b43f54df67d6da95b7ba352637669e46c987f69986f6a",
+    strip_prefix = "rules_python-1.5.3",
     urls = [
-        "https://github.com/bazelbuild/rules_python/releases/download/0.35.0/rules_python-0.35.0.tar.gz",
+        "https://github.com/bazel-contrib/rules_python/releases/download/1.5.3/rules_python-1.5.3.tar.gz",
     ],
 )
 
