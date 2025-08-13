@@ -160,7 +160,7 @@ func demonstrateFlexibleAPI(ctx context.Context) {
 }
 
 // Example of how this would be used in a real application
-func realWorldExample(ctx context.Context) (*ephemos.ManagedIdentityServer, error) {
+func realWorldExample(ctx context.Context) (*ephemos.IdentityOrchestrator, error) {
 	// Production: YAML + env overrides for sensitive data
 	config, err := ephemos.LoadConfigFlexible(ctx,
 		ephemos.WithYAMLSource("config/production.yaml"),
@@ -173,7 +173,7 @@ func realWorldExample(ctx context.Context) (*ephemos.ManagedIdentityServer, erro
 	// For now, we'll simulate server creation (config validation already passed)
 	if config != nil {
 		// Create server with production configuration
-		server, err := ephemos.NewManagedIdentityServer(ctx, &ephemos.ServerOptions{
+		server, err := ephemos.NewIdentityOrchestrator(ctx, &ephemos.ServerOptions{
 			ConfigPath: "", // We already have the config
 			// Alternative: pass config directly if API supports it
 		})
@@ -188,7 +188,7 @@ func realWorldExample(ctx context.Context) (*ephemos.ManagedIdentityServer, erro
 }
 
 // Example for testing environments
-func testingExample(ctx context.Context) (*ephemos.ManagedIdentityServer, error) {
+func testingExample(ctx context.Context) (*ephemos.IdentityOrchestrator, error) {
 	// Testing: Pure code configuration for predictable tests
 	config, err := ephemos.LoadConfigFlexible(ctx,
 		ephemos.WithPureCodeSource(),

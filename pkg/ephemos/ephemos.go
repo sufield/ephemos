@@ -316,6 +316,11 @@ func NewIdentityClient(ctx context.Context, configPath string) (Client, error) {
 
 // Built-in Interceptors
 
+// MetricsConfig configures metrics collection.
+type MetricsConfig struct {
+	AuthMetricsCollector interface{}
+}
+
 // InterceptorConfig configures server interceptors.
 type InterceptorConfig struct {
 	// EnableAuth enables authentication interceptor
@@ -324,8 +329,12 @@ type InterceptorConfig struct {
 	EnableLogging bool
 	// EnableMetrics enables metrics collection interceptor
 	EnableMetrics bool
+	// EnableIdentityPropagation enables identity propagation between services
+	EnableIdentityPropagation bool
 	// Logger for interceptor logging
 	Logger *slog.Logger
+	// MetricsConfig for metrics configuration
+	MetricsConfig *MetricsConfig
 	// CustomInterceptors allows adding custom interceptors
 	CustomInterceptors []grpc.UnaryServerInterceptor
 }
@@ -333,10 +342,38 @@ type InterceptorConfig struct {
 // NewDefaultInterceptorConfig creates a default interceptor configuration.
 func NewDefaultInterceptorConfig() *InterceptorConfig {
 	return &InterceptorConfig{
-		EnableAuth:    true,
-		EnableLogging: true,
-		EnableMetrics: true,
-		Logger:        slog.Default(),
+		EnableAuth:                true,
+		EnableLogging:             true,
+		EnableMetrics:             true,
+		EnableIdentityPropagation: false,
+		Logger:                    slog.Default(),
+		MetricsConfig:             &MetricsConfig{},
+	}
+}
+
+// NewProductionInterceptorConfig creates a production-optimized interceptor configuration.
+func NewProductionInterceptorConfig(serviceName string) *InterceptorConfig {
+	logger := slog.Default().With("service", serviceName)
+	return &InterceptorConfig{
+		EnableAuth:                true,
+		EnableLogging:             true,
+		EnableMetrics:             true,
+		EnableIdentityPropagation: true,
+		Logger:                    logger,
+		MetricsConfig:             &MetricsConfig{},
+	}
+}
+
+// NewDevelopmentInterceptorConfig creates a development-friendly interceptor configuration.
+func NewDevelopmentInterceptorConfig(serviceName string) *InterceptorConfig {
+	logger := slog.Default().With("service", serviceName)
+	return &InterceptorConfig{
+		EnableAuth:                false, // Disabled for easier development
+		EnableLogging:             true,
+		EnableMetrics:             true,
+		EnableIdentityPropagation: false,
+		Logger:                    logger,
+		MetricsConfig:             &MetricsConfig{},
 	}
 }
 
