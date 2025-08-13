@@ -105,10 +105,18 @@ test_suite(
     ],
 )
 
-# TODO: Future Go-based security scanner could be added here
-# go_binary(
-#     name = "security_scanner", 
-#     srcs = ["go/main.go"],
-#     visibility = ["//visibility:public"],
-#     deps = ["@com_github_spf13_cobra//:cobra"],
-# )
+# Go-based security scanner (replaces bash scripts)
+go_binary(
+    name = "security_scanner", 
+    srcs = ["go/main.go"],
+    visibility = ["//visibility:public"],
+    deps = ["@com_github_spf13_cobra//:cobra"],
+)
+
+# Wrapper script for easy execution
+sh_binary(
+    name = "run_security_scanner",
+    srcs = ["run-security-scanner.sh"],
+    visibility = ["//visibility:public"],
+    data = [":security_scanner"],
+)
