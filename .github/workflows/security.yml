@@ -180,7 +180,7 @@ jobs:
         go-version: '1.24.x'
         
     - name: Setup Protocol Buffers (Required for Build)
-      uses: ./.github/actions/setup-protobuf
+      uses: ./.github/actions/setup-protobuf-fixed
         
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
@@ -282,7 +282,7 @@ jobs:
         go-version: '1.24.x'
         
     - name: Setup Protocol Buffers (Required for Build)
-      uses: ./.github/actions/setup-protobuf
+      uses: ./.github/actions/setup-protobuf-fixed
         
     - name: Build project for SBOM scanning
       run: |
