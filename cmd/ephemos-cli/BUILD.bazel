@@ -5,10 +5,7 @@ go_library(
     srcs = ["main.go"],
     importpath = "github.com/sufield/ephemos/cmd/ephemos-cli",
     visibility = ["//visibility:private"],
-    deps = [
-        "//pkg/ephemos",
-        "@com_github_spf13_cobra//:cobra",
-    ],
+    deps = ["//internal/cli"],
 )
 
 go_binary(

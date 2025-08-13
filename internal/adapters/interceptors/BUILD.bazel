@@ -1,0 +1,51 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "interceptors",
+    srcs = [
+        "auth.go",
+        "identity_propagation.go",
+        "logging.go",
+        "metrics.go",
+    ],
+    importpath = "github.com/sufield/ephemos/internal/adapters/interceptors",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/adapters/logging",
+        "//internal/core/ports",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//credentials",
+        "@org_golang_google_grpc//metadata",
+        "@org_golang_google_grpc//peer",
+        "@org_golang_google_grpc//status",
+    ],
+)
+
+go_test(
+    name = "interceptors_test",
+    srcs = [
+        "auth_test.go",
+        "direct_test.go",
+        "identity_propagation_test.go",
+        "integration_test.go",
+        "logging_test.go",
+        "metrics_test.go",
+        "stream_test.go",
+    ],
+    embed = [":interceptors"],
+    deps = [
+        "//internal/core/domain",
+        "//internal/core/ports",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//credentials",
+        "@org_golang_google_grpc//credentials/insecure",
+        "@org_golang_google_grpc//metadata",
+        "@org_golang_google_grpc//peer",
+        "@org_golang_google_grpc//status",
+        "@org_golang_google_grpc//test/bufconn",
+    ],
+)

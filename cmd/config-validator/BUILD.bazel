@@ -1,13 +1,13 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 
 go_library(
-    name = "config-validator_lib", 
+    name = "config-validator_lib",
     srcs = ["main.go"],
     importpath = "github.com/sufield/ephemos/cmd/config-validator",
     visibility = ["//visibility:private"],
     deps = [
-        "//pkg/ephemos",
-        "@com_github_spf13_cobra//:cobra",
+        "//internal/adapters/secondary/config",
+        "//internal/core/ports",
     ],
 )
 

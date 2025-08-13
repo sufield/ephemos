@@ -10,7 +10,7 @@ sh_binary(
 )
 
 sh_binary(
-    name = "lint_format_only", 
+    name = "lint_format_only",
     srcs = ["build/lint-format-only.sh"],
     visibility = ["//visibility:public"],
 )
@@ -83,7 +83,10 @@ sh_binary(
 sh_binary(
     name = "setup_dev_environment",
     srcs = ["setup-dev-environment.sh"],
-    data = [":install_deps", ":install_bazel"],
+    data = [
+        ":install_bazel",
+        ":install_deps",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -97,26 +100,26 @@ sh_binary(
 # Test targets that run the scripts
 sh_test(
     name = "lint_test",
+    size = "small",
     srcs = ["build/lint.sh"],
     tags = ["lint"],
-    size = "small",
 )
 
 sh_test(
-    name = "check_deps_test", 
+    name = "check_deps_test",
+    size = "small",
     srcs = ["check-deps.sh"],
     tags = ["deps"],
-    size = "small",
 )
 
 # Aggregate test targets
 test_suite(
     name = "build_tests",
-    tests = [
-        ":lint_test",
-        ":check_deps_test",
-    ],
     tags = ["build"],
+    tests = [
+        ":check_deps_test",
+        ":lint_test",
+    ],
 )
 
 # Go-based script replacements for better integration
@@ -135,6 +138,6 @@ go_test(
     srcs = ["scripts_test.go"],
     deps = [
         "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require", 
+        "@com_github_stretchr_testify//require",
     ],
 ) if False else None  # TODO: Implement when ready

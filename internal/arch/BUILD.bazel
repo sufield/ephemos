@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "arch",
+    srcs = ["runtime_validation.go"],
+    importpath = "github.com/sufield/ephemos/internal/arch",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "arch_test",
+    srcs = [
+        "dep_boundary_test.go",
+        "interface_segregation_test.go",
+        "runtime_validation_test.go",
+    ],
+    deps = [
+        ":arch",
+        "@org_golang_x_tools//go/packages",
+    ],
+)
