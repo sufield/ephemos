@@ -1,6 +1,7 @@
 package ephemos
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -9,8 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
-	"github.com/sufield/ephemos/internal/core/ports"
+	// Internal imports removed for public API compliance
 )
 
 // Mock implementations for testing
@@ -35,7 +35,7 @@ type mockClient struct {
 	closeError  error
 }
 
-func (m *mockClient) Connect(_, _ string) (ports.Connection, error) {
+func (m *mockClient) Connect(ctx context.Context, serviceName, address string) (*ClientConnection, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
@@ -307,9 +307,9 @@ func TestShutdownCoordinator_SPIFFEProviderCleanup(t *testing.T) {
 	config := DefaultShutdownConfig()
 	coordinator := NewShutdownCoordinator(config)
 
-	// Create a mock SPIFFE provider
+	// Create a mock SPIFFE provider placeholder - internal dependencies removed
 	// Note: In real tests, you might want to use a proper mock or test double
-	provider, _ := spiffe.NewProvider(nil)
+	var provider interface{} = nil // spiffe.Provider placeholder
 	coordinator.RegisterSPIFFEProvider(provider)
 
 	// Perform shutdown
@@ -323,7 +323,7 @@ func TestShutdownCoordinator_SPIFFEProviderCleanup(t *testing.T) {
 	// This would require access to internal state or a mock
 }
 
-func TestManagedIdentityServer_ServeWithShutdown(t *testing.T) {
+func TestIdentityOrchestrator_ServeWithShutdown(t *testing.T) {
 	// Create a test listener
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

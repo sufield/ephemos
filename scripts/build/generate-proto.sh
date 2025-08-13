@@ -30,9 +30,11 @@ echo "Generating protobuf code..."
 echo "  Proto dir: $PROTO_DIR"
 echo "  Output dir: $GO_OUT"
 
-# Secure PATH setup
+# Secure PATH setup with proper Go environment
 readonly ORIGINAL_PATH="$PATH"
-export PATH="$PATH:$(go env GOPATH)/bin:/usr/bin:/usr/local/bin"
+export GO111MODULE=on
+export GOBIN=$(go env GOPATH)/bin
+export PATH="$PATH:$GOBIN:/usr/bin:/usr/local/bin"
 
 # Check for protoc
 if ! command -v protoc >/dev/null 2>&1; then
@@ -63,8 +65,7 @@ if ! command -v protoc >/dev/null 2>&1; then
     fi
 fi
 
-# Check for Go protobuf tools
-export PATH="$PATH:$(go env GOPATH)/bin"
+# Check for Go protobuf tools (GOBIN already set above)
 if ! command -v protoc-gen-go >/dev/null 2>&1; then
     echo "Warning: protoc-gen-go not found, installing with retries..."
     for i in {1..3}; do

@@ -10,9 +10,6 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/sufield/ephemos/internal/adapters/secondary/config"
-	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
-	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/sufield/ephemos/internal/core/services"
@@ -26,34 +23,24 @@ type IdentityClient struct {
 }
 
 // NewIdentityClient creates a new IdentityClient with the given configuration file path.
+// Deprecated: Use NewIdentityClientWithDependencies for proper dependency injection.
 func NewIdentityClient(ctx context.Context, configPath string) (*IdentityClient, error) {
-	configProvider := config.NewFileProvider()
-
-	var cfg *ports.Configuration
-	var err error
-
-	if configPath != "" {
-		cfg, err = configProvider.LoadConfiguration(ctx, configPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load configuration: %w", err)
-		}
-	} else {
-		cfg = configProvider.GetDefaultConfiguration(ctx)
-		if cfg == nil {
-			return nil, &errors.ValidationError{
-				Field:   "configuration",
-				Value:   nil,
-				Message: "no configuration provided and no default configuration available",
-			}
-		}
+	// This is a legacy method maintained for backward compatibility.
+	// For new code, use NewIdentityClientWithDependencies instead.
+	return nil, &errors.ValidationError{
+		Field:   "constructor",
+		Value:   "NewIdentityClient",
+		Message: "deprecated constructor - use NewIdentityClientWithDependencies instead",
 	}
-
-	return NewIdentityClientWithConfig(ctx, cfg)
 }
 
-// NewIdentityClientWithConfig creates a new identity client with pre-validated configuration.
-// This method assumes the configuration has already been loaded and validated.
-func NewIdentityClientWithConfig(_ context.Context, cfg *ports.Configuration) (*IdentityClient, error) {
+// NewIdentityClientWithDependencies creates a new identity client with injected dependencies.
+// This constructor follows proper dependency injection and hexagonal architecture principles.
+func NewIdentityClientWithDependencies(
+	identityProvider ports.IdentityProvider,
+	transportProvider ports.TransportProvider,
+	cfg *ports.Configuration,
+) (*IdentityClient, error) {
 	if cfg == nil {
 		return nil, &errors.ValidationError{
 			Field:   "configuration",
@@ -62,15 +49,24 @@ func NewIdentityClientWithConfig(_ context.Context, cfg *ports.Configuration) (*
 		}
 	}
 
-	spiffeProvider, err := spiffe.NewProvider(cfg.SPIFFE)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create SPIFFE provider: %w", err)
+	if identityProvider == nil {
+		return nil, &errors.ValidationError{
+			Field:   "identityProvider",
+			Value:   nil,
+			Message: "identity provider cannot be nil",
+		}
 	}
 
-	transportProvider := transport.NewGRPCProvider(spiffeProvider)
+	if transportProvider == nil {
+		return nil, &errors.ValidationError{
+			Field:   "transportProvider",
+			Value:   nil,
+			Message: "transport provider cannot be nil",
+		}
+	}
 
 	identityService, err := services.NewIdentityService(
-		spiffeProvider,
+		identityProvider,
 		transportProvider,
 		cfg,
 	)

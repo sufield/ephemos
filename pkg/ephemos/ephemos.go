@@ -8,11 +8,7 @@ import (
 	"net"
 
 	"google.golang.org/grpc"
-
-	"github.com/sufield/ephemos/internal/adapters/interceptors"
-	"github.com/sufield/ephemos/internal/adapters/primary/api"
-	"github.com/sufield/ephemos/internal/core/errors"
-	"github.com/sufield/ephemos/internal/core/ports"
+	"log/slog"
 )
 
 // ServiceRegistrar is the interface that service implementations must implement.
@@ -28,7 +24,10 @@ import (
 //	})
 //
 // Advanced users can implement this interface directly for custom registration logic.
-type ServiceRegistrar = api.ServiceRegistrar
+type ServiceRegistrar interface {
+	// Register registers the service with the provided gRPC server
+	Register(grpcServer *grpc.Server)
+}
 
 // GenericServiceRegistrar is a generic implementation that can register any gRPC service
 // without requiring developers to write service-specific registrars. This eliminates
@@ -138,7 +137,7 @@ type Client interface {
 	// The context can be used for cancellation and timeouts.
 	// Returns a ClientConnection that provides access to the underlying gRPC connection.
 	// The caller must call Close() on the returned connection to release resources.
-	Connect(ctx context.Context, serviceName, address string) (*api.ClientConnection, error)
+	Connect(ctx context.Context, serviceName, address string) (*ClientConnection, error)
 
 	// Close releases any resources held by the client.
 	// Should be called when the client is no longer needed.
@@ -201,7 +200,7 @@ type Client interface {
 //	server.Serve(ctx, lis)
 func NewIdentityServer(ctx context.Context, configPath string) (Server, error) {
 	if ctx == nil {
-		return nil, &errors.ValidationError{
+		return nil, &ValidationError{
 			Field:   "context",
 			Value:   nil,
 			Message: "context cannot be nil",
@@ -218,8 +217,8 @@ func NewIdentityServer(ctx context.Context, configPath string) (Server, error) {
 		return nil, fmt.Errorf("server initialization failed: %w", err)
 	}
 
-	// Create server with validated configuration
-	server, err := api.NewWorkloadServerWithConfig(ctx, config)
+	// Create server with validated configuration using internal factory
+	server, err := createServerWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity server: %w", err)
 	}
@@ -289,7 +288,7 @@ func NewIdentityServer(ctx context.Context, configPath string) (Server, error) {
 //	serviceClient := proto.NewServiceClient(conn.GetClientConnection())
 func NewIdentityClient(ctx context.Context, configPath string) (Client, error) {
 	if ctx == nil {
-		return nil, &errors.ValidationError{
+		return nil, &ValidationError{
 			Field:   "context",
 			Value:   nil,
 			Message: "context cannot be nil",
@@ -306,8 +305,8 @@ func NewIdentityClient(ctx context.Context, configPath string) (Client, error) {
 		return nil, fmt.Errorf("client initialization failed: %w", err)
 	}
 
-	// Create client with validated configuration
-	client, err := api.NewIdentityClientWithConfig(ctx, config)
+	// Create client with validated configuration using internal factory
+	client, err := createClientWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity client: %w", err)
 	}
@@ -317,134 +316,83 @@ func NewIdentityClient(ctx context.Context, configPath string) (Client, error) {
 
 // Built-in Interceptors
 
-// InterceptorConfig provides configuration for built-in interceptors.
+// InterceptorConfig configures server interceptors.
 type InterceptorConfig struct {
 	// EnableAuth enables authentication interceptor
 	EnableAuth bool
-	// AuthConfig configuration for authentication
-	AuthConfig *interceptors.AuthConfig
-
-	// EnableIdentityPropagation enables identity propagation for outgoing calls
-	EnableIdentityPropagation bool
-	// IdentityPropagationConfig configuration for identity propagation
-	IdentityPropagationConfig *interceptors.IdentityPropagationConfig
-
-	// EnableLogging enables audit logging interceptor
+	// EnableLogging enables audit logging interceptor  
 	EnableLogging bool
-	// LoggingConfig configuration for logging
-	LoggingConfig *interceptors.LoggingConfig
-
 	// EnableMetrics enables metrics collection interceptor
 	EnableMetrics bool
-	// MetricsConfig configuration for metrics
-	MetricsConfig *interceptors.MetricsConfig
+	// Logger for interceptor logging
+	Logger *slog.Logger
+	// CustomInterceptors allows adding custom interceptors
+	CustomInterceptors []grpc.UnaryServerInterceptor
 }
 
 // NewDefaultInterceptorConfig creates a default interceptor configuration.
 func NewDefaultInterceptorConfig() *InterceptorConfig {
 	return &InterceptorConfig{
-		EnableAuth:                true,
-		AuthConfig:                interceptors.DefaultAuthConfig(),
-		EnableIdentityPropagation: false, // Disabled by default
-		EnableLogging:             true,
-		LoggingConfig:             interceptors.NewSecureLoggingConfig(),
-		EnableMetrics:             true,
-		MetricsConfig:             interceptors.DefaultMetricsConfig("ephemos-service"),
-	}
-}
-
-// NewProductionInterceptorConfig creates a production-ready interceptor configuration.
-func NewProductionInterceptorConfig(serviceName string) *InterceptorConfig {
-	return &InterceptorConfig{
-		EnableAuth:                true,
-		AuthConfig:                interceptors.DefaultAuthConfig(),
-		EnableIdentityPropagation: true,
-		EnableLogging:             true,
-		LoggingConfig:             interceptors.NewSecureLoggingConfig(),
-		EnableMetrics:             true,
-		MetricsConfig:             interceptors.DefaultMetricsConfig(serviceName),
-	}
-}
-
-// NewDevelopmentInterceptorConfig creates a development-friendly interceptor configuration.
-func NewDevelopmentInterceptorConfig(serviceName string) *InterceptorConfig {
-	return &InterceptorConfig{
-		EnableAuth:                false, // Disabled for easier development
-		AuthConfig:                interceptors.DefaultAuthConfig(),
-		EnableIdentityPropagation: true,
-		EnableLogging:             true,
-		LoggingConfig:             interceptors.NewDebugLoggingConfig(),
-		EnableMetrics:             true,
-		MetricsConfig:             interceptors.DefaultMetricsConfig(serviceName),
+		EnableAuth:    true,
+		EnableLogging: true,
+		EnableMetrics: true,
+		Logger:        slog.Default(),
 	}
 }
 
 // CreateServerInterceptors creates gRPC server interceptors based on configuration.
 func CreateServerInterceptors(
 	config *InterceptorConfig,
-	_ ports.IdentityProvider,
 ) ([]grpc.UnaryServerInterceptor, []grpc.StreamServerInterceptor) {
+	if config == nil {
+		config = NewDefaultInterceptorConfig()
+	}
+
 	var unaryInterceptors []grpc.UnaryServerInterceptor
 	var streamInterceptors []grpc.StreamServerInterceptor
 
-	// Identity propagation server interceptor (extracts metadata)
-	if config.EnableIdentityPropagation {
-		serverPropagation := interceptors.NewIdentityPropagationServerInterceptor(config.LoggingConfig.Logger)
-		unaryInterceptors = append(unaryInterceptors, serverPropagation.UnaryServerInterceptor())
-		streamInterceptors = append(streamInterceptors, serverPropagation.StreamServerInterceptor())
+	// Add logging interceptor
+	if config.EnableLogging && config.Logger != nil {
+		unaryInterceptors = append(unaryInterceptors, createLoggingInterceptor(config.Logger))
 	}
-
-	// Authentication interceptor
-	if config.EnableAuth {
-		authInterceptor := interceptors.NewAuthInterceptor(config.AuthConfig)
-		unaryInterceptors = append(unaryInterceptors, authInterceptor.UnaryServerInterceptor())
-		streamInterceptors = append(streamInterceptors, authInterceptor.StreamServerInterceptor())
-	}
-
-	// Logging interceptor
-	if config.EnableLogging {
-		loggingInterceptor := interceptors.NewLoggingInterceptor(config.LoggingConfig)
-		unaryInterceptors = append(unaryInterceptors, loggingInterceptor.UnaryServerInterceptor())
-		streamInterceptors = append(streamInterceptors, loggingInterceptor.StreamServerInterceptor())
-	}
-
-	// Metrics interceptor
+	
+	// Add metrics interceptor
 	if config.EnableMetrics {
-		metricsInterceptor := interceptors.NewMetricsInterceptor(config.MetricsConfig)
-		unaryInterceptors = append(unaryInterceptors, metricsInterceptor.UnaryServerInterceptor())
-		streamInterceptors = append(streamInterceptors, metricsInterceptor.StreamServerInterceptor())
+		unaryInterceptors = append(unaryInterceptors, createMetricsInterceptor())
 	}
-
+	
+	// Add auth interceptor
+	if config.EnableAuth {
+		unaryInterceptors = append(unaryInterceptors, createAuthInterceptor())
+	}
+	
+	// Add custom interceptors
+	unaryInterceptors = append(unaryInterceptors, config.CustomInterceptors...)
+	
 	return unaryInterceptors, streamInterceptors
 }
 
 // CreateClientInterceptors creates gRPC client interceptors based on configuration.
 func CreateClientInterceptors(
 	config *InterceptorConfig,
-	identityProvider ports.IdentityProvider,
 ) ([]grpc.UnaryClientInterceptor, []grpc.StreamClientInterceptor) {
+	if config == nil {
+		config = NewDefaultInterceptorConfig()
+	}
+
 	var unaryInterceptors []grpc.UnaryClientInterceptor
 	var streamInterceptors []grpc.StreamClientInterceptor
 
-	// Identity propagation client interceptor (adds metadata)
-	if config.EnableIdentityPropagation && identityProvider != nil {
-		if config.IdentityPropagationConfig == nil {
-			config.IdentityPropagationConfig = interceptors.DefaultIdentityPropagationConfig(identityProvider)
-		}
-		config.IdentityPropagationConfig.IdentityProvider = identityProvider
-
-		clientPropagation := interceptors.NewIdentityPropagationInterceptor(config.IdentityPropagationConfig)
-		unaryInterceptors = append(unaryInterceptors, clientPropagation.UnaryClientInterceptor())
-		streamInterceptors = append(streamInterceptors, clientPropagation.StreamClientInterceptor())
+	// Add client-side logging interceptor
+	if config.EnableLogging && config.Logger != nil {
+		unaryInterceptors = append(unaryInterceptors, createClientLoggingInterceptor(config.Logger))
 	}
-
-	// Metrics interceptor
+	
+	// Add client-side metrics interceptor
 	if config.EnableMetrics {
-		metricsInterceptor := interceptors.NewMetricsInterceptor(config.MetricsConfig)
-		unaryInterceptors = append(unaryInterceptors, metricsInterceptor.UnaryClientInterceptor())
-		streamInterceptors = append(streamInterceptors, metricsInterceptor.StreamClientInterceptor())
+		unaryInterceptors = append(unaryInterceptors, createClientMetricsInterceptor())
 	}
-
+	
 	return unaryInterceptors, streamInterceptors
 }
 
