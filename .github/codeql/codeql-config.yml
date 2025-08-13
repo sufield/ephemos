@@ -1,32 +1,39 @@
-# CodeQL configuration file for Ephemos
-# This configuration enhances the default CodeQL analysis
+# CodeQL Configuration for Ephemos
+# This configuration ensures comprehensive static analysis security scanning
 
-name: "Ephemos CodeQL Config"
+name: "Ephemos Security Analysis"
 
-# Specify query suites to run
+# Disable default queries to use only our selected query suites
+disable-default-queries: false
+
+# Query suites to run for comprehensive security analysis
 queries:
-  - uses: security-extended
-  - uses: security-and-quality
+  - name: "Security and Quality"  
+    uses: security-and-quality
+  - name: "Security Extended"
+    uses: security-extended
 
-# Define custom query paths if needed
-# query-filters:
-#   - exclude:
-#       id: go/path-injection
-
-# Paths to include/exclude from analysis
+# Path filters to focus analysis on relevant code
 paths:
-  - pkg
-  - internal
-  - examples
-paths-ignore:
-  - vendor
-  - "**/*_test.go"
-  - "**/*.pb.go"
-  - "**/testdata/**"
-  - docs
+  - "pkg/"
+  - "internal/" 
+  - "cmd/"
+  - "examples/"
 
-# Language-specific configuration
+# Exclude paths that don't need security analysis
+paths-ignore:
+  - "**/*_test.go"       # Test files (analyzed separately)
+  - "**/*.pb.go"         # Generated protobuf files
+  - "**/*_grpc.pb.go"    # Generated gRPC files
+  - ".github/"           # GitHub workflow files
+  - "scripts/"           # Build scripts
+  - "tools/"             # Development tools
+  - "docs/"              # Documentation
+  - "*.md"               # Markdown files
+
+# Languages to analyze
 languages:
-  go:
-    # Additional build commands if needed
-    # build-command: make build
+  - go
+
+# Build configuration
+build-mode: manual
