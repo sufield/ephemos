@@ -3,6 +3,8 @@
 package ephemos
 
 import (
+	"fmt"
+
 	"github.com/joomcode/errorx"
 )
 
@@ -119,7 +121,8 @@ var (
 
 // NewEnhancedValidationError creates a field validation error with full context and stack trace
 func NewEnhancedValidationError(field string, value interface{}, message string) error {
-	return FieldValidationError.New(message).
+	formatted := fmt.Sprintf("validation failed: %s", message)
+	return FieldValidationError.New(formatted).
 		WithProperty(PropertyField, field).
 		WithProperty(PropertyValue, value).
 		WithProperty(PropertyCode, "VALIDATION_FAILED")
@@ -127,35 +130,40 @@ func NewEnhancedValidationError(field string, value interface{}, message string)
 
 // NewEnhancedConfigError creates a configuration error with file context and stack trace  
 func NewEnhancedConfigError(file string, message string) error {
-	return EnhancedConfigurationError.New(message).
+	formatted := fmt.Sprintf("configuration error: %s", message)
+	return EnhancedConfigurationError.New(formatted).
 		WithProperty(PropertyFile, file).
 		WithProperty(PropertyCode, "CONFIG_ERROR")
 }
 
 // NewEnhancedDomainError creates a domain error with operation context and stack trace
 func NewEnhancedDomainError(operation string, message string) error {
-	return EnhancedDomainError.New(message).
+	formatted := fmt.Sprintf("domain error: %s", message)
+	return EnhancedDomainError.New(formatted).
 		WithProperty(PropertyOperation, operation).
 		WithProperty(PropertyCode, "DOMAIN_ERROR")
 }
 
 // NewEnhancedSystemError creates a system error with service context and stack trace
 func NewEnhancedSystemError(service string, message string) error {
-	return EnhancedSystemError.New(message).
+	formatted := fmt.Sprintf("system error: %s", message)
+	return EnhancedSystemError.New(formatted).
 		WithProperty(PropertyService, service).
 		WithProperty(PropertyCode, "SYSTEM_ERROR")
 }
 
 // NewTimeoutError creates a timeout error using errorx built-in timeout trait
 func NewTimeoutError(operation string, message string) error {
-	return TimeoutError.New(message).
+	formatted := fmt.Sprintf("timeout error: %s", message)
+	return TimeoutError.New(formatted).
 		WithProperty(PropertyOperation, operation).
 		WithProperty(PropertyCode, "TIMEOUT_ERROR")
 }
 
 // NewTemporaryError creates a temporary error that might succeed on retry
 func NewTemporaryError(service string, message string) error {
-	return TemporaryError.New(message).
+	formatted := fmt.Sprintf("temporary error: %s", message)
+	return TemporaryError.New(formatted).
 		WithProperty(PropertyService, service).
 		WithProperty(PropertyCode, "TEMPORARY_ERROR")
 }
@@ -276,7 +284,8 @@ func WrapWithEnhancedContext(err error, errorType *errorx.Type, message string) 
 	if err == nil {
 		return nil
 	}
-	return errorType.Wrap(err, message)
+	formatted := fmt.Sprintf("wrapped error: %s", message)
+	return errorType.Wrap(err, formatted)
 }
 
 // DecorateError adds context to an existing errorx error without changing its type
@@ -285,8 +294,10 @@ func DecorateError(err error, additionalContext string) error {
 		return nil
 	}
 	if _, ok := err.(*errorx.Error); ok {
-		return errorx.Decorate(err, additionalContext)
+		formatted := fmt.Sprintf("decorated error: %s", additionalContext)
+		return errorx.Decorate(err, formatted)
 	}
 	// If it's not an errorx error, wrap it with enhanced system error
-	return EnhancedSystemError.Wrap(err, additionalContext)
+	formatted := fmt.Sprintf("wrapped non-errorx error: %s", additionalContext)
+	return EnhancedSystemError.Wrap(err, formatted)
 }
