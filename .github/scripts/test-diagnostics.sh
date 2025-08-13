@@ -457,7 +457,7 @@ parse_test_failures() {
     
     while IFS= read -r line; do
         # Detect start of test failure
-        if [[ "$line" =~ ^---\ FAIL:\ ]]; then
+        if [[ "$line" =~ ^---[[:space:]]FAIL:[[:space:]] ]]; then
             current_test=$(echo "$line" | sed 's/^--- FAIL: \([^(]*\).*/\1/')
             in_failure=true
             log_diagnostic "ERROR" "❌ FAILED TEST: $current_test"
