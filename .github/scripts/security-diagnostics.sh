@@ -46,7 +46,7 @@ validate_security_tools() {
     
     # Map of security tools and their installation methods (pinned to stable versions)
     declare -A security_tools=(
-        ["govulncheck"]="golang.org/x/vuln/cmd/govulncheck@v1.2.0"
+        ["govulncheck"]="golang.org/x/vuln/cmd/govulncheck@latest"
         ["golangci-lint"]="github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.0"
         ["gosec"]="github.com/securego/gosec/v2/cmd/gosec@v2.21.2"
         ["staticcheck"]="honnef.co/go/tools/cmd/staticcheck@v0.4.7"
@@ -112,7 +112,7 @@ install_security_tools() {
     
     # Security tool installation mappings (pinned to stable versions for reliability)
     declare -A tool_packages=(
-        ["govulncheck"]="golang.org/x/vuln/cmd/govulncheck@v1.2.0"
+        ["govulncheck"]="golang.org/x/vuln/cmd/govulncheck@latest"
         ["golangci-lint"]="github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.0"
         ["gosec"]="github.com/securego/gosec/v2/cmd/gosec@v2.21.2"
         ["staticcheck"]="honnef.co/go/tools/cmd/staticcheck@v0.4.7"
