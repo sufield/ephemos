@@ -41,6 +41,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-bench-
           
+    - name: Setup Protocol Buffers (Required for Build)
+      uses: ./.github/actions/setup-protobuf
+        
     - name: Install dependencies
       run: make setup
 

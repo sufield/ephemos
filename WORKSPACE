@@ -71,6 +71,13 @@ http_archive(
     sha256 = "1535151efbc7893f38b0578e83cac584f2819974f065698976989ec71c1af84a",
 )
 
+# Java rules
+http_archive(
+    name = "rules_java",
+    urls = ["https://github.com/bazelbuild/rules_java/releases/download/7.6.0/rules_java-7.6.0.tar.gz"],
+    sha256 = "1da22389fe688c515ed732d01a2b18f3961eb4431aec40dcbaa043b58ba7941e",
+)
+
 # Python rules
 http_archive(
     name = "rules_python",
@@ -84,6 +91,7 @@ http_archive(
 load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies", "rules_cc_toolchains")
 load("@bazel_features//:deps.bzl", "bazel_features_deps")
 load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies")
+load("@rules_java//java:repositories.bzl", "rules_java_dependencies", "rules_java_toolchains")
 load("@rules_python//python:repositories.bzl", "py_repositories", "python_register_toolchains")
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
@@ -95,6 +103,10 @@ rules_cc_toolchains()
 bazel_features_deps()
 
 rules_proto_dependencies()
+
+rules_java_dependencies()
+
+rules_java_toolchains()
 
 py_repositories()
 

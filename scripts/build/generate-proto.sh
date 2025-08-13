@@ -66,13 +66,37 @@ fi
 # Check for Go protobuf tools
 export PATH="$PATH:$(go env GOPATH)/bin"
 if ! command -v protoc-gen-go >/dev/null 2>&1; then
-    echo "Warning: protoc-gen-go not found, installing..."
-    go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+    echo "Warning: protoc-gen-go not found, installing with retries..."
+    for i in {1..3}; do
+        if go install google.golang.org/protobuf/cmd/protoc-gen-go@latest; then
+            echo "✅ protoc-gen-go installed successfully"
+            break
+        else
+            echo "⚠️ protoc-gen-go install attempt $i failed"
+            if [ $i -eq 3 ]; then
+                echo "❌ All protoc-gen-go install attempts failed"
+                exit 1
+            fi
+            sleep 2
+        fi
+    done
 fi
 
 if ! command -v protoc-gen-go-grpc >/dev/null 2>&1; then
-    echo "Warning: protoc-gen-go-grpc not found, installing..."
-    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+    echo "Warning: protoc-gen-go-grpc not found, installing with retries..."
+    for i in {1..3}; do
+        if go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest; then
+            echo "✅ protoc-gen-go-grpc installed successfully"
+            break
+        else
+            echo "⚠️ protoc-gen-go-grpc install attempt $i failed"
+            if [ $i -eq 3 ]; then
+                echo "❌ All protoc-gen-go-grpc install attempts failed"
+                exit 1
+            fi
+            sleep 2
+        fi
+    done
 fi
 
 echo "Found protoc at: $(which protoc)"

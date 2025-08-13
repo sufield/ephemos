@@ -313,8 +313,8 @@ func buildIntegrationServerOptions(tc *integrationTestCase) []grpc.ServerOption 
 }
 
 // Helper function to build client options (reduces complexity).
-func buildIntegrationClientOptions(tc *integrationTestCase, lis *bufconn.Listener) []grpc.NewClientOption {
-	clientOpts := []grpc.NewClientOption{
+func buildIntegrationClientOptions(tc *integrationTestCase, lis *bufconn.Listener) []grpc.DialOption {
+	clientOpts := []grpc.DialOption{
 		grpc.WithContextDialer(bufDialer(lis)),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}

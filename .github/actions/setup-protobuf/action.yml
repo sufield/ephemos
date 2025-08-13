@@ -46,6 +46,9 @@ runs:
         go version
         go env GOPATH
         
+        # Set Go proxy to handle network issues
+        go env -w GOPROXY=https://proxy.golang.org,direct
+        
         # Install protobuf tools with explicit PATH management
         GOPATH_BIN="$(go env GOPATH)/bin"
         echo "GOPATH_BIN: $GOPATH_BIN"
@@ -53,11 +56,35 @@ runs:
         # Ensure Go bin directory exists
         mkdir -p "$GOPATH_BIN"
         
-        echo "Installing protoc-gen-go..."
-        GOBIN="$GOPATH_BIN" go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        echo "Installing protoc-gen-go with retries..."
+        for i in {1..3}; do
+          if GOBIN="$GOPATH_BIN" go install google.golang.org/protobuf/cmd/protoc-gen-go@latest; then
+            echo "✅ protoc-gen-go installed successfully"
+            break
+          else
+            echo "⚠️ protoc-gen-go install attempt $i failed"
+            if [ $i -eq 3 ]; then
+              echo "❌ All protoc-gen-go install attempts failed"
+              exit 1
+            fi
+            sleep 5
+          fi
+        done
         
-        echo "Installing protoc-gen-go-grpc..."
-        GOBIN="$GOPATH_BIN" go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+        echo "Installing protoc-gen-go-grpc with retries..."
+        for i in {1..3}; do
+          if GOBIN="$GOPATH_BIN" go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest; then
+            echo "✅ protoc-gen-go-grpc installed successfully"
+            break
+          else
+            echo "⚠️ protoc-gen-go-grpc install attempt $i failed"
+            if [ $i -eq 3 ]; then
+              echo "❌ All protoc-gen-go-grpc install attempts failed"
+              exit 1
+            fi
+            sleep 5
+          fi
+        done
         
         # Add Go bin to PATH for current and future steps
         export PATH="$GOPATH_BIN:$PATH"
