@@ -37,24 +37,24 @@ runs:
         # Create proto file if missing
         if [ ! -f "examples/proto/echo.proto" ]; then
           mkdir -p examples/proto
-          cat > examples/proto/echo.proto << 'EOF'
-syntax = "proto3";
-package ephemos.echo;
-option go_package = "github.com/sufield/ephemos/examples/proto";
-
-service EchoService {
-  rpc Echo(EchoRequest) returns (EchoResponse);
-}
-
-message EchoRequest {
-  string message = 1;
-}
-
-message EchoResponse {
-  string message = 1;
-  string from = 2;
-}
-EOF
+          cat << 'EOF' > examples/proto/echo.proto
+        syntax = "proto3";
+        package ephemos.echo;
+        option go_package = "github.com/sufield/ephemos/examples/proto";
+        
+        service EchoService {
+          rpc Echo(EchoRequest) returns (EchoResponse);
+        }
+        
+        message EchoRequest {
+          string message = 1;
+        }
+        
+        message EchoResponse {
+          string message = 1;
+          string from = 2;
+        }
+        EOF
         fi
         
         # Generate files
