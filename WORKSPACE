@@ -40,6 +40,16 @@ http_archive(
     ],
 )
 
+# Prebuilt protoc toolchain for faster builds
+http_archive(
+    name = "toolchains_protoc",
+    sha256 = "3019f9ed1273d547334da2004e634340c896d9e24dd6d899911e03b694fdc1f5",
+    strip_prefix = "toolchains_protoc-0.4.3", 
+    urls = [
+        "https://github.com/aspect-build/toolchains_protoc/releases/download/v0.4.3/toolchains_protoc-v0.4.3.tar.gz",
+    ],
+)
+
 # Protocol buffers rules
 http_archive(
     name = "rules_proto",
@@ -99,6 +109,14 @@ go_register_toolchains(version = "1.24.5")
 
 gazelle_dependencies()
 
+# Register prebuilt protoc toolchains
+load("@toolchains_protoc//protoc:toolchain.bzl", "protoc_toolchains")
+
+protoc_toolchains(
+    name = "protoc_toolchains",
+    version = "28.3",  # Use a stable protoc version
+)
+
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 
 protobuf_deps()
@@ -108,3 +126,6 @@ load("//:deps.bzl", "go_dependencies")
 
 # gazelle:repository_macro deps.bzl%go_dependencies
 go_dependencies()
+
+# Register custom Go proto toolchains
+register_toolchains("//tools/toolchains:all")

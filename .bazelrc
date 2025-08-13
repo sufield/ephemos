@@ -5,6 +5,15 @@ build --incompatible_enable_cc_toolchain_resolution
 build --cxxopt=-std=c++14
 build --host_cxxopt=-std=c++14
 
+# Protocol buffer optimization settings
+common --incompatible_enable_proto_toolchain_resolution
+
+# Prevent accidental source builds of protobuf/gRPC (fail fast if they try to build from source)
+common --per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
+common --host_per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
+common --per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
+common --host_per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
+
 # External dependency settings
 common --enable_workspace
 common --noenable_bzlmod
