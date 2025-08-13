@@ -29,7 +29,8 @@ build --incompatible_strict_action_env
 
 # Performance settings
 build --jobs=auto
-build --local_resources=memory=75%,cpu=100%
+build --local_resources=cpu=HOST_CPUS
+build --local_resources=memory=HOST_RAM*0.75
 
 # Reproducible builds
 build --workspace_status_command="$(pwd)/tools/workspace_status.sh"

@@ -4,6 +4,7 @@
 # SPIFFE URIs in test files and documentation (example.org domain)
 spiffe://example\.org/.*
 spiffe://example\.org/[^/]*
+spiffe://test\.example\.org/.*
 
 # Test SPIFFE patterns with wildcards (for pattern matching tests)
 spiffe://test\.com/.*

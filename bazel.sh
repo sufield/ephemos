@@ -65,10 +65,13 @@ show_help() {
     echo "  format        - Format BUILD files"
     echo ""
     echo "Development commands:"
+    echo "  setup         - Complete development environment setup"
     echo "  clean         - Clean build artifacts"
     echo "  deps          - Update dependencies"
     echo "  gazelle       - Update BUILD files"
     echo "  check-deps    - Check dependencies"
+    echo "  install-deps  - Install development dependencies"
+    echo "  install-bazel - Install/update Bazel build system"
     echo ""
     echo "Demo commands:"
     echo "  demo          - Run complete demo"
@@ -185,6 +188,24 @@ case "${1:-help}" in
         log_info "Checking dependencies..."
         bazel run //scripts:check_deps
         log_success "Dependency check completed!"
+        ;;
+    
+    "install-deps")
+        log_info "Installing development dependencies..."
+        bazel run //scripts:install_deps
+        log_success "Development dependencies installation completed!"
+        ;;
+    
+    "install-bazel")
+        log_info "Installing Bazel build system..."
+        bazel run //scripts:install_bazel
+        log_success "Bazel installation completed!"
+        ;;
+    
+    "setup")
+        log_info "Setting up development environment..."
+        bazel run //scripts:setup_dev_environment
+        log_success "Development environment setup completed!"
         ;;
     
     "demo")

@@ -55,7 +55,8 @@ jobs:
         build:ci --test_summary=detailed
         build:ci --build_tests_only
         build:ci --jobs=auto
-        build:ci --local_resources=memory=75%,cpu=100%
+        build:ci --local_resources=cpu=4
+        build:ci --local_resources=memory=4096
         build:ci --sandbox_default_allow_network=false
         build:ci --incompatible_strict_action_env
         
