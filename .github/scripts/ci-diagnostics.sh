@@ -50,7 +50,8 @@ init_diagnostics() {
 log_diagnostic() {
     local level="$1"
     local message="$2"
-    local location="${BASH_SOURCE[2]##*/}:${BASH_LINENO[1]}"
+    local source_file="${BASH_SOURCE[2]:-unknown}"
+    local location="${source_file##*/}:${BASH_LINENO[1]:-0}"
     local timestamp="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
     local function_name="${FUNCNAME[2]:-main}"
     local elapsed_time=$(($(date +%s) - JOB_START_TIME))
