@@ -60,12 +60,12 @@ http_archive(
 #     ],
 # )
 
-# Protocol buffers rules - Using compatible version for Bazel 7.x
+# Protocol buffers rules - Using latest stable version for Bazel 7.x
 http_archive(
     name = "rules_proto",
-    sha256 = "6fb6767d1bef535310547e03247f7518b03487740c11b6c6adb7952033fe1295",
-    strip_prefix = "rules_proto-6.0.2",
-    url = "https://github.com/bazelbuild/rules_proto/releases/download/6.0.2/rules_proto-6.0.2.tar.gz",
+    sha256 = "14a225870ab4e91869652cfd69ef2028277fc1dc4910d65d353b62d6e0ae21f4",
+    strip_prefix = "rules_proto-7.1.0",
+    url = "https://github.com/bazelbuild/rules_proto/releases/download/7.1.0/rules_proto-7.1.0.tar.gz",
 )
 
 # Note: Protocol buffers now managed by rules_proto 7.1.0
@@ -78,13 +78,8 @@ http_archive(
 #     sha256 = "1535151efbc7893f38b0578e83cac584f2819974f065698976989ec71c1af84a",
 # )
 
-# Note: Java rules commented out - project uses Go, not Java  
-# If needed by transitive dependencies, uncomment with compatible version:
-# http_archive(
-#     name = "rules_java", 
-#     urls = ["https://github.com/bazelbuild/rules_java/releases/download/7.12.5/rules_java-7.12.5.tar.gz"],
-#     sha256 = "17b18cb4f92ab7b94aa343ce78531b73960b1bed2ba166e5b02c9fdf0b0ac270",
-# )
+# Java rules - Using embedded Java rules from protobuf (managed by rules_proto 7.1.0)
+# Note: rules_proto 7.1.0 uses protobuf 29.0 which includes Java proto rules
 
 # Python rules - Updated to latest stable version compatible with Bazel 7.x
 # This version resolves PyCcLinkParamsProvider issues and provides full Bazel 7 support
@@ -101,7 +96,7 @@ load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies", "rules_cc_toolch
 load("@bazel_features//:deps.bzl", "bazel_features_deps")
 load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies")
 load("@rules_python//python:repositories.bzl", "py_repositories", "python_register_toolchains")
-# Note: rules_java load commented out - project uses Go, not Java
+# Note: Java rules loaded from protobuf (managed by rules_proto 7.1.0)
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 
@@ -113,7 +108,7 @@ bazel_features_deps()
 
 rules_proto_dependencies()
 
-# Note: rules_java initialization commented out - project uses Go, not Java
+# Note: Java rules initialization handled by protobuf (managed by rules_proto 7.1.0)
 
 py_repositories()
 
