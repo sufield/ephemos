@@ -122,7 +122,7 @@ var (
 
 // NewEnhancedValidationError creates a field validation error with full context and stack trace
 func NewEnhancedValidationError(field string, value interface{}, message string) error {
-	return FieldValidationError.New("validation failed: "+message).
+	return FieldValidationError.New("validation failed: %s", message).
 		WithProperty(PropertyField, field).
 		WithProperty(PropertyValue, value).
 		WithProperty(PropertyCode, "VALIDATION_FAILED")
@@ -130,35 +130,35 @@ func NewEnhancedValidationError(field string, value interface{}, message string)
 
 // NewEnhancedConfigError creates a configuration error with file context and stack trace
 func NewEnhancedConfigError(file string, message string) error {
-	return EnhancedConfigurationError.New("configuration error: "+message).
+	return EnhancedConfigurationError.New("configuration error: %s", message).
 		WithProperty(PropertyFile, file).
 		WithProperty(PropertyCode, "CONFIG_ERROR")
 }
 
 // NewEnhancedDomainError creates a domain error with operation context and stack trace
 func NewEnhancedDomainError(operation string, message string) error {
-	return EnhancedDomainError.New("domain error: "+message).
+	return EnhancedDomainError.New("domain error: %s", message).
 		WithProperty(PropertyOperation, operation).
 		WithProperty(PropertyCode, "DOMAIN_ERROR")
 }
 
 // NewEnhancedSystemError creates a system error with service context and stack trace
 func NewEnhancedSystemError(service string, message string) error {
-	return EnhancedSystemError.New("system error: "+message).
+	return EnhancedSystemError.New("system error: %s", message).
 		WithProperty(PropertyService, service).
 		WithProperty(PropertyCode, "SYSTEM_ERROR")
 }
 
 // NewTimeoutError creates a timeout error using errorx built-in timeout trait
 func NewTimeoutError(operation string, message string) error {
-	return TimeoutError.New("timeout error: "+message).
+	return TimeoutError.New("timeout error: %s", message).
 		WithProperty(PropertyOperation, operation).
 		WithProperty(PropertyCode, "TIMEOUT_ERROR")
 }
 
 // NewTemporaryError creates a temporary error that might succeed on retry
 func NewTemporaryError(service string, message string) error {
-	return TemporaryError.New("temporary error: "+message).
+	return TemporaryError.New("temporary error: %s", message).
 		WithProperty(PropertyService, service).
 		WithProperty(PropertyCode, "TEMPORARY_ERROR")
 }
@@ -279,7 +279,7 @@ func WrapWithEnhancedContext(err error, errorType *errorx.Type, message string) 
 	if err == nil {
 		return nil
 	}
-	return errorType.Wrap(err, "wrapped error: "+message)
+	return errorType.Wrap(err, "wrapped error: %s", message)
 }
 
 // DecorateError adds context to an existing errorx error without changing its type
@@ -288,9 +288,9 @@ func DecorateError(err error, additionalContext string) error {
 		return nil
 	}
 	if _, ok := err.(*errorx.Error); ok {
-		return errorx.Decorate(err, "decorated error: "+additionalContext)
+		return errorx.Decorate(err, "decorated error: %s", additionalContext)
 	}
 	// If it's not an errorx error, wrap it with enhanced system error
-	return EnhancedSystemError.Wrap(err, "wrapped non-errorx error: "+additionalContext)
+	return EnhancedSystemError.Wrap(err, "wrapped non-errorx error: %s", additionalContext)
 }
 
