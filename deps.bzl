@@ -1,6 +1,9 @@
+"""External Go dependencies for the Ephemos project."""
+
 load("@bazel_gazelle//:deps.bzl", "go_repository")
 
 def go_dependencies():
+    """Declares all external Go dependencies using go_repository."""
     go_repository(
         name = "com_github_microsoft_go_winio",
         importpath = "github.com/Microsoft/go-winio",
