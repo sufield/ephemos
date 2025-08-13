@@ -2,12 +2,12 @@ workspace(name = "ephemos")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
-# C++ rules (required by Bazel toolchain) - Updated for Bazel 7.x compatibility
+# C++ rules (required by Bazel toolchain) - Using stable version compatible with Bazel 7.x
 http_archive(
     name = "rules_cc",
-    urls = ["https://github.com/bazelbuild/rules_cc/releases/download/0.0.10/rules_cc-0.0.10.tar.gz"],
-    sha256 = "65b67b81c6da378f136cc7e7e14ee08d5b9375973427eceb8c773a4f69fa7e49",
-    strip_prefix = "rules_cc-0.0.10",
+    urls = ["https://github.com/bazelbuild/rules_cc/releases/download/0.0.16/rules_cc-0.0.16.tar.gz"],
+    sha256 = "bbf1ae2f83305b7053b11e4467d317a7ba3517a12cef608543c1b1c5bf48a4df",
+    strip_prefix = "rules_cc-0.0.16",
 )
 
 # Bazel Go rules
@@ -40,15 +40,15 @@ http_archive(
     ],
 )
 
-# Prebuilt protoc toolchain for faster builds
-http_archive(
-    name = "toolchains_protoc",
-    sha256 = "3019f9ed1273d547334da2004e634340c896d9e24dd6d899911e03b694fdc1f5",
-    strip_prefix = "toolchains_protoc-0.4.3", 
-    urls = [
-        "https://github.com/aspect-build/toolchains_protoc/releases/download/v0.4.3/toolchains_protoc-v0.4.3.tar.gz",
-    ],
-)
+# Note: Prebuilt protoc toolchain temporarily disabled due to version compatibility issues
+# http_archive(
+#     name = "toolchains_protoc",
+#     sha256 = "3019f9ed1273d547334da2004e634340c896d9e24dd6d899911e03b694fdc1f5",
+#     strip_prefix = "toolchains_protoc-0.4.3", 
+#     urls = [
+#         "https://github.com/aspect-build/toolchains_protoc/releases/download/v0.4.3/toolchains_protoc-v0.4.3.tar.gz",
+#     ],
+# )
 
 # Protocol buffers rules
 http_archive(
@@ -109,13 +109,13 @@ go_register_toolchains(version = "1.24.5")
 
 gazelle_dependencies()
 
-# Register prebuilt protoc toolchains
-load("@toolchains_protoc//protoc:toolchain.bzl", "protoc_toolchains")
-
-protoc_toolchains(
-    name = "protoc_toolchains",
-    version = "28.3",  # Use a stable protoc version
-)
+# Note: Prebuilt protoc toolchains disabled due to compatibility issues
+# load("@toolchains_protoc//protoc:toolchain.bzl", "protoc_toolchains")
+# 
+# protoc_toolchains(
+#     name = "protoc_toolchains",
+#     version = "27.0",  # Use a stable protoc version supported by toolchains_protoc
+# )
 
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 
@@ -127,5 +127,5 @@ load("//:deps.bzl", "go_dependencies")
 # gazelle:repository_macro deps.bzl%go_dependencies
 go_dependencies()
 
-# Register custom Go proto toolchains
-register_toolchains("//tools/toolchains:all")
+# Note: Custom Go proto toolchains disabled due to compatibility issues
+# register_toolchains("//tools/toolchains:all")

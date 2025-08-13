@@ -96,6 +96,12 @@ jobs:
         bazel info
         echo "Workspace: $(bazel info workspace)"
         echo "Output base: $(bazel info output_base)"
+        
+        # Verify protobuf optimization configuration
+        echo "🔧 Verifying protobuf optimization..."
+        if [ -f "scripts/validate-bazel-config.sh" ]; then
+          bash scripts/validate-bazel-config.sh
+        fi
 
     - name: Clean Bazel cache if needed
       run: |
@@ -110,18 +116,36 @@ jobs:
     - name: Fetch Bazel external dependencies
       run: |
         echo "🔄 Fetching external dependencies..."
-        bazel fetch --all
-        echo "✅ Dependencies fetched successfully"
+        # Retry mechanism for rules_cc issues
+        for i in {1..3}; do
+          echo "Attempt $i/3..."
+          if bazel fetch --all; then
+            echo "✅ Dependencies fetched successfully"
+            break
+          else
+            echo "⚠️ Fetch attempt $i failed"
+            if [ $i -eq 3 ]; then
+              echo "❌ All fetch attempts failed"
+              echo "This may be a rules_cc configuration issue"
+              echo "Checking WORKSPACE configuration..."
+              grep -A5 -B5 "rules_cc" WORKSPACE || true
+              exit 1
+            fi
+            echo "🔄 Cleaning cache and retrying..."
+            bazel clean --expunge
+            sleep 5
+          fi
+        done
 
     - name: Generate protobuf files
       run: |
-        echo "🔧 Generating protobuf files..."
-        # Generate protobuf files if script exists
-        if [ -f "scripts/build/generate-proto.sh" ]; then
-          bash scripts/build/generate-proto.sh examples/proto examples/proto
-        fi
+        echo "🔧 Generating protobuf files with Bazel..."
+        # Use Go-based proto generator instead of bash script
+        bazel run //scripts/proto:proto_generator -- install --proto-dir=examples/proto --go-out=examples/proto
+        
         # Verify protobuf files exist
-        ls -la examples/proto/*.pb.go 2>/dev/null || echo "No pb.go files yet"
+        echo "✅ Generated protobuf files:"
+        ls -la examples/proto/*.pb.go 2>/dev/null || echo "No pb.go files generated yet"
 
     - name: Build all targets
       run: |
