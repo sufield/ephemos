@@ -15,11 +15,7 @@ sh_binary(
     visibility = ["//visibility:public"],
 )
 
-sh_binary(
-    name = "ci_lint",
-    srcs = ["ci/lint.sh"], 
-    visibility = ["//visibility:public"],
-)
+# ci_lint is now in //scripts/ci:lint_check
 
 sh_binary(
     name = "generate_proto",

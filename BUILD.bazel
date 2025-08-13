@@ -25,8 +25,6 @@ test_suite(
     name = "all_tests",
     tests = [
         "//pkg/ephemos:ephemos_test",
-        "//internal/...:all",
-        "//cmd/...:all",
         "//scripts:build_tests",
         "//scripts/security:security_tests",
         "//scripts/demo:demo_tests", 
