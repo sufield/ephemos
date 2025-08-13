@@ -1,0 +1,48 @@
+# CI scripts converted to Bazel targets
+
+sh_binary(
+    name = "lint",
+    srcs = ["lint.sh"],
+    visibility = ["//visibility:public"],
+    tags = ["ci", "lint"],
+)
+
+sh_binary(
+    name = "security_checks",
+    srcs = ["security-checks.sh"],
+    visibility = ["//visibility:public"],
+    tags = ["ci", "security"],
+    data = [
+        "//scripts/security:scan_secrets",
+        "//scripts/security:scan_vulnerabilities",
+    ],
+)
+
+# CI test targets
+sh_test(
+    name = "lint_test",
+    srcs = ["lint.sh"],
+    tags = ["ci"],
+    size = "small",
+)
+
+sh_test(
+    name = "security_checks_test",
+    srcs = ["security-checks.sh"],
+    tags = ["ci", "security"],
+    size = "medium",
+    data = [
+        "//scripts/security:scan_secrets",
+        "//scripts/security:scan_vulnerabilities",
+    ],
+)
+
+# CI test suite
+test_suite(
+    name = "ci_tests",
+    tests = [
+        ":lint_test",
+        ":security_checks_test",
+    ],
+    tags = ["ci"],
+)

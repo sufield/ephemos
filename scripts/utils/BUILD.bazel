@@ -1,0 +1,60 @@
+# Utility scripts converted to Bazel targets
+
+sh_binary(
+    name = "test_server",
+    srcs = ["test-server.sh"],
+    visibility = ["//visibility:public"],
+    tags = ["utils", "test"],
+    data = [
+        "//examples/echo-server",
+    ],
+)
+
+sh_binary(
+    name = "test_registration",
+    srcs = ["test-registration.sh"],
+    visibility = ["//visibility:public"],
+    tags = ["utils", "test"],
+)
+
+sh_binary(
+    name = "cleanup_all_entries", 
+    srcs = ["cleanup-all-entries.sh"],
+    visibility = ["//visibility:public"],
+    tags = ["utils", "cleanup"],
+)
+
+sh_binary(
+    name = "show_demo_messages",
+    srcs = ["show-demo-messages.sh"],
+    visibility = ["//visibility:public"],
+    tags = ["utils", "demo"],
+)
+
+# Utility test targets
+sh_test(
+    name = "server_test",
+    srcs = ["test-server.sh"],
+    tags = ["utils"],
+    size = "medium",
+    data = [
+        "//examples/echo-server",
+    ],
+)
+
+sh_test(
+    name = "registration_test",
+    srcs = ["test-registration.sh"],
+    tags = ["utils"],
+    size = "small",
+)
+
+# Utility test suite
+test_suite(
+    name = "utils_tests",
+    tests = [
+        ":server_test",
+        ":registration_test", 
+    ],
+    tags = ["utils"],
+)
