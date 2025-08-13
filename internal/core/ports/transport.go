@@ -19,6 +19,9 @@ type ServerPort interface {
 	Stop() error
 }
 
+// Server is an alias for ServerPort for backward compatibility
+type Server = ServerPort
+
 // ClientPort represents a secure client abstraction without framework dependencies.
 type ClientPort interface {
 	// Connect establishes a connection to a service
@@ -27,6 +30,9 @@ type ClientPort interface {
 	Close() error
 }
 
+// Client is an alias for ClientPort for backward compatibility
+type Client = ClientPort
+
 // ConnectionPort represents a connection to a service.
 type ConnectionPort interface {
 	// GetClientConnection returns the underlying connection for service clients
@@ -34,6 +40,9 @@ type ConnectionPort interface {
 	// Close closes the connection
 	Close() error
 }
+
+// Connection is an alias for ConnectionPort for backward compatibility
+type Connection = ConnectionPort
 
 // ListenerPort represents a network listener abstraction.
 type ListenerPort interface {
@@ -45,11 +54,17 @@ type ListenerPort interface {
 	Addr() string
 }
 
+// Listener is an alias for ListenerPort for backward compatibility
+type Listener = ListenerPort
+
 // ServiceRegistrarPort abstracts service registration without framework dependencies.
 type ServiceRegistrarPort interface {
 	// Register registers the service with the provided server
 	Register(server interface{})
 }
+
+// ServiceRegistrar is an alias for ServiceRegistrarPort for backward compatibility
+type ServiceRegistrar = ServiceRegistrarPort
 
 // TransportProvider provides secure transport without framework dependencies.
 type TransportProvider interface {

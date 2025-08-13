@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+
+	"google.golang.org/grpc"
 )
 
 // createServerWithConfig creates a server with internal dependency injection.
@@ -108,12 +110,16 @@ func (c *clientImpl) Close() error {
 // ClientConnection placeholder type for now
 type ClientConnection struct {
 	// Simple placeholder - in production would contain actual gRPC connection
+	conn *grpc.ClientConn
 }
 
 func (c *ClientConnection) Close() error {
+	if c.conn != nil {
+		return c.conn.Close()
+	}
 	return nil
 }
 
-func (c *ClientConnection) GetClientConnection() interface{} {
-	return nil
+func (c *ClientConnection) GetClientConnection() *grpc.ClientConn {
+	return c.conn
 }
