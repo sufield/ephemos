@@ -64,8 +64,7 @@ jobs:
         echo "test --config=ci" >> .bazelrc.local
         echo "coverage --config=ci" >> .bazelrc.local
         
-        # Enable bzlmod for modern dependency management
-        echo "common --enable_bzlmod" >> .bazelrc.local
+        # Bzlmod is already enabled in .bazelrc
         
         # Add CI-specific configuration
         cat >> .bazelrc.local << EOF
