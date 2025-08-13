@@ -4,7 +4,10 @@
 build --incompatible_enable_cc_toolchain_resolution
 build --cxxopt=-std=c++14
 build --host_cxxopt=-std=c++14
-build --noenable_bzlmod
+
+# External dependency settings
+common --enable_workspace
+common --noenable_bzlmod
 
 # Go settings
 # build --@io_bazel_rules_go//go/config:pure  # Commented out to avoid early dependency resolution
@@ -26,8 +29,7 @@ build --incompatible_strict_action_env
 
 # Performance settings
 build --jobs=auto
-build --local_ram_resources=HOST_RAM*0.75
-build --local_cpu_resources=HOST_CPUS
+build --local_resources=memory=75%,cpu=100%
 
 # Reproducible builds
 build --workspace_status_command="$(pwd)/tools/workspace_status.sh"

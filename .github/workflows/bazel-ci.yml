@@ -43,6 +43,10 @@ jobs:
         echo "test --config=ci" >> .bazelrc.local
         echo "coverage --config=ci" >> .bazelrc.local
         
+        # Enable workspace mode for external dependencies
+        echo "common --enable_workspace" >> .bazelrc.local
+        echo "common --noenable_bzlmod" >> .bazelrc.local
+        
         # Add CI-specific configuration
         cat >> .bazelrc.local << EOF
         # CI Configuration
@@ -51,8 +55,7 @@ jobs:
         build:ci --test_summary=detailed
         build:ci --build_tests_only
         build:ci --jobs=auto
-        build:ci --local_ram_resources=HOST_RAM*0.75
-        build:ci --local_cpu_resources=HOST_CPUS
+        build:ci --local_resources=memory=75%,cpu=100%
         build:ci --sandbox_default_allow_network=false
         build:ci --incompatible_strict_action_env
         
