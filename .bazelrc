@@ -7,7 +7,7 @@ build --host_cxxopt=-std=c++14
 build --noenable_bzlmod
 
 # Go settings
-build --@io_bazel_rules_go//go/config:pure
+# build --@io_bazel_rules_go//go/config:pure  # Commented out to avoid early dependency resolution
 
 # Test settings
 test --test_output=errors
@@ -36,4 +36,4 @@ build --workspace_status_command="$(pwd)/tools/workspace_status.sh"
 build --verbose_failures
 
 # Platform settings
-build --platforms=@io_bazel_rules_go//go/toolchain:linux_amd64
+# build --platforms=@io_bazel_rules_go//go/toolchain:linux_amd64  # Commented out to avoid early dependency resolution

@@ -1,18 +1,12 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
-load("@com_google_protobuf//:protobuf.bzl", "proto_library")
 
-proto_library(
-    name = "proto_proto",
-    srcs = ["echo.proto"],
-    visibility = ["//visibility:public"],
-)
-
+# Simplified protobuf setup - let rules_go handle proto compilation
 go_proto_library(
     name = "proto_go_proto",
     compilers = ["@io_bazel_rules_go//proto:go_grpc"],
     importpath = "github.com/sufield/ephemos/examples/proto",
-    proto = ":proto_proto",
+    protos = ["echo.proto"],
     visibility = ["//visibility:public"],
 )
 
