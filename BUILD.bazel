@@ -1,0 +1,57 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix github.com/sufield/ephemos
+gazelle(name = "gazelle")
+
+# Keep generated BUILD files up to date with gazelle update
+gazelle(
+    name = "gazelle-update-repos",
+    args = [
+        "-from_file=go.mod",
+        "-to_macro=deps.bzl%go_dependencies",
+        "-prune",
+    ],
+    command = "update-repos",
+)
+
+# Format all BUILD files
+gazelle(
+    name = "gazelle-fix",
+    command = "fix",
+)
+
+# Test everything
+test_suite(
+    name = "all_tests",
+    tests = [
+        "//pkg/ephemos:ephemos_test",
+        "//internal/...:all",
+        "//cmd/...:all",
+    ],
+)
+
+# Build all binaries
+filegroup(
+    name = "all_binaries",
+    srcs = [
+        "//cmd/ephemos-cli:ephemos-cli",
+        "//cmd/config-validator:config-validator", 
+        "//examples/echo-server:echo-server",
+        "//examples/echo-client:echo-client",
+    ],
+)
+
+# Security analysis
+sh_test(
+    name = "security_scan",
+    srcs = ["tools/security_scan.sh"],
+    data = [":all_binaries"],
+    tags = ["security"],
+)
+
+# Lint check
+sh_test(
+    name = "lint_check", 
+    srcs = ["tools/lint_check.sh"],
+    tags = ["lint"],
+)

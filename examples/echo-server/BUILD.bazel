@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "echo-server_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/sufield/ephemos/examples/echo-server", 
+    visibility = ["//visibility:private"],
+    deps = [
+        "//examples/proto",
+        "//pkg/ephemos",
+        "@org_golang_google_grpc//:grpc",
+    ],
+)
+
+go_binary(
+    name = "echo-server",
+    embed = [":echo-server_lib"],
+    visibility = ["//visibility:public"],
+    x_defs = {
+        "main.Version": "{STABLE_VERSION}",
+        "main.CommitHash": "{STABLE_COMMIT_HASH}",
+        "main.BuildTime": "{STABLE_BUILD_TIME}",
+        "main.BuildUser": "{STABLE_BUILD_USER}",
+        "main.BuildHost": "{STABLE_BUILD_HOST}",
+    },
+)

@@ -1,0 +1,55 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ephemos",
+    srcs = [
+        "client.go",
+        "config.go", 
+        "config_enhanced.go",
+        "config_validation.go",
+        "interceptors.go",
+        "server.go",
+        "transport.go",
+        "types.go",
+        "validation.go",
+    ],
+    importpath = "github.com/sufield/ephemos/pkg/ephemos",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//examples/proto:proto_go_proto",
+        "@com_github_spf13_cobra//:cobra",
+        "@com_github_spiffe_go_spiffe_v2//spiffeid",
+        "@com_github_spiffe_go_spiffe_v2//spiffetls/tlsconfig", 
+        "@com_github_spiffe_go_spiffe_v2//workloadapi",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+        "@org_golang_google_protobuf//types/known/emptypb",
+        "@in_gopkg_yaml_v3//:yaml_v3",
+    ],
+)
+
+go_test(
+    name = "ephemos_test",
+    srcs = [
+        "client_test.go",
+        "config_enhanced_test.go",
+        "config_test.go",
+        "config_validation_test.go",
+        "identity_fuzz_test.go",
+        "interceptors_test.go",
+        "server_test.go",
+        "transport_test.go",
+        "validation_test.go",
+    ],
+    embed = [":ephemos"],
+    deps = [
+        "//examples/proto:proto_go_proto",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+        "@org_golang_google_grpc//test/bufconn",
+    ],
+)
