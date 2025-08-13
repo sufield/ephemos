@@ -37,15 +37,40 @@ runs:
         protoc --version || (echo "❌ protoc version check failed" && exit 1)
         echo "✅ protoc installed at: $(which protoc)"
         
-    - name: Install Go protobuf tools
+    - name: Install Go protobuf tools with enhanced diagnostics
       shell: bash
       run: |
-        echo "Installing Go protobuf tools..."
+        echo "🔧 Installing Go protobuf tools with enhanced diagnostics..."
         
-        # Ensure Go and necessary environment variables are set
+        # CRITICAL: Set GOBIN explicitly to prevent installation failures
         export GO111MODULE=on
-        export GOBIN=$(go env GOPATH)/bin
-        export PATH="$PATH:$GOBIN"
+        export GOBIN=$HOME/go/bin  # Explicit path, not relying on GOPATH detection
+        export PATH="$GOBIN:$PATH"
+        
+        echo "📋 Environment Diagnostic Information:"
+        echo "  - Go Version: $(go version)"
+        echo "  - GOPATH: $(go env GOPATH)"
+        echo "  - GOBIN (set): $GOBIN"
+        echo "  - HOME: $HOME"
+        echo "  - PWD: $(pwd)"
+        echo "  - USER: $(whoami)"
+        echo "  - PATH: $PATH"
+        echo ""
+        
+        # Verify Go is working and environment is correct
+        if ! go version >/dev/null 2>&1; then
+          echo "❌ CRITICAL: Go is not working properly"
+          echo "   - Go installation may be corrupt or missing"
+          echo "   - Check setup-go step in workflow"
+          exit 1
+        fi
+        
+        if [ -z "$GOBIN" ]; then
+          echo "❌ CRITICAL: GOBIN is not set"
+          echo "   - GOBIN must be set for go install to work reliably"
+          echo "   - Falling back to GOPATH/bin detection"
+          export GOBIN=$(go env GOPATH)/bin
+        fi
         
         # Ensure Go is working properly
         go version
@@ -59,45 +84,155 @@ runs:
         # Ensure Go bin directory exists
         mkdir -p "$GOBIN"
         
-        # Clean install protoc-gen-go and protoc-gen-go-grpc with retries
-        echo "Installing protoc-gen-go..."
+        # CRITICAL: Clean install protoc-gen-go with detailed error reporting
+        echo "📥 Installing protoc-gen-go with detailed diagnostics..."
         for i in {1..3}; do
-          if go install google.golang.org/protobuf/cmd/protoc-gen-go@latest; then
-            echo "✅ protoc-gen-go installed on attempt $i"
+          echo "  Attempt $i/3: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest"
+          
+          if install_output=$(go install google.golang.org/protobuf/cmd/protoc-gen-go@latest 2>&1); then
+            echo "✅ protoc-gen-go installed successfully on attempt $i"
+            if [ -f "$GOBIN/protoc-gen-go" ]; then
+              echo "   ✅ Binary confirmed at: $GOBIN/protoc-gen-go"
+              ls -la "$GOBIN/protoc-gen-go"
+            else
+              echo "   ⚠️ Binary not found at expected location: $GOBIN/protoc-gen-go"
+              echo "   📁 GOBIN contents:"
+              ls -la "$GOBIN" || echo "   ❌ GOBIN directory does not exist"
+            fi
             break
           else
-            echo "⚠️ protoc-gen-go install attempt $i failed, retrying..."
+            echo "❌ protoc-gen-go install attempt $i failed"
+            echo "   📋 Error output: $install_output"
+            echo "   📋 GOPROXY: $(go env GOPROXY)"
+            echo "   📋 GOSUMDB: $(go env GOSUMDB)"
+            echo "   📋 Network connectivity test:"
+            curl -s --max-time 10 https://proxy.golang.org/ >/dev/null && echo "   ✅ Go proxy accessible" || echo "   ❌ Go proxy NOT accessible"
+            
             if [ $i -eq 3 ]; then
-              echo "❌ Failed to install protoc-gen-go after 3 attempts"
+              echo "❌ CRITICAL: Failed to install protoc-gen-go after 3 attempts"
+              echo "   📋 Possible causes:"
+              echo "     - Network connectivity issues"
+              echo "     - Go proxy configuration problems  "
+              echo "     - GOBIN directory permissions"
+              echo "     - Go installation corruption"
+              echo "   📋 Troubleshooting steps:"
+              echo "     1. Check network connectivity to proxy.golang.org"
+              echo "     2. Verify GOBIN directory exists and is writable: $GOBIN"
+              echo "     3. Verify Go installation: go version"
+              echo "     4. Check Go environment: go env"
               exit 1
             fi
             sleep 2
           fi
         done
         
-        echo "Installing protoc-gen-go-grpc..."
+        echo "📥 Installing protoc-gen-go-grpc with detailed diagnostics..."
         for i in {1..3}; do
-          if go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest; then
-            echo "✅ protoc-gen-go-grpc installed on attempt $i"
+          echo "  Attempt $i/3: go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest"
+          
+          if install_output=$(go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest 2>&1); then
+            echo "✅ protoc-gen-go-grpc installed successfully on attempt $i"
+            if [ -f "$GOBIN/protoc-gen-go-grpc" ]; then
+              echo "   ✅ Binary confirmed at: $GOBIN/protoc-gen-go-grpc"
+              ls -la "$GOBIN/protoc-gen-go-grpc"
+            else
+              echo "   ⚠️ Binary not found at expected location: $GOBIN/protoc-gen-go-grpc"
+              echo "   📁 GOBIN contents:"
+              ls -la "$GOBIN" || echo "   ❌ GOBIN directory does not exist"
+            fi
             break
           else
-            echo "⚠️ protoc-gen-go-grpc install attempt $i failed, retrying..."
+            echo "❌ protoc-gen-go-grpc install attempt $i failed"
+            echo "   📋 Error output: $install_output"
+            echo "   📋 GOPROXY: $(go env GOPROXY)"
+            echo "   📋 Module information:"
+            go list -m google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest 2>&1 || echo "   ❌ Module query failed"
+            
             if [ $i -eq 3 ]; then
-              echo "❌ Failed to install protoc-gen-go-grpc after 3 attempts"
+              echo "❌ CRITICAL: Failed to install protoc-gen-go-grpc after 3 attempts"
+              echo "   📋 Possible causes:"
+              echo "     - Network connectivity issues"
+              echo "     - Go proxy configuration problems"
+              echo "     - Module resolution failures"
+              echo "     - GOBIN directory permissions"
+              echo "   📋 Troubleshooting steps:"
+              echo "     1. Verify network access to proxy.golang.org"
+              echo "     2. Check module availability: go list -m google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest"
+              echo "     3. Verify GOBIN permissions: ls -la $GOBIN"
+              echo "     4. Try manual install: go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest"
               exit 1
             fi
-            sleep 2
+            sleep 3
           fi
         done
         
-        # Add Go bin to PATH for current and future steps
+        # CRITICAL: Add Go bin to PATH for current and future steps
+        echo "🔧 Adding GOBIN to GITHUB_PATH for future steps..."
         echo "$GOBIN" >> $GITHUB_PATH
         
-        # Verify installation with updated PATH
+        # Also set environment variables for future steps
+        echo "GOBIN=$GOBIN" >> $GITHUB_ENV
+        echo "PATH=$GOBIN:$PATH" >> $GITHUB_ENV
+        
+        echo "✅ Environment variables set for future workflow steps:"
+        echo "  - GOBIN=$GOBIN added to GITHUB_ENV"
+        echo "  - PATH updated in GITHUB_ENV"
+        echo "  - $GOBIN added to GITHUB_PATH"
+        
+        # CRITICAL: Verify installation with comprehensive PATH diagnostics
         export PATH="$GOBIN:$PATH"
-        echo "Verifying installation with updated PATH..."
-        which protoc-gen-go || { echo "❌ protoc-gen-go not found in PATH: $PATH"; ls -la "$GOBIN"; exit 1; }
-        which protoc-gen-go-grpc || { echo "❌ protoc-gen-go-grpc not found in PATH: $PATH"; ls -la "$GOBIN"; exit 1; }
+        echo "🔍 Comprehensive installation verification..."
+        echo "   Current PATH: $PATH"
+        echo "   GOBIN: $GOBIN"
+        echo ""
+        
+        # Check protoc-gen-go with detailed diagnostics
+        if which protoc-gen-go >/dev/null 2>&1; then
+          protoc_gen_go_path=$(which protoc-gen-go)
+          echo "✅ protoc-gen-go found at: $protoc_gen_go_path"
+          ls -la "$protoc_gen_go_path"
+          if [ -x "$protoc_gen_go_path" ]; then
+            echo "   ✅ Binary is executable"
+          else
+            echo "   ❌ Binary is NOT executable - fixing permissions"
+            chmod +x "$protoc_gen_go_path"
+          fi
+        else
+          echo "❌ CRITICAL: protoc-gen-go not found in PATH"
+          echo "   🔍 Diagnostic information:"
+          echo "     - PATH: $PATH"
+          echo "     - GOBIN: $GOBIN"
+          echo "     - GOBIN exists: $([ -d "$GOBIN" ] && echo 'YES' || echo 'NO')"
+          echo "     - GOBIN contents:"
+          ls -la "$GOBIN" 2>/dev/null || echo "       Directory not accessible"
+          echo "     - Search results for protoc-gen-go:"
+          find "$HOME" -name "protoc-gen-go" 2>/dev/null | head -5 || echo "       No files found"
+          exit 1
+        fi
+        
+        # Check protoc-gen-go-grpc with detailed diagnostics  
+        if which protoc-gen-go-grpc >/dev/null 2>&1; then
+          protoc_gen_go_grpc_path=$(which protoc-gen-go-grpc)
+          echo "✅ protoc-gen-go-grpc found at: $protoc_gen_go_grpc_path"
+          ls -la "$protoc_gen_go_grpc_path"
+          if [ -x "$protoc_gen_go_grpc_path" ]; then
+            echo "   ✅ Binary is executable"
+          else
+            echo "   ❌ Binary is NOT executable - fixing permissions"
+            chmod +x "$protoc_gen_go_grpc_path"
+          fi
+        else
+          echo "❌ CRITICAL: protoc-gen-go-grpc not found in PATH"
+          echo "   🔍 Diagnostic information:"
+          echo "     - PATH: $PATH"
+          echo "     - GOBIN: $GOBIN"
+          echo "     - GOBIN exists: $([ -d "$GOBIN" ] && echo 'YES' || echo 'NO')"
+          echo "     - GOBIN contents:"
+          ls -la "$GOBIN" 2>/dev/null || echo "       Directory not accessible"
+          echo "     - Search results for protoc-gen-go-grpc:"
+          find "$HOME" -name "protoc-gen-go-grpc" 2>/dev/null | head -5 || echo "       No files found"
+          exit 1
+        fi
         
         echo "✅ Go protobuf tools installed successfully"
         echo "protoc-gen-go: $(which protoc-gen-go)"
@@ -106,29 +241,107 @@ runs:
         # Make tools executable (in case permissions are wrong)
         chmod +x "$GOBIN/protoc-gen-go" "$GOBIN/protoc-gen-go-grpc" 2>/dev/null || true
         
-    - name: Verify all tools are available
+    - name: Final comprehensive tool verification
       shell: bash
       run: |
-        echo "Final verification of all protobuf tools..."
-        # Ensure Go bin directory is in PATH (redundant but safe)
-        export GOBIN=$(go env GOPATH)/bin
+        echo "🔍 Final comprehensive verification of all protobuf tools..."
+        
+        # CRITICAL: Use consistent GOBIN setting across all steps
+        export GOBIN=$HOME/go/bin  # Consistent with installation step
         export PATH="$GOBIN:$PATH:/usr/bin:/usr/local/bin"
         
-        echo "Current PATH: $PATH"
-        echo "GOBIN: $GOBIN"
-        echo "Contents of GOBIN directory:"
-        ls -la "$GOBIN" || echo "GOBIN directory not found"
+        echo "📋 Environment Summary:"
+        echo "  - Current PATH: $PATH"
+        echo "  - GOBIN: $GOBIN"
+        echo "  - HOME: $HOME"
+        echo "  - Working Directory: $(pwd)"
+        echo ""
         
-        echo "Checking protoc..."
-        which protoc && protoc --version || { echo "❌ protoc verification failed"; exit 1; }
+        echo "📁 GOBIN Directory Analysis:"
+        if [ -d "$GOBIN" ]; then
+          echo "  ✅ GOBIN directory exists: $GOBIN"
+          echo "  📄 Contents (with sizes and permissions):"
+          ls -lah "$GOBIN" | while IFS= read -r line; do
+            echo "    $line"
+          done
+          echo "  📊 Directory size: $(du -sh "$GOBIN" | cut -f1)"
+        else
+          echo "  ❌ CRITICAL: GOBIN directory does not exist: $GOBIN"
+          echo "  🔍 Parent directory contents:"
+          ls -la "$(dirname "$GOBIN")" 2>/dev/null || echo "    Parent directory not accessible"
+          exit 1
+        fi
+        echo ""
         
-        echo "Checking protoc-gen-go..."
-        which protoc-gen-go || { echo "❌ protoc-gen-go not found"; exit 1; }
+        # Enhanced protoc verification
+        echo "🔧 Protoc Compiler Verification:"
+        if protoc_path=$(which protoc 2>/dev/null); then
+          echo "  ✅ protoc found at: $protoc_path"
+          if protoc_version=$(protoc --version 2>&1); then
+            echo "  ✅ Version: $protoc_version"
+          else
+            echo "  ❌ Version check failed"
+            exit 1
+          fi
+        else
+          echo "  ❌ CRITICAL: protoc not found in PATH"
+          echo "  🔍 Searching for protoc in common locations:"
+          for path in /usr/bin/protoc /usr/local/bin/protoc /opt/homebrew/bin/protoc; do
+            if [ -f "$path" ]; then
+              echo "    Found: $path"
+            fi
+          done
+          exit 1
+        fi
+        echo ""
         
-        echo "Checking protoc-gen-go-grpc..."  
-        which protoc-gen-go-grpc || { echo "❌ protoc-gen-go-grpc not found"; exit 1; }
+        # Enhanced protoc-gen-go verification
+        echo "🏗️ protoc-gen-go Verification:"
+        if protoc_gen_go_path=$(which protoc-gen-go 2>/dev/null); then
+          echo "  ✅ protoc-gen-go found at: $protoc_gen_go_path"
+          echo "  📊 File info: $(ls -lah "$protoc_gen_go_path")"
+          if [ -x "$protoc_gen_go_path" ]; then
+            echo "  ✅ Binary is executable"
+          else
+            echo "  ❌ Binary is not executable"
+            exit 1
+          fi
+        else
+          echo "  ❌ CRITICAL: protoc-gen-go not found"
+          echo "  🔍 Comprehensive search:"
+          find / -name "protoc-gen-go" -type f 2>/dev/null | head -10 | while IFS= read -r found_path; do
+            echo "    Found: $found_path"
+          done
+          exit 1
+        fi
+        echo ""
         
-        echo "✅ All protobuf tools verified and ready"
+        # Enhanced protoc-gen-go-grpc verification
+        echo "🌐 protoc-gen-go-grpc Verification:"
+        if protoc_gen_go_grpc_path=$(which protoc-gen-go-grpc 2>/dev/null); then
+          echo "  ✅ protoc-gen-go-grpc found at: $protoc_gen_go_grpc_path"
+          echo "  📊 File info: $(ls -lah "$protoc_gen_go_grpc_path")"
+          if [ -x "$protoc_gen_go_grpc_path" ]; then
+            echo "  ✅ Binary is executable"
+          else
+            echo "  ❌ Binary is not executable"
+            exit 1
+          fi
+        else
+          echo "  ❌ CRITICAL: protoc-gen-go-grpc not found"
+          echo "  🔍 Comprehensive search:"
+          find / -name "protoc-gen-go-grpc" -type f 2>/dev/null | head -10 | while IFS= read -r found_path; do
+            echo "    Found: $found_path"
+          done
+          exit 1
+        fi
+        echo ""
+        
+        echo "🎉 All protobuf tools successfully verified and ready for use!"
+        echo "📄 Tool Summary:"
+        echo "  - protoc: $(which protoc) ($(protoc --version))"
+        echo "  - protoc-gen-go: $(which protoc-gen-go)"
+        echo "  - protoc-gen-go-grpc: $(which protoc-gen-go-grpc)"
         
     - name: Generate protobuf code with enhanced diagnostics
       shell: bash
@@ -194,22 +407,69 @@ runs:
             echo "✅ Enhanced protobuf generation completed successfully"
           else
             generation_exit_code=$?
-            echo "❌ Enhanced protobuf generation failed with exit code: $generation_exit_code"
+            echo "❌ CRITICAL: Enhanced protobuf generation failed with exit code: $generation_exit_code"
             echo ""
-            echo "📋 Diagnostic Information:"
-            echo "  - Script Path: scripts/build/generate-proto.sh" 
-            echo "  - Proto Directory: examples/proto"
-            echo "  - Output Directory: examples/proto"
-            echo "  - Verbose Mode: $EPHEMOS_VERBOSE"
+            echo "🔍 COMPREHENSIVE FAILURE DIAGNOSTICS:"
+            echo "  ========================================"
+            echo "  Script Path: scripts/build/generate-proto.sh"
+            echo "  Proto Directory: examples/proto"
+            echo "  Output Directory: examples/proto"
+            echo "  Verbose Mode: $EPHEMOS_VERBOSE"
+            echo "  Exit Code: $generation_exit_code"
             echo ""
-            echo "🔍 Available Tools Check:"
-            which protoc && protoc --version || echo "  - protoc: NOT FOUND"
-            which protoc-gen-go || echo "  - protoc-gen-go: NOT FOUND"
-            which protoc-gen-go-grpc || echo "  - protoc-gen-go-grpc: NOT FOUND"
+            
+            echo "🛠️ Tool Availability Analysis:"
+            for tool in protoc protoc-gen-go protoc-gen-go-grpc; do
+              if tool_path=$(which $tool 2>/dev/null); then
+                echo "  ✅ $tool: $tool_path"
+                if [ "$tool" = "protoc" ]; then
+                  echo "    Version: $(protoc --version 2>/dev/null || echo 'Version check failed')"
+                fi
+                echo "    Permissions: $(ls -la "$tool_path" 2>/dev/null || echo 'Cannot read permissions')"
+              else
+                echo "  ❌ $tool: NOT FOUND"
+                echo "    Search results:"
+                find /usr -name "$tool" 2>/dev/null | head -3 | while IFS= read -r found; do
+                  echo "      Found: $found"
+                done
+              fi
+            done
             echo ""
-            echo "📁 Directory Contents:"
-            ls -la examples/proto/ || echo "  Proto directory not accessible"
+            
+            echo "📁 File System Analysis:"
+            echo "  Proto source directory (examples/proto):"
+            if [ -d "examples/proto" ]; then
+              echo "    ✅ Directory exists"
+              echo "    📄 Contents:"
+              ls -lah examples/proto/ | while IFS= read -r line; do
+                echo "      $line"
+              done
+            else
+              echo "    ❌ Directory does not exist"
+            fi
             echo ""
+            
+            echo "🌐 Environment Analysis:"
+            echo "  PATH: $PATH"
+            echo "  GOBIN: $GOBIN"
+            echo "  GOPATH: $(go env GOPATH 2>/dev/null || echo 'Not available')"
+            echo "  HOME: $HOME"
+            echo "  PWD: $(pwd)"
+            echo "  USER: $(whoami)"
+            echo ""
+            
+            echo "📊 System Resources:"
+            echo "  Disk space: $(df -h . | tail -1 | awk '{print $4}') available"
+            echo "  Memory: $(free -h | grep '^Mem:' | awk '{print $7}') available"
+            echo ""
+            
+            echo "🚨 TROUBLESHOOTING STEPS:"
+            echo "  1. Verify all tools are in PATH: which protoc protoc-gen-go protoc-gen-go-grpc"
+            echo "  2. Check file permissions: ls -la examples/proto/"
+            echo "  3. Verify proto file syntax: protoc --decode_raw < examples/proto/echo.proto"
+            echo "  4. Test manual generation: protoc --go_out=. examples/proto/echo.proto"
+            echo "  5. Check script permissions: ls -la scripts/build/generate-proto.sh"
+            echo "  ========================================"
             exit $generation_exit_code
           fi
         fi
@@ -234,9 +494,35 @@ runs:
         fi
         
         if [ ${#missing_files[@]} -gt 0 ]; then
-          echo "❌ Missing protobuf files: ${missing_files[*]}"
-          echo "📁 Directory contents after generation:"
-          ls -la examples/proto/
+          echo "❌ CRITICAL: Missing protobuf files detected"
+          echo "   Missing files: ${missing_files[*]}"
+          echo ""
+          echo "🔍 POST-GENERATION FAILURE ANALYSIS:"
+          echo "  ====================================="
+          echo "  Expected files:"
+          echo "    - examples/proto/echo.pb.go (Go message definitions)"
+          echo "    - examples/proto/echo_grpc.pb.go (gRPC service definitions)"
+          echo ""
+          echo "  📁 Actual directory contents:"
+          if [ -d "examples/proto" ]; then
+            ls -lah examples/proto/ | while IFS= read -r line; do
+              echo "    $line"
+            done
+          else
+            echo "    ❌ examples/proto directory does not exist"
+          fi
+          echo ""
+          echo "  🔧 Last protoc command attempted:"
+          echo "    protoc --go_out=examples/proto --go_opt=paths=source_relative \\"
+          echo "           --go-grpc_out=examples/proto --go-grpc_opt=paths=source_relative \\"
+          echo "           -I examples/proto examples/proto/echo.proto"
+          echo ""
+          echo "  🚨 IMMEDIATE ACTION REQUIRED:"
+          echo "    1. Check if examples/proto/echo.proto exists and is valid"
+          echo "    2. Verify protoc command succeeded without errors"
+          echo "    3. Check disk space and permissions"
+          echo "    4. Validate Go protobuf plugin installation"
+          echo "  ====================================="
           exit 1
         fi
         
