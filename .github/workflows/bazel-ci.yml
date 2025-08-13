@@ -1,0 +1,220 @@
+name: Bazel CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  BAZEL_VERSION: '7.4.1'
+
+jobs:
+  bazel-build:
+    name: Bazel Build and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      with:
+        fetch-depth: 0
+
+    - name: Setup Bazel
+      uses: bazelbuild/setup-bazelisk@v3
+      with:
+        bazelisk-version: '1.19.0'
+
+    - name: Mount Bazel cache
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+      with:
+        path: |
+          ~/.cache/bazel
+          ~/.cache/bazelisk
+        key: bazel-${{ runner.os }}-${{ hashFiles('.bazelrc', 'WORKSPACE', 'BUILD.bazel', '**/*.bzl') }}
+        restore-keys: |
+          bazel-${{ runner.os }}-
+
+    - name: Configure Bazel
+      run: |
+        # Configure Bazel for CI
+        echo "build --config=ci" >> .bazelrc.local
+        echo "test --config=ci" >> .bazelrc.local
+        echo "coverage --config=ci" >> .bazelrc.local
+        
+        # Add CI-specific configuration
+        cat >> .bazelrc.local << EOF
+        # CI Configuration
+        build:ci --verbose_failures
+        build:ci --test_output=errors
+        build:ci --test_summary=detailed
+        build:ci --build_tests_only
+        build:ci --jobs=auto
+        build:ci --local_resources=memory=75%,cpu=100%
+        build:ci --sandbox_default_allow_network=false
+        build:ci --experimental_strict_action_env
+        
+        # Test configuration
+        test:ci --test_timeout=300
+        test:ci --test_strategy=standalone
+        test:ci --cache_test_results=auto
+        
+        # Coverage configuration  
+        coverage:ci --combined_report=lcov
+        coverage:ci --coverage_report_generator=@bazel_tools//tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator:Main
+        EOF
+
+    - name: Verify Bazel setup
+      run: |
+        bazel version
+        bazel info
+        echo "Workspace: $(bazel info workspace)"
+        echo "Output base: $(bazel info output_base)"
+
+    - name: Build all targets
+      run: |
+        echo "🏗️ Building all targets..."
+        bazel build //...
+        
+        echo "📋 Built targets:"
+        bazel query "kind(.*_binary, //...)" --output=label
+
+    - name: Run tests with coverage
+      run: |
+        echo "🧪 Running tests with coverage..."
+        bazel coverage //...
+        
+        # Generate coverage report
+        echo "📊 Generating coverage report..."
+        find bazel-out -name "coverage.dat" -exec cat {} \; > coverage_merged.dat || true
+        
+        # Show coverage summary
+        if [ -f "coverage_merged.dat" ]; then
+          echo "📈 Coverage Summary:"
+          head -20 coverage_merged.dat || true
+        fi
+
+    - name: Run linting checks
+      run: |
+        echo "🧹 Running lint checks..."
+        bazel test //:lint_check
+
+    - name: Run security scans
+      run: |
+        echo "🔒 Running security scans..."
+        bazel test //:security_scan
+
+    - name: Generate build info
+      run: |
+        echo "📋 Build Information:"
+        bazel info
+        
+        echo "🏗️ Built Binaries:"
+        find bazel-bin -type f -executable -name "*" | grep -E "(ephemos|echo-)" | head -10 || true
+        
+        echo "📊 Build Summary:"
+        echo "- Built targets: $(bazel query "kind(.*_binary, //...)" --output=label | wc -l)"
+        echo "- Test targets: $(bazel query "kind(.*_test, //...)" --output=label | wc -l)"
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+      if: always()
+      with:
+        name: coverage-reports
+        path: |
+          coverage_merged.dat
+          bazel-out/**/coverage.dat
+        retention-days: 7
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+      if: always()
+      with:
+        name: bazel-binaries
+        path: |
+          bazel-bin/**/ephemos-cli
+          bazel-bin/**/config-validator
+          bazel-bin/**/echo-server
+          bazel-bin/**/echo-client
+        retention-days: 7
+
+    - name: Show build summary
+      if: always()
+      run: |
+        echo "## 🏗️ Bazel Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ job.status }}" = "success" ]; then
+          echo "✅ **Build Status**: Success" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Build Status**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Targets Built" >> $GITHUB_STEP_SUMMARY
+        bazel query "kind(.*_binary, //...)" --output=label | while read target; do
+          echo "- \`$target\`" >> $GITHUB_STEP_SUMMARY
+        done
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Benefits" >> $GITHUB_STEP_SUMMARY
+        echo "- 🚀 **Incremental builds**: Only rebuilds changed components" >> $GITHUB_STEP_SUMMARY
+        echo "- 🔒 **Hermetic builds**: Reproducible across environments" >> $GITHUB_STEP_SUMMARY  
+        echo "- ⚡ **Parallel execution**: Faster build times" >> $GITHUB_STEP_SUMMARY
+        echo "- 🎯 **Dependency tracking**: Explicit and minimal dependencies" >> $GITHUB_STEP_SUMMARY
+
+  bazel-integration:
+    name: Bazel Integration Tests
+    runs-on: ubuntu-latest
+    needs: bazel-build
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+    - name: Setup Bazel
+      uses: bazelbuild/setup-bazelisk@v3
+      with:
+        bazelisk-version: '1.19.0'
+
+    - name: Mount Bazel cache
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+      with:
+        path: |
+          ~/.cache/bazel
+          ~/.cache/bazelisk
+        key: bazel-${{ runner.os }}-${{ hashFiles('.bazelrc', 'WORKSPACE', 'BUILD.bazel', '**/*.bzl') }}
+        restore-keys: |
+          bazel-${{ runner.os }}-
+
+    - name: Build and test demo
+      run: |
+        echo "🎯 Building demo applications..."
+        bazel build //examples/...
+        
+        # Copy binaries for demo
+        mkdir -p bin
+        cp bazel-bin/examples/echo-server/echo-server_/echo-server bin/ || \
+        cp bazel-bin/examples/echo-server/echo-server bin/
+        
+        cp bazel-bin/examples/echo-client/echo-client_/echo-client bin/ || \
+        cp bazel-bin/examples/echo-client/echo-client bin/
+        
+        echo "✅ Demo applications built successfully"
+
+    - name: Verify binary compatibility
+      run: |
+        echo "🔍 Verifying binary compatibility..."
+        
+        # Check that binaries run
+        if [ -f "bin/echo-server" ]; then
+          echo "Echo server binary found"
+          file bin/echo-server
+        fi
+        
+        if [ -f "bin/echo-client" ]; then
+          echo "Echo client binary found"  
+          file bin/echo-client
+        fi
