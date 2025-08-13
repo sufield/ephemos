@@ -16,7 +16,7 @@ func main() {
 	// Example 1: Basic configuration with automatic defaults
 	fmt.Println("\n📋 Example 1: Configuration with automatic defaults")
 	config1 := &ephemos.Configuration{}
-	
+
 	if err := config1.ValidateAndSetDefaults(); err != nil {
 		log.Printf("❌ Validation failed: %v", err)
 	} else {
@@ -51,7 +51,7 @@ func main() {
 
 	if err := config2.ValidateAndSetDefaults(); err != nil {
 		fmt.Printf("❌ Configuration validation failed with multiple errors:\n")
-		
+
 		// Check if it's a validation error collection
 		if validationErrors := ephemos.GetValidationErrors(err); len(validationErrors) > 0 {
 			for i, validationErr := range validationErrors {
@@ -64,12 +64,12 @@ func main() {
 
 	// Example 3: Environment variable configuration
 	fmt.Println("\n🌍 Example 3: Configuration from environment variables")
-	
+
 	// Set some environment variables
 	os.Setenv("EPHEMOS_SERVICE_NAME", "env-service")
 	os.Setenv("EPHEMOS_TRUST_DOMAIN", "example.org")
 	os.Setenv("EPHEMOS_AUTHORIZED_CLIENTS", "spiffe://example.org/client1,spiffe://example.org/client2")
-	
+
 	defer func() {
 		os.Unsetenv("EPHEMOS_SERVICE_NAME")
 		os.Unsetenv("EPHEMOS_TRUST_DOMAIN")
@@ -87,13 +87,13 @@ func main() {
 
 	// Example 4: Custom validation engine configuration
 	fmt.Println("\n⚙️  Example 4: Custom validation engine (fail-fast mode)")
-	
+
 	failFastEngine := ephemos.NewValidationEngine()
 	failFastEngine.StopOnFirstError = true // Enable fail-fast mode
 
 	config4 := &ephemos.Configuration{
 		Service: ephemos.ServiceConfig{
-			Name:   "", // Invalid: required field missing
+			Name:   "",               // Invalid: required field missing
 			Domain: "invalid-domain", // Also invalid, but won't be reported in fail-fast mode
 		},
 	}
@@ -101,7 +101,7 @@ func main() {
 	if err := ephemos.ValidateStructWithEngine(config4, failFastEngine); err != nil {
 		fmt.Printf("❌ Fail-fast validation stopped at first error:\n")
 		fmt.Printf("   Error: %v\n", err)
-		
+
 		// Check if it's a validation error collection
 		if validationErrors := ephemos.GetValidationErrors(err); len(validationErrors) > 0 {
 			fmt.Printf("   Total errors found: %d (stopped early)\n", len(validationErrors))
@@ -110,14 +110,14 @@ func main() {
 
 	// Example 5: Demonstrating default value types
 	fmt.Println("\n🔧 Example 5: Various default value types")
-	
+
 	type ExampleConfig struct {
-		StringField    string   `default:"default-string"`
-		IntField       int      `default:"42"`
-		BoolField      bool     `default:"true"`
-		SliceField     []string `default:"item1,item2,item3"`
-		RequiredField  string   `validate:"required"`
-		OptionalField  string   `validate:"min=5"`
+		StringField   string   `default:"default-string"`
+		IntField      int      `default:"42"`
+		BoolField     bool     `default:"true"`
+		SliceField    []string `default:"item1,item2,item3"`
+		RequiredField string   `validate:"required"`
+		OptionalField string   `validate:"min=5"`
 	}
 
 	exampleConfig := &ExampleConfig{
@@ -138,9 +138,9 @@ func main() {
 
 	// Example 6: Validation rule demonstrations
 	fmt.Println("\n🔍 Example 6: Validation rule demonstrations")
-	
+
 	type ValidationExampleConfig struct {
-		ServiceName     string `validate:"required,min=3,max=50,regex=^[a-zA-Z0-9_-]+$"`
+		ServiceName    string `validate:"required,min=3,max=50,regex=^[a-zA-Z0-9_-]+$"`
 		Port           string `validate:"port"`
 		IPAddress      string `validate:"ip"`
 		Domain         string `validate:"domain"`
@@ -151,7 +151,7 @@ func main() {
 	}
 
 	validationExample := &ValidationExampleConfig{
-		ServiceName:     "valid-service-123",
+		ServiceName:    "valid-service-123",
 		Port:           "8080",
 		IPAddress:      "192.168.1.1",
 		Domain:         "example.org",

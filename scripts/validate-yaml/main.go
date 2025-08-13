@@ -31,7 +31,7 @@ func main() {
 	}
 
 	rootDir := os.Args[1]
-	
+
 	// Find all YAML files
 	yamlFiles, err := findYAMLFiles(rootDir)
 	if err != nil {
@@ -45,7 +45,7 @@ func main() {
 	}
 
 	fmt.Printf("Found %d YAML files to validate:\n", len(yamlFiles))
-	
+
 	// Validate each file
 	var results []ValidationResult
 	var hasErrors bool
@@ -53,7 +53,7 @@ func main() {
 	for _, yamlFile := range yamlFiles {
 		result := validateYAMLFile(yamlFile)
 		results = append(results, result)
-		
+
 		if result.Valid {
 			fmt.Printf("✅ %s - Valid\n", result.Path)
 		} else {
@@ -70,9 +70,9 @@ func main() {
 			validCount++
 		}
 	}
-	
+
 	fmt.Printf("Valid files: %d/%d\n", validCount, len(results))
-	
+
 	if hasErrors {
 		fmt.Printf("❌ Validation failed - %d files have errors\n", len(results)-validCount)
 		os.Exit(1)
@@ -89,7 +89,6 @@ func findYAMLFiles(rootDir string) ([]YAMLFile, error) {
 		if err != nil {
 			return err
 		}
-
 
 		// Skip hidden directories and files, except .github (but don't skip root ".")
 		if strings.HasPrefix(d.Name(), ".") && d.IsDir() && d.Name() != ".github" && path != rootDir {
@@ -123,7 +122,7 @@ func findYAMLFiles(rootDir string) ([]YAMLFile, error) {
 // validateYAMLFile validates a single YAML file
 func validateYAMLFile(yamlFile YAMLFile) ValidationResult {
 	var data interface{}
-	
+
 	// Try to parse the YAML
 	err := yaml.Unmarshal(yamlFile.Content, &data)
 	if err != nil {
