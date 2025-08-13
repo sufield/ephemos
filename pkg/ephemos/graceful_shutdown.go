@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"sync"
 	"time"
-
 	// Internal dependencies removed for public API compliance
 )
 
@@ -271,7 +270,11 @@ func (m *ShutdownCoordinator) performShutdown(graceCtx, drainCtx, forceCtx conte
 	m.shutdownServers(graceCtx, &wg, addError)
 	m.shutdownListeners(&wg, addError)
 	// Wait for Phase 1 & 2 with grace timeout to ensure server timeout errors are collected
-	serverSuccess := m.waitForShutdown(graceCtx, &wg, "Servers and listeners stopped successfully", "Grace timeout exceeded during server shutdown")
+	serverSuccess := m.waitForShutdown(
+		graceCtx, &wg,
+		"Servers and listeners stopped successfully",
+		"Grace timeout exceeded during server shutdown",
+	)
 	if !serverSuccess {
 		// Add timeout error if servers didn't complete within grace period
 		addError(fmt.Errorf("server shutdown exceeded grace timeout of %v", m.config.GracePeriod))

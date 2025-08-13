@@ -61,10 +61,10 @@ func (s *transportServerWrapper) RegisterService(ctx context.Context, serviceReg
 			Message: "service registrar cannot be nil",
 		}
 	}
-	
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// Lazy initialize the transport server
 	if s.transportServer == nil {
 		var err error
@@ -73,7 +73,7 @@ func (s *transportServerWrapper) RegisterService(ctx context.Context, serviceReg
 			return fmt.Errorf("failed to create transport server: %w", err)
 		}
 	}
-	
+
 	// Mount the ServiceRegistrar using the transport server
 	// The adapters know how to handle ServiceRegistrar objects properly
 	return s.transportServer.mountService(serviceRegistrar)
@@ -87,7 +87,7 @@ func (s *transportServerWrapper) Serve(ctx context.Context, listener net.Listene
 			Message: "listener cannot be nil",
 		}
 	}
-	
+
 	s.mu.Lock()
 	if s.transportServer == nil {
 		var err error
@@ -98,7 +98,7 @@ func (s *transportServerWrapper) Serve(ctx context.Context, listener net.Listene
 		}
 	}
 	s.mu.Unlock()
-	
+
 	// Use the transport server's serving logic
 	return s.transportServer.serveOnListener(ctx, listener)
 }
@@ -106,7 +106,7 @@ func (s *transportServerWrapper) Serve(ctx context.Context, listener net.Listene
 func (s *transportServerWrapper) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if s.transportServer != nil {
 		return s.transportServer.Close()
 	}
@@ -117,13 +117,13 @@ func (s *transportServerWrapper) createTransportServer() (*TransportServer, erro
 	server := &TransportServer{
 		config: s.config,
 	}
-	
+
 	// Initialize the appropriate transport based on config
 	transportType := s.config.Transport.Type
 	if transportType == "" {
 		transportType = TransportTypeGRPC // default
 	}
-	
+
 	switch transportType {
 	case TransportTypeGRPC:
 		server.grpcAdapter = NewGRPCAdapter()
@@ -134,7 +134,7 @@ func (s *transportServerWrapper) createTransportServer() (*TransportServer, erro
 	default:
 		return nil, fmt.Errorf("unsupported transport type: %s", transportType)
 	}
-	
+
 	return server, nil
 }
 

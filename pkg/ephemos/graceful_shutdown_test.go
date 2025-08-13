@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
 	// Internal imports removed for public API compliance
 )
 

@@ -12,19 +12,19 @@ import (
 
 // grpcAdapterImpl implements GRPCAdapter.
 type grpcAdapterImpl struct {
-	grpcServer    *grpc.Server
-	interceptors  []grpc.UnaryServerInterceptor
-	services      map[string]interface{}
-	mu            sync.RWMutex
+	grpcServer   *grpc.Server
+	interceptors []grpc.UnaryServerInterceptor
+	services     map[string]interface{}
+	mu           sync.RWMutex
 }
 
 // httpAdapterImpl implements HTTPAdapter.
 type httpAdapterImpl struct {
-	httpServer  *http.Server
-	mux         *http.ServeMux
-	middleware  []func(http.Handler) http.Handler
-	services    map[string]interface{}
-	mu          sync.RWMutex
+	httpServer *http.Server
+	mux        *http.ServeMux
+	middleware []func(http.Handler) http.Handler
+	services   map[string]interface{}
+	mu         sync.RWMutex
 }
 
 // NewGRPCAdapter creates a new gRPC adapter.
@@ -32,7 +32,7 @@ func NewGRPCAdapter(opts ...grpc.ServerOption) GRPCAdapter {
 	adapter := &grpcAdapterImpl{
 		services: make(map[string]interface{}),
 	}
-	
+
 	// Create gRPC server with provided options
 	adapter.grpcServer = grpc.NewServer(opts...)
 	return adapter
@@ -124,7 +124,7 @@ func (a *httpAdapterImpl) ConfigureMiddleware(middleware ...func(http.Handler) h
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.middleware = append(a.middleware, middleware...)
-	
+
 	// Apply middleware to the handler
 	handler := http.Handler(a.mux)
 	for i := len(a.middleware) - 1; i >= 0; i-- {
