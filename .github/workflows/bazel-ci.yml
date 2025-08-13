@@ -111,6 +111,16 @@ jobs:
         bazel fetch --all
         echo "✅ Dependencies fetched successfully"
 
+    - name: Generate protobuf files
+      run: |
+        echo "🔧 Generating protobuf files..."
+        # Generate protobuf files if script exists
+        if [ -f "scripts/build/generate-proto.sh" ]; then
+          bash scripts/build/generate-proto.sh examples/proto examples/proto
+        fi
+        # Verify protobuf files exist
+        ls -la examples/proto/*.pb.go 2>/dev/null || echo "No pb.go files yet"
+
     - name: Build all targets
       run: |
         echo "🏗️ Building all targets..."
