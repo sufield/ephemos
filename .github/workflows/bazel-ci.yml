@@ -118,11 +118,21 @@ jobs:
       run: |
         echo "🧹 Running lint checks..."
         bazel test //:lint_check
+        bazel test //scripts:build_tests
 
     - name: Run security scans
       run: |
         echo "🔒 Running security scans..."
         bazel test //:security_scan
+        bazel test //scripts/security:security_tests
+        bazel run //scripts/security:security_scan_all
+
+    - name: Test script conversions
+      run: |
+        echo "🧪 Testing converted script targets..."
+        bazel test //scripts/ci:ci_tests
+        bazel test //scripts/utils:utils_tests
+        # Note: Demo tests require SPIRE installation, skipped in CI
 
     - name: Generate build info
       run: |

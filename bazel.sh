@@ -61,16 +61,25 @@ show_help() {
     echo "Quality commands:"
     echo "  lint          - Run linting checks"
     echo "  security      - Run security scans"
+    echo "  security-all  - Run all security checks"
     echo "  format        - Format BUILD files"
     echo ""
     echo "Development commands:"
     echo "  clean         - Clean build artifacts"
     echo "  deps          - Update dependencies"
     echo "  gazelle       - Update BUILD files"
+    echo "  check-deps    - Check dependencies"
     echo ""
     echo "Demo commands:"
     echo "  demo          - Run complete demo"
+    echo "  demo-setup    - Setup demo environment"
+    echo "  demo-cleanup  - Cleanup demo environment"
     echo "  examples      - Build example applications"
+    echo ""
+    echo "Script commands:"
+    echo "  scripts-build - Run build script tests"
+    echo "  scripts-security - Run security script tests"
+    echo "  scripts-demo  - Run demo script tests"
     echo ""
     echo "Utility commands:"
     echo "  version       - Show version info"
@@ -142,6 +151,12 @@ case "${1:-help}" in
         log_success "Security scans completed!"
         ;;
     
+    "security-all")
+        log_info "Running all security checks..."
+        bazel run //scripts/security:security_scan_all
+        log_success "All security checks completed!"
+        ;;
+    
     "format")
         log_info "Formatting BUILD files..."
         bazel run //:gazelle-fix
@@ -166,35 +181,52 @@ case "${1:-help}" in
         log_success "BUILD files updated!"
         ;;
     
+    "check-deps")
+        log_info "Checking dependencies..."
+        bazel run //scripts:check_deps
+        log_success "Dependency check completed!"
+        ;;
+    
     "demo")
-        log_info "Running demo..."
-        # Build everything first
-        bazel build //...
-        
-        # Copy binaries to expected locations for demo scripts
-        mkdir -p bin
-        cp bazel-bin/cmd/ephemos-cli/ephemos-cli_/ephemos-cli bin/ephemos || \
-        cp bazel-bin/cmd/ephemos-cli/ephemos-cli bin/ephemos
-        
-        cp bazel-bin/examples/echo-server/echo-server_/echo-server bin/echo-server || \
-        cp bazel-bin/examples/echo-server/echo-server bin/echo-server
-        
-        cp bazel-bin/examples/echo-client/echo-client_/echo-client bin/echo-client || \
-        cp bazel-bin/examples/echo-client/echo-client bin/echo-client
-        
-        # Run demo script
-        if [ -f "scripts/demo/run-demo.sh" ]; then
-            ./scripts/demo/run-demo.sh
-        else
-            log_warning "Demo script not found"
-        fi
+        log_info "Running complete demo..."
+        bazel run //scripts/demo:full_demo
         log_success "Demo completed!"
+        ;;
+    
+    "demo-setup")
+        log_info "Setting up demo environment..."
+        bazel run //scripts/demo:setup_demo
+        log_success "Demo setup completed!"
+        ;;
+    
+    "demo-cleanup")
+        log_info "Cleaning up demo environment..."
+        bazel run //scripts/demo:cleanup
+        log_success "Demo cleanup completed!"
         ;;
     
     "examples")
         log_info "Building examples..."
         bazel build //examples/...
         log_success "Examples built!"
+        ;;
+    
+    "scripts-build")
+        log_info "Running build script tests..."
+        bazel test //scripts:build_tests
+        log_success "Build script tests passed!"
+        ;;
+    
+    "scripts-security")
+        log_info "Running security script tests..."
+        bazel test //scripts/security:security_tests
+        log_success "Security script tests passed!"
+        ;;
+    
+    "scripts-demo")
+        log_info "Running demo script tests..."
+        bazel test //scripts/demo:demo_tests
+        log_success "Demo script tests passed!"
         ;;
     
     "version")

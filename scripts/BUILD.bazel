@@ -1,0 +1,130 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_test")
+
+# Main scripts BUILD file - converts shell scripts to Bazel targets
+
+# Build and CI targets
+sh_binary(
+    name = "lint",
+    srcs = ["build/lint.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "lint_format_only", 
+    srcs = ["build/lint-format-only.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "ci_lint",
+    srcs = ["ci/lint.sh"], 
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "generate_proto",
+    srcs = ["build/generate-proto.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "generate_proto_ci",
+    srcs = ["generate-proto-ci.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "benchmark",
+    srcs = ["benchmark.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "check_deps",
+    srcs = ["check-deps.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "ensure_protoc",
+    srcs = ["ensure-protoc.sh"],
+    visibility = ["//visibility:public"],
+)
+
+# CI setup and build
+sh_binary(
+    name = "ci_setup",
+    srcs = ["ci-setup.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "ci_build_examples",
+    srcs = ["ci-build-examples.sh"],
+    visibility = ["//visibility:public"],
+)
+
+# Development setup
+sh_binary(
+    name = "install_deps",
+    srcs = ["install-deps.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "install_deps_sudo",
+    srcs = ["install-deps-sudo.sh"],
+    visibility = ["//visibility:public"],
+)
+
+# Debug utilities
+sh_binary(
+    name = "debug_ci_build",
+    srcs = ["debug-ci-build.sh"],
+    visibility = ["//visibility:public"],
+)
+
+# Test targets that run the scripts
+sh_test(
+    name = "lint_test",
+    srcs = ["build/lint.sh"],
+    tags = ["lint"],
+    size = "small",
+)
+
+sh_test(
+    name = "check_deps_test", 
+    srcs = ["check-deps.sh"],
+    tags = ["deps"],
+    size = "small",
+)
+
+# Aggregate test targets
+test_suite(
+    name = "build_tests",
+    tests = [
+        ":lint_test",
+        ":check_deps_test",
+    ],
+    tags = ["build"],
+)
+
+# Go-based script replacements for better integration
+go_binary(
+    name = "proto_generator",
+    srcs = ["//scripts/proto:main.go"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@org_golang_google_protobuf//compiler/protogen",
+        "@org_golang_google_protobuf//types/pluginpb",
+    ],
+) if False else None  # TODO: Implement when ready
+
+go_test(
+    name = "scripts_test",
+    srcs = ["scripts_test.go"],
+    deps = [
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require", 
+    ],
+) if False else None  # TODO: Implement when ready

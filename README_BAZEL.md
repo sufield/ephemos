@@ -31,6 +31,14 @@ This document outlines the migration from shell scripts and Makefiles to Bazel f
 - **tools/security_scan.sh**: Security scanning for built binaries
 - **tools/lint_check.sh**: Code quality checks
 
+### 4. Converted Shell Scripts
+
+- **scripts/BUILD.bazel**: Build and CI scripts as Bazel targets
+- **scripts/security/BUILD.bazel**: Security scanning tools as Bazel targets
+- **scripts/demo/BUILD.bazel**: Demo and SPIRE management as Bazel targets
+- **scripts/utils/BUILD.bazel**: Utility scripts as Bazel targets
+- **scripts/ci/BUILD.bazel**: CI-specific scripts as Bazel targets
+
 ## Bazel Benefits
 
 ### Reproducible Builds
@@ -63,14 +71,31 @@ make build           # Build everything
 make proto           # Generate protobuf
 make test            # Run tests
 ./scripts/ci/lint.sh # Run linting
+./scripts/security/scan-secrets.sh # Security scan
+./scripts/demo/run-demo.sh # Run demo
 ```
 
 ### After (Bazel):
 ```bash
-./bazel.sh build     # Build everything
-./bazel.sh proto     # Generate protobuf
-./bazel.sh test      # Run tests
-./bazel.sh lint      # Run linting
+./bazel.sh build         # Build everything
+./bazel.sh proto         # Generate protobuf
+./bazel.sh test          # Run tests
+./bazel.sh lint          # Run linting
+./bazel.sh security-all  # Run all security scans
+./bazel.sh demo          # Run complete demo
+```
+
+### Script Target Examples:
+```bash
+# Run specific script categories
+bazel test //scripts:build_tests          # Test build scripts
+bazel test //scripts/security:security_tests # Test security scripts
+bazel run //scripts/demo:full_demo        # Run complete demo
+
+# Run individual script targets
+bazel run //scripts:lint                  # Run linting
+bazel run //scripts/security:scan_secrets # Scan for secrets
+bazel run //scripts/demo:setup_demo       # Setup demo environment
 ```
 
 ## Migration Roadmap
