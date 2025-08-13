@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 
 	"google.golang.org/grpc"
 )
 
 // createServerWithConfig creates a server with internal dependency injection.
 // This is an internal factory function that handles the complexity of dependency injection.
-func createServerWithConfig(_ context.Context, config *Configuration) (Server, error) {
+func createServerWithConfig(ctx context.Context, config *Configuration) (Server, error) {
 	if config == nil {
 		return nil, &ValidationError{
 			Field:   "configuration",
@@ -19,10 +20,10 @@ func createServerWithConfig(_ context.Context, config *Configuration) (Server, e
 		}
 	}
 
-	// For now, return a simple implementation that satisfies the interface
-	// In the future, this will create proper adapters with dependency injection
-	return &serverImpl{
+	// Create a proper server implementation using TransportServer
+	return &transportServerWrapper{
 		config: config,
+		ctx:    ctx,
 	}, nil
 }
 
@@ -44,13 +45,15 @@ func createClientWithConfig(_ context.Context, config *Configuration) (Client, e
 	}, nil
 }
 
-// Simple implementations that will be replaced with proper adapter-based implementations
-
-type serverImpl struct {
-	config *Configuration
+// transportServerWrapper wraps TransportServer to implement the Server interface
+type transportServerWrapper struct {
+	config          *Configuration
+	ctx             context.Context
+	transportServer *TransportServer
+	mu              sync.Mutex
 }
 
-func (s *serverImpl) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
+func (s *transportServerWrapper) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
 	if serviceRegistrar == nil {
 		return &ValidationError{
 			Field:   "serviceRegistrar",
@@ -58,11 +61,25 @@ func (s *serverImpl) RegisterService(ctx context.Context, serviceRegistrar Servi
 			Message: "service registrar cannot be nil",
 		}
 	}
-	// Simple implementation for now - in production this would use proper adapters
-	return fmt.Errorf("server implementation not yet complete - use NewTransportServer for now")
+	
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
+	// Lazy initialize the transport server
+	if s.transportServer == nil {
+		var err error
+		s.transportServer, err = s.createTransportServer()
+		if err != nil {
+			return fmt.Errorf("failed to create transport server: %w", err)
+		}
+	}
+	
+	// Mount the ServiceRegistrar using the transport server
+	// The adapters know how to handle ServiceRegistrar objects properly
+	return s.transportServer.mountService(serviceRegistrar)
 }
 
-func (s *serverImpl) Serve(ctx context.Context, listener net.Listener) error {
+func (s *transportServerWrapper) Serve(ctx context.Context, listener net.Listener) error {
 	if listener == nil {
 		return &ValidationError{
 			Field:   "listener",
@@ -70,13 +87,55 @@ func (s *serverImpl) Serve(ctx context.Context, listener net.Listener) error {
 			Message: "listener cannot be nil",
 		}
 	}
-	// Simple implementation for now - in production this would use proper adapters
-	return fmt.Errorf("server implementation not yet complete - use NewTransportServer for now")
+	
+	s.mu.Lock()
+	if s.transportServer == nil {
+		var err error
+		s.transportServer, err = s.createTransportServer()
+		if err != nil {
+			s.mu.Unlock()
+			return fmt.Errorf("failed to create transport server: %w", err)
+		}
+	}
+	s.mu.Unlock()
+	
+	// Use the transport server's serving logic
+	return s.transportServer.serveOnListener(ctx, listener)
 }
 
-func (s *serverImpl) Close() error {
-	// Simple implementation for now - no cleanup needed
+func (s *transportServerWrapper) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
+	if s.transportServer != nil {
+		return s.transportServer.Close()
+	}
 	return nil
+}
+
+func (s *transportServerWrapper) createTransportServer() (*TransportServer, error) {
+	server := &TransportServer{
+		config: s.config,
+	}
+	
+	// Initialize the appropriate transport based on config
+	transportType := s.config.Transport.Type
+	if transportType == "" {
+		transportType = TransportTypeGRPC // default
+	}
+	
+	switch transportType {
+	case TransportTypeGRPC:
+		server.grpcAdapter = NewGRPCAdapter()
+		server.grpcServer = server.grpcAdapter.GetGRPCServer()
+	case TransportTypeHTTP:
+		server.httpAdapter = NewHTTPAdapter(s.config.Transport.Address)
+		server.httpServer = server.httpAdapter.GetHTTPServer()
+	default:
+		return nil, fmt.Errorf("unsupported transport type: %s", transportType)
+	}
+	
+	return server, nil
 }
 
 type clientImpl struct {
