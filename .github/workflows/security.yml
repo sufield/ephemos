@@ -224,7 +224,35 @@ jobs:
         # Set analysis category for this workflow
         category: "/language:go"
       
-    - name: Run Semgrep
+    - name: Determine base ref for Semgrep
+      id: base-ref
+      run: |
+        if [[ "${{ github.ref_type }}" == "commit" ]]; then
+          # Use PR base ref if available, otherwise use main
+          BASE_REF="${{ github.event.pull_request.base.ref || 'main' }}"
+          echo "base-ref=$BASE_REF" >> $GITHUB_OUTPUT
+          echo "using-base=true" >> $GITHUB_OUTPUT
+        else
+          echo "using-base=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Run Semgrep (with base)
+      if: steps.base-ref.outputs.using-base == 'true'
+      uses: returntocorp/semgrep-action@v1
+      with:
+        config: >-
+          p/security-audit
+          p/secrets
+          p/owasp-top-ten
+          p/golang
+        # Provide base ref when checked out on a commit instead of branch
+        baseline: ${{ steps.base-ref.outputs.base-ref }}
+      env:
+        SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+      continue-on-error: true
+        
+    - name: Run Semgrep (without base)
+      if: steps.base-ref.outputs.using-base != 'true'
       uses: returntocorp/semgrep-action@v1
       with:
         config: >-
