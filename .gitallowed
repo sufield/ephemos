@@ -73,3 +73,4 @@ spiffe://domain:8080/.*
 spiffe://unicode-域名\.org/.*
 spiffe:///.*
 spiffe://\./.*
+spiffe://env\.com/.*
