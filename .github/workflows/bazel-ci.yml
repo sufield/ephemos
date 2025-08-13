@@ -90,6 +90,19 @@ jobs:
         coverage:ci --coverage_report_generator=@bazel_tools//tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator:Main
         EOF
 
+    - name: Install Buildifier for syntax checking
+      run: |
+        echo "📥 Installing Buildifier for Bazel syntax validation..."
+        curl -LO https://github.com/bazelbuild/buildtools/releases/download/v7.3.1/buildifier-linux-amd64
+        chmod +x buildifier-linux-amd64
+        sudo mv buildifier-linux-amd64 /usr/local/bin/buildifier
+        buildifier --version
+        
+    - name: Validate Bazel syntax
+      run: |
+        echo "🔍 Validating Bazel file syntax before build..."
+        scripts/check-bazel-syntax.sh
+        
     - name: Verify Bazel setup
       run: |
         bazel version

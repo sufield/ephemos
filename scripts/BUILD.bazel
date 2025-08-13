@@ -1,5 +1,3 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_test")
-
 # Main scripts BUILD file - converts shell scripts to Bazel targets
 
 # Build and CI targets
@@ -129,7 +127,7 @@ test_suite(
 #     name = "scripts_test",
 #     srcs = ["scripts_test.go"],
 #     deps = [
-#         "@com_github_stretchr_testify//assert", 
+#         "@com_github_stretchr_testify//assert",
 #         "@com_github_stretchr_testify//require",
 #     ],
 # )

@@ -1,5 +1,3 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary")
-
 # Security scripts converted to Bazel targets
 
 sh_binary(
@@ -111,6 +109,6 @@ test_suite(
 sh_binary(
     name = "run_security_scanner",
     srcs = ["run-security-scanner.sh"],
-    visibility = ["//visibility:public"],
     data = [":security_scanner"],
+    visibility = ["//visibility:public"],
 )

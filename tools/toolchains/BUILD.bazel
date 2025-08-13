@@ -19,7 +19,7 @@ proto_lang_toolchain(
 
 # Go gRPC protobuf toolchain for gRPC service generation
 proto_lang_toolchain(
-    name = "protoc_go_grpc_toolchain", 
+    name = "protoc_go_grpc_toolchain",
     command_line = "--go-grpc_out=%s --go-grpc_opt=paths=source_relative",
     progress_message = "Generating Go gRPC proto_library %{label}",
     runtime = "@org_golang_google_grpc//:grpc",
@@ -29,7 +29,7 @@ proto_lang_toolchain(
 # Combined toolchain that generates both Go protobuf and gRPC code
 proto_lang_toolchain(
     name = "protoc_go_combined_toolchain",
-    command_line = "--go_out=%s --go_opt=paths=source_relative --go-grpc_out=%s --go-grpc_opt=paths=source_relative", 
+    command_line = "--go_out=%s --go_opt=paths=source_relative --go-grpc_out=%s --go-grpc_opt=paths=source_relative",
     progress_message = "Generating Go proto+gRPC library %{label}",
     runtime = "@org_golang_google_protobuf//types/known/emptypb",
     toolchain_type = "@rules_go//proto:toolchain_type",
@@ -43,13 +43,13 @@ toolchain(
 )
 
 toolchain(
-    name = "go_grpc_toolchain", 
+    name = "go_grpc_toolchain",
     toolchain = ":protoc_go_grpc_toolchain",
     toolchain_type = "@rules_go//proto:toolchain_type",
 )
 
 toolchain(
     name = "go_combined_toolchain",
-    toolchain = ":protoc_go_combined_toolchain", 
+    toolchain = ":protoc_go_combined_toolchain",
     toolchain_type = "@rules_go//proto:toolchain_type",
 )

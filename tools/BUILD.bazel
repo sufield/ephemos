@@ -10,7 +10,7 @@ sh_binary(
 )
 
 sh_binary(
-    name = "security_scan", 
+    name = "security_scan",
     srcs = ["security_scan.sh"],
     data = ["//pkg/ephemos:all"],
 )
@@ -23,6 +23,6 @@ sh_binary(
 # Export all toolchain configurations
 exports_files([
     "lint_check.sh",
-    "security_scan.sh", 
+    "security_scan.sh",
     "workspace_status.sh",
 ])
