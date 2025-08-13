@@ -297,7 +297,7 @@ type netListenerAdapter struct {
 	listener net.Listener
 }
 
-func (a *netListenerAdapter) Accept() (interface{}, error) {
+func (a *netListenerAdapter) Accept() (net.Conn, error) {
 	conn, err := a.listener.Accept()
 	if err != nil {
 		return nil, fmt.Errorf("listener accept failed: %w", err)
@@ -312,8 +312,8 @@ func (a *netListenerAdapter) Close() error {
 	return nil
 }
 
-func (a *netListenerAdapter) Addr() string {
-	return a.listener.Addr().String()
+func (a *netListenerAdapter) Addr() net.Addr {
+	return a.listener.Addr()
 }
 
 // WaitForReady waits for the server to be ready to accept connections.

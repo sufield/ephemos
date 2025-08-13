@@ -16,6 +16,8 @@ type WorkloadServer interface {
 	Start(ctx context.Context, listener net.Listener) error
 	// Stop gracefully stops the server
 	Stop() error
+	// Close releases resources and shuts down the server
+	Close() error
 	// RegisterService registers a service with the server
 	RegisterService(registrar ServiceRegistrar) error
 	// GetGRPCServer returns the underlying gRPC server (if applicable)
