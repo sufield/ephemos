@@ -159,6 +159,9 @@ func (ve *ValidationEngine) validateStructField(
 	fieldName string,
 	errCollection *ValidationCollectionError,
 ) {
+	// Initialize nested structs if they are required and zero
+	ve.initializeRequiredNestedStruct(fieldVal, field, fieldName, errCollection)
+	
 	// Set defaults first
 	ve.setDefaults(fieldVal, field, fieldName, errCollection)
 
@@ -519,6 +522,12 @@ func (ve *ValidationEngine) validateFieldRule(val reflect.Value, rule, fieldName
 // Validation rule implementations
 
 func (ve *ValidationEngine) validateRequired(val reflect.Value, _ string) error {
+	// For struct types, we consider them valid if they are initialized (not nil for pointers)
+	// The actual validation of their contents happens during recursive validation
+	if val.Kind() == reflect.Struct {
+		return nil // Structs are always considered "present" once initialized
+	}
+	
 	if ve.isZeroValue(val) {
 		return fmt.Errorf("field is required")
 	}
@@ -837,8 +846,28 @@ func (ve *ValidationEngine) validateAbsolutePath(val reflect.Value, _ string) er
 		return nil // Empty paths are allowed unless required
 	}
 
+	// Check for null bytes (security risk)
+	if strings.Contains(path, "\x00") {
+		return fmt.Errorf("path contains null bytes")
+	}
+
+	// Check for control characters including newlines (security risk)
+	for _, r := range path {
+		if r < 32 || r == 127 { // ASCII control characters
+			return fmt.Errorf("path contains control characters")
+		}
+	}
+
+	// Check if path is absolute
 	if !filepath.IsAbs(path) {
 		return fmt.Errorf("must be an absolute path")
+	}
+
+	// Additional security checks for socket paths
+	// Reject paths that try to escape with relative components
+	cleanPath := filepath.Clean(path)
+	if cleanPath != path {
+		return fmt.Errorf("path contains unsafe components")
 	}
 
 	return nil
@@ -1013,4 +1042,34 @@ func GetValidationErrors(err error) []ValidationError {
 	}
 
 	return nil
+}
+
+// initializeRequiredNestedStruct initializes nested structs that are marked as required.
+func (ve *ValidationEngine) initializeRequiredNestedStruct(
+	fieldVal reflect.Value,
+	field *reflect.StructField,
+	fieldName string,
+	errCollection *ValidationCollectionError,
+) {
+	if !fieldVal.CanSet() {
+		return
+	}
+
+	// Check if this field is required
+	validateTag := field.Tag.Get(ve.TagName)
+	if validateTag == "" {
+		return
+	}
+
+	rules := ve.parseValidationRules(validateTag)
+	if _, isRequired := rules[validationRuleRequired]; !isRequired {
+		return
+	}
+
+	// Initialize nested struct if it's zero and a struct type
+	if fieldVal.Kind() == reflect.Struct && ve.isZeroValue(fieldVal) {
+		// Create a new instance of the struct type
+		newStruct := reflect.New(fieldVal.Type()).Elem()
+		fieldVal.Set(newStruct)
+	}
 }

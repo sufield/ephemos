@@ -4,6 +4,7 @@ package ephemos
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/joomcode/errorx"
 )
@@ -169,32 +170,82 @@ func NewTemporaryError(service string, message string) error {
 
 // IsEnhancedValidationError checks if an error belongs to validation namespace.
 func IsEnhancedValidationError(err error) bool {
-	return errorx.IsOfType(err, EnhancedValidationError) ||
+	// Check direct errorx types
+	if errorx.IsOfType(err, EnhancedValidationError) ||
 		errorx.IsOfType(err, FieldValidationError) ||
-		errorx.IsOfType(err, CollectionValidationError)
+		errorx.IsOfType(err, CollectionValidationError) {
+		return true
+	}
+	
+	// Check wrapped errors
+	if wrapper, ok := err.(*enhancedWrapper); ok {
+		return errorx.IsOfType(wrapper.enhanced, EnhancedValidationError) ||
+			errorx.IsOfType(wrapper.enhanced, FieldValidationError) ||
+			errorx.IsOfType(wrapper.enhanced, CollectionValidationError)
+	}
+	
+	return false
 }
 
 // IsEnhancedConfigurationError checks if an error belongs to configuration namespace.
 func IsEnhancedConfigurationError(err error) bool {
-	return errorx.IsOfType(err, EnhancedConfigurationError) ||
+	// Check direct errorx types
+	if errorx.IsOfType(err, EnhancedConfigurationError) ||
 		errorx.IsOfType(err, ConfigFileError) ||
-		errorx.IsOfType(err, ConfigParseError)
+		errorx.IsOfType(err, ConfigParseError) {
+		return true
+	}
+	
+	// Check wrapped errors
+	if wrapper, ok := err.(*enhancedWrapper); ok {
+		return errorx.IsOfType(wrapper.enhanced, EnhancedConfigurationError) ||
+			errorx.IsOfType(wrapper.enhanced, ConfigFileError) ||
+			errorx.IsOfType(wrapper.enhanced, ConfigParseError)
+	}
+	
+	return false
 }
 
 // IsEnhancedDomainError checks if an error belongs to domain namespace.
 func IsEnhancedDomainError(err error) bool {
-	return errorx.IsOfType(err, EnhancedDomainError) ||
+	// Check direct errorx types
+	if errorx.IsOfType(err, EnhancedDomainError) ||
 		errorx.IsOfType(err, ServiceError) ||
-		errorx.IsOfType(err, IdentityError)
+		errorx.IsOfType(err, IdentityError) {
+		return true
+	}
+	
+	// Check wrapped errors
+	if wrapper, ok := err.(*enhancedWrapper); ok {
+		return errorx.IsOfType(wrapper.enhanced, EnhancedDomainError) ||
+			errorx.IsOfType(wrapper.enhanced, ServiceError) ||
+			errorx.IsOfType(wrapper.enhanced, IdentityError)
+	}
+	
+	return false
 }
 
 // IsEnhancedSystemError checks if an error belongs to system namespace.
 func IsEnhancedSystemError(err error) bool {
-	return errorx.IsOfType(err, EnhancedSystemError) ||
+	// Check direct errorx types
+	if errorx.IsOfType(err, EnhancedSystemError) ||
 		errorx.IsOfType(err, ConnectionError) ||
 		errorx.IsOfType(err, CertificateError) ||
 		errorx.IsOfType(err, TimeoutError) ||
-		errorx.IsOfType(err, TemporaryError)
+		errorx.IsOfType(err, TemporaryError) {
+		return true
+	}
+	
+	// Check wrapped errors
+	if wrapper, ok := err.(*enhancedWrapper); ok {
+		return errorx.IsOfType(wrapper.enhanced, EnhancedSystemError) ||
+			errorx.IsOfType(wrapper.enhanced, ConnectionError) ||
+			errorx.IsOfType(wrapper.enhanced, CertificateError) ||
+			errorx.IsOfType(wrapper.enhanced, TimeoutError) ||
+			errorx.IsOfType(wrapper.enhanced, TemporaryError)
+	}
+	
+	return false
 }
 
 // IsTimeoutError checks if an error has timeout characteristics using errorx traits.
@@ -271,18 +322,50 @@ func GetEnhancedErrorCode(err error) string {
 func GetStackTrace(err error) string {
 	var errorxErr *errorx.Error
 	if errors.As(err, &errorxErr) {
-		// Use string representation which includes stack trace
-		return errorxErr.Error()
+		// Use +v formatting to get detailed stack trace information
+		return fmt.Sprintf("%+v", errorxErr)
 	}
 	return ""
 }
 
-// WrapWithEnhancedContext wraps an existing error with additional context.
+// enhancedWrapper wraps an error with errorx context while maintaining Go error interface compatibility.
+type enhancedWrapper struct {
+	original error
+	enhanced *errorx.Error
+}
+
+func (e *enhancedWrapper) Error() string {
+	return e.enhanced.Error()
+}
+
+func (e *enhancedWrapper) Unwrap() error {
+	return e.original
+}
+
+func (e *enhancedWrapper) Is(target error) bool {
+	return errors.Is(e.original, target)
+}
+
+func (e *enhancedWrapper) As(target interface{}) bool {
+	if errors.As(e.enhanced, target) {
+		return true
+	}
+	return errors.As(e.original, target)
+}
+
+// WrapWithEnhancedContext wraps an existing error with additional context while maintaining error chain compatibility.
 func WrapWithEnhancedContext(err error, errorType *errorx.Type, message string) error {
 	if err == nil {
 		return nil
 	}
-	return errorType.Wrap(err, "wrapped error: %s", message)
+	
+	// Create the enhanced error with stack trace
+	enhanced := errorType.New("wrapped error: %s", message)
+	
+	return &enhancedWrapper{
+		original: err,
+		enhanced: enhanced,
+	}
 }
 
 // DecorateError adds context to an existing errorx error without changing its type.

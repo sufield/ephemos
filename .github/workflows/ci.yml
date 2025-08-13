@@ -881,6 +881,58 @@ jobs:
         
         log_diagnostic "INFO" "🔨 Enhanced application build for integration tests"
         
+        # Ensure protobuf tools are in PATH and generate files if needed
+        if [ -z "${GOBIN:-}" ]; then
+          export GOBIN="$(go env GOPATH)/bin"
+        fi
+        export PATH="$GOBIN:$PATH"
+        
+        log_diagnostic "INFO" "🔧 Validating protobuf tools and generated files"
+        
+        # Verify protobuf tools are available
+        if ! command -v protoc >/dev/null 2>&1; then
+          fail_with_comprehensive_diagnostics 1 \
+            "protoc not found in PATH" \
+            "Protobuf compiler missing from CI environment" \
+            "Ensure setup-protobuf-fixed action completed successfully" \
+            "PATH: $PATH"
+        fi
+        
+        if ! command -v protoc-gen-go >/dev/null 2>&1; then
+          fail_with_comprehensive_diagnostics 1 \
+            "protoc-gen-go not found in PATH" \
+            "Go protobuf plugin missing from CI environment" \
+            "Ensure protobuf tools installation completed successfully" \
+            "PATH: $PATH, GOBIN: $GOBIN"
+        fi
+        
+        if ! command -v protoc-gen-go-grpc >/dev/null 2>&1; then
+          fail_with_comprehensive_diagnostics 1 \
+            "protoc-gen-go-grpc not found in PATH" \
+            "gRPC protobuf plugin missing from CI environment" \
+            "Ensure protobuf tools installation completed successfully" \
+            "PATH: $PATH, GOBIN: $GOBIN"
+        fi
+        
+        # Ensure protobuf files are generated
+        if [[ ! -f "examples/proto/echo.pb.go" || ! -f "examples/proto/echo_grpc.pb.go" ]]; then
+          log_diagnostic "WARN" "Protobuf files missing, regenerating..."
+          
+          # Generate protobuf files
+          protoc --go_out=examples/proto --go_opt=paths=source_relative \
+                 --go-grpc_out=examples/proto --go-grpc_opt=paths=source_relative \
+                 -I examples/proto examples/proto/echo.proto || \
+            fail_with_comprehensive_diagnostics 1 \
+              "Protobuf generation failed during integration build" \
+              "Could not generate required gRPC code" \
+              "Check protoc and plugin installations" \
+              "Proto file: examples/proto/echo.proto"
+          
+          log_diagnostic "SUCCESS" "✅ Protobuf files regenerated successfully"
+        else
+          log_diagnostic "SUCCESS" "✅ Protobuf files already present"
+        fi
+        
         # Clean build environment
         clean_build_environment
         
