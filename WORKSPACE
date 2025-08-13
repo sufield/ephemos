@@ -50,26 +50,23 @@ http_archive(
 #     ],
 # )
 
-# Protocol buffers rules
+# Protocol buffers rules - Updated for Bazel 7.x compatibility
 http_archive(
     name = "rules_proto",
-    sha256 = "6fb6767d1bef535310547e03247f7518b03487740c11b6c6adb7952033fe1295",
-    strip_prefix = "rules_proto-6.0.2",
-    urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_proto/releases/download/6.0.2/rules_proto-6.0.2.tar.gz",
-        "https://github.com/bazelbuild/rules_proto/releases/download/6.0.2/rules_proto-6.0.2.tar.gz",
-    ],
+    sha256 = "14a225870ab4e91869652cfd69ef2028277fc1dc4910d65d353b62d6e0ae21f4",
+    strip_prefix = "rules_proto-7.1.0",
+    url = "https://github.com/bazelbuild/rules_proto/releases/download/7.1.0/rules_proto-7.1.0.tar.gz",
 )
 
-# Protocol buffers
-http_archive(
-    name = "com_google_protobuf",
-    strip_prefix = "protobuf-27.3",
-    urls = [
-        "https://github.com/protocolbuffers/protobuf/archive/v27.3.tar.gz",
-    ],
-    sha256 = "1535151efbc7893f38b0578e83cac584f2819974f065698976989ec71c1af84a",
-)
+# Note: Protocol buffers now managed by rules_proto 7.1.0
+# http_archive(
+#     name = "com_google_protobuf",
+#     strip_prefix = "protobuf-27.3",
+#     urls = [
+#         "https://github.com/protocolbuffers/protobuf/archive/v27.3.tar.gz",
+#     ],
+#     sha256 = "1535151efbc7893f38b0578e83cac584f2819974f065698976989ec71c1af84a",
+# )
 
 # Java rules
 http_archive(
@@ -129,9 +126,9 @@ gazelle_dependencies()
 #     version = "27.0",  # Use a stable protoc version supported by toolchains_protoc
 # )
 
-load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
-
-protobuf_deps()
+# Note: protobuf_deps no longer needed - managed by rules_proto 7.1.0
+# load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+# protobuf_deps()
 
 # Go dependencies
 load("//:deps.bzl", "go_dependencies")
