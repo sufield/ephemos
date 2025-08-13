@@ -3,6 +3,8 @@
 package ephemos
 
 import (
+	"errors"
+
 	"github.com/joomcode/errorx"
 )
 
@@ -27,7 +29,7 @@ func systemNamespace() errorx.Namespace {
 	return ephemosNamespace().NewSubNamespace("system")
 }
 
-// Enhanced error types with errorx features
+// Enhanced error types with errorx features.
 var (
 	// Validation errors
 	EnhancedValidationError   = validationNamespace().NewType("validation_error")
@@ -54,7 +56,7 @@ var (
 	TemporaryError = systemNamespace().NewType("temporary_error", errorx.Temporary())
 )
 
-// Common error properties for consistent error context
+// Common error properties for consistent error context.
 var (
 	// PropertyField identifies which field caused the error
 	PropertyField = errorx.RegisterProperty("field")
@@ -78,7 +80,7 @@ var (
 	PropertyReason = errorx.RegisterProperty("reason")
 )
 
-// Enhanced predefined domain errors with errorx features and automatic stack traces
+// Enhanced predefined domain errors with errorx features and automatic stack traces.
 var (
 	// Service validation errors with enhanced context
 	ErrEnhancedInvalidServiceName = ServiceError.New("service name is invalid").
@@ -118,9 +120,9 @@ var (
 					WithProperty(PropertyCode, "CONFIG_MALFORMED")
 )
 
-// Enhanced helper functions for creating errors with rich context
+// Enhanced helper functions for creating errors with rich context.
 
-// NewEnhancedValidationError creates a field validation error with full context and stack trace
+// NewEnhancedValidationError creates a field validation error with full context and stack trace.
 func NewEnhancedValidationError(field string, value interface{}, message string) error {
 	return FieldValidationError.New("validation failed: %s", message).
 		WithProperty(PropertyField, field).
@@ -128,65 +130,65 @@ func NewEnhancedValidationError(field string, value interface{}, message string)
 		WithProperty(PropertyCode, "VALIDATION_FAILED")
 }
 
-// NewEnhancedConfigError creates a configuration error with file context and stack trace
+// NewEnhancedConfigError creates a configuration error with file context and stack trace.
 func NewEnhancedConfigError(file string, message string) error {
 	return EnhancedConfigurationError.New("configuration error: %s", message).
 		WithProperty(PropertyFile, file).
 		WithProperty(PropertyCode, "CONFIG_ERROR")
 }
 
-// NewEnhancedDomainError creates a domain error with operation context and stack trace
+// NewEnhancedDomainError creates a domain error with operation context and stack trace.
 func NewEnhancedDomainError(operation string, message string) error {
 	return EnhancedDomainError.New("domain error: %s", message).
 		WithProperty(PropertyOperation, operation).
 		WithProperty(PropertyCode, "DOMAIN_ERROR")
 }
 
-// NewEnhancedSystemError creates a system error with service context and stack trace
+// NewEnhancedSystemError creates a system error with service context and stack trace.
 func NewEnhancedSystemError(service string, message string) error {
 	return EnhancedSystemError.New("system error: %s", message).
 		WithProperty(PropertyService, service).
 		WithProperty(PropertyCode, "SYSTEM_ERROR")
 }
 
-// NewTimeoutError creates a timeout error using errorx built-in timeout trait
+// NewTimeoutError creates a timeout error using errorx built-in timeout trait.
 func NewTimeoutError(operation string, message string) error {
 	return TimeoutError.New("timeout error: %s", message).
 		WithProperty(PropertyOperation, operation).
 		WithProperty(PropertyCode, "TIMEOUT_ERROR")
 }
 
-// NewTemporaryError creates a temporary error that might succeed on retry
+// NewTemporaryError creates a temporary error that might succeed on retry.
 func NewTemporaryError(service string, message string) error {
 	return TemporaryError.New("temporary error: %s", message).
 		WithProperty(PropertyService, service).
 		WithProperty(PropertyCode, "TEMPORARY_ERROR")
 }
 
-// Enhanced error checking functions using errorx capabilities
+// Enhanced error checking functions using errorx capabilities.
 
-// IsEnhancedValidationError checks if an error belongs to validation namespace
+// IsEnhancedValidationError checks if an error belongs to validation namespace.
 func IsEnhancedValidationError(err error) bool {
 	return errorx.IsOfType(err, EnhancedValidationError) ||
 		errorx.IsOfType(err, FieldValidationError) ||
 		errorx.IsOfType(err, CollectionValidationError)
 }
 
-// IsEnhancedConfigurationError checks if an error belongs to configuration namespace
+// IsEnhancedConfigurationError checks if an error belongs to configuration namespace.
 func IsEnhancedConfigurationError(err error) bool {
 	return errorx.IsOfType(err, EnhancedConfigurationError) ||
 		errorx.IsOfType(err, ConfigFileError) ||
 		errorx.IsOfType(err, ConfigParseError)
 }
 
-// IsEnhancedDomainError checks if an error belongs to domain namespace
+// IsEnhancedDomainError checks if an error belongs to domain namespace.
 func IsEnhancedDomainError(err error) bool {
 	return errorx.IsOfType(err, EnhancedDomainError) ||
 		errorx.IsOfType(err, ServiceError) ||
 		errorx.IsOfType(err, IdentityError)
 }
 
-// IsEnhancedSystemError checks if an error belongs to system namespace
+// IsEnhancedSystemError checks if an error belongs to system namespace.
 func IsEnhancedSystemError(err error) bool {
 	return errorx.IsOfType(err, EnhancedSystemError) ||
 		errorx.IsOfType(err, ConnectionError) ||
@@ -195,19 +197,19 @@ func IsEnhancedSystemError(err error) bool {
 		errorx.IsOfType(err, TemporaryError)
 }
 
-// IsTimeoutError checks if an error has timeout characteristics using errorx traits
+// IsTimeoutError checks if an error has timeout characteristics using errorx traits.
 func IsTimeoutError(err error) bool {
 	return errorx.IsTimeout(err)
 }
 
-// IsTemporaryError checks if an error is temporary using errorx traits
+// IsTemporaryError checks if an error is temporary using errorx traits.
 func IsTemporaryError(err error) bool {
 	return errorx.IsTemporary(err)
 }
 
-// Enhanced property extraction functions with better error handling
+// Enhanced property extraction functions with better error handling.
 
-// GetEnhancedErrorField extracts the field name from a validation error
+// GetEnhancedErrorField extracts the field name from a validation error.
 func GetEnhancedErrorField(err error) string {
 	if prop, ok := errorx.ExtractProperty(err, PropertyField); ok {
 		if field, ok := prop.(string); ok {
@@ -217,7 +219,7 @@ func GetEnhancedErrorField(err error) string {
 	return ""
 }
 
-// GetEnhancedErrorValue extracts the invalid value from a validation error
+// GetEnhancedErrorValue extracts the invalid value from a validation error.
 func GetEnhancedErrorValue(err error) interface{} {
 	if prop, ok := errorx.ExtractProperty(err, PropertyValue); ok {
 		return prop
@@ -225,7 +227,7 @@ func GetEnhancedErrorValue(err error) interface{} {
 	return nil
 }
 
-// GetEnhancedErrorFile extracts the file name from a configuration error
+// GetEnhancedErrorFile extracts the file name from a configuration error.
 func GetEnhancedErrorFile(err error) string {
 	if prop, ok := errorx.ExtractProperty(err, PropertyFile); ok {
 		if file, ok := prop.(string); ok {
@@ -235,7 +237,7 @@ func GetEnhancedErrorFile(err error) string {
 	return ""
 }
 
-// GetEnhancedErrorService extracts the service name from a system error
+// GetEnhancedErrorService extracts the service name from a system error.
 func GetEnhancedErrorService(err error) string {
 	if prop, ok := errorx.ExtractProperty(err, PropertyService); ok {
 		if service, ok := prop.(string); ok {
@@ -245,7 +247,7 @@ func GetEnhancedErrorService(err error) string {
 	return ""
 }
 
-// GetEnhancedErrorOperation extracts the operation from a domain error
+// GetEnhancedErrorOperation extracts the operation from a domain error.
 func GetEnhancedErrorOperation(err error) string {
 	if prop, ok := errorx.ExtractProperty(err, PropertyOperation); ok {
 		if operation, ok := prop.(string); ok {
@@ -255,7 +257,7 @@ func GetEnhancedErrorOperation(err error) string {
 	return ""
 }
 
-// GetEnhancedErrorCode extracts the error code for programmatic handling
+// GetEnhancedErrorCode extracts the error code for programmatic handling.
 func GetEnhancedErrorCode(err error) string {
 	if prop, ok := errorx.ExtractProperty(err, PropertyCode); ok {
 		if code, ok := prop.(string); ok {
@@ -265,16 +267,17 @@ func GetEnhancedErrorCode(err error) string {
 	return ""
 }
 
-// GetStackTrace extracts stack trace information from errorx errors
+// GetStackTrace extracts stack trace information from errorx errors.
 func GetStackTrace(err error) string {
-	if errorxErr, ok := err.(*errorx.Error); ok {
+	var errorxErr *errorx.Error
+	if errors.As(err, &errorxErr) {
 		// Use string representation which includes stack trace
 		return errorxErr.Error()
 	}
 	return ""
 }
 
-// WrapWithEnhancedContext wraps an existing error with additional context
+// WrapWithEnhancedContext wraps an existing error with additional context.
 func WrapWithEnhancedContext(err error, errorType *errorx.Type, message string) error {
 	if err == nil {
 		return nil
@@ -282,15 +285,15 @@ func WrapWithEnhancedContext(err error, errorType *errorx.Type, message string) 
 	return errorType.Wrap(err, "wrapped error: %s", message)
 }
 
-// DecorateError adds context to an existing errorx error without changing its type
+// DecorateError adds context to an existing errorx error without changing its type.
 func DecorateError(err error, additionalContext string) error {
 	if err == nil {
 		return nil
 	}
-	if _, ok := err.(*errorx.Error); ok {
+	var errorxErr *errorx.Error
+	if errors.As(err, &errorxErr) {
 		return errorx.Decorate(err, "decorated error: %s", additionalContext)
 	}
 	// If it's not an errorx error, wrap it with enhanced system error
 	return EnhancedSystemError.Wrap(err, "wrapped non-errorx error: %s", additionalContext)
 }
-
