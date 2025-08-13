@@ -64,9 +64,8 @@ jobs:
         echo "test --config=ci" >> .bazelrc.local
         echo "coverage --config=ci" >> .bazelrc.local
         
-        # Enable workspace mode for external dependencies
-        echo "common --enable_workspace" >> .bazelrc.local
-        echo "common --noenable_bzlmod" >> .bazelrc.local
+        # Enable bzlmod for modern dependency management
+        echo "common --enable_bzlmod" >> .bazelrc.local
         
         # Add CI-specific configuration
         cat >> .bazelrc.local << EOF
