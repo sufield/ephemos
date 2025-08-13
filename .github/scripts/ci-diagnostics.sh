@@ -2,6 +2,12 @@
 # Comprehensive CI/CD Diagnostic Library with Fail-Fast Verbose Reporting
 # Usage: source ./.github/scripts/ci-diagnostics.sh
 
+# Guard against multiple sourcing
+if [ "${CI_DIAGNOSTICS_LOADED:-}" = "1" ]; then
+    return 0 2>/dev/null || exit 0
+fi
+export CI_DIAGNOSTICS_LOADED=1
+
 set -euo pipefail
 
 # Global diagnostic configuration
@@ -10,15 +16,15 @@ SCRIPT_NAME="${0##*/}"
 DIAGNOSTIC_LOG_FILE="${GITHUB_WORKSPACE:-/tmp}/ci-diagnostic.log"
 JOB_START_TIME=$(date +%s)
 
-# Color codes for enhanced output
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly PURPLE='\033[0;35m'
-readonly CYAN='\033[0;36m'
-readonly WHITE='\033[1;37m'
-readonly NC='\033[0m' # No Color
+# Color codes for enhanced output (use different names to avoid conflicts)
+readonly DIAG_RED='\033[0;31m'
+readonly DIAG_GREEN='\033[0;32m'
+readonly DIAG_YELLOW='\033[1;33m'
+readonly DIAG_BLUE='\033[0;34m'
+readonly DIAG_PURPLE='\033[0;35m'
+readonly DIAG_CYAN='\033[0;36m'
+readonly DIAG_WHITE='\033[1;37m'
+readonly DIAG_NC='\033[0m' # No Color
 
 # Initialize diagnostic logging
 init_diagnostics() {
@@ -53,14 +59,14 @@ log_diagnostic() {
     local icon=""
     
     case "$level" in
-        "TRACE")   color_code="$CYAN";    icon="🔍"; [[ $DIAGNOSTIC_MODE -lt 2 ]] && return 0 ;;
-        "DEBUG")   color_code="$BLUE";    icon="🐛"; [[ $DIAGNOSTIC_MODE -lt 1 ]] && return 0 ;;
-        "INFO")    color_code="$GREEN";   icon="ℹ️" ;;
-        "WARN")    color_code="$YELLOW";  icon="⚠️" ;;
-        "ERROR")   color_code="$RED";     icon="❌" ;;
-        "FATAL")   color_code="$PURPLE";  icon="💀" ;;
-        "SUCCESS") color_code="$GREEN";   icon="✅" ;;
-        *) color_code="$WHITE"; icon="📝" ;;
+        "TRACE")   color_code="$DIAG_CYAN";    icon="🔍"; [[ $DIAGNOSTIC_MODE -lt 2 ]] && return 0 ;;
+        "DEBUG")   color_code="$DIAG_BLUE";    icon="🐛"; [[ $DIAGNOSTIC_MODE -lt 1 ]] && return 0 ;;
+        "INFO")    color_code="$DIAG_GREEN";   icon="ℹ️" ;;
+        "WARN")    color_code="$DIAG_YELLOW";  icon="⚠️" ;;
+        "ERROR")   color_code="$DIAG_RED";     icon="❌" ;;
+        "FATAL")   color_code="$DIAG_PURPLE";  icon="💀" ;;
+        "SUCCESS") color_code="$DIAG_GREEN";   icon="✅" ;;
+        *) color_code="$DIAG_WHITE"; icon="📝" ;;
     esac
     
     local formatted_message
@@ -68,7 +74,7 @@ log_diagnostic() {
         "$timestamp" "$elapsed_time" "$location" "$function_name" "$icon" "$level" "$message")
     
     # Output to console with color
-    echo -e "${color_code}${formatted_message}${NC}"
+    echo -e "${color_code}${formatted_message}${DIAG_NC}"
     
     # Output to log file without color codes
     echo "$formatted_message" >> "$DIAGNOSTIC_LOG_FILE"

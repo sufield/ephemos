@@ -81,8 +81,13 @@ runs:
         # Set Go proxy to handle network issues
         go env -w GOPROXY=https://proxy.golang.org,direct
         
-        # Ensure Go bin directory exists
+        # Ensure Go bin directory exists with proper permissions
         mkdir -p "$GOBIN"
+        chmod 755 "$GOBIN"
+        
+        # Log current state for debugging
+        echo "📁 GOBIN directory state before installation:"
+        ls -la "$GOBIN" 2>/dev/null || echo "  GOBIN directory is empty or doesn't exist"
         
         # CRITICAL: Clean install protoc-gen-go with detailed error reporting
         echo "📥 Installing protoc-gen-go with detailed diagnostics..."
@@ -170,13 +175,14 @@ runs:
         echo "🔧 Adding GOBIN to GITHUB_PATH for future steps..."
         echo "$GOBIN" >> $GITHUB_PATH
         
-        # Also set environment variables for future steps
+        # Also set environment variables for future steps  
         echo "GOBIN=$GOBIN" >> $GITHUB_ENV
-        echo "PATH=$GOBIN:$PATH" >> $GITHUB_ENV
+        
+        # Note: We don't set PATH in GITHUB_ENV as it can cause issues
+        # Instead, we ensure GOBIN is added to GITHUB_PATH which is safer
         
         echo "✅ Environment variables set for future workflow steps:"
         echo "  - GOBIN=$GOBIN added to GITHUB_ENV"
-        echo "  - PATH updated in GITHUB_ENV"
         echo "  - $GOBIN added to GITHUB_PATH"
         
         # CRITICAL: Verify installation with comprehensive PATH diagnostics
