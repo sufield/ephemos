@@ -11,10 +11,10 @@ import (
 
 // spiffeProviderImpl is the concrete implementation of SPIFFEProvider.
 type spiffeProviderImpl struct {
-	config       *SPIFFEConfig
-	identity     ServiceIdentity
-	tlsConfig    *tls.Config
-	mu           sync.RWMutex
+	config        *SPIFFEConfig
+	identity      ServiceIdentity
+	tlsConfig     *tls.Config
+	mu            sync.RWMutex
 	isInitialized bool
 }
 

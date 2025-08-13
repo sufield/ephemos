@@ -6,49 +6,52 @@ import (
 	"github.com/joomcode/errorx"
 )
 
-// Error namespaces organize related error types using errorx
-var (
-	// EphemosNamespace is the root namespace for all Ephemos errors
-	EphemosNamespace = errorx.NewNamespace("ephemos")
+// Error namespace functions for lazy initialization.
+func ephemosNamespace() *errorx.Namespace {
+	return errorx.NewNamespace("ephemos")
+}
 
-	// ValidationNamespace for all validation-related errors
-	ValidationNamespace = EphemosNamespace.NewSubNamespace("validation")
+func validationNamespace() *errorx.Namespace {
+	return ephemosNamespace().NewSubNamespace("validation")
+}
 
-	// ConfigurationNamespace for configuration parsing and validation errors
-	ConfigurationNamespace = EphemosNamespace.NewSubNamespace("configuration")
+func configurationNamespace() *errorx.Namespace {
+	return ephemosNamespace().NewSubNamespace("configuration")
+}
 
-	// DomainNamespace for business logic and domain errors
-	DomainNamespace = EphemosNamespace.NewSubNamespace("domain")
+func domainNamespace() *errorx.Namespace {
+	return ephemosNamespace().NewSubNamespace("domain")
+}
 
-	// SystemNamespace for infrastructure and system-level errors
-	SystemNamespace = EphemosNamespace.NewSubNamespace("system")
-)
+func systemNamespace() *errorx.Namespace {
+	return ephemosNamespace().NewSubNamespace("system")
+}
 
 // Enhanced error types with errorx features
 var (
 	// Validation errors
-	EnhancedValidationError    = ValidationNamespace.NewType("validation_error")
-	FieldValidationError       = ValidationNamespace.NewType("field_validation")
-	CollectionValidationError  = ValidationNamespace.NewType("collection_error")
+	EnhancedValidationError   = ValidationNamespace.NewType("validation_error")
+	FieldValidationError      = ValidationNamespace.NewType("field_validation")
+	CollectionValidationError = ValidationNamespace.NewType("collection_error")
 
 	// Configuration errors
 	EnhancedConfigurationError = ConfigurationNamespace.NewType("config_error")
-	ConfigFileError           = ConfigurationNamespace.NewType("config_file")
-	ConfigParseError          = ConfigurationNamespace.NewType("config_parse")
+	ConfigFileError            = ConfigurationNamespace.NewType("config_file")
+	ConfigParseError           = ConfigurationNamespace.NewType("config_parse")
 
 	// Domain errors
-	EnhancedDomainError       = DomainNamespace.NewType("domain_error")
-	ServiceError              = DomainNamespace.NewType("service_error")
-	IdentityError             = DomainNamespace.NewType("identity_error")
+	EnhancedDomainError = DomainNamespace.NewType("domain_error")
+	ServiceError        = DomainNamespace.NewType("service_error")
+	IdentityError       = DomainNamespace.NewType("identity_error")
 
-	// System errors  
-	EnhancedSystemError       = SystemNamespace.NewType("system_error")
-	ConnectionError           = SystemNamespace.NewType("connection_error")
-	CertificateError          = SystemNamespace.NewType("certificate_error")
-	
+	// System errors
+	EnhancedSystemError = SystemNamespace.NewType("system_error")
+	ConnectionError     = SystemNamespace.NewType("connection_error")
+	CertificateError    = SystemNamespace.NewType("certificate_error")
+
 	// Specialized error types with built-in traits
-	TimeoutError              = SystemNamespace.NewType("timeout_error", errorx.Timeout())
-	TemporaryError            = SystemNamespace.NewType("temporary_error", errorx.Temporary())
+	TimeoutError   = SystemNamespace.NewType("timeout_error", errorx.Timeout())
+	TemporaryError = SystemNamespace.NewType("temporary_error", errorx.Temporary())
 )
 
 // Common error properties for consistent error context
@@ -79,83 +82,83 @@ var (
 var (
 	// Service validation errors with enhanced context
 	ErrEnhancedInvalidServiceName = ServiceError.New("service name is invalid").
-		WithProperty(PropertyCode, "INVALID_SERVICE_NAME")
+					WithProperty(PropertyCode, "INVALID_SERVICE_NAME")
 
 	ErrEnhancedInvalidDomain = ServiceError.New("domain is invalid").
-		WithProperty(PropertyCode, "INVALID_DOMAIN")
+					WithProperty(PropertyCode, "INVALID_DOMAIN")
 
 	ErrEnhancedMissingConfiguration = EnhancedConfigurationError.New("required configuration is missing").
-		WithProperty(PropertyCode, "MISSING_CONFIGURATION")
+					WithProperty(PropertyCode, "MISSING_CONFIGURATION")
 
 	// SPIFFE/Identity errors with enhanced traits
 	ErrEnhancedSPIFFERegistration = IdentityError.New("failed to register service with SPIFFE").
-		WithProperty(PropertyCode, "SPIFFE_REGISTRATION_FAILED")
+					WithProperty(PropertyCode, "SPIFFE_REGISTRATION_FAILED")
 
 	ErrEnhancedInvalidSocketPath = IdentityError.New("SPIFFE socket path is invalid").
-		WithProperty(PropertyCode, "INVALID_SOCKET_PATH")
+					WithProperty(PropertyCode, "INVALID_SOCKET_PATH")
 
 	ErrEnhancedCertificateUnavailable = CertificateError.New("certificate is not available").
-		WithProperty(PropertyCode, "CERTIFICATE_UNAVAILABLE")
+						WithProperty(PropertyCode, "CERTIFICATE_UNAVAILABLE")
 
 	ErrEnhancedTrustBundleUnavailable = CertificateError.New("trust bundle is not available").
-		WithProperty(PropertyCode, "TRUST_BUNDLE_UNAVAILABLE")
+						WithProperty(PropertyCode, "TRUST_BUNDLE_UNAVAILABLE")
 
 	// Connection errors with timeout support
 	ErrEnhancedConnectionFailed = ConnectionError.New("failed to establish connection").
-		WithProperty(PropertyCode, "CONNECTION_FAILED")
+					WithProperty(PropertyCode, "CONNECTION_FAILED")
 
 	// Enhanced configuration file errors
 	ErrEnhancedConfigFileNotFound = ConfigFileError.New("configuration file not found").
-		WithProperty(PropertyCode, "CONFIG_FILE_NOT_FOUND")
+					WithProperty(PropertyCode, "CONFIG_FILE_NOT_FOUND")
 
 	ErrEnhancedConfigFileUnreadable = ConfigFileError.New("configuration file unreadable").
-		WithProperty(PropertyCode, "CONFIG_FILE_UNREADABLE")
+					WithProperty(PropertyCode, "CONFIG_FILE_UNREADABLE")
 
 	ErrEnhancedConfigMalformed = ConfigParseError.New("configuration file malformed").
-		WithProperty(PropertyCode, "CONFIG_MALFORMED")
+					WithProperty(PropertyCode, "CONFIG_MALFORMED")
 )
 
 // Enhanced helper functions for creating errors with rich context
 
 // NewEnhancedValidationError creates a field validation error with full context and stack trace
 func NewEnhancedValidationError(field string, value interface{}, message string) error {
-	return FieldValidationError.New("validation failed: " + message).
+	return FieldValidationError.New("validation failed: "+message).
 		WithProperty(PropertyField, field).
 		WithProperty(PropertyValue, value).
 		WithProperty(PropertyCode, "VALIDATION_FAILED")
 }
 
-// NewEnhancedConfigError creates a configuration error with file context and stack trace  
+// NewEnhancedConfigError creates a configuration error with file context and stack trace
 func NewEnhancedConfigError(file string, message string) error {
-	return EnhancedConfigurationError.New("configuration error: " + message).
+	return EnhancedConfigurationError.New("configuration error: "+message).
 		WithProperty(PropertyFile, file).
 		WithProperty(PropertyCode, "CONFIG_ERROR")
 }
 
 // NewEnhancedDomainError creates a domain error with operation context and stack trace
 func NewEnhancedDomainError(operation string, message string) error {
-	return EnhancedDomainError.New("domain error: " + message).
+	return EnhancedDomainError.New("domain error: "+message).
 		WithProperty(PropertyOperation, operation).
 		WithProperty(PropertyCode, "DOMAIN_ERROR")
 }
 
 // NewEnhancedSystemError creates a system error with service context and stack trace
 func NewEnhancedSystemError(service string, message string) error {
-	return EnhancedSystemError.New("system error: " + message).
+	return EnhancedSystemError.New("system error: "+message).
 		WithProperty(PropertyService, service).
 		WithProperty(PropertyCode, "SYSTEM_ERROR")
 }
 
 // NewTimeoutError creates a timeout error using errorx built-in timeout trait
 func NewTimeoutError(operation string, message string) error {
-	return TimeoutError.New("timeout error: " + message).
+	return TimeoutError.New("timeout error: "+message).
 		WithProperty(PropertyOperation, operation).
 		WithProperty(PropertyCode, "TIMEOUT_ERROR")
 }
 
 // NewTemporaryError creates a temporary error that might succeed on retry
 func NewTemporaryError(service string, message string) error {
-	return TemporaryError.New("temporary error: " + message).
+	return TemporaryError.New("temporary error: "+message).
 		WithProperty(PropertyService, service).
 		WithProperty(PropertyCode, "TEMPORARY_ERROR")
 }
@@ -164,32 +167,32 @@ func NewTemporaryError(service string, message string) error {
 
 // IsEnhancedValidationError checks if an error belongs to validation namespace
 func IsEnhancedValidationError(err error) bool {
-	return errorx.IsOfType(err, EnhancedValidationError) || 
-	       errorx.IsOfType(err, FieldValidationError) || 
-	       errorx.IsOfType(err, CollectionValidationError)
+	return errorx.IsOfType(err, EnhancedValidationError) ||
+		errorx.IsOfType(err, FieldValidationError) ||
+		errorx.IsOfType(err, CollectionValidationError)
 }
 
 // IsEnhancedConfigurationError checks if an error belongs to configuration namespace
 func IsEnhancedConfigurationError(err error) bool {
-	return errorx.IsOfType(err, EnhancedConfigurationError) || 
-	       errorx.IsOfType(err, ConfigFileError) || 
-	       errorx.IsOfType(err, ConfigParseError)
+	return errorx.IsOfType(err, EnhancedConfigurationError) ||
+		errorx.IsOfType(err, ConfigFileError) ||
+		errorx.IsOfType(err, ConfigParseError)
 }
 
 // IsEnhancedDomainError checks if an error belongs to domain namespace
 func IsEnhancedDomainError(err error) bool {
-	return errorx.IsOfType(err, EnhancedDomainError) || 
-	       errorx.IsOfType(err, ServiceError) || 
-	       errorx.IsOfType(err, IdentityError)
+	return errorx.IsOfType(err, EnhancedDomainError) ||
+		errorx.IsOfType(err, ServiceError) ||
+		errorx.IsOfType(err, IdentityError)
 }
 
 // IsEnhancedSystemError checks if an error belongs to system namespace
 func IsEnhancedSystemError(err error) bool {
-	return errorx.IsOfType(err, EnhancedSystemError) || 
-	       errorx.IsOfType(err, ConnectionError) || 
-	       errorx.IsOfType(err, CertificateError) ||
-	       errorx.IsOfType(err, TimeoutError) ||
-	       errorx.IsOfType(err, TemporaryError)
+	return errorx.IsOfType(err, EnhancedSystemError) ||
+		errorx.IsOfType(err, ConnectionError) ||
+		errorx.IsOfType(err, CertificateError) ||
+		errorx.IsOfType(err, TimeoutError) ||
+		errorx.IsOfType(err, TemporaryError)
 }
 
 // IsTimeoutError checks if an error has timeout characteristics using errorx traits
@@ -276,7 +279,7 @@ func WrapWithEnhancedContext(err error, errorType *errorx.Type, message string) 
 	if err == nil {
 		return nil
 	}
-	return errorType.Wrap(err, "wrapped error: " + message)
+	return errorType.Wrap(err, "wrapped error: "+message)
 }
 
 // DecorateError adds context to an existing errorx error without changing its type
@@ -285,8 +288,9 @@ func DecorateError(err error, additionalContext string) error {
 		return nil
 	}
 	if _, ok := err.(*errorx.Error); ok {
-		return errorx.Decorate(err, "decorated error: " + additionalContext)
+		return errorx.Decorate(err, "decorated error: "+additionalContext)
 	}
 	// If it's not an errorx error, wrap it with enhanced system error
-	return EnhancedSystemError.Wrap(err, "wrapped non-errorx error: " + additionalContext)
+	return EnhancedSystemError.Wrap(err, "wrapped non-errorx error: "+additionalContext)
 }
+

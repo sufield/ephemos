@@ -325,7 +325,7 @@ type MetricsConfig struct {
 type InterceptorConfig struct {
 	// EnableAuth enables authentication interceptor
 	EnableAuth bool
-	// EnableLogging enables audit logging interceptor  
+	// EnableLogging enables audit logging interceptor
 	EnableLogging bool
 	// EnableMetrics enables metrics collection interceptor
 	EnableMetrics bool
@@ -392,20 +392,20 @@ func CreateServerInterceptors(
 	if config.EnableLogging && config.Logger != nil {
 		unaryInterceptors = append(unaryInterceptors, createLoggingInterceptor(config.Logger))
 	}
-	
+
 	// Add metrics interceptor
 	if config.EnableMetrics {
 		unaryInterceptors = append(unaryInterceptors, createMetricsInterceptor())
 	}
-	
+
 	// Add auth interceptor
 	if config.EnableAuth {
 		unaryInterceptors = append(unaryInterceptors, createAuthInterceptor())
 	}
-	
+
 	// Add custom interceptors
 	unaryInterceptors = append(unaryInterceptors, config.CustomInterceptors...)
-	
+
 	return unaryInterceptors, streamInterceptors
 }
 
@@ -424,12 +424,12 @@ func CreateClientInterceptors(
 	if config.EnableLogging && config.Logger != nil {
 		unaryInterceptors = append(unaryInterceptors, createClientLoggingInterceptor(config.Logger))
 	}
-	
+
 	// Add client-side metrics interceptor
 	if config.EnableMetrics {
 		unaryInterceptors = append(unaryInterceptors, createClientMetricsInterceptor())
 	}
-	
+
 	return unaryInterceptors, streamInterceptors
 }
 
@@ -487,3 +487,4 @@ func IdentityClient() Client {
 	}
 	return client
 }
+

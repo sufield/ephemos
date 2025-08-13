@@ -208,7 +208,7 @@ func TestEnhancedErrors(t *testing.T) {
 		// Test decorating non-errorx error
 		regularErr := errors.New("regular error")
 		decoratedRegularErr := DecorateError(regularErr, "enhanced context")
-		
+
 		if !IsEnhancedSystemError(decoratedRegularErr) {
 			t.Error("Expected decorated regular error to be wrapped as enhanced system error")
 		}

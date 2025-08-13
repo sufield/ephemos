@@ -93,7 +93,6 @@ func (c *Configuration) ValidateAndSetDefaults() error {
 	return ValidateStruct(c)
 }
 
-
 // Environment variable names for configuration.
 const (
 	EnvServiceName       = "EPHEMOS_SERVICE_NAME"

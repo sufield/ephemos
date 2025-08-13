@@ -999,7 +999,6 @@ func ValidateStructWithEngine(v any, engine *ValidationEngine) error {
 	return engine.ValidateAndSetDefaults(v)
 }
 
-
 // GetValidationErrors extracts all validation errors from an error.
 func GetValidationErrors(err error) []ValidationError {
 	var validationErr *ValidationError

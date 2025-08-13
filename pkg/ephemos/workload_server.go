@@ -101,7 +101,7 @@ func (s *workloadServerImpl) RegisterService(registrar ServiceRegistrar) error {
 
 	// Register with the gRPC server
 	registrar.Register(s.grpcServer)
-	
+
 	// Store in registry for tracking
 	s.mu.Lock()
 	s.serviceRegistry[fmt.Sprintf("%T", registrar)] = registrar

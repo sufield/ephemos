@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-
 	// Internal adapters temporarily removed to eliminate dependencies
 )
 
@@ -286,7 +285,7 @@ func (s *TransportServer) serveGRPCOnListener(ctx context.Context, listener net.
 	return serverErr
 }
 
-// serveHTTPOnListener serves HTTP on a pre-created listener  
+// serveHTTPOnListener serves HTTP on a pre-created listener
 func (s *TransportServer) serveHTTPOnListener(ctx context.Context, listener net.Listener) error {
 	var wg sync.WaitGroup
 	var serverErr error
@@ -312,7 +311,7 @@ func (s *TransportServer) serveHTTPOnListener(ctx context.Context, listener net.
 	// Wait for context cancellation
 	go func() {
 		<-ctx.Done()
-		
+
 		// Graceful shutdown for HTTP server
 		shutdownTimeout, shutdownCancel := context.WithTimeout(context.Background(), DefaultShutdownTimeout)
 		defer shutdownCancel()
