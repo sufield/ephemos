@@ -497,7 +497,7 @@ parse_golangci_lint_results() {
     local style_issues=0
     
     while IFS= read -r line; do
-        if [[ "$line" =~ ^[^:]+:[0-9]+:[0-9]+:.*\\([^)]+\\) ]]; then
+        if [[ "$line" =~ ^[^:]+:[0-9]+:[0-9]+: ]]; then
             issue_count=$((issue_count + 1))
             
             # Categorize by linter type
