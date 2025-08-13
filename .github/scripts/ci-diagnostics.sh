@@ -60,8 +60,8 @@ log_diagnostic() {
     local icon=""
     
     case "$level" in
-        "TRACE")   color_code="$DIAG_CYAN";    icon="🔍"; [[ $DIAGNOSTIC_MODE -lt 2 ]] && return 0 ;;
-        "DEBUG")   color_code="$DIAG_BLUE";    icon="🐛"; [[ $DIAGNOSTIC_MODE -lt 1 ]] && return 0 ;;
+        "TRACE")   color_code="$DIAG_CYAN";    icon="🔍"; [[ ${DIAGNOSTIC_MODE:-1} -lt 2 ]] && return 0 ;;
+        "DEBUG")   color_code="$DIAG_BLUE";    icon="🐛"; [[ ${DIAGNOSTIC_MODE:-1} -lt 1 ]] && return 0 ;;
         "INFO")    color_code="$DIAG_GREEN";   icon="ℹ️" ;;
         "WARN")    color_code="$DIAG_YELLOW";  icon="⚠️" ;;
         "ERROR")   color_code="$DIAG_RED";     icon="❌" ;;
@@ -585,7 +585,7 @@ monitor_system_resources() {
     # Check for low disk space
     local disk_usage_percent
     disk_usage_percent=$(df . | awk 'NR==2{print $5}' | sed 's/%//')
-    if [[ $disk_usage_percent -gt 80 ]]; then
+    if [[ ${disk_usage_percent:-0} -gt 80 ]]; then
         log_diagnostic "WARN" "High disk usage detected: ${disk_usage_percent}%"
     fi
     

@@ -278,6 +278,9 @@ clean_build_environment() {
 perform_standard_build() {
     log_diagnostic "INFO" "🔨 Performing standard build"
     
+    # Ensure bin directory exists
+    mkdir -p bin
+    
     # Build main package
     execute_with_diagnostics "build-main-pkg" "Building main Ephemos package" \
         go build -v ./pkg/ephemos
@@ -299,6 +302,9 @@ perform_standard_build() {
 
 perform_examples_build() {
     log_diagnostic "INFO" "🔨 Building examples"
+    
+    # Ensure bin directory exists
+    mkdir -p bin
     
     # Build echo server example
     execute_with_diagnostics "build-echo-server" "Building echo server example" \
