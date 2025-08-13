@@ -30,7 +30,17 @@ http_archive(
     ],
 )
 
-# Bazel features compatibility layer
+# Bazel skylib - Required by rules_java
+http_archive(
+    name = "bazel_skylib",
+    sha256 = "bc283cdfcd526a52c3201279cda4bc298652efa898b10b4db0837dc51652756f",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.7.1/bazel-skylib-1.7.1.tar.gz",
+        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.7.1/bazel-skylib-1.7.1.tar.gz",
+    ],
+)
+
+# Bazel features compatibility layer - Updated for latest compatibility
 http_archive(
     name = "bazel_features",
     sha256 = "ba1282c1aa1d1fffdcf994ab32131d7c7551a9bc960fbf05f42d55a1b930cbfb",
@@ -68,12 +78,12 @@ http_archive(
 #     sha256 = "1535151efbc7893f38b0578e83cac584f2819974f065698976989ec71c1af84a",
 # )
 
-# Note: Java rules removed as project uses Go, not Java
-# If needed by transitive dependencies, uncomment with latest version:
+# Note: Java rules commented out - project uses Go, not Java  
+# If needed by transitive dependencies, uncomment with compatible version:
 # http_archive(
 #     name = "rules_java", 
-#     urls = ["https://github.com/bazelbuild/rules_java/releases/download/8.15.1/rules_java-8.15.1.tar.gz"],
-#     sha256 = "9b04cbbb0fee0632aeba628159938484cfadf4a9d2f5b1c356e8300c56467896",
+#     urls = ["https://github.com/bazelbuild/rules_java/releases/download/7.12.5/rules_java-7.12.5.tar.gz"],
+#     sha256 = "17b18cb4f92ab7b94aa343ce78531b73960b1bed2ba166e5b02c9fdf0b0ac270",
 # )
 
 # Python rules - Updated to latest stable version compatible with Bazel 7.x
@@ -91,7 +101,7 @@ load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies", "rules_cc_toolch
 load("@bazel_features//:deps.bzl", "bazel_features_deps")
 load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies")
 load("@rules_python//python:repositories.bzl", "py_repositories", "python_register_toolchains")
-# Note: rules_java dependencies removed as project uses Go, not Java
+# Note: rules_java load commented out - project uses Go, not Java
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 
@@ -103,7 +113,7 @@ bazel_features_deps()
 
 rules_proto_dependencies()
 
-# Note: rules_java initialization removed as project uses Go, not Java
+# Note: rules_java initialization commented out - project uses Go, not Java
 
 py_repositories()
 
