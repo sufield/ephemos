@@ -47,7 +47,7 @@ func main() {
 
 	results := make(map[string]*PackageResult)
 	scanner := bufio.NewScanner(file)
-	
+
 	var totalTests, passedTests, failedTests, skippedTests int
 	var compilationErrors []string
 
@@ -127,11 +127,11 @@ func main() {
 	// Print per-package results
 	fmt.Println("📦 PACKAGE RESULTS:")
 	fmt.Println("-------------------")
-	
+
 	for _, pkgName := range packages {
 		pkg := results[pkgName]
 		shortName := getShortPackageName(pkgName)
-		
+
 		if pkg.BuildFailed {
 			fmt.Printf("❌ %-40s [BUILD FAILED]\n", shortName)
 			continue
@@ -146,7 +146,7 @@ func main() {
 
 		fmt.Printf("%s %-40s Pass:%3d  Fail:%3d  Skip:%3d  (%.2fs)\n",
 			status, shortName, pkg.Passed, pkg.Failed, pkg.Skipped, pkg.TotalElapsed)
-		
+
 		// Show failed test names
 		if len(pkg.FailedTests) > 0 {
 			for _, test := range pkg.FailedTests {
@@ -164,7 +164,7 @@ func main() {
 	fmt.Printf("✅ Tests Passed:    %d\n", passedTests)
 	fmt.Printf("❌ Tests Failed:    %d\n", failedTests)
 	fmt.Printf("⏭️  Tests Skipped:   %d\n", skippedTests)
-	
+
 	if failedTests > 0 {
 		fmt.Printf("\n🔥 %d TEST(S) FAILED - See details above\n", failedTests)
 	}
