@@ -44,12 +44,12 @@ validate_security_tools() {
     
     log_diagnostic "INFO" "🔍 Validating security tools for scan type: $scan_type"
     
-    # Map of security tools and their installation methods
+    # Map of security tools and their installation methods (pinned to stable versions)
     declare -A security_tools=(
-        ["govulncheck"]="golang.org/x/vuln/cmd/govulncheck@latest"
-        ["golangci-lint"]="github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
-        ["gosec"]="github.com/securego/gosec/v2/cmd/gosec@latest"
-        ["staticcheck"]="honnef.co/go/tools/cmd/staticcheck@latest"
+        ["govulncheck"]="golang.org/x/vuln/cmd/govulncheck@v1.2.0"
+        ["golangci-lint"]="github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.0"
+        ["gosec"]="github.com/securego/gosec/v2/cmd/gosec@v2.21.2"
+        ["staticcheck"]="honnef.co/go/tools/cmd/staticcheck@v0.4.7"
     )
     
     local missing_tools=()
@@ -110,12 +110,12 @@ install_security_tools() {
     
     log_diagnostic "INFO" "📦 Installing security tools: ${tools[*]}"
     
-    # Security tool installation mappings
+    # Security tool installation mappings (pinned to stable versions for reliability)
     declare -A tool_packages=(
-        ["govulncheck"]="golang.org/x/vuln/cmd/govulncheck@latest"
-        ["golangci-lint"]="github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
-        ["gosec"]="github.com/securego/gosec/v2/cmd/gosec@latest"
-        ["staticcheck"]="honnef.co/go/tools/cmd/staticcheck@latest"
+        ["govulncheck"]="golang.org/x/vuln/cmd/govulncheck@v1.2.0"
+        ["golangci-lint"]="github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.0"
+        ["gosec"]="github.com/securego/gosec/v2/cmd/gosec@v2.21.2"
+        ["staticcheck"]="honnef.co/go/tools/cmd/staticcheck@v0.4.7"
     )
     
     local installation_failed=0

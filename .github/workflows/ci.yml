@@ -81,12 +81,34 @@ jobs:
         # Start performance monitoring
         perf_start=$(monitor_step_performance "golangci-lint-analysis" 900 600)
         
-        # Install golangci-lint if not available
+        # Install golangci-lint if not available (with retry logic for network reliability)
         if ! command -v golangci-lint >/dev/null 2>&1; then
           log_diagnostic "INFO" "Installing golangci-lint"
-          execute_with_diagnostics "install-golangci-lint" \
-            "Installing golangci-lint" \
-            go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          
+          # Retry installation up to 3 times for network reliability
+          max_retries=3
+          for attempt in $(seq 1 $max_retries); do
+            if execute_with_diagnostics "install-golangci-lint-attempt-$attempt" \
+              "Installing golangci-lint (attempt $attempt/$max_retries)" \
+              go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.0; then
+              
+              if command -v golangci-lint >/dev/null 2>&1; then
+                log_diagnostic "SUCCESS" "✅ golangci-lint installed successfully"
+                break
+              fi
+            fi
+            
+            if [[ $attempt -lt $max_retries ]]; then
+              log_diagnostic "WARN" "golangci-lint installation attempt $attempt failed, retrying..."
+              sleep 3
+            else
+              fail_with_comprehensive_diagnostics 1 \
+                "Failed to install golangci-lint after $max_retries attempts" \
+                "Network connectivity issue preventing tool installation" \
+                "Check network connectivity and service availability" \
+                "Try re-running the workflow or use a different runner"
+            fi
+          done
         fi
         
         # Enhanced golangci-lint run with comprehensive error analysis
