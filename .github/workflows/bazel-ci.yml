@@ -51,9 +51,10 @@ jobs:
         build:ci --test_summary=detailed
         build:ci --build_tests_only
         build:ci --jobs=auto
-        build:ci --local_resources=memory=75%,cpu=100%
+        build:ci --local_ram_resources=HOST_RAM*0.75
+        build:ci --local_cpu_resources=HOST_CPUS
         build:ci --sandbox_default_allow_network=false
-        build:ci --experimental_strict_action_env
+        build:ci --incompatible_strict_action_env
         
         # Test configuration
         test:ci --test_timeout=300
@@ -71,6 +72,22 @@ jobs:
         bazel info
         echo "Workspace: $(bazel info workspace)"
         echo "Output base: $(bazel info output_base)"
+
+    - name: Clean Bazel cache if needed
+      run: |
+        echo "🧹 Checking for cache issues..."
+        # Clean cache if this is a retry or if external dependencies failed before
+        if [ "${{ github.run_attempt }}" != "1" ]; then
+          echo "⚠️ Retry detected, cleaning Bazel cache..."
+          bazel clean --expunge
+          rm -rf ~/.cache/bazel ~/.cache/bazelisk || true
+        fi
+
+    - name: Sync Bazel external dependencies
+      run: |
+        echo "🔄 Syncing external dependencies..."
+        bazel sync
+        echo "✅ Dependencies synced successfully"
 
     - name: Build all targets
       run: |
