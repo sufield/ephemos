@@ -122,17 +122,15 @@ test_suite(
     ],
 )
 
-# TODO: Future Go-based script replacements could be added here
-# go_binary(
-#     name = "proto_generator",
-#     srcs = ["proto/main.go"], 
-#     visibility = ["//visibility:public"],
-#     deps = [
-#         "@org_golang_google_protobuf//compiler/protogen",
-#         "@org_golang_google_protobuf//types/pluginpb",
-#     ],
-# )
-#
+# Go-based protobuf generator (replaces bash scripts)
+go_binary(
+    name = "proto_generator",
+    srcs = ["proto/main.go"], 
+    visibility = ["//visibility:public"],
+    deps = ["@com_github_spf13_cobra//:cobra"],
+)
+
+# TODO: Future Go-based tests could be added here
 # go_test(
 #     name = "scripts_test",
 #     srcs = ["scripts_test.go"],
