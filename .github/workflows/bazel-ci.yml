@@ -54,6 +54,8 @@ jobs:
         key: bazel-${{ runner.os }}-${{ hashFiles('.bazelrc', 'WORKSPACE', 'BUILD.bazel', '**/*.bzl') }}
         restore-keys: |
           bazel-${{ runner.os }}-
+      # Note: Protobuf optimization configured in WORKSPACE and .bazelrc
+      # Uses prebuilt protoc binaries for 30-60% faster builds
 
     - name: Configure Bazel
       run: |

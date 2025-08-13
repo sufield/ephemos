@@ -1,0 +1,34 @@
+load("@rules_proto//proto:defs.bzl", "proto_lang_toolchain")
+
+# Go protobuf toolchain using prebuilt protoc
+proto_lang_toolchain(
+    name = "protoc_go_toolchain",
+    command_line = "--go_out=%s --go_opt=paths=source_relative",
+    progress_message = "Generating Go proto_library %{label}",
+    runtime = "@org_golang_google_protobuf//:protobuf_go",
+    toolchain_type = "@rules_go//proto:toolchain_type",
+    visibility = ["//visibility:public"],
+)
+
+# Go gRPC toolchain using prebuilt protoc
+proto_lang_toolchain(
+    name = "protoc_go_grpc_toolchain", 
+    command_line = "--go-grpc_out=%s --go-grpc_opt=paths=source_relative",
+    progress_message = "Generating Go gRPC proto_library %{label}",
+    runtime = "@org_golang_google_grpc//:grpc_go",
+    toolchain_type = "@rules_go//proto/grpc:toolchain_type",
+    visibility = ["//visibility:public"],
+)
+
+# Export toolchains for registration
+toolchain(
+    name = "go_proto_toolchain",
+    toolchain = ":protoc_go_toolchain",
+    toolchain_type = "@rules_go//proto:toolchain_type",
+)
+
+toolchain(
+    name = "go_grpc_toolchain",
+    toolchain = ":protoc_go_grpc_toolchain", 
+    toolchain_type = "@rules_go//proto/grpc:toolchain_type",
+)
