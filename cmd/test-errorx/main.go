@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/suffield/ephemos/pkg/ephemos"
+	"github.com/sufield/ephemos/pkg/ephemos"
 )
 
 func main() {
