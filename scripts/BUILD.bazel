@@ -68,12 +68,26 @@ sh_binary(
 sh_binary(
     name = "install_deps",
     srcs = ["install-deps.sh"],
+    data = [":install_bazel"],
     visibility = ["//visibility:public"],
 )
 
 sh_binary(
     name = "install_deps_sudo",
     srcs = ["install-deps-sudo.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "install_bazel",
+    srcs = ["install-bazel.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "setup_dev_environment",
+    srcs = ["setup-dev-environment.sh"],
+    data = [":install_deps", ":install_bazel"],
     visibility = ["//visibility:public"],
 )
 

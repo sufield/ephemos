@@ -1,0 +1,14 @@
+# act configuration file
+# This configures act to work with the Ephemos project
+
+# Use medium-sized runner by default
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Enable verbose output for debugging
+--verbose
+
+# Use local secrets file
+--secret-file .secrets
+
+# Set default event
+--eventpath .github/workflows/events/push.json

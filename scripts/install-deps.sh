@@ -225,17 +225,68 @@ else
     echo -e "${GREEN}✓ Go bin directory is in PATH${NC}"
 fi
 
-# 7. Test protobuf generation
-echo -e "\n${BLUE}7. Testing protobuf generation...${NC}"
+# 7. Install Bazel build system
+echo -e "\n${BLUE}7. Installing Bazel build system...${NC}"
+if command_exists bazel; then
+    BAZEL_VERSION=$(bazel version 2>/dev/null | grep "Build label" | awk '{print $3}' || echo "unknown")
+    echo -e "${GREEN}✓ Bazel is already installed: $BAZEL_VERSION${NC}"
+else
+    echo "Installing Bazel..."
+    if ./scripts/install-bazel.sh; then
+        echo -e "${GREEN}✓ Bazel installed successfully${NC}"
+    else
+        echo -e "${RED}✗ Bazel installation failed${NC}"
+        INSTALL_ERRORS=1
+    fi
+fi
+
+# 8. Install act (GitHub Actions local runner)
+echo -e "\n${BLUE}8. Installing act (GitHub Actions local runner)...${NC}"
+if command_exists act; then
+    ACT_VERSION=$(act --version 2>/dev/null | head -n1 || echo "unknown")
+    echo -e "${GREEN}✓ act is already installed: $ACT_VERSION${NC}"
+else
+    echo "Installing act..."
+    if curl -s https://api.github.com/repos/nektos/act/releases/latest | grep "browser_download_url.*linux_amd64" | cut -d '"' -f 4 | xargs curl -L -o /tmp/act && chmod +x /tmp/act; then
+        mkdir -p "$HOME/bin"
+        mv /tmp/act "$HOME/bin/act"
+        export PATH="$HOME/bin:$PATH"
+        echo -e "${GREEN}✓ act installed to $HOME/bin/act${NC}"
+        
+        # Add to PATH in shell profiles if not already there
+        for shell_profile in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+            if [[ -f "$shell_profile" ]] && ! grep -q 'export PATH="$HOME/bin:$PATH"' "$shell_profile"; then
+                echo 'export PATH="$HOME/bin:$PATH"' >> "$shell_profile"
+            fi
+        done
+    else
+        echo -e "${YELLOW}⚠️  Failed to install act (optional)${NC}"
+    fi
+fi
+
+# 9. Test protobuf generation
+echo -e "\n${BLUE}9. Testing protobuf generation...${NC}"
 export PATH="$PATH:$(go env GOPATH)/bin"
 
 if command_exists protoc && command_exists protoc-gen-go && command_exists protoc-gen-go-grpc; then
     echo "Testing protobuf generation..."
-    if make proto; then
-        echo -e "${GREEN}✓ Protobuf generation test successful${NC}"
+    # Use Bazel if available, otherwise fall back to make
+    if command_exists bazel && [[ -f "bazel.sh" ]]; then
+        if ./bazel.sh proto; then
+            echo -e "${GREEN}✓ Protobuf generation test successful (Bazel)${NC}"
+        else
+            echo -e "${RED}✗ Protobuf generation test failed (Bazel)${NC}"
+            INSTALL_ERRORS=1
+        fi
+    elif command_exists make && [[ -f "Makefile" ]]; then
+        if make proto; then
+            echo -e "${GREEN}✓ Protobuf generation test successful (Make)${NC}"
+        else
+            echo -e "${RED}✗ Protobuf generation test failed (Make)${NC}"
+            INSTALL_ERRORS=1
+        fi
     else
-        echo -e "${RED}✗ Protobuf generation test failed${NC}"
-        INSTALL_ERRORS=1
+        echo -e "${YELLOW}⚠️  No build system found to test protobuf generation${NC}"
     fi
 else
     echo -e "${RED}✗ Missing protobuf tools for testing${NC}"
@@ -247,14 +298,32 @@ echo -e "\n=================================================="
 if [ $INSTALL_ERRORS -eq 0 ]; then
     echo -e "${GREEN}🎉 All dependencies installed successfully!${NC}"
     echo ""
-    echo "You can now run:"
-    echo "  make build       # Build main CLI tools"
-    echo "  make examples    # Build example applications"
-    echo "  make test        # Run tests"
-    echo "  make lint        # Run linting"
-    echo ""
-    echo "For security scanning:"
-    echo "  ./scripts/security-scan.sh"
+    echo "Available build systems:"
+    if command_exists bazel && [[ -f "bazel.sh" ]]; then
+        echo -e "${GREEN}✓ Bazel (recommended):${NC}"
+        echo "  ./bazel.sh build         # Build all targets"
+        echo "  ./bazel.sh test          # Run tests"
+        echo "  ./bazel.sh lint          # Run linting"
+        echo "  ./bazel.sh security-all  # Run security scans"
+        echo "  ./bazel.sh examples      # Build examples"
+        echo ""
+    fi
+    if command_exists make && [[ -f "Makefile" ]]; then
+        echo -e "${BLUE}✓ Make (legacy):${NC}"
+        echo "  make build       # Build main CLI tools"
+        echo "  make examples    # Build example applications"
+        echo "  make test        # Run tests"
+        echo "  make lint        # Run linting"
+        echo ""
+    fi
+    if command_exists act && [[ -f ".actrc" ]]; then
+        echo -e "${GREEN}✓ Local CI/CD testing:${NC}"
+        echo "  ./act -l                 # List available workflows"
+        echo "  ./act -j test            # Run specific job locally"
+        echo "  ./act --dryrun           # Validate workflows"
+        echo ""
+    fi
+    echo "For additional help, see: docs/contributors/"
     exit 0
 else
     echo -e "${YELLOW}⚠️  Partial installation completed.${NC}"
@@ -266,7 +335,12 @@ else
     echo "  # OR install manually as suggested above"
     echo ""
     echo "You can still try to build - Go dependencies are available:"
-    echo "  make build       # May work if protoc already installed"
+    if command_exists bazel && [[ -f "bazel.sh" ]]; then
+        echo "  ./bazel.sh build       # May work if protoc already installed"
+    fi
+    if command_exists make && [[ -f "Makefile" ]]; then
+        echo "  make build             # May work if protoc already installed"
+    fi
     # Exit 0 instead of exit 1 to avoid breaking automated processes
     exit 0
 fi
@@ -274,6 +348,12 @@ fi
 echo -e "\n💡 ${BLUE}Next steps:${NC}"
 echo "1. If protoc installation was skipped, run: ./scripts/install-deps-sudo.sh"
 echo "2. Restart your terminal or run: source ~/.bashrc"
-echo "3. Run: make build"
-echo "4. Run: make test"
-echo "5. Start developing!"
+if command_exists bazel && [[ -f "bazel.sh" ]]; then
+    echo "3. Run: ./bazel.sh build"
+    echo "4. Run: ./bazel.sh test"
+    echo "5. Try local CI: ./act -j test"
+else
+    echo "3. Run: make build"
+    echo "4. Run: make test"
+fi
+echo "6. Start developing!"
