@@ -1851,8 +1851,30 @@ jobs:
     - name: Setup Protocol Buffers (Required for CI/CD)
       uses: ./.github/actions/setup-protobuf-fixed
         
+    - name: Verify protoc setup
+      run: |
+        echo "🔍 Verifying protoc tools are available..."
+        export GOBIN="${GOBIN:-$(go env GOPATH)/bin}"
+        export PATH="$GOBIN:$PATH"
+        
+        # Verify protoc compiler
+        protoc --version || { echo "❌ protoc not found"; exit 1; }
+        
+        # Verify Go plugins
+        command -v protoc-gen-go >/dev/null || { echo "❌ protoc-gen-go not in PATH"; exit 1; }
+        command -v protoc-gen-go-grpc >/dev/null || { echo "❌ protoc-gen-go-grpc not in PATH"; exit 1; }
+        
+        echo "✅ All protoc tools verified:"
+        echo "  protoc: $(which protoc)"
+        echo "  protoc-gen-go: $(which protoc-gen-go)"
+        echo "  protoc-gen-go-grpc: $(which protoc-gen-go-grpc)"
+        
     - name: Run benchmarks
       run: |
+        # Ensure protoc tools are in PATH
+        export GOBIN="${GOBIN:-$(go env GOPATH)/bin}"
+        export PATH="$GOBIN:$PATH"
+        
         go clean -cache
         make ci-setup
         # Use clean benchmark script to avoid log noise issues
