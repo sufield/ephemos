@@ -64,8 +64,7 @@ jobs:
         test:ci --test_strategy=standalone
         test:ci --cache_test_results=auto
         
-        # Coverage configuration  
-        coverage:ci --combined_report=lcov
+        # Coverage configuration (lcov is now default in Bazel 8.x)
         coverage:ci --coverage_report_generator=@bazel_tools//tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator:Main
         EOF
 
@@ -86,11 +85,11 @@ jobs:
           rm -rf ~/.cache/bazel ~/.cache/bazelisk || true
         fi
 
-    - name: Sync Bazel external dependencies
+    - name: Fetch Bazel external dependencies
       run: |
-        echo "🔄 Syncing external dependencies..."
-        bazel sync
-        echo "✅ Dependencies synced successfully"
+        echo "🔄 Fetching external dependencies..."
+        bazel fetch --all
+        echo "✅ Dependencies fetched successfully"
 
     - name: Build all targets
       run: |
