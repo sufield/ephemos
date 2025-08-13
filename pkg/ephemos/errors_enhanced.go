@@ -30,28 +30,28 @@ func systemNamespace() *errorx.Namespace {
 // Enhanced error types with errorx features
 var (
 	// Validation errors
-	EnhancedValidationError   = ValidationNamespace.NewType("validation_error")
-	FieldValidationError      = ValidationNamespace.NewType("field_validation")
-	CollectionValidationError = ValidationNamespace.NewType("collection_error")
+	EnhancedValidationError   = validationNamespace().NewType("validation_error")
+	FieldValidationError      = validationNamespace().NewType("field_validation")
+	CollectionValidationError = validationNamespace().NewType("collection_error")
 
 	// Configuration errors
-	EnhancedConfigurationError = ConfigurationNamespace.NewType("config_error")
-	ConfigFileError            = ConfigurationNamespace.NewType("config_file")
-	ConfigParseError           = ConfigurationNamespace.NewType("config_parse")
+	EnhancedConfigurationError = configurationNamespace().NewType("config_error")
+	ConfigFileError            = configurationNamespace().NewType("config_file")
+	ConfigParseError           = configurationNamespace().NewType("config_parse")
 
 	// Domain errors
-	EnhancedDomainError = DomainNamespace.NewType("domain_error")
-	ServiceError        = DomainNamespace.NewType("service_error")
-	IdentityError       = DomainNamespace.NewType("identity_error")
+	EnhancedDomainError = domainNamespace().NewType("domain_error")
+	ServiceError        = domainNamespace().NewType("service_error")
+	IdentityError       = domainNamespace().NewType("identity_error")
 
 	// System errors
-	EnhancedSystemError = SystemNamespace.NewType("system_error")
-	ConnectionError     = SystemNamespace.NewType("connection_error")
-	CertificateError    = SystemNamespace.NewType("certificate_error")
+	EnhancedSystemError = systemNamespace().NewType("system_error")
+	ConnectionError     = systemNamespace().NewType("connection_error")
+	CertificateError    = systemNamespace().NewType("certificate_error")
 
 	// Specialized error types with built-in traits
-	TimeoutError   = SystemNamespace.NewType("timeout_error", errorx.Timeout())
-	TemporaryError = SystemNamespace.NewType("temporary_error", errorx.Temporary())
+	TimeoutError   = systemNamespace().NewType("timeout_error", errorx.Timeout())
+	TemporaryError = systemNamespace().NewType("temporary_error", errorx.Temporary())
 )
 
 // Common error properties for consistent error context
