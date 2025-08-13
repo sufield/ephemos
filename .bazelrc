@@ -16,8 +16,8 @@ common --noenable_bzlmod
 test --test_output=errors
 test --test_summary=detailed
 
-# Coverage settings
-coverage --combined_report=lcov
+# Coverage settings (lcov is now default in Bazel 8.x)
+# coverage --combined_report=lcov  # Commented out: lcov is now the default
 coverage --coverage_report_generator=@bazel_tools//tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator:Main
 
 # Remote cache (can be configured for CI)
