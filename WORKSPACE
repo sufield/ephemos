@@ -76,13 +76,14 @@ http_archive(
 #     sha256 = "9b04cbbb0fee0632aeba628159938484cfadf4a9d2f5b1c356e8300c56467896",
 # )
 
-# Python rules
+# Python rules - Updated to latest version compatible with Bazel 7.x
+# This version resolves PyCcLinkParamsProvider issues and provides full Bazel 7 support
 http_archive(
     name = "rules_python",
-    sha256 = "778aaeab3e6cfd56d681c89f5c10d7ad6bf8d2f1a72de9de55b23081b2d31618",
-    strip_prefix = "rules_python-0.34.0",
+    sha256 = "0a8003b044294d7840ac7d9d73eef05d6ceb682d7516781a4ec62eeb34702578",
+    strip_prefix = "rules_python-0.35.0",
     urls = [
-        "https://github.com/bazelbuild/rules_python/releases/download/0.34.0/rules_python-0.34.0.tar.gz",
+        "https://github.com/bazelbuild/rules_python/releases/download/0.35.0/rules_python-0.35.0.tar.gz",
     ],
 )
 
@@ -135,5 +136,9 @@ load("//:deps.bzl", "go_dependencies")
 # gazelle:repository_macro deps.bzl%go_dependencies
 go_dependencies()
 
-# Note: Custom Go proto toolchains disabled due to compatibility issues
-# register_toolchains("//tools/toolchains:all")
+# Register custom Go proto toolchains for optimized builds
+register_toolchains(
+    "//tools/toolchains:go_proto_toolchain",
+    "//tools/toolchains:go_grpc_toolchain", 
+    "//tools/toolchains:go_combined_toolchain",
+)

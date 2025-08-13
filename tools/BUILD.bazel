@@ -1,0 +1,28 @@
+# Tools directory for build and development utilities
+
+package(default_visibility = ["//visibility:public"])
+
+# Shell scripts for various build and development tasks
+sh_binary(
+    name = "lint_check",
+    srcs = ["lint_check.sh"],
+    data = ["//pkg/ephemos:all"],
+)
+
+sh_binary(
+    name = "security_scan", 
+    srcs = ["security_scan.sh"],
+    data = ["//pkg/ephemos:all"],
+)
+
+sh_binary(
+    name = "workspace_status",
+    srcs = ["workspace_status.sh"],
+)
+
+# Export all toolchain configurations
+exports_files([
+    "lint_check.sh",
+    "security_scan.sh", 
+    "workspace_status.sh",
+])
