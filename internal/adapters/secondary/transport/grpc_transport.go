@@ -250,7 +250,7 @@ func (c *GRPCClient) createConnection(serviceName, address string) (ports.Connec
 	dialOptions = append(dialOptions, c.credentialOption)
 
 	// Create connection (dialing is lazy and handled via connection params)
-	conn, err := grpc.Dial(address, dialOptions...)
+	conn, err := grpc.NewClient(address, dialOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client for service %s at %s: %w", serviceName, address, err)
 	}
