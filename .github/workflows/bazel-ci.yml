@@ -43,7 +43,7 @@ jobs:
     - name: Setup Bazel
       uses: bazelbuild/setup-bazelisk@v3
       with:
-        bazelisk-version: '1.19.0'
+        bazelisk-version: '1.18.0'
 
     - name: Mount Bazel cache
       uses: actions/cache@v4
@@ -262,7 +262,7 @@ jobs:
     - name: Setup Bazel
       uses: bazelbuild/setup-bazelisk@v3
       with:
-        bazelisk-version: '1.19.0'
+        bazelisk-version: '1.18.0'
 
     - name: Mount Bazel cache
       uses: actions/cache@v4
