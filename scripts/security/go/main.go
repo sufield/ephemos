@@ -23,11 +23,11 @@ type SecurityScanner struct {
 
 // ScanResult represents the result of a security scan
 type ScanResult struct {
-	Name      string
-	Passed    bool
-	Details   string
-	Duration  time.Duration
-	Warnings  []string
+	Name     string
+	Passed   bool
+	Details  string
+	Duration time.Duration
+	Warnings []string
 }
 
 // NewSecurityScanner creates a new security scanner instance
@@ -50,17 +50,17 @@ Includes: secrets scanning, vulnerability detection, SBOM generation, and valida
 		Run: func(cmd *cobra.Command, args []string) {
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
-			
+
 			// Determine project root
 			projectRoot, err := determineProjectRoot()
 			if err != nil {
 				log.Fatalf("Failed to determine project root: %v", err)
 			}
-			
+
 			scanner := NewSecurityScanner(projectRoot)
 			scanner.verbose = verbose
 			scanner.exitOnError = !continueOnError
-			
+
 			if err := scanner.RunAllScans(); err != nil {
 				log.Fatalf("Security scan failed: %v", err)
 			}
@@ -123,7 +123,7 @@ func (s *SecurityScanner) RunAllScans() error {
 func (s *SecurityScanner) runSecretsScans() ScanResult {
 	fmt.Println("📝 Running secrets scans...")
 	start := time.Now()
-	
+
 	var warnings []string
 	passed := true
 	details := []string{}
@@ -173,7 +173,7 @@ func (s *SecurityScanner) runSecretsScans() ScanResult {
 func (s *SecurityScanner) runVulnerabilityScans() ScanResult {
 	fmt.Println("🔍 Running vulnerability scans...")
 	start := time.Now()
-	
+
 	var warnings []string
 	passed := true
 	details := []string{}
@@ -215,7 +215,7 @@ func (s *SecurityScanner) runVulnerabilityScans() ScanResult {
 func (s *SecurityScanner) runSBOMScans() ScanResult {
 	fmt.Println("📋 Running SBOM generation and validation...")
 	start := time.Now()
-	
+
 	var warnings []string
 	passed := true
 	details := []string{}
@@ -247,14 +247,14 @@ func (s *SecurityScanner) runSBOMScans() ScanResult {
 func (s *SecurityScanner) runGitleaks() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, "gitleaks", "detect", "--source", ".", "--no-git", "--verbose")
 	cmd.Dir = s.projectRoot
-	
+
 	if s.verbose {
 		fmt.Println("Running: gitleaks detect --source . --no-git --verbose")
 	}
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		if strings.Contains(string(output), "no leaks found") {
@@ -268,24 +268,24 @@ func (s *SecurityScanner) runGitleaks() error {
 func (s *SecurityScanner) runTruffleHog() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, "trufflehog", "filesystem", "--directory=.", "--only-verified", "--json")
 	cmd.Dir = s.projectRoot
-	
+
 	if s.verbose {
 		fmt.Println("Running: trufflehog filesystem --directory=. --only-verified --json")
 	}
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("trufflehog execution failed: %v", err)
 	}
-	
+
 	// Check if any secrets were found
 	if strings.Contains(string(output), "SourceType") {
 		return fmt.Errorf("TruffleHog found potential secrets")
 	}
-	
+
 	return nil
 }
 
@@ -295,7 +295,7 @@ func (s *SecurityScanner) runCustomSecretsPattern() error {
 		if err != nil {
 			return err
 		}
-		
+
 		// Skip non-Go files and certain directories
 		if !strings.HasSuffix(path, ".go") ||
 			strings.Contains(path, "/.git/") ||
@@ -303,10 +303,10 @@ func (s *SecurityScanner) runCustomSecretsPattern() error {
 			strings.Contains(path, "/node_modules/") {
 			return nil
 		}
-		
+
 		return s.scanFileForSecrets(path)
 	})
-	
+
 	return err
 }
 
@@ -316,10 +316,10 @@ func (s *SecurityScanner) scanFileForSecrets(filePath string) error {
 		return err
 	}
 	defer file.Close()
-	
+
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
-	
+
 	// Common secret patterns
 	patterns := []string{
 		"password",
@@ -329,47 +329,47 @@ func (s *SecurityScanner) scanFileForSecrets(filePath string) error {
 		"token",
 		"private_key",
 	}
-	
+
 	for scanner.Scan() {
 		lineNum++
 		line := strings.ToLower(scanner.Text())
-		
+
 		// Skip comments and test files
 		if strings.Contains(line, "//") || strings.Contains(filePath, "_test.go") {
 			continue
 		}
-		
+
 		for _, pattern := range patterns {
 			if strings.Contains(line, pattern) && strings.Contains(line, "=") {
 				// Check if it looks like a hardcoded credential (exclude common false positives)
-				if !strings.Contains(line, "fmt.") && 
-				   !strings.Contains(line, "log.") &&
-				   !strings.Contains(line, "test") &&
-				   !strings.Contains(line, "example") &&
-				   !strings.Contains(line, "placeholder") &&
-				   !strings.Contains(line, "\""+pattern+"\"") && // Skip quoted patterns like our array
-				   !strings.Contains(line, "[]string{") &&       // Skip string array definitions
-				   !strings.Contains(line, "patterns") {         // Skip our patterns array
+				if !strings.Contains(line, "fmt.") &&
+					!strings.Contains(line, "log.") &&
+					!strings.Contains(line, "test") &&
+					!strings.Contains(line, "example") &&
+					!strings.Contains(line, "placeholder") &&
+					!strings.Contains(line, "\""+pattern+"\"") && // Skip quoted patterns like our array
+					!strings.Contains(line, "[]string{") && // Skip string array definitions
+					!strings.Contains(line, "patterns") { // Skip our patterns array
 					return fmt.Errorf("potential hardcoded credential in %s:%d", filePath, lineNum)
 				}
 			}
 		}
 	}
-	
+
 	return scanner.Err()
 }
 
 func (s *SecurityScanner) runGovulncheck() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, "govulncheck", "./...")
 	cmd.Dir = s.projectRoot
-	
+
 	if s.verbose {
 		fmt.Println("Running: govulncheck ./...")
 	}
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("govulncheck found vulnerabilities: %s", string(output))
@@ -380,14 +380,14 @@ func (s *SecurityScanner) runGovulncheck() error {
 func (s *SecurityScanner) runTrivy() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, "trivy", "fs", "--exit-code", "1", "--severity", "HIGH,CRITICAL", ".")
 	cmd.Dir = s.projectRoot
-	
+
 	if s.verbose {
 		fmt.Println("Running: trivy fs --exit-code 1 --severity HIGH,CRITICAL .")
 	}
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("trivy found high/critical vulnerabilities: %s", string(output))
@@ -401,39 +401,39 @@ func (s *SecurityScanner) runSyftSBOM() error {
 	if err := os.MkdirAll(sbomDir, 0755); err != nil {
 		return fmt.Errorf("failed to create sbom directory: %v", err)
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	
+
 	// Generate SPDX format SBOM
 	spdxPath := filepath.Join(sbomDir, "ephemos-sbom.spdx.json")
 	cmd := exec.CommandContext(ctx, "syft", ".", "-o", "spdx-json", "--file", spdxPath)
 	cmd.Dir = s.projectRoot
-	
+
 	if s.verbose {
 		fmt.Printf("Running: syft . -o spdx-json --file %s\n", spdxPath)
 	}
-	
+
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("syft SBOM generation failed: %s", string(output))
 	}
-	
+
 	// Generate CycloneDX format SBOM
 	cycloneDir := filepath.Join(sbomDir, "ephemos-sbom.cyclonedx.json")
 	cmd = exec.CommandContext(ctx, "syft", ".", "-o", "cyclonedx-json", "--file", cycloneDir)
 	cmd.Dir = s.projectRoot
-	
+
 	if s.verbose {
 		fmt.Printf("Running: syft . -o cyclonedx-json --file %s\n", cycloneDir)
 	}
-	
+
 	if output, err := cmd.CombinedOutput(); err != nil {
 		// CycloneDX is optional, just log warning
 		if s.verbose {
 			fmt.Printf("Warning: CycloneDX SBOM generation failed: %s\n", string(output))
 		}
 	}
-	
+
 	return nil
 }
 
@@ -448,19 +448,19 @@ func (s *SecurityScanner) printSummary(results []ScanResult, overallPassed bool)
 	fmt.Println("\n" + strings.Repeat("=", 60))
 	fmt.Println("📊 SECURITY SCAN SUMMARY")
 	fmt.Println(strings.Repeat("=", 60))
-	
+
 	for _, result := range results {
 		status := "✅ PASSED"
 		if !result.Passed {
 			status = "❌ FAILED"
 		}
-		
+
 		fmt.Printf("%-30s %s (%.2fs)\n", result.Name, status, result.Duration.Seconds())
-		
+
 		if result.Details != "" {
 			fmt.Printf("    Details: %s\n", result.Details)
 		}
-		
+
 		if len(result.Warnings) > 0 {
 			fmt.Println("    Warnings:")
 			for _, warning := range result.Warnings {
@@ -469,7 +469,7 @@ func (s *SecurityScanner) printSummary(results []ScanResult, overallPassed bool)
 		}
 		fmt.Println()
 	}
-	
+
 	if overallPassed {
 		fmt.Println("🎉 All security scans passed!")
 	} else {
@@ -483,19 +483,19 @@ func determineProjectRoot() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
 			return dir, nil
 		}
-		
+
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			break
 		}
 		dir = parent
 	}
-	
+
 	return "", fmt.Errorf("could not find project root (go.mod not found)")
 }
 
@@ -507,24 +507,24 @@ func secretsCmd() *cobra.Command {
 		Short: "Run only secrets scanning",
 		Run: func(cmd *cobra.Command, args []string) {
 			verbose, _ := cmd.Flags().GetBool("verbose")
-			
+
 			projectRoot, err := determineProjectRoot()
 			if err != nil {
 				log.Fatalf("Failed to determine project root: %v", err)
 			}
-			
+
 			scanner := NewSecurityScanner(projectRoot)
 			scanner.verbose = verbose
-			
+
 			result := scanner.runSecretsScans()
 			scanner.printSummary([]ScanResult{result}, result.Passed)
-			
+
 			if !result.Passed {
 				os.Exit(1)
 			}
 		},
 	}
-	
+
 	cmd.Flags().BoolP("verbose", "v", false, "Enable verbose output")
 	return cmd
 }
@@ -535,24 +535,24 @@ func vulnerabilitiesCmd() *cobra.Command {
 		Short: "Run only vulnerability scanning",
 		Run: func(cmd *cobra.Command, args []string) {
 			verbose, _ := cmd.Flags().GetBool("verbose")
-			
+
 			projectRoot, err := determineProjectRoot()
 			if err != nil {
 				log.Fatalf("Failed to determine project root: %v", err)
 			}
-			
+
 			scanner := NewSecurityScanner(projectRoot)
 			scanner.verbose = verbose
-			
+
 			result := scanner.runVulnerabilityScans()
 			scanner.printSummary([]ScanResult{result}, result.Passed)
-			
+
 			if !result.Passed {
 				os.Exit(1)
 			}
 		},
 	}
-	
+
 	cmd.Flags().BoolP("verbose", "v", false, "Enable verbose output")
 	return cmd
 }
@@ -563,24 +563,24 @@ func sbomCmd() *cobra.Command {
 		Short: "Run only SBOM generation and validation",
 		Run: func(cmd *cobra.Command, args []string) {
 			verbose, _ := cmd.Flags().GetBool("verbose")
-			
+
 			projectRoot, err := determineProjectRoot()
 			if err != nil {
 				log.Fatalf("Failed to determine project root: %v", err)
 			}
-			
+
 			scanner := NewSecurityScanner(projectRoot)
 			scanner.verbose = verbose
-			
+
 			result := scanner.runSBOMScans()
 			scanner.printSummary([]ScanResult{result}, result.Passed)
-			
+
 			if !result.Passed {
 				os.Exit(1)
 			}
 		},
 	}
-	
+
 	cmd.Flags().BoolP("verbose", "v", false, "Enable verbose output")
 	return cmd
 }

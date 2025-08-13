@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
 
-	"github.com/sufield/ephemos/internal/adapters/logging"
+	"github.com/sufield/ephemos/internal/core/util"
 )
 
 const (
@@ -53,7 +53,7 @@ func NewLoggingInterceptor(config *LoggingConfig) *LoggingInterceptor {
 	logger := config.Logger
 	if logger == nil {
 		// Use secure logger with automatic redaction
-		secureLogger := logging.NewSecureLogger(slog.Default().Handler())
+		secureLogger := util.NewSecureLogger(slog.Default().Handler())
 		logger = secureLogger
 	}
 

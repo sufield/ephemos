@@ -999,12 +999,6 @@ func ValidateStructWithEngine(v any, engine *ValidationEngine) error {
 	return engine.ValidateAndSetDefaults(v)
 }
 
-// IsValidationError checks if an error is a validation error.
-func IsValidationError(err error) bool {
-	var validationErr *ValidationError
-	var collectionErr *ValidationCollectionError
-	return errors.As(err, &validationErr) || errors.As(err, &collectionErr)
-}
 
 // GetValidationErrors extracts all validation errors from an error.
 func GetValidationErrors(err error) []ValidationError {

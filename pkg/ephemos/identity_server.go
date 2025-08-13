@@ -11,10 +11,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/sufield/ephemos/internal/adapters/primary/api"
-	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
-	"github.com/sufield/ephemos/internal/core/ports"
 )
 
 const (
@@ -22,14 +18,14 @@ const (
 	DefaultReadyCheckInterval = 100 * time.Millisecond
 )
 
-// ManagedIdentityServer provides a production-ready identity server with graceful shutdown.
-type ManagedIdentityServer struct {
-	baseServer          *api.WorkloadServer
+// IdentityOrchestrator provides a production-ready identity server with graceful shutdown.
+type IdentityOrchestrator struct {
+	baseServer          Server
 	shutdownCoordinator *ShutdownCoordinator
-	spiffeProvider      *spiffe.Provider
-	config              *ports.Configuration
+	spiffeProvider      SPIFFEProvider
+	config              *Configuration
 	listeners           []net.Listener
-	clients             []ports.Client
+	clients             []Client
 	mu                  sync.RWMutex
 	isRunning           bool
 	shutdownChan        chan struct{}
@@ -38,7 +34,7 @@ type ManagedIdentityServer struct {
 // ServerOptions configures the identity server.
 type ServerOptions struct {
 	// Configuration for the server
-	Config *ports.Configuration
+	Config *Configuration
 
 	// ConfigPath for loading configuration from file
 	ConfigPath string
@@ -71,34 +67,28 @@ func initializeServerOptions(opts *ServerOptions) *ServerOptions {
 }
 
 // createBaseServer creates the base identity server.
-func createBaseServer(ctx context.Context, opts *ServerOptions) (*api.WorkloadServer, error) {
+func createBaseServer(ctx context.Context, opts *ServerOptions) (Server, error) {
 	if opts.Config != nil {
-		server, err := api.NewWorkloadServerWithConfig(ctx, opts.Config)
+		server, err := createServerWithConfig(ctx, opts.Config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create server with config: %w", err)
 		}
 		return server, nil
 	}
-	server, err := api.NewWorkloadServer(ctx, opts.ConfigPath)
+	server, err := NewIdentityServer(ctx, opts.ConfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create server from path: %w", err)
 	}
 	return server, nil
 }
 
-// createSPIFFEProvider creates the SPIFFE provider if configured.
-func createSPIFFEProvider(opts *ServerOptions) *spiffe.Provider {
-	var spiffeConfig *ports.SPIFFEConfig
-	if opts.Config != nil {
+// createSPIFFEProvider creates a SPIFFE provider based on options.
+func createSPIFFEProvider(opts *ServerOptions) (SPIFFEProvider, error) {
+	var spiffeConfig *SPIFFEConfig
+	if opts.Config != nil && opts.Config.SPIFFE != nil {
 		spiffeConfig = opts.Config.SPIFFE
 	}
-
-	provider, err := spiffe.NewProvider(spiffeConfig)
-	if err != nil {
-		slog.Warn("Failed to create SPIFFE provider", "error", err)
-		return nil
-	}
-	return provider
+	return NewSPIFFEProvider(spiffeConfig)
 }
 
 // setupShutdownHooks configures shutdown hooks.
@@ -126,8 +116,8 @@ func setupShutdownHooks(ctx context.Context, opts *ServerOptions) {
 	}
 }
 
-// NewManagedIdentityServer creates a production-ready identity server with graceful shutdown.
-func NewManagedIdentityServer(ctx context.Context, opts *ServerOptions) (*ManagedIdentityServer, error) {
+// NewIdentityOrchestrator creates a production-ready identity server with graceful shutdown.
+func NewIdentityOrchestrator(ctx context.Context, opts *ServerOptions) (*IdentityOrchestrator, error) {
 	opts = initializeServerOptions(opts)
 
 	// Create base server
@@ -137,25 +127,26 @@ func NewManagedIdentityServer(ctx context.Context, opts *ServerOptions) (*Manage
 	}
 
 	// Create SPIFFE provider
-	spiffeProvider := createSPIFFEProvider(opts)
+	spiffeProvider, err := createSPIFFEProvider(opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SPIFFE provider: %w", err)
+	}
 
 	// Create and configure shutdown coordinator
 	shutdownCoordinator := NewShutdownCoordinator(opts.ShutdownConfig)
 	shutdownCoordinator.RegisterServer(baseServer)
-	if spiffeProvider != nil {
-		shutdownCoordinator.RegisterSPIFFEProvider(spiffeProvider)
-	}
+	shutdownCoordinator.RegisterSPIFFEProvider(spiffeProvider)
 
 	// Set up hooks
 	setupShutdownHooks(ctx, opts)
 
-	server := &ManagedIdentityServer{
+	server := &IdentityOrchestrator{
 		baseServer:          baseServer,
 		shutdownCoordinator: shutdownCoordinator,
 		spiffeProvider:      spiffeProvider,
 		config:              opts.Config,
 		listeners:           make([]net.Listener, 0),
-		clients:             make([]ports.Client, 0),
+		clients:             make([]Client, 0),
 		shutdownChan:        make(chan struct{}),
 	}
 
@@ -168,7 +159,7 @@ func NewManagedIdentityServer(ctx context.Context, opts *ServerOptions) (*Manage
 }
 
 // RegisterService delegates to the base server.
-func (s *ManagedIdentityServer) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
+func (s *IdentityOrchestrator) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
 	if err := s.baseServer.RegisterService(ctx, serviceRegistrar); err != nil {
 		return fmt.Errorf("failed to register service: %w", err)
 	}
@@ -176,7 +167,7 @@ func (s *ManagedIdentityServer) RegisterService(ctx context.Context, serviceRegi
 }
 
 // Serve starts the server with graceful shutdown support.
-func (s *ManagedIdentityServer) Serve(ctx context.Context, listener net.Listener) error {
+func (s *IdentityOrchestrator) Serve(ctx context.Context, listener net.Listener) error {
 	s.mu.Lock()
 	s.isRunning = true
 	s.listeners = append(s.listeners, listener)
@@ -210,7 +201,7 @@ func (s *ManagedIdentityServer) Serve(ctx context.Context, listener net.Listener
 }
 
 // ServeWithDeadline starts the server with a specific deadline for operation.
-func (s *ManagedIdentityServer) ServeWithDeadline(ctx context.Context, listener net.Listener, deadline time.Time) error {
+func (s *IdentityOrchestrator) ServeWithDeadline(ctx context.Context, listener net.Listener, deadline time.Time) error {
 	deadlineCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 
@@ -218,12 +209,12 @@ func (s *ManagedIdentityServer) ServeWithDeadline(ctx context.Context, listener 
 }
 
 // Close initiates graceful shutdown.
-func (s *ManagedIdentityServer) Close() error {
+func (s *IdentityOrchestrator) Close() error {
 	return s.Shutdown(context.Background())
 }
 
 // Shutdown performs graceful shutdown with context deadline support.
-func (s *ManagedIdentityServer) Shutdown(ctx context.Context) error {
+func (s *IdentityOrchestrator) Shutdown(ctx context.Context) error {
 	s.mu.Lock()
 	if !s.isRunning {
 		s.mu.Unlock()
@@ -239,7 +230,7 @@ func (s *ManagedIdentityServer) Shutdown(ctx context.Context) error {
 	return s.performShutdown(ctx)
 }
 
-func (s *ManagedIdentityServer) performShutdown(ctx context.Context) error {
+func (s *IdentityOrchestrator) performShutdown(ctx context.Context) error {
 	slog.Info("Initiating graceful shutdown")
 
 	// Create shutdown context with deadline if not already set
@@ -254,7 +245,7 @@ func (s *ManagedIdentityServer) performShutdown(ctx context.Context) error {
 	return s.shutdownCoordinator.Shutdown(shutdownCtx)
 }
 
-func (s *ManagedIdentityServer) setupSignalHandling(ctx context.Context) {
+func (s *IdentityOrchestrator) setupSignalHandling(ctx context.Context) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
@@ -276,7 +267,7 @@ func (s *ManagedIdentityServer) setupSignalHandling(ctx context.Context) {
 }
 
 // RegisterClient registers a client for cleanup during shutdown.
-func (s *ManagedIdentityServer) RegisterClient(client ports.Client) {
+func (s *IdentityOrchestrator) RegisterClient(client Client) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -285,17 +276,17 @@ func (s *ManagedIdentityServer) RegisterClient(client ports.Client) {
 }
 
 // RegisterCleanupFunc registers a custom cleanup function.
-func (s *ManagedIdentityServer) RegisterCleanupFunc(fn func() error) {
+func (s *IdentityOrchestrator) RegisterCleanupFunc(fn func() error) {
 	s.shutdownCoordinator.RegisterCleanupFunc(fn)
 }
 
-// GetSPIFFEProvider returns the SPIFFE provider if available.
-func (s *ManagedIdentityServer) GetSPIFFEProvider() *spiffe.Provider {
+// GetSPIFFEProvider returns the server's SPIFFE provider.
+func (s *IdentityOrchestrator) GetSPIFFEProvider() SPIFFEProvider {
 	return s.spiffeProvider
 }
 
 // IsRunning returns whether the server is currently running.
-func (s *ManagedIdentityServer) IsRunning() bool {
+func (s *IdentityOrchestrator) IsRunning() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.isRunning
@@ -326,7 +317,7 @@ func (a *netListenerAdapter) Addr() string {
 }
 
 // WaitForReady waits for the server to be ready to accept connections.
-func (s *ManagedIdentityServer) WaitForReady(ctx context.Context) error {
+func (s *IdentityOrchestrator) WaitForReady(ctx context.Context) error {
 	ticker := time.NewTicker(DefaultReadyCheckInterval)
 	defer ticker.Stop()
 

@@ -19,10 +19,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	grpcAdapter "github.com/sufield/ephemos/internal/adapters/grpc"
-	httpAdapter "github.com/sufield/ephemos/internal/adapters/http"
-	"github.com/sufield/ephemos/internal/adapters/secondary/config"
-	"github.com/sufield/ephemos/internal/core/ports"
+	// Internal adapters temporarily removed to eliminate dependencies
 )
 
 const (
@@ -41,14 +38,14 @@ const (
 // TransportServer represents a transport-agnostic service server.
 // The transport (gRPC, HTTP, etc.) is determined by configuration.
 type TransportServer struct {
-	config *ports.Configuration
+	config *Configuration
 
 	// Transport implementations - only one will be active
 	grpcServer  *grpc.Server
-	grpcAdapter *grpcAdapter.Adapter
+	grpcAdapter GRPCAdapter
 	httpServer  *http.Server
 	httpMux     *http.ServeMux
-	httpAdapter *httpAdapter.Adapter
+	httpAdapter HTTPAdapter
 }
 
 // newTransportServer creates a new server instance from configuration.
@@ -68,14 +65,12 @@ func newTransportServer(ctx context.Context, configPath string) (*TransportServe
 	// Initialize the appropriate transport based on config
 	switch config.Transport.Type {
 	case TransportTypeGRPC:
-		server.grpcServer = grpc.NewServer()
-		server.grpcAdapter = grpcAdapter.NewAdapter(server.grpcServer)
+		server.grpcAdapter = NewGRPCAdapter()
+		server.grpcServer = server.grpcAdapter.GetGRPCServer()
 	case TransportTypeHTTP:
+		server.httpAdapter = NewHTTPAdapter(config.Transport.Address)
+		server.httpServer = server.httpAdapter.GetHTTPServer()
 		server.httpMux = http.NewServeMux()
-		server.httpAdapter = httpAdapter.NewAdapter(server.httpMux)
-		server.httpServer = &http.Server{
-			Handler: server.httpMux,
-		}
 	default:
 		return nil, fmt.Errorf("unsupported transport type: %s", config.Transport.Type)
 	}
@@ -95,15 +90,15 @@ func mount[T any](server *TransportServer, impl T) error {
 func (s *TransportServer) mountService(impl any) error {
 	switch s.config.Transport.Type {
 	case TransportTypeGRPC:
-		if err := s.grpcAdapter.Mount(impl); err != nil {
-			return fmt.Errorf("failed to mount gRPC service: %w", err)
+		if s.grpcAdapter == nil {
+			return fmt.Errorf("gRPC adapter not initialized")
 		}
-		return nil
+		return s.grpcAdapter.Mount(impl)
 	case TransportTypeHTTP:
-		if err := s.httpAdapter.Mount(impl); err != nil {
-			return fmt.Errorf("failed to mount HTTP service: %w", err)
+		if s.httpAdapter == nil {
+			return fmt.Errorf("HTTP adapter not initialized")
 		}
-		return nil
+		return s.httpAdapter.Mount(impl)
 	default:
 		return fmt.Errorf("unsupported transport type: %s", s.config.Transport.Type)
 	}
@@ -248,10 +243,9 @@ func (s *TransportServer) Close() error {
 }
 
 // loadConfig loads configuration from the specified path using the existing config system.
-func loadConfig(ctx context.Context, path string) (*ports.Configuration, error) {
-	// Use existing configuration loading
-	configProvider := config.NewFileProvider()
-	cfg, err := configProvider.LoadConfiguration(ctx, path)
+func loadConfig(ctx context.Context, path string) (*Configuration, error) {
+	// Use existing configuration loading from config.go
+	cfg, err := loadAndValidateConfig(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}

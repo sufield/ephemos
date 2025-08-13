@@ -10,9 +10,6 @@ import (
 	"strings"
 
 	yaml "gopkg.in/yaml.v3"
-
-	coreErrors "github.com/sufield/ephemos/internal/core/errors"
-	"github.com/sufield/ephemos/internal/core/ports"
 )
 
 // Domain-specific errors for configuration validation failures.
@@ -67,7 +64,7 @@ func (e *ConfigValidationError) Unwrap() error {
 // - ErrConfigFileUnreadable: File exists but cannot be read (permissions, etc.)
 // - ErrConfigMalformed: Invalid YAML syntax in config file
 // - ErrInvalidConfig: Configuration validation failed (wrapped with specific details).
-func loadAndValidateConfig(ctx context.Context, configPath string) (*ports.Configuration, error) {
+func loadAndValidateConfig(ctx context.Context, configPath string) (*Configuration, error) {
 	// Step 1: Resolve and validate config path
 	resolvedPath, err := resolveConfigPath(configPath)
 	if err != nil {
@@ -86,14 +83,11 @@ func loadAndValidateConfig(ctx context.Context, configPath string) (*ports.Confi
 	}
 
 	// Step 4: Comprehensive validation with domain-specific error wrapping
-	// Convert internal config to public config and validate using new engine
-	publicConfig := convertToPublicConfig(config)
-	if err := validateConfigComprehensive(publicConfig, resolvedPath); err != nil {
+	if err := validateConfigComprehensive(config, resolvedPath); err != nil {
 		return nil, err
 	}
 
-	// Convert back to internal config
-	return convertFromPublicConfig(publicConfig), nil
+	return config, nil
 }
 
 // resolveConfigPath determines the actual config file path to use.
@@ -172,7 +166,7 @@ func validateFileAccess(path string) error {
 }
 
 // loadConfigFile loads and parses the configuration file.
-func loadConfigFile(ctx context.Context, path string) (*ports.Configuration, error) {
+func loadConfigFile(ctx context.Context, path string) (*Configuration, error) {
 	// If no config file, return default configuration
 	if path == "" {
 		provider := &fileProviderCompat{}
@@ -196,7 +190,7 @@ func loadConfigFile(ctx context.Context, path string) (*ports.Configuration, err
 	}
 
 	// Parse YAML with enhanced error handling
-	var config ports.Configuration
+	var config Configuration
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		// Provide more user-friendly YAML parsing errors
 		return nil, &ConfigValidationError{
@@ -236,7 +230,7 @@ func validateConfigComprehensive(config *Configuration, configPath string) error
 // wrapValidationError converts internal validation errors to user-friendly ConfigValidationError.
 func wrapValidationError(err error, configPath string) error {
 	// Check if it's already a validation error
-	var validationErr *coreErrors.ValidationError
+	var validationErr *ValidationError
 	if errors.As(err, &validationErr) {
 		return &ConfigValidationError{
 			File:    configPath,
@@ -258,7 +252,7 @@ func wrapValidationError(err error, configPath string) error {
 }
 
 // enhanceValidationMessage provides more user-friendly validation error messages.
-func enhanceValidationMessage(err *coreErrors.ValidationError) string {
+func enhanceValidationMessage(err *ValidationError) string {
 	switch err.Field {
 	case "service.name":
 		return fmt.Sprintf("Service name '%v' is invalid. Must be non-empty and contain only "+
@@ -280,16 +274,16 @@ func enhanceValidationMessage(err *coreErrors.ValidationError) string {
 // fileProviderCompat provides compatibility with the existing file provider interface.
 type fileProviderCompat struct{}
 
-func (p *fileProviderCompat) GetDefaultConfiguration(_ context.Context) *ports.Configuration {
-	return &ports.Configuration{
-		Service: ports.ServiceConfig{
+func (p *fileProviderCompat) GetDefaultConfiguration(_ context.Context) *Configuration {
+	return &Configuration{
+		Service: ServiceConfig{
 			Name:   "ephemos-service",
 			Domain: "", // Empty domain uses SPIRE trust domain
 		},
-		SPIFFE: &ports.SPIFFEConfig{
+		SPIFFE: &SPIFFEConfig{
 			SocketPath: "/tmp/spire-agent/public/api.sock",
 		},
-		Transport: ports.TransportConfig{
+		Transport: TransportConfig{
 			Type:    "grpc",
 			Address: ":50051",
 		},
@@ -326,76 +320,3 @@ func GetConfigValidationError(err error) *ConfigValidationError {
 	return nil
 }
 
-// convertToPublicConfig converts internal ports.Configuration to public Configuration.
-func convertToPublicConfig(internal *ports.Configuration) *Configuration {
-	if internal == nil {
-		return nil
-	}
-
-	config := &Configuration{
-		Service: ServiceConfig{
-			Name:   internal.Service.Name,
-			Domain: internal.Service.Domain,
-		},
-		Transport: TransportConfig{
-			Type:    internal.Transport.Type,
-			Address: internal.Transport.Address,
-		},
-		AuthorizedClients: internal.AuthorizedClients,
-		TrustedServers:    internal.TrustedServers,
-	}
-
-	if internal.SPIFFE != nil {
-		config.SPIFFE = &SPIFFEConfig{
-			SocketPath: internal.SPIFFE.SocketPath,
-		}
-	}
-
-	if internal.Transport.TLS != nil {
-		config.Transport.TLS = &TLSConfig{
-			Enabled:   internal.Transport.TLS.Enabled,
-			CertFile:  internal.Transport.TLS.CertFile,
-			KeyFile:   internal.Transport.TLS.KeyFile,
-			UseSPIFFE: internal.Transport.TLS.UseSPIFFE,
-		}
-	}
-
-	return config
-}
-
-// convertFromPublicConfig converts public Configuration to internal ports.Configuration.
-func convertFromPublicConfig(public *Configuration) *ports.Configuration {
-	if public == nil {
-		return nil
-	}
-
-	config := &ports.Configuration{
-		Service: ports.ServiceConfig{
-			Name:   public.Service.Name,
-			Domain: public.Service.Domain,
-		},
-		Transport: ports.TransportConfig{
-			Type:    public.Transport.Type,
-			Address: public.Transport.Address,
-		},
-		AuthorizedClients: public.AuthorizedClients,
-		TrustedServers:    public.TrustedServers,
-	}
-
-	if public.SPIFFE != nil {
-		config.SPIFFE = &ports.SPIFFEConfig{
-			SocketPath: public.SPIFFE.SocketPath,
-		}
-	}
-
-	if public.Transport.TLS != nil {
-		config.Transport.TLS = &ports.TLSConfig{
-			Enabled:   public.Transport.TLS.Enabled,
-			CertFile:  public.Transport.TLS.CertFile,
-			KeyFile:   public.Transport.TLS.KeyFile,
-			UseSPIFFE: public.Transport.TLS.UseSPIFFE,
-		}
-	}
-
-	return config
-}

@@ -108,10 +108,10 @@ spiffe:
 
 		config, err := loadAndValidateConfig(ctx, configFile)
 
-		// Test that invalid addresses are caught
-		if address == "" || strings.Contains(address, "\x00") {
+		// Test that invalid addresses are caught (but not empty addresses, which get defaults)
+		if strings.Contains(address, "\x00") {
 			if err == nil {
-				t.Errorf("Expected validation error for address: %q", address)
+				t.Errorf("Expected validation error for address with null byte: %q", address)
 			}
 		}
 
@@ -164,8 +164,8 @@ spiffe:
 
 		_, err := loadAndValidateConfig(ctx, configFile)
 
-		// Test validation of socket paths
-		if socketPath == "" || !strings.HasPrefix(socketPath, "/") || strings.Contains(socketPath, "\x00") {
+		// Test validation of socket paths (empty paths are allowed and get defaults)
+		if (socketPath != "" && !strings.HasPrefix(socketPath, "/")) || strings.Contains(socketPath, "\x00") {
 			if err == nil {
 				t.Errorf("Expected validation error for socket path: %q", socketPath)
 			}
@@ -212,13 +212,15 @@ spiffe:
 
 		_, err := loadAndValidateConfig(ctx, configFile)
 
-		// Only "grpc" and "http" should be valid (case sensitive)
+		// Only "grpc", "http", and "tcp" should be valid per struct tag (empty gets default)
+		// Case sensitive validation
 		validTypes := map[string]bool{
 			"grpc": true,
 			"http": true,
+			"tcp":  true,
 		}
 
-		if !validTypes[transportType] {
+		if transportType != "" && !validTypes[transportType] {
 			if err == nil {
 				t.Errorf("Expected validation error for transport type: %q", transportType)
 			}

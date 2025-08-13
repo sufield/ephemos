@@ -93,16 +93,6 @@ func (c *Configuration) ValidateAndSetDefaults() error {
 	return ValidateStruct(c)
 }
 
-// ValidationError provides detailed information about configuration validation failures.
-type ValidationError struct {
-	Field   string // Field that failed validation
-	Value   any    // Invalid value
-	Message string // Human-readable error message
-}
-
-func (e *ValidationError) Error() string {
-	return fmt.Sprintf("validation failed for field '%s': %s", e.Field, e.Message)
-}
 
 // Environment variable names for configuration.
 const (
@@ -143,13 +133,13 @@ func LoadFromEnvironment() (*Configuration, error) {
 	// Parse comma-separated authorized clients
 	if authorizedClients := os.Getenv(EnvAuthorizedClients); authorizedClients != "" {
 		// Note: parseCommaSeparatedList is defined in config_enhanced.go in the same package
-		config.AuthorizedClients = parseCommaSeparatedList(authorizedClients)
+		config.AuthorizedClients = ParseCommaSeparatedList(authorizedClients)
 	}
 
 	// Parse comma-separated trusted servers
 	if trustedServers := os.Getenv(EnvTrustedServers); trustedServers != "" {
 		// Note: parseCommaSeparatedList is defined in config_enhanced.go in the same package
-		config.TrustedServers = parseCommaSeparatedList(trustedServers)
+		config.TrustedServers = ParseCommaSeparatedList(trustedServers)
 	}
 
 	// Validate and set defaults using the new validation engine
@@ -184,13 +174,13 @@ func (c *Configuration) MergeWithEnvironment() error {
 	// Override authorized clients if set via environment
 	if authorizedClients := os.Getenv(EnvAuthorizedClients); authorizedClients != "" {
 		// Note: parseCommaSeparatedList is defined in config_enhanced.go in the same package
-		c.AuthorizedClients = parseCommaSeparatedList(authorizedClients)
+		c.AuthorizedClients = ParseCommaSeparatedList(authorizedClients)
 	}
 
 	// Override trusted servers if set via environment
 	if trustedServers := os.Getenv(EnvTrustedServers); trustedServers != "" {
 		// Note: parseCommaSeparatedList is defined in config_enhanced.go in the same package
-		c.TrustedServers = parseCommaSeparatedList(trustedServers)
+		c.TrustedServers = ParseCommaSeparatedList(trustedServers)
 	}
 
 	// Validate and set defaults using the new validation engine

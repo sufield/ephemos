@@ -15,25 +15,25 @@ import (
 
 // ProtoGenerator represents the protobuf code generator
 type ProtoGenerator struct {
-	protoDir    string
-	outputDir   string
-	verbose     bool
+	protoDir        string
+	outputDir       string
+	verbose         bool
 	forceRegenerate bool
 }
 
 // ProtocInfo holds information about protoc installation
 type ProtocInfo struct {
-	Version    string
-	Path       string
-	Available  bool
+	Version   string
+	Path      string
+	Available bool
 }
 
 // ProtoGenResult represents the result of protobuf generation
 type ProtoGenResult struct {
-	Generated    []string
-	Skipped      []string
-	Duration     time.Duration
-	ProtocInfo   ProtocInfo
+	Generated  []string
+	Skipped    []string
+	Duration   time.Duration
+	ProtocInfo ProtocInfo
 }
 
 func main() {
@@ -53,24 +53,24 @@ Features:
 		Run: func(cmd *cobra.Command, args []string) {
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			force, _ := cmd.Flags().GetBool("force")
-			
+
 			protoDir := "examples/proto"
 			outputDir := "examples/proto"
-			
+
 			if len(args) >= 1 {
 				protoDir = args[0]
 			}
 			if len(args) >= 2 {
 				outputDir = args[1]
 			}
-			
+
 			generator := &ProtoGenerator{
-				protoDir:    protoDir,
-				outputDir:   outputDir,
-				verbose:     verbose,
+				protoDir:        protoDir,
+				outputDir:       outputDir,
+				verbose:         verbose,
 				forceRegenerate: force,
 			}
-			
+
 			if err := generator.GenerateProtoCode(); err != nil {
 				log.Fatalf("Proto generation failed: %v", err)
 			}
@@ -80,7 +80,7 @@ Features:
 	rootCmd.Flags().BoolP("verbose", "v", false, "Enable verbose output")
 	rootCmd.Flags().BoolP("force", "f", false, "Force regeneration even if files are up to date")
 	rootCmd.Flags().Bool("check-only", false, "Check if generation is needed without generating")
-	
+
 	// Add subcommands
 	rootCmd.AddCommand(installCmd())
 	rootCmd.AddCommand(validateCmd())
@@ -98,22 +98,22 @@ func (p *ProtoGenerator) GenerateProtoCode() error {
 	fmt.Printf("Output directory: %s\n\n", p.outputDir)
 
 	start := time.Now()
-	
+
 	// Validate input directories
 	if err := p.validateDirectories(); err != nil {
 		return fmt.Errorf("directory validation failed: %v", err)
 	}
-	
+
 	// Find proto files
 	protoFiles, err := p.findProtoFiles()
 	if err != nil {
 		return fmt.Errorf("failed to find proto files: %v", err)
 	}
-	
+
 	if len(protoFiles) == 0 {
 		return fmt.Errorf("no .proto files found in %s", p.protoDir)
 	}
-	
+
 	// Check if regeneration is needed
 	if !p.forceRegenerate {
 		upToDate, err := p.areFilesUpToDate(protoFiles)
@@ -127,39 +127,39 @@ func (p *ProtoGenerator) GenerateProtoCode() error {
 			return nil
 		}
 	}
-	
+
 	// Setup protoc and plugins
 	protocInfo, err := p.setupProtoc()
 	if err != nil {
 		return fmt.Errorf("protoc setup failed: %v", err)
 	}
-	
+
 	if p.verbose {
 		fmt.Printf("Using protoc: %s (version: %s)\n", protocInfo.Path, protocInfo.Version)
 	}
-	
+
 	// Generate code for each proto file
 	result := ProtoGenResult{
 		ProtocInfo: protocInfo,
 	}
-	
+
 	for _, protoFile := range protoFiles {
 		if p.verbose {
 			fmt.Printf("Processing: %s\n", protoFile)
 		}
-		
+
 		if err := p.generateProtoFile(protoFile); err != nil {
 			return fmt.Errorf("failed to generate code for %s: %v", protoFile, err)
 		}
-		
+
 		result.Generated = append(result.Generated, protoFile)
 	}
-	
+
 	result.Duration = time.Since(start)
-	
+
 	// Print results
 	p.printResults(result)
-	
+
 	return nil
 }
 
@@ -169,35 +169,35 @@ func (p *ProtoGenerator) validateDirectories() error {
 	if _, err := os.Stat(p.protoDir); os.IsNotExist(err) {
 		return fmt.Errorf("proto directory does not exist: %s", p.protoDir)
 	}
-	
+
 	// Create output directory if it doesn't exist
 	if err := os.MkdirAll(p.outputDir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory %s: %v", p.outputDir, err)
 	}
-	
+
 	return nil
 }
 
 // findProtoFiles discovers all .proto files in the proto directory
 func (p *ProtoGenerator) findProtoFiles() ([]string, error) {
 	var protoFiles []string
-	
+
 	err := filepath.Walk(p.protoDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if strings.HasSuffix(path, ".proto") && !info.IsDir() {
 			protoFiles = append(protoFiles, path)
 		}
-		
+
 		return nil
 	})
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return protoFiles, nil
 }
 
@@ -209,12 +209,12 @@ func (p *ProtoGenerator) areFilesUpToDate(protoFiles []string) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		
+
 		// Check corresponding generated files
 		baseName := strings.TrimSuffix(filepath.Base(protoFile), ".proto")
 		pbGoFile := filepath.Join(p.outputDir, baseName+".pb.go")
 		grpcGoFile := filepath.Join(p.outputDir, baseName+"_grpc.pb.go")
-		
+
 		// Check if generated files exist and are newer
 		for _, genFile := range []string{pbGoFile, grpcGoFile} {
 			genStat, err := os.Stat(genFile)
@@ -224,20 +224,20 @@ func (p *ProtoGenerator) areFilesUpToDate(protoFiles []string) (bool, error) {
 			if err != nil {
 				return false, err
 			}
-			
+
 			if genStat.ModTime().Before(protoStat.ModTime()) {
 				return false, nil // Generated file is older
 			}
 		}
 	}
-	
+
 	return true, nil
 }
 
 // setupProtoc ensures protoc and required plugins are available
 func (p *ProtoGenerator) setupProtoc() (ProtocInfo, error) {
 	info := ProtocInfo{}
-	
+
 	// Check if protoc is available
 	protocPath, err := exec.LookPath("protoc")
 	if err != nil {
@@ -247,36 +247,36 @@ func (p *ProtoGenerator) setupProtoc() (ProtocInfo, error) {
 			"  macOS: brew install protobuf\n" +
 			"  Windows: choco install protoc")
 	}
-	
+
 	info.Path = protocPath
 	info.Available = true
-	
+
 	// Get protoc version
 	if version, err := p.getProtocVersion(); err == nil {
 		info.Version = version
 	}
-	
+
 	// Setup Go path for plugins
 	goPath, err := p.getGoPath()
 	if err != nil {
 		return info, fmt.Errorf("failed to get GOPATH: %v", err)
 	}
-	
+
 	goBin := filepath.Join(goPath, "bin")
 	currentPath := os.Getenv("PATH")
 	newPath := goBin + string(os.PathListSeparator) + currentPath
 	os.Setenv("PATH", newPath)
-	
+
 	// Ensure protoc-gen-go is available
 	if err := p.ensurePlugin("protoc-gen-go", "google.golang.org/protobuf/cmd/protoc-gen-go@latest"); err != nil {
 		return info, err
 	}
-	
+
 	// Ensure protoc-gen-go-grpc is available
 	if err := p.ensurePlugin("protoc-gen-go-grpc", "google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest"); err != nil {
 		return info, err
 	}
-	
+
 	return info, nil
 }
 
@@ -284,13 +284,13 @@ func (p *ProtoGenerator) setupProtoc() (ProtocInfo, error) {
 func (p *ProtoGenerator) getProtocVersion() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, "protoc", "--version")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
 	}
-	
+
 	return strings.TrimSpace(string(output)), nil
 }
 
@@ -298,13 +298,13 @@ func (p *ProtoGenerator) getProtocVersion() (string, error) {
 func (p *ProtoGenerator) getGoPath() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, "go", "env", "GOPATH")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
 	}
-	
+
 	return strings.TrimSpace(string(output)), nil
 }
 
@@ -317,31 +317,31 @@ func (p *ProtoGenerator) ensurePlugin(pluginName, packageName string) error {
 		}
 		return nil
 	}
-	
+
 	fmt.Printf("Installing %s...\n", pluginName)
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, "go", "install", packageName)
 	if p.verbose {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
-	
+
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to install %s: %v", pluginName, err)
 	}
-	
+
 	// Verify installation
 	if _, err := exec.LookPath(pluginName); err != nil {
 		return fmt.Errorf("failed to verify %s installation", pluginName)
 	}
-	
+
 	if p.verbose {
 		fmt.Printf("✅ %s installed successfully\n", pluginName)
 	}
-	
+
 	return nil
 }
 
@@ -349,7 +349,7 @@ func (p *ProtoGenerator) ensurePlugin(pluginName, packageName string) error {
 func (p *ProtoGenerator) generateProtoFile(protoFile string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	
+
 	// Build protoc command
 	cmd := exec.CommandContext(ctx, "protoc",
 		"--go_out="+p.outputDir,
@@ -359,20 +359,20 @@ func (p *ProtoGenerator) generateProtoFile(protoFile string) error {
 		"-I", p.protoDir,
 		protoFile,
 	)
-	
+
 	if p.verbose {
 		fmt.Printf("Running: %s\n", cmd.String())
 	}
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("protoc execution failed: %v\nOutput: %s", err, string(output))
 	}
-	
+
 	if p.verbose && len(output) > 0 {
 		fmt.Printf("Protoc output: %s\n", string(output))
 	}
-	
+
 	return nil
 }
 
@@ -381,11 +381,11 @@ func (p *ProtoGenerator) printResults(result ProtoGenResult) {
 	fmt.Println("\n" + strings.Repeat("=", 60))
 	fmt.Println("📊 PROTOBUF GENERATION SUMMARY")
 	fmt.Println(strings.Repeat("=", 60))
-	
+
 	fmt.Printf("Protoc version: %s\n", result.ProtocInfo.Version)
 	fmt.Printf("Generated files: %d\n", len(result.Generated))
 	fmt.Printf("Duration: %.2fs\n\n", result.Duration.Seconds())
-	
+
 	if len(result.Generated) > 0 {
 		fmt.Println("Generated from:")
 		for _, file := range result.Generated {
@@ -393,14 +393,14 @@ func (p *ProtoGenerator) printResults(result ProtoGenResult) {
 			fmt.Printf("  %s → %s.pb.go, %s_grpc.pb.go\n", file, baseName, baseName)
 		}
 	}
-	
+
 	if len(result.Skipped) > 0 {
 		fmt.Println("\nSkipped files:")
 		for _, file := range result.Skipped {
 			fmt.Printf("  %s (up to date)\n", file)
 		}
 	}
-	
+
 	fmt.Println("\n🎉 Protobuf generation completed successfully!")
 }
 
@@ -412,13 +412,13 @@ func installCmd() *cobra.Command {
 		Short: "Install protoc and required plugins",
 		Run: func(cmd *cobra.Command, args []string) {
 			generator := &ProtoGenerator{verbose: true}
-			
+
 			fmt.Println("🔧 Installing protoc plugins...")
-			
+
 			if _, err := generator.setupProtoc(); err != nil {
 				log.Fatalf("Installation failed: %v", err)
 			}
-			
+
 			fmt.Println("✅ All plugins installed successfully!")
 		},
 	}
@@ -431,34 +431,34 @@ func validateCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			verbose, _ := cmd.Flags().GetBool("verbose")
-			
+
 			protoDir := "examples/proto"
 			if len(args) >= 1 {
 				protoDir = args[0]
 			}
-			
+
 			generator := &ProtoGenerator{
 				protoDir: protoDir,
 				verbose:  verbose,
 			}
-			
+
 			fmt.Printf("🔍 Validating proto files in: %s\n", protoDir)
-			
+
 			// Find proto files
 			protoFiles, err := generator.findProtoFiles()
 			if err != nil {
 				log.Fatalf("Failed to find proto files: %v", err)
 			}
-			
+
 			if len(protoFiles) == 0 {
 				log.Fatalf("No .proto files found in %s", protoDir)
 			}
-			
+
 			// Setup protoc for validation
 			if _, err := generator.setupProtoc(); err != nil {
 				log.Fatalf("Protoc setup failed: %v", err)
 			}
-			
+
 			// Validate each proto file
 			for _, protoFile := range protoFiles {
 				if err := generator.validateProtoFile(protoFile); err != nil {
@@ -466,11 +466,11 @@ func validateCmd() *cobra.Command {
 				}
 				fmt.Printf("✅ %s is valid\n", protoFile)
 			}
-			
+
 			fmt.Printf("\n🎉 All %d proto files are valid!\n", len(protoFiles))
 		},
 	}
-	
+
 	cmd.Flags().BoolP("verbose", "v", false, "Enable verbose output")
 	return cmd
 }
@@ -478,23 +478,23 @@ func validateCmd() *cobra.Command {
 func (p *ProtoGenerator) validateProtoFile(protoFile string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	// Use protoc to validate without generating output
 	cmd := exec.CommandContext(ctx, "protoc",
 		"--descriptor_set_out=/dev/null",
 		"-I", p.protoDir,
 		protoFile,
 	)
-	
+
 	if p.verbose {
 		fmt.Printf("Validating: %s\n", protoFile)
 	}
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("validation failed: %v\nOutput: %s", err, string(output))
 	}
-	
+
 	return nil
 }
 
@@ -505,30 +505,30 @@ func cleanCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			verbose, _ := cmd.Flags().GetBool("verbose")
-			
+
 			outputDir := "examples/proto"
 			if len(args) >= 1 {
 				outputDir = args[0]
 			}
-			
+
 			fmt.Printf("🧹 Cleaning generated files in: %s\n", outputDir)
-			
+
 			// Find generated files
 			patterns := []string{"*.pb.go", "*_grpc.pb.go"}
 			var removedFiles []string
-			
+
 			for _, pattern := range patterns {
 				matches, err := filepath.Glob(filepath.Join(outputDir, pattern))
 				if err != nil {
 					log.Printf("Warning: Failed to match pattern %s: %v", pattern, err)
 					continue
 				}
-				
+
 				for _, file := range matches {
 					if verbose {
 						fmt.Printf("Removing: %s\n", file)
 					}
-					
+
 					if err := os.Remove(file); err != nil {
 						log.Printf("Warning: Failed to remove %s: %v", file, err)
 					} else {
@@ -536,7 +536,7 @@ func cleanCmd() *cobra.Command {
 					}
 				}
 			}
-			
+
 			if len(removedFiles) == 0 {
 				fmt.Println("No generated files found to clean")
 			} else {
@@ -544,7 +544,7 @@ func cleanCmd() *cobra.Command {
 			}
 		},
 	}
-	
+
 	cmd.Flags().BoolP("verbose", "v", false, "Enable verbose output")
 	return cmd
 }
