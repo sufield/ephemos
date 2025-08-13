@@ -32,6 +32,33 @@ jobs:
       with:
         go-version: '1.24.x'
         
+    - name: Install Protocol Buffers tools
+      run: |
+        # Install protoc
+        sudo apt-get update && sudo apt-get install -y protobuf-compiler
+        
+        # Install Go protobuf tools
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+        
+        # Verify installations
+        protoc --version
+        which protoc-gen-go
+        which protoc-gen-go-grpc
+        
+    - name: Generate protobuf files
+      run: |
+        echo "🔧 Generating protobuf files for vulnerability scanning..."
+        
+        # Generate Go code from proto files
+        protoc --go_out=examples/proto --go_opt=paths=source_relative \
+               --go-grpc_out=examples/proto --go-grpc_opt=paths=source_relative \
+               -I examples/proto examples/proto/echo.proto
+        
+        # Verify generated files
+        echo "✅ Generated files:"
+        ls -la examples/proto/*.pb.go
+        
     - name: Install govulncheck
       run: go install golang.org/x/vuln/cmd/govulncheck@latest
       

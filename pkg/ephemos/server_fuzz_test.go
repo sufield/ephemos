@@ -56,8 +56,8 @@ spiffe:
 
 		_, err := loadAndValidateConfig(ctx, configFile)
 
-		// Validation should catch invalid service names
-		if serviceName == "" || strings.ContainsAny(serviceName, "\x00\n\t@/\\") {
+		// Validation should catch invalid service names (empty names get defaults, so only truly invalid patterns should fail)
+		if strings.ContainsAny(serviceName, "\x00\n\t@/\\") {
 			if err == nil {
 				t.Errorf("Expected validation error for service name: %q", serviceName)
 			}
@@ -153,7 +153,7 @@ transport:
   type: grpc
   address: :50051
 spiffe:
-  socket_path: "` + strings.ReplaceAll(socketPath, `"`, `\"`) + `"`
+  socketPath: "` + strings.ReplaceAll(socketPath, `"`, `\"`) + `"`
 
 		if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
 			return

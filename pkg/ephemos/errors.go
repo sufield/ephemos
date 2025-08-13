@@ -19,5 +19,9 @@ func (e *ValidationError) Error() string {
 // IsValidationError checks if an error is a validation error.
 func IsValidationError(err error) bool {
 	_, ok := err.(*ValidationError)
+	if ok {
+		return true
+	}
+	_, ok = err.(*ValidationCollectionError)
 	return ok
 }

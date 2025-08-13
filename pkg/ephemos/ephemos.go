@@ -371,7 +371,7 @@ func NewDevelopmentInterceptorConfig(serviceName string) *InterceptorConfig {
 		EnableAuth:                false, // Disabled for easier development
 		EnableLogging:             true,
 		EnableMetrics:             true,
-		EnableIdentityPropagation: false,
+		EnableIdentityPropagation: true, // Enabled for development testing
 		Logger:                    logger,
 		MetricsConfig:             &MetricsConfig{},
 	}
