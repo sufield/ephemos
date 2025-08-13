@@ -62,3 +62,14 @@ pattern:.*spiffe://
 
 # Configuration test patterns
 ports\.Env.*spiffe://
+
+# Fuzz test SPIFFE URIs (pkg/ephemos/identity_fuzz_test.go)
+spiffe://trust\.domain\.com/.*
+spiffe://very-very-very-long-trust-domain-name\.example\.com/.*
+spiffe://domain\.com/.*
+spiffe://domain/.*
+spiffe://256\.256\.256\.256/.*
+spiffe://domain:8080/.*
+spiffe://unicode-域名\.org/.*
+spiffe:///.*
+spiffe://\./.*
