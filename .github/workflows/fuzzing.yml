@@ -173,6 +173,15 @@ jobs:
         echo "Creating build-out directory structure..."
         mkdir -p build-out
         
+        # Verify protobuf files exist before building
+        echo "Verifying protobuf files..."
+        if [ ! -f "examples/proto/echo.pb.go" ] || [ ! -f "examples/proto/echo_grpc.pb.go" ]; then
+          echo "❌ Protobuf files missing, regenerating..."
+          make proto || exit 1
+        else
+          echo "✅ Protobuf files found"
+        fi
+        
         # Build the project first to ensure everything compiles
         echo "Building project..."
         make build
@@ -317,6 +326,16 @@ jobs:
         # Build the fuzz target binaries
         echo "Building fuzz target binaries..."
         cd fuzz-targets
+        
+        # Ensure Go protobuf tools are in PATH for fuzz target builds
+        GOPATH_BIN="$(go env GOPATH)/bin"
+        export PATH="$GOPATH_BIN:$PATH"
+        echo "PATH updated for fuzz builds: $PATH"
+        
+        # Verify protobuf tools are available
+        echo "Verifying protobuf tools for fuzz builds..."
+        which protoc-gen-go || (echo "❌ protoc-gen-go not found" && exit 1)
+        which protoc-gen-go-grpc || (echo "❌ protoc-gen-go-grpc not found" && exit 1)
         
         # Initialize Go module for fuzz targets
         if [ ! -f go.mod ]; then
