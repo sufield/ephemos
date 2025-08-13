@@ -10,6 +10,8 @@ This document outlines the migration from shell scripts and Makefiles to Bazel f
 
 - **WORKSPACE**: Main Bazel configuration with Go rules, Gazelle, and protobuf support
 - **.bazelrc**: Build configuration with security, performance, and reproducible build settings
+  - External dependency mode: `--enable_workspace` with `--noenable_bzlmod`
+  - Modern resource flags: `--local_resources=memory=75%,cpu=100%`
 - **BUILD.bazel**: Root build file with targets for testing, building, and utilities
 - **deps.bzl**: Go dependency management compatible with go.mod
 
@@ -79,11 +81,11 @@ make test            # Run tests
 - [x] Set up protobuf generation
 - [x] Create wrapper script (bazel.sh)
 
-### Phase 2: CI/CD Integration (Next)
-- [ ] Update GitHub Actions workflows
-- [ ] Replace shell script calls with Bazel
-- [ ] Add remote caching for CI
-- [ ] Migrate security scanning
+### Phase 2: CI/CD Integration ✅
+- [x] Update GitHub Actions workflows
+- [x] Replace shell script calls with Bazel
+- [x] Add remote caching for CI
+- [x] Migrate security scanning
 
 ### Phase 3: Advanced Features (Future)
 - [ ] Remote build execution
