@@ -43,7 +43,7 @@ jobs:
         check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
-      uses: ./.github/actions/setup-protobuf
+      uses: ./.github/actions/setup-protobuf-fixed
       
     - name: Initialize Enhanced Diagnostics
       shell: bash
@@ -224,7 +224,7 @@ jobs:
         check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
-      uses: ./.github/actions/setup-protobuf
+      uses: ./.github/actions/setup-protobuf-fixed
       
     - name: Verify examples use only public APIs
       run: |
@@ -253,7 +253,7 @@ jobs:
         check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
-      uses: ./.github/actions/setup-protobuf
+      uses: ./.github/actions/setup-protobuf-fixed
       
     - name: Initialize Enhanced Security Diagnostics
       shell: bash
@@ -370,7 +370,7 @@ jobs:
         check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
-      uses: ./.github/actions/setup-protobuf
+      uses: ./.github/actions/setup-protobuf-fixed
       
     - name: Initialize Enhanced Build Diagnostics
       shell: bash
@@ -605,7 +605,7 @@ jobs:
         check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
-      uses: ./.github/actions/setup-protobuf
+      uses: ./.github/actions/setup-protobuf-fixed
       
     - name: Initialize Enhanced Test Diagnostics
       shell: bash
@@ -734,7 +734,7 @@ jobs:
         check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
-      uses: ./.github/actions/setup-protobuf
+      uses: ./.github/actions/setup-protobuf-fixed
       
     - name: Initialize Enhanced Integration Diagnostics
       shell: bash
@@ -1465,7 +1465,7 @@ jobs:
         check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
-      uses: ./.github/actions/setup-protobuf
+      uses: ./.github/actions/setup-protobuf-fixed
       
     - name: Initialize Enhanced Dependency Diagnostics
       shell: bash
@@ -1775,7 +1775,7 @@ jobs:
         check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
-      uses: ./.github/actions/setup-protobuf
+      uses: ./.github/actions/setup-protobuf-fixed
         
     - name: Run benchmarks
       run: |
@@ -1812,7 +1812,7 @@ jobs:
         check-latest: true
         
     - name: Setup Protocol Buffers (Required for CI/CD)
-      uses: ./.github/actions/setup-protobuf
+      uses: ./.github/actions/setup-protobuf-fixed
         
     - name: Install cross-compilation tools
       run: go install github.com/goreleaser/goreleaser@latest

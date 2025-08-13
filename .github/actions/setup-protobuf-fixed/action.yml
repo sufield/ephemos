@@ -1,0 +1,77 @@
+name: 'Setup Protocol Buffers (Fixed)'
+description: 'Install protobuf compiler and Go tools with proper PATH handling'
+runs:
+  using: 'composite'
+  steps:
+    - name: Install protoc compiler
+      shell: bash
+      run: |
+        echo "📦 Installing protobuf compiler..."
+        if [[ "$RUNNER_OS" == "Linux" ]]; then
+          sudo apt-get update && sudo apt-get install -y protobuf-compiler
+        elif [[ "$RUNNER_OS" == "macOS" ]]; then
+          brew install protobuf
+        elif [[ "$RUNNER_OS" == "Windows" ]]; then
+          choco install protoc
+        fi
+        protoc --version || { echo "❌ protoc not installed"; exit 1; }
+        echo "✅ protoc installed: $(protoc --version)"
+
+    - name: Install Go protobuf tools
+      shell: bash
+      run: |
+        # Use the install script for consistent installation
+        ./scripts/install-protobuf-tools.sh
+
+    - name: Generate protobuf files
+      shell: bash
+      run: |
+        echo "🔧 Generating protobuf files..."
+        
+        # Load GOBIN from environment or detect it
+        if [ -z "$GOBIN" ]; then
+          export GOBIN="$(go env GOPATH)/bin"
+        fi
+        export PATH="$GOBIN:$PATH"
+        
+        # Create proto file if missing
+        if [ ! -f "examples/proto/echo.proto" ]; then
+          mkdir -p examples/proto
+          cat > examples/proto/echo.proto << 'EOF'
+syntax = "proto3";
+package ephemos.echo;
+option go_package = "github.com/sufield/ephemos/examples/proto";
+
+service EchoService {
+  rpc Echo(EchoRequest) returns (EchoResponse);
+}
+
+message EchoRequest {
+  string message = 1;
+}
+
+message EchoResponse {
+  string message = 1;
+  string from = 2;
+}
+EOF
+        fi
+        
+        # Generate files
+        protoc --go_out=examples/proto --go_opt=paths=source_relative \
+               --go-grpc_out=examples/proto --go-grpc_opt=paths=source_relative \
+               -I examples/proto examples/proto/echo.proto || {
+          echo "❌ Generation failed. Debug info:"
+          echo "PATH: $PATH"
+          echo "protoc: $(which protoc)"
+          echo "protoc-gen-go: $(which protoc-gen-go)"
+          echo "protoc-gen-go-grpc: $(which protoc-gen-go-grpc)"
+          exit 1
+        }
+        
+        # Verify
+        [ -f "examples/proto/echo.pb.go" ] || { echo "❌ echo.pb.go missing"; exit 1; }
+        [ -f "examples/proto/echo_grpc.pb.go" ] || { echo "❌ echo_grpc.pb.go missing"; exit 1; }
+        
+        echo "✅ Generated files:"
+        ls -la examples/proto/*.pb.go
