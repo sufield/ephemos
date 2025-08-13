@@ -122,22 +122,22 @@ test_suite(
     ],
 )
 
-# Go-based script replacements for better integration
-go_binary(
-    name = "proto_generator",
-    srcs = ["//scripts/proto:main.go"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "@org_golang_google_protobuf//compiler/protogen",
-        "@org_golang_google_protobuf//types/pluginpb",
-    ],
-) if False else None  # TODO: Implement when ready
-
-go_test(
-    name = "scripts_test",
-    srcs = ["scripts_test.go"],
-    deps = [
-        "@com_github_stretchr_testify//assert",
-        "@com_github_stretchr_testify//require",
-    ],
-) if False else None  # TODO: Implement when ready
+# TODO: Future Go-based script replacements could be added here
+# go_binary(
+#     name = "proto_generator",
+#     srcs = ["proto/main.go"], 
+#     visibility = ["//visibility:public"],
+#     deps = [
+#         "@org_golang_google_protobuf//compiler/protogen",
+#         "@org_golang_google_protobuf//types/pluginpb",
+#     ],
+# )
+#
+# go_test(
+#     name = "scripts_test",
+#     srcs = ["scripts_test.go"],
+#     deps = [
+#         "@com_github_stretchr_testify//assert", 
+#         "@com_github_stretchr_testify//require",
+#     ],
+# )
