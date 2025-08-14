@@ -63,8 +63,6 @@ show_migration_plan() {
 test_bazel_build() {
     log_info "Testing Bazel build..."
     
-    # Skip protobuf generation (examples archived for 0.1 release)
-    log_info "Protobuf examples archived - skipping protobuf generation test"
     
     # Test main library build
     log_info "Testing library build..."

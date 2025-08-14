@@ -123,7 +123,6 @@ import (
     "net"
     
     "github.com/sufield/ephemos/pkg/ephemos"
-    "github.com/sufield/ephemos/examples/proto"
 )
 
 func main() {

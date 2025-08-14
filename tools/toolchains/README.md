@@ -82,13 +82,6 @@ After configuration, continue using Bazel normally:
 # Clean build to see the performance improvement
 bazel clean --expunge
 bazel build //...
-
-# Build specific proto targets
-bazel build //examples/proto:echo_proto
-bazel build //examples/proto:proto_go_proto
-
-# Test the optimization
-bazel build //examples/proto:proto --verbose_explanations
 ```
 
 ## Performance Benefits
@@ -105,12 +98,12 @@ To verify the optimization is working:
 
 1. **Check toolchain usage**:
    ```bash
-   bazel build //examples/proto:proto --toolchain_resolution_debug
+   bazel build //... --toolchain_resolution_debug
    ```
 
 2. **Monitor build actions**:
    ```bash
-   bazel build //examples/proto:proto --execution_log_binary_file=/tmp/execution.log
+   bazel build //... --execution_log_binary_file=/tmp/execution.log
    ```
 
 3. **Verify no source compilation**:

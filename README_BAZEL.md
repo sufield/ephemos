@@ -18,11 +18,8 @@ This document outlines the migration from shell scripts and Makefiles to Bazel f
 ### 2. Component BUILD Files
 
 - **pkg/ephemos/BUILD.bazel**: Library and test targets for core package
-- **examples/proto/BUILD.bazel**: Protobuf generation and Go library
 - **cmd/ephemos-cli/BUILD.bazel**: CLI binary with version injection
 - **cmd/config-validator/BUILD.bazel**: Config validator binary
-- **examples/echo-server/BUILD.bazel**: Echo server example
-- **examples/echo-client/BUILD.bazel**: Echo client example
 
 ### 3. Utility Scripts
 
@@ -156,7 +153,6 @@ bazel run //scripts/demo:setup_demo       # Setup demo environment
 | `bazel.sh` | Wrapper script for common tasks |
 | `tools/workspace_status.sh` | Version information script |
 | `pkg/ephemos/BUILD.bazel` | Core library build rules |
-| `examples/proto/BUILD.bazel` | Protobuf generation |
 | `cmd/*/BUILD.bazel` | Binary build rules |
 
 ## Benefits Over Shell Scripts
