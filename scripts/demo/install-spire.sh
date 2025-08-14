@@ -2,7 +2,7 @@
 set -e
 
 # Configuration
-SPIRE_VERSION="1.8.7"
+SPIRE_VERSION="1.11.3"  # Pinned to latest stable version
 INSTALL_DIR="/opt/spire"
 SPIRE_URL="https://github.com/spiffe/spire/releases/download/v${SPIRE_VERSION}/spire-${SPIRE_VERSION}-linux-amd64-musl.tar.gz"
 

@@ -23,7 +23,7 @@ jobs:
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
     - name: Setup Go Environment
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@d35c59acafcf5e5c0e3e1ee3398ca19e5be81c4e # v5.5.0
       with:
         go-version: ${{ env.GO_VERSION }}
         check-latest: true
@@ -125,7 +125,7 @@ jobs:
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
     - name: Setup Go Environment
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@d35c59acafcf5e5c0e3e1ee3398ca19e5be81c4e # v5.5.0
       with:
         go-version: ${{ env.GO_VERSION }}
         check-latest: true
@@ -375,7 +375,7 @@ EOF
         echo "✅ Fuzz targets successfully created"
 
     - name: Run ClusterFuzzLite
-      uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+      uses: google/clusterfuzzlite/actions/run_fuzzers@cb1488bb74c8ca8d4fcbfc7c0ab2e1efa06c91e3 # v1
       with:
         language: go
         # Run for shorter time in CI to avoid timeouts
@@ -411,7 +411,7 @@ EOF
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
     - name: Setup Go Environment
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@d35c59acafcf5e5c0e3e1ee3398ca19e5be81c4e # v5.5.0
       with:
         go-version: ${{ env.GO_VERSION }}
         check-latest: true
