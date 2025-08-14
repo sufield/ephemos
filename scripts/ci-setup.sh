@@ -77,8 +77,6 @@ main() {
     install_go_protobuf_tools
     
     # Generate protobuf code
-    echo "🔨 Generating protobuf code..."
-    make proto
     
     # Verify everything is working
     verify_setup

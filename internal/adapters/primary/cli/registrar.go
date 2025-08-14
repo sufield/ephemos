@@ -192,7 +192,7 @@ func (r *Registrar) validateConfig(cfg *ports.Configuration) error {
 // createSPIREEntry creates a registration entry in SPIRE.
 // NOTE: In production, you should use the SPIRE Server API directly via gRPC
 // This implementation uses the CLI for simplicity, as the SPIRE Server API
-// requires additional proto definitions not included in go-spiffe
+// requires additional service definitions not included in go-spiffe
 //
 //nolint:cyclop,funlen // Function has inherent complexity from validation and command execution
 func (r *Registrar) createSPIREEntry(ctx context.Context, cfg *ports.Configuration) error {

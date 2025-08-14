@@ -125,7 +125,6 @@ make lint
 
 4. **CI Environments**: Use CI-friendly build targets
    ```bash
-   make proto-ci    # Tolerant of missing protoc
    ```
 
 ### "protoc-gen-go not found"
@@ -198,7 +197,6 @@ ephemos/
 | `make setup` | Install all development dependencies |
 | `make check-deps` | Check if dependencies are installed |
 | `make build` | Build CLI tools |
-| `make proto` | Generate protobuf code |
 | `make examples` | Build example applications |
 | `make test` | Run test suite |
 | `make lint` | Run code linting |

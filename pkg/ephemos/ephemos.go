@@ -20,7 +20,7 @@ import (
 //
 //	// Recommended approach (no boilerplate):
 //	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-//		proto.RegisterYourServiceServer(s, &yourService{})
+//		yourservice.RegisterYourServiceServer(s, &yourService{})
 //	})
 //
 // Advanced users can implement this interface directly for custom registration logic.
@@ -37,7 +37,7 @@ type ServiceRegistrar interface {
 //
 //	// Instead of writing a custom registrar, use the generic one:
 //	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-//		proto.RegisterYourServiceServer(s, &YourServiceImpl{})
+//		yourservice.RegisterYourServiceServer(s, &YourServiceImpl{})
 //	})
 //	server.RegisterService(ctx, registrar)
 type GenericServiceRegistrar struct {
@@ -55,12 +55,12 @@ type GenericServiceRegistrar struct {
 //
 //	// For an Echo service:
 //	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-//		proto.RegisterEchoServiceServer(s, &MyEchoServer{})
+//		echoservice.RegisterEchoServiceServer(s, &MyEchoServer{})
 //	})
 //
 //	// For any other service:
 //	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-//		proto.RegisterUserServiceServer(s, &MyUserService{})
+//		userservice.RegisterUserServiceServer(s, &MyUserService{})
 //	})
 func NewServiceRegistrar(registerFunc func(*grpc.Server)) ServiceRegistrar {
 	return &GenericServiceRegistrar{
@@ -88,7 +88,7 @@ func (r *GenericServiceRegistrar) Register(grpcServer *grpc.Server) {
 //	}
 //	defer server.Close() // Ensure proper cleanup
 //
-//	serviceRegistrar := proto.NewYourServiceRegistrar(&yourService{})
+//	serviceRegistrar := yourservice.NewYourServiceRegistrar(&yourService{})
 //	server.RegisterService(ctx, serviceRegistrar)
 //
 //	lis, _ := net.Listen("tcp", ":50051")
@@ -192,7 +192,7 @@ type Client interface {
 //	defer server.Close()
 //
 //	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-//		proto.RegisterYourServiceServer(s, &myService{})
+//		yourservice.RegisterYourServiceServer(s, &myService{})
 //	})
 //	server.RegisterService(ctx, registrar)
 //	lis, _ := net.Listen("tcp", ":50051")
@@ -285,7 +285,7 @@ func NewIdentityServer(ctx context.Context, configPath string) (Server, error) {
 //	}
 //	defer conn.Close()
 //
-//	serviceClient := proto.NewServiceClient(conn.GetClientConnection())
+//	serviceClient := yourservice.NewServiceClient(conn.GetClientConnection())
 func NewIdentityClient(ctx context.Context, configPath string) (Client, error) {
 	if ctx == nil {
 		return nil, &ValidationError{

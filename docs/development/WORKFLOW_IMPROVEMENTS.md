@@ -14,11 +14,7 @@ Created reusable composite actions to eliminate repetitive setup code:
 - Downloads dependencies
 - Supports configurable Go versions
 
-**`.github/actions/setup-protobuf/action.yml`**
-- Cross-platform protobuf compiler installation
-- Installs Go protobuf tools
 - Optional installation verification
-- Generates protobuf code
 
 ### 2. Makefile CI Targets Enhanced ✅
 
@@ -33,7 +29,6 @@ Enhanced existing Makefile with CI-specific targets:
 ### 3. CI Setup Script ✅
 
 Created `scripts/ci-setup.sh` for complex setup scenarios:
-- Cross-platform protobuf installation
 - Go tools installation
 - Installation verification
 - Error handling and logging
@@ -54,15 +49,9 @@ Created `scripts/ci-setup.sh` for complex setup scenarios:
       ~/go/pkg/mod
     key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
 - name: Install Protocol Buffers compiler
-  run: sudo apt update && sudo apt install -y protobuf-compiler
-- name: Install Go protobuf tools
   run: |
-    go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 - name: Download dependencies
   run: go mod download
-- name: Generate protobuf code
-  run: make proto
 ```
 
 **After (clean and reusable):**
@@ -72,7 +61,6 @@ Created `scripts/ci-setup.sh` for complex setup scenarios:
   with:
     go-version: ${{ env.GO_VERSION }}
 - name: Setup Protocol Buffers
-  uses: ./.github/actions/setup-protobuf
   with:
     verify-installation: true
 ```
@@ -114,7 +102,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: ./.github/actions/setup-go
-    - uses: ./.github/actions/setup-protobuf
     - run: make ci-test
 ```
 
@@ -130,7 +117,6 @@ jobs:
     - uses: ./.github/actions/setup-go
       with:
         go-version: ${{ matrix.go-version }}
-    - uses: ./.github/actions/setup-protobuf
     - run: make ci-build
 ```
 
@@ -150,7 +136,6 @@ jobs:
 ### 1. **Reduced Workflow Execution Time**
 - Optimized caching strategies reduce setup time
 - Parallel dependency downloads
-- Reusable protobuf generation
 
 ### 2. **Better Resource Usage**
 - Efficient caching keys reduce redundant downloads  

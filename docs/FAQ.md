@@ -593,7 +593,6 @@ This will:
 make build
 
 # Build specific components
-make proto      # Generate protobuf code
 make examples   # Build example applications
 make test       # Run tests
 make clean      # Clean artifacts

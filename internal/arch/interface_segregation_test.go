@@ -241,7 +241,7 @@ func checkDomainPurity(t *testing.T, filePath string) []string {
 	// Check for infrastructure-specific types in domain
 	infrastructureTypes := []string{
 		"grpc", "http", "sql", "db", "database", "redis", "kafka",
-		"json", "xml", "proto", "pb", "rest", "graphql",
+		"json", "xml", "serialization", "pb", "rest", "graphql",
 	}
 
 	ast.Inspect(node, func(n ast.Node) bool {

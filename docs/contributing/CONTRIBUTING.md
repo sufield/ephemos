@@ -87,7 +87,7 @@ make build
 make examples
 
 # Generate protobuf code (if needed)
-make proto
+make build
 ```
 
 ### Testing

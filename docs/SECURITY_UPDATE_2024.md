@@ -140,7 +140,6 @@ examples/*/*-example
 !examples/**/*.yaml
 !examples/**/*.yml
 !examples/**/*.json
-!examples/**/*.proto
 !examples/**/*.mod
 !examples/**/*.sum
 !examples/**/*.txt
@@ -170,7 +169,6 @@ built locally.
 make setup  # Automatically detects and installs missing dependencies
 
 # Option 2: Go Tools Only (No Sudo Required)  
-make install-deps  # Installs Go protobuf tools only
 
 # Option 3: Complete Installation (Requires Sudo)
 ./scripts/install-deps-sudo.sh  # Installs system packages + Go tools
@@ -202,7 +200,6 @@ make install-deps  # Installs Go protobuf tools only
 ```bash
 # GitHub Actions compatibility verified
 ✅ Existing workflows continue to work unchanged
-✅ setup-protobuf action provides system dependencies
 ✅ Environment detection prevents sudo attempts in CI
 ✅ Graceful error handling doesn't break pipelines
 ```

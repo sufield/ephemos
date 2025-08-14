@@ -15,7 +15,7 @@ fi
 
 echo "Running go vet..."
 if ! go vet ./...; then
-    echo "⚠️ go vet found build issues (may need 'make proto' first)" >&2
+    echo "⚠️ go vet found build issues" >&2
     echo "Continuing with other lint checks..."
 fi
 

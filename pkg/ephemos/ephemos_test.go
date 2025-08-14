@@ -199,7 +199,7 @@ func ExampleNewServiceRegistrar() {
 	// Register using the generic registrar - no boilerplate needed!
 	registrar := ephemos.NewServiceRegistrar(func(_ *grpc.Server) {
 		// In a real implementation, you would register your gRPC service here:
-		// proto.RegisterMyServiceServer(s, serviceImpl)
+		// myservice.RegisterMyServiceServer(s, serviceImpl)
 	})
 
 	// Use with Ephemos server

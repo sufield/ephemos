@@ -34,12 +34,6 @@ go build -v ./pkg/ephemos || {
     exit 1
 }
 
-# Generate protobuf if not already done
-echo "🛠️  Ensuring protobuf files are generated..."
-make proto || {
-    echo "❌ Failed to generate protobuf files"
-    exit 1
-}
 
 # Clear cache again after protobuf generation
 echo "🧹 Clearing cache after protobuf generation..."
