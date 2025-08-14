@@ -1,12 +1,11 @@
-name: CI/CD Pipeline (MINIMAL)
+name: CI/CD Pipeline (DISABLED)
 
-# TEMPORARILY DISABLED - Only running Bazel CI workflow for now
-# All original jobs moved to ci-original.yml
-# Only Bazel CI (bazel-ci.yml) is active
+# ALL CI JOBS TEMPORARILY DISABLED
+# Focus on lightweight HTTP over mTLS library without complex build systems
 
 on:
-  # Minimal triggers to avoid conflicts with Bazel CI
-  workflow_dispatch:  # Manual trigger only
+  # Only manual trigger
+  workflow_dispatch:
 
 env:
   GO_VERSION: '1.24.x'
@@ -14,12 +13,12 @@ env:
 
 jobs:
   placeholder:
-    name: CI Jobs Disabled - Bazel CI Only
+    name: CI Jobs Disabled
     runs-on: ubuntu-latest
     steps:
     - name: Notice
       run: |
-        echo "🚫 All CI jobs are temporarily disabled"
-        echo "🔧 Only Bazel CI workflow is active (bazel-ci.yml)"
-        echo "📋 Original jobs saved in ci-original.yml"
-        echo "🎯 Focus: Get Bazel build and test working first"
+        echo "🚫 All CI/CD jobs are temporarily disabled"
+        echo "🎯 Focus: Lightweight HTTP over mTLS library development"
+        echo "🔧 Using Make-based build system only"
+        echo "📋 Bazel CI removed - library uses Go toolchain"
