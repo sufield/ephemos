@@ -12,6 +12,10 @@ on:
 env:
   SCAN_WORKSPACE: "https://github.com/sufield/ephemos"
 
+# Restrict permissions for security - only read access needed for SAST scanning
+permissions:
+  contents: read
+
 jobs:
   scan:
     name: ShiftLeft Security Scan

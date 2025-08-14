@@ -20,6 +20,9 @@ on:
           - 'warn'
           - 'error'
 
+# Restrict permissions for security - deny by default, allow only specific permissions per job
+permissions: {}
+
 jobs:
   renovate:
     name: Renovate Dependencies
