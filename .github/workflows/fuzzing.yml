@@ -174,11 +174,7 @@ jobs:
         echo "🎯 Creating config fuzz target binary..."
         
         # Create config fuzz target binary with error handling
-        if ! cat > "fuzz-targets/config_fuzz_main.go" << 'EOF'
-        then
-          echo "❌ Error: Failed to create config fuzz target file"
-          exit 1
-        fi
+        cat > "fuzz-targets/config_fuzz_main.go" << 'EOF'
         package main
         
         import (
@@ -222,6 +218,11 @@ jobs:
         }
         EOF
         
+        if [ $? -ne 0 ]; then
+          echo "❌ Error: Failed to create config fuzz target file"
+          exit 1
+        fi
+        
         echo "✅ Config fuzz target created successfully"
         
         # Verify the file was created correctly
@@ -233,11 +234,7 @@ jobs:
         echo "🎯 Creating server fuzz target binary..."
         
         # Create server fuzz target binary with error handling
-        if ! cat > "fuzz-targets/server_fuzz_main.go" << 'EOF'
-        then
-          echo "❌ Error: Failed to create server fuzz target file"
-          exit 1
-        fi
+        cat > "fuzz-targets/server_fuzz_main.go" << 'EOF'
         package main
         
         import (
@@ -287,6 +284,11 @@ jobs:
         }
         EOF
         
+        if [ $? -ne 0 ]; then
+          echo "❌ Error: Failed to create server fuzz target file"
+          exit 1
+        fi
+        
         echo "✅ Server fuzz target created successfully"
         
         # Verify the file was created correctly
@@ -298,11 +300,7 @@ jobs:
         echo "🎯 Creating identity fuzz target binary..."
         
         # Create identity fuzz target binary with error handling
-        if ! cat > "fuzz-targets/identity_fuzz_main.go" << 'EOF'
-        then
-          echo "❌ Error: Failed to create identity fuzz target file"
-          exit 1
-        fi 
+        cat > "fuzz-targets/identity_fuzz_main.go" << 'EOF'
         package main
         
         import (
@@ -355,6 +353,11 @@ jobs:
         	}
         }
         EOF
+        
+        if [ $? -ne 0 ]; then
+          echo "❌ Error: Failed to create identity fuzz target file"
+          exit 1
+        fi
         
         echo "✅ Identity fuzz target created successfully"
         
