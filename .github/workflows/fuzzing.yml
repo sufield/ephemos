@@ -130,7 +130,10 @@ jobs:
           # For ClusterFuzzLite with Go, we need to create binaries that wrap our fuzz tests
           # Create a temporary directory for fuzz target source files
           mkdir -p fuzz-targets
+          echo "✅ Created fuzz-targets directory"
+          
           # Create config fuzz target binary
+          echo "Creating config_fuzz_main.go..."
           cat > fuzz-targets/config_fuzz_main.go << 'EOF'
           package main
           import (
@@ -167,7 +170,10 @@ jobs:
             }
           }
           EOF
+          echo "✅ Created config_fuzz_main.go"
+          
           # Create server fuzz target binary
+          echo "Creating server_fuzz_main.go..."
           cat > fuzz-targets/server_fuzz_main.go << 'EOF'
           package main
           import (
@@ -210,7 +216,10 @@ jobs:
             }
           }
           EOF
+          echo "✅ Created server_fuzz_main.go"
+          
           # Create identity fuzz target binary
+          echo "Creating identity_fuzz_main.go..."
           cat > fuzz-targets/identity_fuzz_main.go << 'EOF'
           package main
           import (
@@ -256,18 +265,39 @@ jobs:
             }
           }
           EOF
+          echo "✅ Created identity_fuzz_main.go"
+          
+          # Verify all source files were created successfully
+          echo "Verifying all fuzz target source files were created..."
+          ls -la fuzz-targets/
+          
+          missing_files=0
+          for target in config_fuzz_main.go server_fuzz_main.go identity_fuzz_main.go; do
+            if [ -f "fuzz-targets/$target" ]; then
+              line_count=$(wc -l < "fuzz-targets/$target")
+              echo "✅ $target exists ($line_count lines)"
+              # Verify file has reasonable content (more than just a few lines)
+              if [ "$line_count" -lt 10 ]; then
+                echo "⚠️ $target seems too small ($line_count lines)"
+              fi
+            else
+              echo "❌ $target missing after creation attempt"
+              missing_files=$((missing_files + 1))
+            fi
+          done
+          
+          if [ $missing_files -gt 0 ]; then
+            echo "❌ $missing_files source files are missing - cannot proceed with build"
+            echo "Working directory: $(pwd)"
+            echo "Available files:"
+            find . -name "*.go" -type f | head -10
+            exit 1
+          fi
+          
+          echo "✅ All source files created successfully"
+          
           # Build the fuzz target binaries
           echo "Building fuzz target binaries..."
-          
-          # Verify source files exist before building
-          for target in config_fuzz_main.go server_fuzz_main.go identity_fuzz_main.go; do
-            if [ ! -f "fuzz-targets/$target" ]; then
-              echo "❌ Source file fuzz-targets/$target not found"
-              ls -la fuzz-targets/
-              exit 1
-            fi
-            echo "✅ Found source file: fuzz-targets/$target"
-          done
           
           # Build each target with proper error handling
           echo "Building config_fuzz..."
