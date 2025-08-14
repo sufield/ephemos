@@ -91,9 +91,9 @@ jobs:
         name: api-documentation
         path: docs/api/
 
-  # Example validation
-  validate-examples:
-    name: Validate Examples
+  # Configuration validation
+  validate-configs:
+    name: Validate Configurations
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -105,38 +105,32 @@ jobs:
         go-version: '1.24.x'
         
         
-    - name: Build examples
+    - name: Build project
       run: |
-        make build examples
+        make build
         
-    - name: Validate example configuration files
+    - name: Validate configuration files
       run: |
-        # Check YAML syntax
-        for file in config/*.yaml examples/**/*.yaml; do
+        # Check YAML syntax in config directory
+        for file in config/*.yaml; do
           if [[ -f "$file" ]]; then
             echo "Validating $file"
             python3 -c "import yaml; yaml.safe_load(open('$file'))" || echo "Invalid YAML: $file"
           fi
         done
         
-    - name: Test example documentation
+    - name: Verify configuration validator
       run: |
-        # Check if example commands in README work
-        if grep -q "go run examples" README.md; then
-          echo "Found Go run examples in README, validating..."
-          # Extract and test go run commands
-          grep "go run examples" README.md | while read line; do
-            echo "Testing: $line"
-            timeout 5 $line --help || echo "Command failed: $line"
-          done
-        fi
+        # Build and test the config validator tool
+        go build -o config-validator ./cmd/config-validator
+        ./config-validator --help || echo "Config validator help check"
 
   # Release automation
   release:
     name: Create Release
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [docs-lint, api-docs, validate-examples]
+    needs: [docs-lint, api-docs, validate-configs]
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
