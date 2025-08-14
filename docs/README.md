@@ -26,6 +26,7 @@ Welcome to the Ephemos documentation. This directory contains all documentation 
 - [register-ephimos.md](./development/register-ephimos.md) - Service registration guide
 
 ### 📁 [security/](./security/)
+- [SAST_IMPLEMENTATION.md](./security/SAST_IMPLEMENTATION.md) - Static Application Security Testing (SAST) implementation
 - [SECURITY-LOGGING.md](./security/SECURITY-LOGGING.md) - Security logging guidelines
 - [SECURITY_ARCHITECTURE.md](./security/SECURITY_ARCHITECTURE.md) - Security architecture overview
 - [SECURITY_RUNBOOK.md](./security/SECURITY_RUNBOOK.md) - Security incident response runbook

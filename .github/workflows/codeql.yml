@@ -1,0 +1,76 @@
+name: "CodeQL Security Analysis"
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run CodeQL analysis every Monday at 6:00 AM UTC
+    - cron: '0 6 * * 1'
+
+jobs:
+  analyze:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'go' ]
+        # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+    - name: Set up Go
+      uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+      with:
+        go-version: '1.21'
+        check-latest: true
+
+    # Initializes the CodeQL tools for scanning.
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@e2b3eafc8d227b0241d48be5f425d47c2d750a13 # v3.26.10
+      with:
+        languages: ${{ matrix.language }}
+        config-file: ./.github/codeql/codeql-config.yml
+        # Additional queries beyond config file
+        queries: +security-extended,security-and-quality
+
+    # Autobuild attempts to build any compiled languages  (C/C++, C#, Go, or Java).
+    # If this step fails, then you should remove it and run the build manually (see below)
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@e2b3eafc8d227b0241d48be5f425d47c2d750a13 # v3.26.10
+
+    # ℹ️ Command-line programs to run using the OS shell.
+    # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
+
+    # If the Autobuild fails above, remove it and uncomment the following three lines. 
+    # modify them (or add more) to build your code if your project, please refer to the EXAMPLE below for guidance.
+
+    # - name: Build Go project
+    #   run: |
+    #     go mod download
+    #     go build -v ./...
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@e2b3eafc8d227b0241d48be5f425d47c2d750a13 # v3.26.10
+      with:
+        category: "/language:${{matrix.language}}"
+        # Upload results to GitHub Security tab
+        upload: true
+
+    # Optional: Upload SARIF results as artifacts for further analysis
+    - name: Upload CodeQL results as artifacts
+      if: always()
+      uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+      with:
+        name: codeql-results-${{ matrix.language }}
+        path: /home/runner/work/_temp/_github_workflow_codeql_databases/
+        retention-days: 5

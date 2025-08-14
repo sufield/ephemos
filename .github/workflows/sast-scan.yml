@@ -2,22 +2,39 @@ name: SAST Scan with ShiftLeft
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
     branches: [ main ]
+  schedule:
+    # Run additional SAST scans every Tuesday at 2:00 AM UTC (complement CodeQL on Monday)
+    - cron: '0 2 * * 2'
 
 env:
   SCAN_WORKSPACE: "https://github.com/sufield/ephemos"
 
 jobs:
   scan:
+    name: ShiftLeft Security Scan
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
-      - name: Perform ShiftLeft Scan
+      - name: Set up Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version: '1.21'
+          check-latest: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Perform ShiftLeft Security Scan
         uses: ShiftLeftSecurity/scan-action@master
         with:
           type: "credscan,go,depscan"  # credscan for secrets, go for SAST on Go code, depscan for dependencies
@@ -30,5 +47,14 @@ jobs:
         if: always()  # Upload even if scan fails
         uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         with:
-          name: scan-reports
+          name: shiftleft-scan-reports
           path: reports/
+          retention-days: 30
+
+      # Optional: Convert results to SARIF and upload to GitHub Security tab
+      - name: Upload SARIF results to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@e2b3eafc8d227b0241d48be5f425d47c2d750a13 # v3.26.10
+        with:
+          sarif_file: reports/
+        continue-on-error: true
