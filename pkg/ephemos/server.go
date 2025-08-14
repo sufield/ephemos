@@ -22,8 +22,6 @@ import (
 )
 
 const (
-	// TransportTypeGRPC represents gRPC transport type.
-	TransportTypeGRPC = "grpc"
 	// TransportTypeHTTP represents HTTP transport type.
 	TransportTypeHTTP = "http"
 	// DefaultShutdownTimeout is the default timeout for graceful shutdown.

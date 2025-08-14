@@ -1,5 +1,5 @@
-# Configuration for HTTP transport demo  
-# This config makes the transport-agnostic server use HTTP/REST
+# Configuration for gRPC transport demo
+# This config makes the transport-agnostic server use gRPC
 
 service:
   name: "transport-demo"
@@ -10,7 +10,7 @@ spiffe:
 
 transport:
   type: "http"
-  address: ":8080"
+  address: ":50051"
   tls:
     enabled: false  # For demo purposes - enable in production
     useSpiffe: false
