@@ -152,8 +152,10 @@ jobs:
     - name: Generate protobuf files
       run: |
         echo "🔧 Generating protobuf files with Bazel..."
-        # Use Go-based proto generator instead of bash script
-        bazel run //scripts/proto:proto_generator -- install --proto-dir=examples/proto --go-out=examples/proto
+        # First install the required tools
+        bazel run //scripts/proto:proto_generator -- install
+        # Then generate protobuf files (proto_dir and output_dir as positional arguments)
+        bazel run //scripts/proto:proto_generator -- examples/proto examples/proto
         
         # Verify protobuf files exist
         echo "✅ Generated protobuf files:"
