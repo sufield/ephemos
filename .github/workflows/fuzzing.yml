@@ -258,60 +258,103 @@ jobs:
           EOF
           # Build the fuzz target binaries
           echo "Building fuzz target binaries..."
-          cd fuzz-targets
-          # Build standalone Go binaries (no external dependencies needed)
-          echo "Building standalone Go binaries..."
+          
+          # Verify source files exist before building
+          for target in config_fuzz_main.go server_fuzz_main.go identity_fuzz_main.go; do
+            if [ ! -f "fuzz-targets/$target" ]; then
+              echo "❌ Source file fuzz-targets/$target not found"
+              ls -la fuzz-targets/
+              exit 1
+            fi
+            echo "✅ Found source file: fuzz-targets/$target"
+          done
+          
+          # Build each target with proper error handling
           echo "Building config_fuzz..."
-          go build -v -o ../build-out/config_fuzz ./config_fuzz_main.go
-          if [ $? -eq 0 ]; then
+          if go build -v -o build-out/config_fuzz ./fuzz-targets/config_fuzz_main.go; then
             echo "✅ config_fuzz built successfully"
           else
             echo "❌ config_fuzz build failed"
+            echo "Build output:"
+            go build -v -o build-out/config_fuzz ./fuzz-targets/config_fuzz_main.go 2>&1 || true
             exit 1
           fi
+          
           echo "Building server_fuzz..."
-          go build -v -o ../build-out/server_fuzz ./server_fuzz_main.go
-          if [ $? -eq 0 ]; then
+          if go build -v -o build-out/server_fuzz ./fuzz-targets/server_fuzz_main.go; then
             echo "✅ server_fuzz built successfully"
           else
             echo "❌ server_fuzz build failed"
+            echo "Build output:"
+            go build -v -o build-out/server_fuzz ./fuzz-targets/server_fuzz_main.go 2>&1 || true
             exit 1
           fi
+          
           echo "Building identity_fuzz..."
-          go build -v -o ../build-out/identity_fuzz ./identity_fuzz_main.go
-          if [ $? -eq 0 ]; then
+          if go build -v -o build-out/identity_fuzz ./fuzz-targets/identity_fuzz_main.go; then
             echo "✅ identity_fuzz built successfully"
           else
             echo "❌ identity_fuzz build failed"
+            echo "Build output:"
+            go build -v -o build-out/identity_fuzz ./fuzz-targets/identity_fuzz_main.go 2>&1 || true
             exit 1
           fi
-          cd ..
           # Verify build-out directory has fuzz targets
+          echo "Verifying build output..."
+          if [ ! -d "build-out" ]; then
+            echo "❌ build-out directory does not exist"
+            exit 1
+          fi
+          
           echo "Contents of build-out directory:"
-          ls -la build-out/ || echo "build-out directory does not exist"
+          ls -la build-out/
+          
           # Count the number of binaries created
           BINARY_COUNT=$(find build-out/ -type f -executable 2>/dev/null | wc -l)
           echo "Number of executable files found: $BINARY_COUNT"
-          # Check each expected binary
+          
+          # Check each expected binary exists and is executable
+          missing_targets=0
           for binary in config_fuzz server_fuzz identity_fuzz; do
             if [ -f "build-out/$binary" ]; then
-              echo "✅ $binary exists and is $(file build-out/$binary)"
+              echo "✅ $binary exists"
+              # Check if it's executable
+              if [ -x "build-out/$binary" ]; then
+                echo "✅ $binary is executable"
+                # Test the binary can run
+                if "./build-out/$binary" >/dev/null 2>&1; then
+                  echo "✅ $binary runs successfully"
+                else
+                  echo "⚠️ $binary exists but failed to run"
+                fi
+              else
+                echo "⚠️ $binary exists but is not executable"
+                chmod +x "build-out/$binary"
+                echo "✅ Made $binary executable"
+              fi
             else
               echo "❌ $binary is missing"
+              missing_targets=$((missing_targets + 1))
             fi
           done
-          # Validate that we have fuzz targets
-          if [ -z "$(ls -A build-out/ 2>/dev/null)" ]; then
-            echo "❌ build-out directory is empty after building fuzz targets"
-            echo "Debugging: Contents of fuzz-targets directory:"
-            ls -la fuzz-targets/
-            echo "Debugging: Go build environment:"
-            cd fuzz-targets
-            go env
-            cd ..
+          
+          # Validate that we have all required fuzz targets
+          if [ $missing_targets -gt 0 ]; then
+            echo "❌ $missing_targets fuzz targets are missing"
+            echo "Debugging information:"
+            echo "Contents of fuzz-targets directory:"
+            ls -la fuzz-targets/ 2>/dev/null || echo "fuzz-targets directory not found"
+            echo "Go environment:"
+            go env | head -10
             exit 1
           fi
-          echo "✅ Fuzz targets successfully created"
+          
+          if [ $BINARY_COUNT -lt 3 ]; then
+            echo "❌ Expected 3 fuzz targets, found $BINARY_COUNT"
+            exit 1
+          fi
+          
+          echo "✅ All $BINARY_COUNT fuzz targets successfully created and verified"
       - name: Run ClusterFuzzLite
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
         with:
