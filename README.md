@@ -1,10 +1,10 @@
 # Ephemos
 
-**No more API keys or secrets between your services.** Ephemos handles service-to-service authentication automatically using certificates that rotate every hour - so you never have to manage, store, or worry about API keys again.
+**No more plaintext API keys or secrets between your services.** Ephemos handles service-to-service authentication automatically using certificates that rotate every hour - so you never have to manage, store, or worry about API keys again.
 
 ## The Problem with API Keys
 
-Every microservice needs to authenticate to other services. The traditional approach uses API keys:
+Every service needs to authenticate to other services. The traditional approach uses API keys:
 
 ### ❌ Before: API Keys Everywhere
 
@@ -109,91 +109,61 @@ func main() {
 
 ## Configuration (No Secrets Here Either!)
 
-Instead of managing API keys, you just configure which services can talk to each other:
+Instead of managing API keys, you just configure your service identity:
 
 **time-server.yaml** (server configuration):
 ```yaml
 service:
   name: "time-server"
-
-# Which services are allowed to connect to this server
-authorized_clients:
-  - "time-client"
-  - "monitoring-service"
-  # Any other service will be rejected automatically
 ```
 
 **time-client.yaml** (client configuration):
 ```yaml
 service:
   name: "time-client"
-
-# Which services this client trusts to connect to  
-trusted_services:
-  - "time-server"
 ```
 
 **No secrets in these config files!** Authentication happens using certificates that are automatically managed behind the scenes.
 
-## Real-World Example
 
-Let's see how a payment service calls a user service:
+## Workflow Comparison: Admin Registration vs Dashboard Management
 
-### ❌ Before: API Keys
+### ❌ Old Workflow: Dashboard + API Key Management
 
-```go
-// payment-service calling user-service
-func (p *PaymentService) ProcessPayment(userID string, amount float64) error {
-    // 😫 Need to manage API key for user-service
-    userAPIKey := os.Getenv("USER_SERVICE_API_KEY")
-    
-    req, _ := http.NewRequest("GET", 
-        fmt.Sprintf("https://user-service/users/%s", userID), nil)
-    req.Header.Set("Authorization", "Bearer " + userAPIKey)
-    
-    resp, err := http.DefaultClient.Do(req)
-    if resp.StatusCode == 401 {
-        return errors.New("user service rejected our API key")
-    }
-    
-    // Process payment logic...
-    return nil
-}
+**For Developers (every time they need service-to-service communication):**
+1. 🌐 Log into company dashboard/admin panel  
+2. 🔑 Navigate to "API Keys" section
+3. ➕ Create new API key for each service pair (e.g., "time-client-to-time-server")
+4. 📋 Copy the generated key 
+5. 💾 Store key in environment variables, Kubernetes secrets, or config management
+6. 🔄 Repeat for every service that needs to talk to another service
+7. 📅 Set up rotation schedules and alerts for key expiration
+8. 🚨 Handle key rotation across all deployments when keys expire
+
+**Problems:**
+- Developers need dashboard access and training
+- Keys proliferate rapidly (N×M keys for N services talking to M services)
+- Manual rotation procedures
+- Keys can be forgotten, logged, or mismanaged
+
+### ✅ New Workflow: Admin Registration (One-Time Setup)
+
+**For Administrators (one-time setup per service):**
+```bash
+# Admin registers each service once when it's created
+ephemos register service --name time-client
+ephemos register service --name time-server
 ```
 
-### ✅ After: Ephemos
+**For Developers (zero setup needed):**
+- ✅ **No dashboard login required**
+- ✅ **No API keys to create or manage**  
+- ✅ **No secrets to store or rotate**
+- ✅ **Just write code and configure your service identity**
 
-```go
-// payment-service calling user-service  
-func (p *PaymentService) ProcessPayment(userID string, amount float64) error {
-    // 🎉 No API keys needed - authentication is automatic!
-    user, err := p.userClient.GetUser(context.Background(), userID)
-    if err != nil {
-        return err // Authentication happens transparently
-    }
-    
-    // Process payment logic...
-    return nil
-}
-```
-
-**Configuration:**
-```yaml
-# payment-service config
-service:
-  name: "payment-service"
-trusted_services:
-  - "user-service"
-
----
-# user-service config  
-service:
-  name: "user-service"
-authorized_clients:
-  - "payment-service"
-  - "admin-dashboard" 
-  # payment-service is allowed, others are rejected
-```
+**Key Difference:**
+- **Before:** Developers had to manage secrets for every service interaction
+- **After:** Admin registers services once; developers just configure service identity in YAML
 
 ## Quick Start
 
@@ -224,8 +194,8 @@ service := ephemos.NewServiceClient(conn)
 Instead of generating API keys, register your services:
 ```bash
 # One-time setup per service (like creating a database user)
-ephemos register service --name payment-service
-ephemos register service --name user-service
+ephemos register service --name time-client
+ephemos register service --name time-server
 ```
 
 ### 4. Deploy Without Secrets
@@ -239,8 +209,8 @@ kind: Secret
 metadata:
   name: api-keys
 data:
-  USER_SERVICE_API_KEY: dXNlci1zZXJ2aWNlLXNlY3JldA== # base64 encoded secret 😫
-  PAYMENT_SERVICE_API_KEY: cGF5bWVudC1zZXJ2aWNlLXNlY3JldA==
+  TIME_SERVICE_API_KEY: dGltZS1zZXJ2aWNlLXNlY3JldA== # base64 encoded secret 😫
+  TIME_CLIENT_API_KEY: dGltZS1jbGllbnQtc2VjcmV0
 
 ---
 apiVersion: apps/v1
@@ -249,13 +219,13 @@ spec:
   template:
     spec:
       containers:
-      - name: payment-service
+      - name: time-client
         env:
-        - name: USER_SERVICE_API_KEY
+        - name: TIME_SERVICE_API_KEY
           valueFrom:
             secretKeyRef:
               name: api-keys
-              key: USER_SERVICE_API_KEY # 😫 Managing secrets
+              key: TIME_SERVICE_API_KEY # 😫 Managing secrets
 ```
 
 **After (Kubernetes with Ephemos):**
@@ -266,7 +236,7 @@ spec:
   template:
     spec:
       containers:
-      - name: payment-service
+      - name: time-client
         # 🎉 No secrets needed!
         volumeMounts:
         - name: ephemos-config
@@ -279,8 +249,8 @@ spec:
 
 ## Benefits for Developers
 
-### 🧹 **Cleaner Code**
-- No authentication logic cluttering your business methods
+### 🧹 **Simpler Code**
+- No authentication logic cluttering your business logic
 - No API key management code
 - No error handling for expired/invalid keys
 
@@ -299,22 +269,22 @@ spec:
 ### 🧪 **Simpler Testing**
 ```go
 // Test your business logic without mocking authentication
-func TestProcessPayment(t *testing.T) {
-    service := &PaymentService{} 
-    err := service.ProcessPayment("user123", 100.00)
+func TestGetCurrentTime(t *testing.T) {
+    client := &TimeClient{} 
+    time, err := client.GetCurrentTime("UTC")
     // No need to mock API key validation!
 }
 ```
 
-## How It Works (Simple Version)
+## How It Works
 
-1. **Instead of API keys**, each service gets a unique certificate
-2. **Certificates prove identity** - like a driver's license for services  
-3. **Certificates rotate automatically** every hour (you never see them)
-4. **Services authenticate each other** during connection, before your code runs
-5. **Authorization is configured**, not coded - specify which services can talk to which
+**Like Caddy for your internal services** - just as Caddy automatically handles HTTPS certificates, Ephemos automatically handles service authentication:
 
-Think of it like **HTTPS for your internal services** - you don't manage the certificates, but you get automatic encryption and authentication.
+- **Caddy**: Issues short-lived certificates (12 hours) from its local CA for HTTPS
+- **Ephemos**: Issues short-lived certificates (1 hour) from SPIRE for service identity
+- **Both**: Auto-rotate certificates before expiration - zero manual management
+
+The key difference: Caddy secures browser-to-server, Ephemos secures service-to-service.
 
 ## Installation & Setup
 
