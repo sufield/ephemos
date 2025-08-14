@@ -1,0 +1,48 @@
+# Multi-stage Dockerfile for Ephemos with pinned dependencies
+# This provides better security and smaller final image size
+
+# Build stage - using Go 1.24 on Alpine with pinned digest
+FROM golang:1.24-alpine@sha256:8c9183f715b0b4eca05e91f856c8de7fbcc42f1638794cb4837a9a96c7ea6e2e AS builder
+
+# Install build dependencies
+RUN apk add --no-cache git make
+
+# Set working directory
+WORKDIR /build
+
+# Copy go mod files first for better caching
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN make build
+
+# Final stage - minimal Alpine image with pinned digest
+FROM alpine:3.20@sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1
+
+# Install runtime dependencies only
+RUN apk add --no-cache ca-certificates
+
+# Create non-root user for security
+RUN adduser -D -u 1000 ephemos
+
+# Set working directory
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=builder /build/bin/ephemos /app/ephemos
+
+# Change ownership to non-root user
+RUN chown -R ephemos:ephemos /app
+
+# Switch to non-root user
+USER ephemos
+
+# Expose default port (adjust as needed)
+EXPOSE 8080
+
+# Run the application
+ENTRYPOINT ["/app/ephemos"]
