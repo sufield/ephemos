@@ -126,8 +126,7 @@ ephemos/
 │   │   └── services/       # Domain services
 │   ├── adapters/
 │   │   ├── primary/        # Inbound adapters (API, CLI)
-│   │   └── secondary/      # Outbound adapters (SPIFFE, gRPC)
-│   └── proto/              # Generated protobuf code
+│   │   └── secondary/      # Outbound adapters (SPIFFE, HTTP)
 ├── pkg/ephemos/            # Public API
 ├── examples/               # Example applications
 ├── configs/                # Configuration files

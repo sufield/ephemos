@@ -66,7 +66,6 @@ Makefile.security     # Security scanning
 
 scripts/
 ├── build/
-│   ├── generate-proto.sh     # Secure protobuf generation
 │   └── lint.sh              # Linting automation
 ├── security/
 │   ├── install-tools.sh     # Secure tool installation
