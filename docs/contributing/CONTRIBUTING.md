@@ -66,8 +66,6 @@ source ~/.bashrc
 
 ### Go Protobuf Tools
 ```bash
-go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 ```
 
 ### Optional Development Tools
@@ -189,9 +187,7 @@ go mod tidy
 make build
 ```
 
-**protoc not found:**
 ```bash
-# The project requires protoc for development
 # Use our automated setup:
 make setup                           # Smart setup (recommended)
 ./scripts/install-deps-sudo.sh      # Full installation with sudo
@@ -256,7 +252,6 @@ Before submitting changes:
 - **OS**: Ubuntu 24 (optimized, but works on other Linux distros)
 - **Go**: 1.23+ (1.24.5+ recommended)
 - **System tools**: git, make, curl, wget, build-essential
-- **Protobuf**: protoc compiler + Go plugins
 - **Optional**: golangci-lint, gosec, govulncheck for development
 
 ### New Security-First Setup

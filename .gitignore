@@ -262,9 +262,6 @@ act-cache/
 /tmp/bazel
 ~/bin/bazel
 bazel-installer*
-protoc-*
-/protoc
-protoc
 
 # Development caches and temporary files
 .cache/

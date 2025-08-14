@@ -11,7 +11,6 @@ github.com/davecgh/go-spew v1.1.1
 github.com/envoyproxy/go-control-plane v0.13.4
 github.com/envoyproxy/go-control-plane/envoy v1.32.4
 github.com/envoyproxy/go-control-plane/ratelimit v0.1.0
-github.com/envoyproxy/protoc-gen-validate v1.2.1
 github.com/go-jose/go-jose/v4 v4.0.5 [v4.1.2]
 github.com/go-logr/logr v1.4.3
 github.com/go-logr/stdr v1.2.2

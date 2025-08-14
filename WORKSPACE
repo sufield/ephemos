@@ -75,7 +75,7 @@ rules_cc_toolchains()
 
 bazel_features_deps()
 
-# Note: Proto dependencies removed - library uses HTTP over mTLS without protobuf
+# Note: Library uses HTTP over mTLS for service communication
 
 py_repositories()
 

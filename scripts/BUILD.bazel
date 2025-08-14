@@ -29,11 +29,6 @@ sh_binary(
     visibility = ["//visibility:public"],
 )
 
-sh_binary(
-    name = "ensure_protoc",
-    srcs = ["ensure-protoc.sh"],
-    visibility = ["//visibility:public"],
-)
 
 # CI setup and build
 sh_binary(

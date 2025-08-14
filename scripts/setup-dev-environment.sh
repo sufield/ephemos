@@ -91,13 +91,7 @@ else
     MISSING_TOOLS+=("Bazel")
 fi
 
-# Check protoc
-if command_exists protoc; then
-    PROTOC_VERSION=$(protoc --version | awk '{print $2}')
-    echo -e "${GREEN}✓ protoc: $PROTOC_VERSION${NC}"
 else
-    echo -e "${YELLOW}⚠️  protoc not found${NC}"
-    MISSING_TOOLS+=("protoc")
 fi
 
 # Check act
@@ -110,16 +104,10 @@ fi
 
 # Check Go tools
 export PATH="$PATH:$(go env GOPATH)/bin"
-if command_exists protoc-gen-go; then
-    echo -e "${GREEN}✓ protoc-gen-go${NC}"
 else
-    echo -e "${YELLOW}⚠️  protoc-gen-go not found${NC}"
 fi
 
-if command_exists protoc-gen-go-grpc; then
-    echo -e "${GREEN}✓ protoc-gen-go-grpc${NC}"
 else
-    echo -e "${YELLOW}⚠️  protoc-gen-go-grpc not found${NC}"
 fi
 
 # Test build system
