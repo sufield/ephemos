@@ -1,0 +1,25 @@
+{
+  "ref": "refs/heads/fix/ci-test-compilation-checks",
+  "before": "0000000000000000000000000000000000000000",
+  "after": "d5b4500123456789abcdef0123456789abcdef01",
+  "repository": {
+    "name": "ephemos",
+    "full_name": "user/ephemos",
+    "private": false,
+    "default_branch": "main"
+  },
+  "pusher": {
+    "name": "user",
+    "email": "user@example.com"
+  },
+  "commits": [
+    {
+      "id": "d5b4500123456789abcdef0123456789abcdef01",
+      "message": "Test commit for act",
+      "author": {
+        "name": "user",
+        "email": "user@example.com"
+      }
+    }
+  ]
+}

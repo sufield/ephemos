@@ -18,11 +18,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-
-	grpcAdapter "github.com/sufield/ephemos/internal/adapters/grpc"
-	httpAdapter "github.com/sufield/ephemos/internal/adapters/http"
-	"github.com/sufield/ephemos/internal/adapters/secondary/config"
-	"github.com/sufield/ephemos/internal/core/ports"
+	// Internal adapters temporarily removed to eliminate dependencies
 )
 
 const (
@@ -41,14 +37,14 @@ const (
 // TransportServer represents a transport-agnostic service server.
 // The transport (gRPC, HTTP, etc.) is determined by configuration.
 type TransportServer struct {
-	config *ports.Configuration
+	config *Configuration
 
 	// Transport implementations - only one will be active
 	grpcServer  *grpc.Server
-	grpcAdapter *grpcAdapter.Adapter
+	grpcAdapter GRPCAdapter
 	httpServer  *http.Server
 	httpMux     *http.ServeMux
-	httpAdapter *httpAdapter.Adapter
+	httpAdapter HTTPAdapter
 }
 
 // newTransportServer creates a new server instance from configuration.
@@ -68,14 +64,12 @@ func newTransportServer(ctx context.Context, configPath string) (*TransportServe
 	// Initialize the appropriate transport based on config
 	switch config.Transport.Type {
 	case TransportTypeGRPC:
-		server.grpcServer = grpc.NewServer()
-		server.grpcAdapter = grpcAdapter.NewAdapter(server.grpcServer)
+		server.grpcAdapter = NewGRPCAdapter()
+		server.grpcServer = server.grpcAdapter.GetGRPCServer()
 	case TransportTypeHTTP:
+		server.httpAdapter = NewHTTPAdapter(config.Transport.Address)
+		server.httpServer = server.httpAdapter.GetHTTPServer()
 		server.httpMux = http.NewServeMux()
-		server.httpAdapter = httpAdapter.NewAdapter(server.httpMux)
-		server.httpServer = &http.Server{
-			Handler: server.httpMux,
-		}
 	default:
 		return nil, fmt.Errorf("unsupported transport type: %s", config.Transport.Type)
 	}
@@ -95,15 +89,15 @@ func mount[T any](server *TransportServer, impl T) error {
 func (s *TransportServer) mountService(impl any) error {
 	switch s.config.Transport.Type {
 	case TransportTypeGRPC:
-		if err := s.grpcAdapter.Mount(impl); err != nil {
-			return fmt.Errorf("failed to mount gRPC service: %w", err)
+		if s.grpcAdapter == nil {
+			return fmt.Errorf("gRPC adapter not initialized")
 		}
-		return nil
+		return s.grpcAdapter.Mount(impl)
 	case TransportTypeHTTP:
-		if err := s.httpAdapter.Mount(impl); err != nil {
-			return fmt.Errorf("failed to mount HTTP service: %w", err)
+		if s.httpAdapter == nil {
+			return fmt.Errorf("HTTP adapter not initialized")
 		}
-		return nil
+		return s.httpAdapter.Mount(impl)
 	default:
 		return fmt.Errorf("unsupported transport type: %s", s.config.Transport.Type)
 	}
@@ -125,6 +119,24 @@ func (s *TransportServer) ListenAndServe(ctx context.Context) error {
 		return s.serveHTTP(ctx, shutdownCtx, addr)
 	default:
 		return fmt.Errorf("unsupported transport type: %s", s.config.Transport.Type)
+	}
+}
+
+// serveOnListener serves on a pre-created listener without signal handling.
+// This is used by the Server interface implementation.
+func (s *TransportServer) serveOnListener(ctx context.Context, listener net.Listener) error {
+	transportType := s.config.Transport.Type
+	if transportType == "" {
+		transportType = TransportTypeGRPC // default
+	}
+
+	switch transportType {
+	case TransportTypeGRPC:
+		return s.serveGRPCOnListener(ctx, listener)
+	case TransportTypeHTTP:
+		return s.serveHTTPOnListener(ctx, listener)
+	default:
+		return fmt.Errorf("unsupported transport type: %s", transportType)
 	}
 }
 
@@ -230,6 +242,92 @@ func (s *TransportServer) serveHTTP(ctx, shutdownCtx context.Context, addr strin
 	return serverErr
 }
 
+// serveGRPCOnListener serves gRPC on a pre-created listener
+func (s *TransportServer) serveGRPCOnListener(ctx context.Context, listener net.Listener) error {
+	defer func() {
+		if closeErr := listener.Close(); closeErr != nil {
+			// Log error but don't override main error
+			_ = closeErr
+		}
+	}()
+
+	var wg sync.WaitGroup
+	var serverErr error
+	var errMutex sync.Mutex
+
+	setServerError := func(err error) {
+		errMutex.Lock()
+		defer errMutex.Unlock()
+		if serverErr == nil && err != nil {
+			serverErr = err
+		}
+	}
+
+	// Start gRPC server in a goroutine
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := s.grpcServer.Serve(listener); err != nil {
+			setServerError(fmt.Errorf("gRPC server error: %w", err))
+		}
+	}()
+
+	// Wait for context cancellation
+	go func() {
+		<-ctx.Done()
+		s.grpcServer.GracefulStop()
+	}()
+
+	wg.Wait()
+
+	errMutex.Lock()
+	defer errMutex.Unlock()
+	return serverErr
+}
+
+// serveHTTPOnListener serves HTTP on a pre-created listener
+func (s *TransportServer) serveHTTPOnListener(ctx context.Context, listener net.Listener) error {
+	var wg sync.WaitGroup
+	var serverErr error
+	var errMutex sync.Mutex
+
+	setServerError := func(err error) {
+		errMutex.Lock()
+		defer errMutex.Unlock()
+		if serverErr == nil && err != nil {
+			serverErr = err
+		}
+	}
+
+	// Start HTTP server in a goroutine
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := s.httpServer.Serve(listener); err != nil && err != http.ErrServerClosed {
+			setServerError(fmt.Errorf("HTTP server error: %w", err))
+		}
+	}()
+
+	// Wait for context cancellation
+	go func() {
+		<-ctx.Done()
+
+		// Graceful shutdown for HTTP server
+		shutdownTimeout, shutdownCancel := context.WithTimeout(context.Background(), DefaultShutdownTimeout)
+		defer shutdownCancel()
+
+		if err := s.httpServer.Shutdown(shutdownTimeout); err != nil {
+			setServerError(fmt.Errorf("HTTP server shutdown error: %w", err))
+		}
+	}()
+
+	wg.Wait()
+
+	errMutex.Lock()
+	defer errMutex.Unlock()
+	return serverErr
+}
+
 // Close gracefully shuts down the server.
 func (s *TransportServer) Close() error {
 	switch s.config.Transport.Type {
@@ -248,10 +346,9 @@ func (s *TransportServer) Close() error {
 }
 
 // loadConfig loads configuration from the specified path using the existing config system.
-func loadConfig(ctx context.Context, path string) (*ports.Configuration, error) {
-	// Use existing configuration loading
-	configProvider := config.NewFileProvider()
-	cfg, err := configProvider.LoadConfiguration(ctx, path)
+func loadConfig(ctx context.Context, path string) (*Configuration, error) {
+	// Use existing configuration loading from config.go
+	cfg, err := loadAndValidateConfig(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}

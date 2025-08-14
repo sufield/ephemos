@@ -3,6 +3,7 @@ module github.com/sufield/ephemos
 go 1.24
 
 require (
+	github.com/joomcode/errorx v1.2.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spiffe/go-spiffe/v2 v2.5.0
 	github.com/stretchr/testify v1.10.0

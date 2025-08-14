@@ -53,8 +53,7 @@ func NewLoggingInterceptor(config *LoggingConfig) *LoggingInterceptor {
 	logger := config.Logger
 	if logger == nil {
 		// Use secure logger with automatic redaction
-		secureLogger := logging.NewSecureLogger(slog.Default().Handler())
-		logger = secureLogger
+		logger = logging.NewSecureSlogLogger(slog.Default().Handler())
 	}
 
 	// Set default slow request threshold

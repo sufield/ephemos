@@ -18,20 +18,16 @@ LDFLAGS := -X main.Version=$(VERSION) \
 GO_BUILD_FLAGS := -trimpath -ldflags "$(LDFLAGS)"
 
 # Variables
-PROTO_DIR := examples/proto
-GO_OUT := examples/proto
 CLI_BINARY := ephemos
-SERVER_BINARY := echo-server
-CLIENT_BINARY := echo-client
 CONFIG_VALIDATOR_BINARY := config-validator
 
 # PHONY targets - all targets that don't create files
-.PHONY: all build proto proto-ci examples test clean deps fmt lint help setup \
+.PHONY: all build test clean deps fmt lint help setup \
         check-deps install-deps install-deps-sudo benchmark fmt-only core-help version show-build-info \
         arch-test arch-guard fuzz fuzz-build
 
 # Default target
-all: proto build examples
+all: build
 
 # Build library and CLI with reproducible builds
 build: check-deps show-build-info
@@ -42,35 +38,13 @@ build: check-deps show-build-info
 	@echo "Build completed!"
 	@echo "Binaries built with version: $(VERSION)"
 
-# Generate protobuf code
-proto: check-deps
-	@echo "Generating protobuf code..."
-	@mkdir -p "$(GO_OUT)"
-	@./scripts/build/generate-proto.sh "$(PROTO_DIR)" "$(GO_OUT)"
-
-# CI-friendly protobuf generation (doesn't fail on missing protoc)
-proto-ci:
-	@echo "Generating protobuf code (CI mode)..."
-	@mkdir -p "$(GO_OUT)"
-	@./scripts/generate-proto-ci.sh "$(PROTO_DIR)" "$(GO_OUT)" || { \
-		echo "⚠️  Protobuf generation failed in CI mode"; \
-		echo "💡 This might be expected in some CI environments"; \
-		echo "💡 Ensure your CI setup includes protoc installation"; \
-		exit 0; \
-	}
 
 # Build example applications with reproducible builds
-examples: proto
-	@echo "Building example applications with reproducible build flags..."
-	@mkdir -p bin
-	go build $(GO_BUILD_FLAGS) -v -o "bin/$(SERVER_BINARY)" ./examples/echo-server
-	go build $(GO_BUILD_FLAGS) -v -o "bin/$(CLIENT_BINARY)" ./examples/echo-client
-	@echo "Examples built with version: $(VERSION)"
 
 # Run tests
 test: check-deps
 	@echo "Running tests..."
-	go test -v ./...
+	go test -v $(shell go list ./... | grep -v /archive/)
 	@echo "Tests completed!"
 
 # Run benchmarks
@@ -132,7 +106,6 @@ core-help:
 	@echo ""
 	@echo "Build targets (with reproducible builds):"
 	@echo "  make build          - Build library and CLI with version info"
-	@echo "  make examples       - Build example applications with version info"
 	@echo "  make clean          - Clean build artifacts"
 	@echo ""
 	@echo "Development targets:"
@@ -146,10 +119,6 @@ core-help:
 	@echo "  make fmt            - Format code"
 	@echo "  make fmt-only       - Format code only (no validation)"
 	@echo "  make lint           - Lint code"
-	@echo ""
-	@echo "Protobuf targets:"
-	@echo "  make proto          - Generate protobuf code"
-	@echo "  make proto-ci       - Generate protobuf code (CI-friendly)"
 	@echo ""
 	@echo "Information targets:"
 	@echo "  make version        - Show version"
@@ -174,7 +143,7 @@ setup:
 				echo "You can now run: make build"; \
 			else \
 				echo "🔧 Setup partially complete. System packages still needed."; \
-				echo "For system packages (protoc), run: ./scripts/install-deps-sudo.sh"; \
+				echo "For system packages, run: ./scripts/install-deps-sudo.sh"; \
 				echo "Or install manually and run 'make setup' again"; \
 			fi; \
 		else \
@@ -192,13 +161,13 @@ check-deps:
 	else \
 		echo ""; \
 		echo "🔧 Missing dependencies detected. Installing Go tools automatically..."; \
-		if ./scripts/ensure-protoc.sh; then \
-			echo "✅ Go protobuf tools installed successfully"; \
+		if ./scripts/install-deps.sh; then \
+			echo "✅ Go tools installed successfully"; \
 		else \
 			echo ""; \
 			echo "⚠️  Some dependencies missing. Build may fail."; \
 			if [ "${CI:-}" = "true" ] || [ "${GITHUB_ACTIONS:-}" = "true" ]; then \
-				echo "💡 CI detected: Check setup-protobuf action in GitHub workflow"; \
+				echo "💡 CI detected: Check setup actions in GitHub workflow"; \
 			else \
 				echo "💡 Run 'make setup' for smart installation"; \
 				echo "💡 Or run: ./scripts/install-deps-sudo.sh for system packages"; \

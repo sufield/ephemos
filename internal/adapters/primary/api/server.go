@@ -9,9 +9,6 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/sufield/ephemos/internal/adapters/secondary/config"
-	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
-	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/sufield/ephemos/internal/core/services"
@@ -27,34 +24,25 @@ type WorkloadServer struct {
 }
 
 // NewWorkloadServer creates a new workload server with the given configuration.
+// Deprecated: Use NewWorkloadServerWithDependencies for proper dependency injection.
 func NewWorkloadServer(ctx context.Context, configPath string) (*WorkloadServer, error) {
-	// Legacy method - load config via file path
-	configProvider := config.NewFileProvider()
-
-	var cfg *ports.Configuration
-	var err error
-	if configPath != "" {
-		cfg, err = configProvider.LoadConfiguration(ctx, configPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load configuration: %w", err)
-		}
-	} else {
-		cfg = configProvider.GetDefaultConfiguration(ctx)
-		if cfg == nil {
-			return nil, &errors.ValidationError{
-				Field:   "configuration",
-				Value:   nil,
-				Message: "failed to get default configuration",
-			}
-		}
+	// This is a legacy method maintained for backward compatibility.
+	// For new code, use NewWorkloadServerWithDependencies instead.
+	return nil, &errors.ValidationError{
+		Field:   "constructor",
+		Value:   "NewWorkloadServer",
+		Message: "deprecated constructor - use NewWorkloadServerWithDependencies instead",
 	}
-
-	return NewWorkloadServerWithConfig(ctx, cfg)
 }
 
-// NewWorkloadServerWithConfig creates a new workload server with pre-validated configuration.
-// This method assumes the configuration has already been loaded and validated.
-func NewWorkloadServerWithConfig(_ context.Context, cfg *ports.Configuration) (*WorkloadServer, error) {
+// NewWorkloadServerWithDependencies creates a new workload server with injected dependencies.
+// This constructor follows proper dependency injection and hexagonal architecture principles.
+func NewWorkloadServerWithDependencies(
+	identityProvider ports.IdentityProvider,
+	transportProvider ports.TransportProvider,
+	configProvider ports.ConfigurationProvider,
+	cfg *ports.Configuration,
+) (*WorkloadServer, error) {
 	if cfg == nil {
 		return nil, &errors.ValidationError{
 			Field:   "configuration",
@@ -63,15 +51,32 @@ func NewWorkloadServerWithConfig(_ context.Context, cfg *ports.Configuration) (*
 		}
 	}
 
-	spiffeProvider, err := spiffe.NewProvider(cfg.SPIFFE)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create SPIFFE provider: %w", err)
+	if identityProvider == nil {
+		return nil, &errors.ValidationError{
+			Field:   "identityProvider",
+			Value:   nil,
+			Message: "identity provider cannot be nil",
+		}
 	}
 
-	transportProvider := transport.NewGRPCProvider(spiffeProvider)
+	if transportProvider == nil {
+		return nil, &errors.ValidationError{
+			Field:   "transportProvider",
+			Value:   nil,
+			Message: "transport provider cannot be nil",
+		}
+	}
+
+	if configProvider == nil {
+		return nil, &errors.ValidationError{
+			Field:   "configProvider",
+			Value:   nil,
+			Message: "configuration provider cannot be nil",
+		}
+	}
 
 	identityService, err := services.NewIdentityService(
-		spiffeProvider,
+		identityProvider,
 		transportProvider,
 		cfg,
 	)
@@ -81,7 +86,7 @@ func NewWorkloadServerWithConfig(_ context.Context, cfg *ports.Configuration) (*
 
 	return &WorkloadServer{
 		identityService: identityService,
-		configProvider:  config.NewFileProvider(), // Create new provider for the server instance
+		configProvider:  configProvider,
 		serviceName:     cfg.Service.Name,
 	}, nil
 }
@@ -139,7 +144,7 @@ func (s *WorkloadServer) Serve(ctx context.Context, listener net.Listener) error
 	slog.Info("Server ready", "service", s.serviceName, "address", listener.Addr().String())
 
 	// Adapt net.Listener to ports.Listener
-	portListener := transport.NewNetListener(listener)
+	portListener := &netListenerAdapter{listener: listener}
 	if err := s.domainServer.Start(portListener); err != nil {
 		return fmt.Errorf("failed to serve domain server: %w", err)
 	}
@@ -180,4 +185,24 @@ func (a *serviceRegistrarAdapter) Register(server interface{}) {
 	if grpcServer, ok := server.(*grpc.Server); ok {
 		a.registrar.Register(grpcServer)
 	}
+}
+
+// netListenerAdapter adapts net.Listener to ports.Listener.
+type netListenerAdapter struct {
+	listener net.Listener
+}
+
+// Accept waits for and returns the next connection.
+func (l *netListenerAdapter) Accept() (interface{}, error) {
+	return l.listener.Accept()
+}
+
+// Close closes the listener.
+func (l *netListenerAdapter) Close() error {
+	return l.listener.Close()
+}
+
+// Addr returns the listener's network address.
+func (l *netListenerAdapter) Addr() string {
+	return l.listener.Addr().String()
 }

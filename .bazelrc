@@ -1,0 +1,43 @@
+# Bazel configuration for Ephemos
+
+# Build settings
+build --incompatible_enable_cc_toolchain_resolution
+build --cxxopt=-std=c++14
+build --host_cxxopt=-std=c++14
+
+
+# External dependency settings
+common --enable_workspace
+common --noenable_bzlmod
+
+# Go settings
+# build --@io_bazel_rules_go//go/config:pure  # Commented out to avoid early dependency resolution
+
+# Test settings
+test --test_output=errors
+test --test_summary=detailed
+
+# Coverage settings (lcov is now default in Bazel 8.x)
+# coverage --combined_report=lcov  # Commented out: lcov is now the default
+coverage --coverage_report_generator=@bazel_tools//tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator:Main
+
+# Remote cache (can be configured for CI)
+# build --remote_cache=grpc://localhost:9090
+
+# Security settings
+build --sandbox_default_allow_network=false
+build --incompatible_strict_action_env
+
+# Performance settings
+build --jobs=auto
+build --local_resources=cpu=HOST_CPUS
+build --local_resources=memory=HOST_RAM*0.75
+
+# Reproducible builds
+build --workspace_status_command="$(pwd)/tools/workspace_status.sh"
+
+# Verbose failures
+build --verbose_failures
+
+# Platform settings
+# build --platforms=@io_bazel_rules_go//go/toolchain:linux_amd64  # Commented out to avoid early dependency resolution

@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "config-validation_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/sufield/ephemos/examples/config-validation",
+    visibility = ["//visibility:private"],
+    deps = ["//pkg/ephemos"],
+)
+
+go_binary(
+    name = "config-validation",
+    embed = [":config-validation_lib"],
+    visibility = ["//visibility:public"],
+)

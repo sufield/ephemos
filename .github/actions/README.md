@@ -23,23 +23,6 @@ Sets up the Go environment with caching and version verification.
 - Verifies Go version matches expected versions (1.23 or 1.24)
 - Downloads project dependencies
 
-### setup-protobuf
-
-Installs Protocol Buffers compiler and Go protobuf tools across different platforms.
-
-**Usage:**
-```yaml
-- name: Setup Protocol Buffers
-  uses: ./.github/actions/setup-protobuf
-  with:
-    verify-installation: 'true'  # Optional, defaults to 'false'
-```
-
-**Features:**
-- Cross-platform protobuf compiler installation (Linux, macOS, Windows)
-- Installs Go protobuf tools (protoc-gen-go, protoc-gen-go-grpc)
-- Optional installation verification
-- Generates protobuf code using project Makefile
 
 ## Benefits
 
@@ -58,7 +41,7 @@ For more complex setup requirements, you can also use:
 
 ## Examples
 
-### Simple job with both actions:
+### Simple job with Go setup:
 ```yaml
 jobs:
   test:
@@ -66,7 +49,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: ./.github/actions/setup-go
-    - uses: ./.github/actions/setup-protobuf
     - run: make ci-test
 ```
 
@@ -83,6 +65,5 @@ jobs:
     - uses: ./.github/actions/setup-go
       with:
         go-version: ${{ matrix.go-version }}
-    - uses: ./.github/actions/setup-protobuf
     - run: make ci-build
 ```

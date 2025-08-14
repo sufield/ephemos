@@ -125,7 +125,7 @@ func (b *ConfigBuilder) buildFromYAML(ctx context.Context) (*Configuration, erro
 
 	// Validate final configuration
 	if err := config.Validate(); err != nil {
-		return nil, fmt.Errorf("final config validation failed: %w", err)
+		return nil, wrapValidationError(err, "yaml-config")
 	}
 
 	return config, nil
@@ -144,7 +144,7 @@ func (b *ConfigBuilder) buildFromEnvOnly(_ context.Context) (*Configuration, err
 
 	// Validate final configuration
 	if err := config.Validate(); err != nil {
-		return nil, fmt.Errorf("env-only config validation failed: %w", err)
+		return nil, wrapValidationError(err, "env-only-config")
 	}
 
 	return config, nil
@@ -182,7 +182,7 @@ func (b *ConfigBuilder) buildFromPureCode(_ context.Context) (*Configuration, er
 
 	// Validate final configuration
 	if err := config.Validate(); err != nil {
-		return nil, fmt.Errorf("pure-code config validation failed: %w", err)
+		return nil, wrapValidationError(err, "pure-code-config")
 	}
 
 	return config, nil
@@ -208,8 +208,8 @@ func (b *ConfigBuilder) applyTransportEnvOverrides(config *Configuration) {
 	}
 }
 
-// parseCommaSeparatedList parses and trims a comma-separated environment variable.
-func parseCommaSeparatedList(value string) []string {
+// ParseCommaSeparatedList parses and trims a comma-separated environment variable.
+func ParseCommaSeparatedList(value string) []string {
 	items := strings.Split(value, ",")
 	for i, item := range items {
 		items[i] = strings.TrimSpace(item)
@@ -237,12 +237,12 @@ func (b *ConfigBuilder) applyEnvOverrides(config *Configuration) *Configuration 
 
 	// Authorized clients override
 	if val := os.Getenv(b.envPrefix + "_AUTHORIZED_CLIENTS"); val != "" {
-		envConfig.AuthorizedClients = parseCommaSeparatedList(val)
+		envConfig.AuthorizedClients = ParseCommaSeparatedList(val)
 	}
 
 	// Trusted servers override
 	if val := os.Getenv(b.envPrefix + "_TRUSTED_SERVERS"); val != "" {
-		envConfig.TrustedServers = parseCommaSeparatedList(val)
+		envConfig.TrustedServers = ParseCommaSeparatedList(val)
 	}
 
 	return &envConfig

@@ -1,5 +1,7 @@
 # Ephemos Documentation
 
+<!-- hello merge success -->
+
 Welcome to the Ephemos documentation. This directory contains all documentation for the Ephemos project, organized by topic.
 
 ## Documentation Structure

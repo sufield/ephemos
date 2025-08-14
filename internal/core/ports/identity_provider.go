@@ -9,8 +9,8 @@ import (
 // ErrIdentityNotFound is returned when an identity cannot be found.
 var ErrIdentityNotFound = errors.New("identity not found")
 
-// ServiceIdentity defines service ID.
-type ServiceIdentity interface {
+// ServiceIdentityProvider defines service ID.
+type ServiceIdentityProvider interface {
 	GetDomain() string
 	GetName() string
 	Validate() error

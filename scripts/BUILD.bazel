@@ -1,0 +1,133 @@
+# Main scripts BUILD file - converts shell scripts to Bazel targets
+
+# Build and CI targets
+sh_binary(
+    name = "lint",
+    srcs = ["build/lint.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "lint_format_only",
+    srcs = ["build/lint-format-only.sh"],
+    visibility = ["//visibility:public"],
+)
+
+# ci_lint is now in //scripts/ci:lint_check
+
+sh_binary(
+    name = "generate_proto",
+    srcs = ["build/generate-proto.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "generate_proto_ci",
+    srcs = ["generate-proto-ci.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "benchmark",
+    srcs = ["benchmark.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "check_deps",
+    srcs = ["check-deps.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "ensure_protoc",
+    srcs = ["ensure-protoc.sh"],
+    visibility = ["//visibility:public"],
+)
+
+# CI setup and build
+sh_binary(
+    name = "ci_setup",
+    srcs = ["ci-setup.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "ci_build_examples",
+    srcs = ["ci-build-examples.sh"],
+    visibility = ["//visibility:public"],
+)
+
+# Development setup
+sh_binary(
+    name = "install_deps",
+    srcs = ["install-deps.sh"],
+    data = [":install_bazel"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "install_deps_sudo",
+    srcs = ["install-deps-sudo.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "install_bazel",
+    srcs = ["install-bazel.sh"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "setup_dev_environment",
+    srcs = ["setup-dev-environment.sh"],
+    data = [
+        ":install_bazel",
+        ":install_deps",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# Debug utilities
+sh_binary(
+    name = "debug_ci_build",
+    srcs = ["debug-ci-build.sh"],
+    visibility = ["//visibility:public"],
+)
+
+# Test targets that run the scripts
+sh_test(
+    name = "lint_test",
+    size = "small",
+    srcs = ["build/lint.sh"],
+    tags = ["lint"],
+)
+
+sh_test(
+    name = "check_deps_test",
+    size = "small",
+    srcs = ["check-deps.sh"],
+    tags = ["deps"],
+)
+
+# Aggregate test targets
+test_suite(
+    name = "build_tests",
+    tags = ["build"],
+    tests = [
+        ":check_deps_test",
+        ":lint_test",
+    ],
+)
+
+# Note: Go-based protobuf generator is defined in //scripts/proto:proto_generator
+
+# TODO: Future Go-based tests could be added here
+# go_test(
+#     name = "scripts_test",
+#     srcs = ["scripts_test.go"],
+#     deps = [
+#         "@com_github_stretchr_testify//assert",
+#         "@com_github_stretchr_testify//require",
+#     ],
+# )

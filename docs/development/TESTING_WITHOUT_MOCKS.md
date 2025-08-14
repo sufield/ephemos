@@ -60,7 +60,6 @@ func (s *TestEchoServer) Echo(ctx context.Context, req *EchoRequest) (*EchoRespo
 }
 ```
 
-**Example**: See `examples/proto/test/client_test.go`
 
 ### 3. Registration Trackers
 
@@ -242,7 +241,6 @@ Use real components with test configurations (e.g., in-memory databases, test se
 ## Examples in Codebase
 
 - **Configuration Testing**: `internal/adapters/primary/cli/registrar_test.go`
-- **Service Testing**: `examples/proto/test/client_test.go`
 - **Registration Testing**: `pkg/ephemos/ephemos_test.go`
 - **API Testing**: `internal/adapters/primary/api/server_test.go`
 

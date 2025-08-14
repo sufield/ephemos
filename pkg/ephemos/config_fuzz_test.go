@@ -7,8 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
-
-	coreErrors "github.com/sufield/ephemos/internal/core/errors"
+	// coreErrors import removed for public API compliance
 )
 
 // FuzzResolveConfigPath tests the config path resolution with random inputs.
@@ -208,7 +207,7 @@ func FuzzEnhanceValidationMessage(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, field, value string) {
 		// Create a validation error
-		validationErr := &coreErrors.ValidationError{
+		validationErr := &ValidationError{
 			Field:   field,
 			Value:   value,
 			Message: "original message",

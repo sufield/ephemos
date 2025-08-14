@@ -154,7 +154,8 @@ func (h *RedactorHandler) redactSensitiveStrings(value string) string {
 	return value
 }
 
-// NewSecureLogger creates a new slog.Logger with automatic sensitive data redaction.
-func NewSecureLogger(handler slog.Handler) *slog.Logger {
+// NewSecureSlogLogger creates a new slog.Logger with automatic sensitive data redaction.
+// This returns a standard *slog.Logger for backward compatibility.
+func NewSecureSlogLogger(handler slog.Handler) *slog.Logger {
 	return slog.New(NewRedactorHandler(handler))
 }

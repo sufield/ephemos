@@ -4,7 +4,7 @@ inputs:
   go-version:
     description: 'Go version to install'
     required: false
-    default: '1.24'
+    default: '1.24.x'
   verify-version:
     description: 'Whether to verify the Go version matches expected'
     required: false
@@ -16,25 +16,31 @@ runs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ inputs.go-version }}
+        check-latest: true
     
-    - name: Clear Go caches (prevent stale cache issues)
+    - name: Verify Go installation
       shell: bash
       run: |
-        echo "🧹 Clearing Go caches to prevent stale build issues..."
-        go clean -cache || true
-        go clean -testcache || true
-        go clean -modcache || true
-        echo "✅ Go caches cleared"
+        echo "🔍 Verifying Go installation..."
+        echo "Go version: $(go version)"
+        echo "GOROOT: $(go env GOROOT)"
+        echo "GOPATH: $(go env GOPATH)"
         
-    - name: Verify Go version
-      if: ${{ inputs.verify-version == 'true' }}
+        # Verify key stdlib packages exist
+        go list std | grep -E "^(context|crypto)$" || (echo "❌ Standard library packages missing" && exit 1)
+        echo "✅ Go installation verified"
+    
+    - name: Clean conflicting cache directories before restore
       shell: bash
       run: |
-        echo "Expected Go version: ${GO_VERSION}"
-        echo "Actual Go version: $(go version)"
-        go version | grep -E "(go1\.(22|23|24))" || (echo "ERROR: Go version is not 1.22, 1.23, or 1.24" && exit 1)
-      env:
-        GO_VERSION: ${{ inputs.go-version }}
+        echo "🧹 Cleaning potential conflicting cache directories..."
+        # Clean cache directories that might conflict with cache restoration
+        rm -rf ~/.cache/go-build || true
+        rm -rf ~/go/pkg/mod || true
+        # Create directories to ensure proper permissions
+        mkdir -p ~/.cache/go-build
+        mkdir -p ~/go/pkg
+        echo "✅ Cache directories cleaned and prepared"
         
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -42,11 +48,29 @@ runs:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ inputs.go-version }}-${{ hashFiles('**/go.sum') }}-${{ github.run_number }}
+        key: ${{ runner.os }}-go-${{ inputs.go-version }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
-          ${{ runner.os }}-go-${{ inputs.go-version }}-${{ hashFiles('**/go.sum') }}-
           ${{ runner.os }}-go-${{ inputs.go-version }}-
           ${{ runner.os }}-go-
+        
+    - name: Clear Go build caches (preserve modules)
+      shell: bash
+      run: |
+        echo "🧹 Clearing Go build and test caches (preserving modules)..."
+        go clean -cache || true
+        go clean -testcache || true
+        # NOTE: Not clearing modcache to preserve downloaded modules
+        echo "✅ Go build caches cleared (modules preserved)"
+        
+    - name: Verify Go version
+      if: ${{ inputs.verify-version == 'true' }}
+      shell: bash
+      run: |
+        echo "Expected Go version: ${GO_VERSION}"
+        echo "Actual Go version: $(go version)"
+        go version | grep -E "(go1\.24)" || (echo "ERROR: Go version is not 1.24" && exit 1)
+      env:
+        GO_VERSION: ${{ inputs.go-version }}
           
     - name: Download dependencies
       shell: bash
