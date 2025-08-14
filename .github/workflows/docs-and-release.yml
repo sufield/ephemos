@@ -32,7 +32,7 @@ jobs:
         markdownlint '**/*.md' --ignore node_modules --ignore .github || true
         
     - name: Check links in documentation
-      uses: gaurav-nelson/github-action-markdown-link-check@3c3b66f4ee92e5fe8c9c2cd3c5b1bfa7cf3e24bb # v1.0.17
+      uses: gaurav-nelson/github-action-markdown-link-check@v1
       with:
         use-quiet-mode: 'yes'
         use-verbose-mode: 'yes'
