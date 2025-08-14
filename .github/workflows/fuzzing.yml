@@ -296,37 +296,72 @@ jobs:
           
           echo "✅ All source files created successfully"
           
+          # Prepare Go module environment for standalone fuzz targets
+          echo "Preparing Go module environment..."
+          cd fuzz-targets
+          # Initialize a minimal go.mod for the fuzz targets if one doesn't exist
+          if [ ! -f go.mod ]; then
+            go mod init fuzz-targets
+            echo "✅ Initialized go.mod for fuzz targets"
+          fi
+          cd ..
+          
           # Build the fuzz target binaries
           echo "Building fuzz target binaries..."
           
-          # Build each target with proper error handling
+          # Ensure build-out directory exists and is writable
+          mkdir -p build-out
+          chmod 755 build-out
+          echo "✅ Prepared build-out directory"
+          
+          # Check Go environment
+          echo "Go version: $(go version)"
+          echo "Go environment:"
+          go env | grep -E "(GOROOT|GOPATH|GOCACHE|GOMOD)"
+          
+          # Build each target with proper error handling and detailed output
           echo "Building config_fuzz..."
-          if go build -v -o build-out/config_fuzz ./fuzz-targets/config_fuzz_main.go; then
+          echo "Command: go build -v -o build-out/config_fuzz ./fuzz-targets/config_fuzz_main.go"
+          if go build -v -o build-out/config_fuzz ./fuzz-targets/config_fuzz_main.go 2>&1; then
             echo "✅ config_fuzz built successfully"
+            ls -la build-out/config_fuzz
+            ./build-out/config_fuzz 2>/dev/null && echo "✅ config_fuzz runs successfully" || echo "⚠️ config_fuzz execution test failed"
           else
             echo "❌ config_fuzz build failed"
-            echo "Build output:"
-            go build -v -o build-out/config_fuzz ./fuzz-targets/config_fuzz_main.go 2>&1 || true
+            echo "Detailed error output:"
+            go build -v -o build-out/config_fuzz ./fuzz-targets/config_fuzz_main.go
+            echo "Source file content check:"
+            head -5 ./fuzz-targets/config_fuzz_main.go
             exit 1
           fi
           
           echo "Building server_fuzz..."
-          if go build -v -o build-out/server_fuzz ./fuzz-targets/server_fuzz_main.go; then
+          echo "Command: go build -v -o build-out/server_fuzz ./fuzz-targets/server_fuzz_main.go"
+          if go build -v -o build-out/server_fuzz ./fuzz-targets/server_fuzz_main.go 2>&1; then
             echo "✅ server_fuzz built successfully"
+            ls -la build-out/server_fuzz
+            ./build-out/server_fuzz 2>/dev/null && echo "✅ server_fuzz runs successfully" || echo "⚠️ server_fuzz execution test failed"
           else
             echo "❌ server_fuzz build failed"
-            echo "Build output:"
-            go build -v -o build-out/server_fuzz ./fuzz-targets/server_fuzz_main.go 2>&1 || true
+            echo "Detailed error output:"
+            go build -v -o build-out/server_fuzz ./fuzz-targets/server_fuzz_main.go
+            echo "Source file content check:"
+            head -5 ./fuzz-targets/server_fuzz_main.go
             exit 1
           fi
           
           echo "Building identity_fuzz..."
-          if go build -v -o build-out/identity_fuzz ./fuzz-targets/identity_fuzz_main.go; then
+          echo "Command: go build -v -o build-out/identity_fuzz ./fuzz-targets/identity_fuzz_main.go"
+          if go build -v -o build-out/identity_fuzz ./fuzz-targets/identity_fuzz_main.go 2>&1; then
             echo "✅ identity_fuzz built successfully"
+            ls -la build-out/identity_fuzz
+            ./build-out/identity_fuzz 2>/dev/null && echo "✅ identity_fuzz runs successfully" || echo "⚠️ identity_fuzz execution test failed"
           else
             echo "❌ identity_fuzz build failed"
-            echo "Build output:"
-            go build -v -o build-out/identity_fuzz ./fuzz-targets/identity_fuzz_main.go 2>&1 || true
+            echo "Detailed error output:"
+            go build -v -o build-out/identity_fuzz ./fuzz-targets/identity_fuzz_main.go
+            echo "Source file content check:"
+            head -5 ./fuzz-targets/identity_fuzz_main.go
             exit 1
           fi
           # Verify build-out directory has fuzz targets
