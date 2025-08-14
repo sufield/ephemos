@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/sufield/ephemos/internal/core/ports"
 )
@@ -17,8 +16,6 @@ func TestLoadFromEnvironment(t *testing.T) {
 		ports.EnvServiceName,
 		ports.EnvTrustDomain,
 		ports.EnvSPIFFESocket,
-		ports.EnvAuthorizedClients,
-		ports.EnvTrustedServers,
 		ports.EnvDebugEnabled,
 	} {
 		t.Setenv(env, "")
@@ -84,26 +81,6 @@ func TestLoadFromEnvironment(t *testing.T) {
 			expectError:   true,
 			errorContains: "debug mode is enabled",
 		},
-		{
-			name: "with authorization lists",
-			envVars: map[string]string{
-				ports.EnvServiceName:       "payment-service",
-				ports.EnvTrustDomain:       "prod.company.com",
-				ports.EnvAuthorizedClients: "spiffe://prod.company.com/api-gateway, spiffe://prod.company.com/billing",
-				ports.EnvTrustedServers:    "spiffe://prod.company.com/database,spiffe://prod.company.com/cache",
-			},
-			expectError: false,
-		},
-		{
-			name: "wildcard authorization warning",
-			envVars: map[string]string{
-				ports.EnvServiceName:       "payment-service",
-				ports.EnvTrustDomain:       "prod.company.com",
-				ports.EnvAuthorizedClients: "spiffe://prod.company.com/*",
-			},
-			expectError:   true,
-			errorContains: "authorized client contains wildcard",
-		},
 	}
 
 	for _, tt := range tests {
@@ -140,7 +117,6 @@ func TestMergeWithEnvironment(t *testing.T) {
 	for _, env := range []string{
 		ports.EnvServiceName,
 		ports.EnvTrustDomain,
-		ports.EnvAuthorizedClients,
 	} {
 		t.Setenv(env, "")
 	}
@@ -154,13 +130,11 @@ func TestMergeWithEnvironment(t *testing.T) {
 		SPIFFE: &ports.SPIFFEConfig{
 			SocketPath: "/tmp/file/socket",
 		},
-		AuthorizedClients: []string{"spiffe://file.domain.com/client1"},
 	}
 
 	// Set environment variables that should override
 	t.Setenv(ports.EnvServiceName, "env-service")
 	t.Setenv(ports.EnvTrustDomain, "env.domain.com")
-	t.Setenv(ports.EnvAuthorizedClients, "spiffe://env.domain.com/client2, spiffe://env.domain.com/client3")
 
 	err := config.MergeWithEnvironment()
 	assert.NoError(t, err)
@@ -168,64 +142,11 @@ func TestMergeWithEnvironment(t *testing.T) {
 	// Verify environment variables override file values
 	assert.Equal(t, "env-service", config.Service.Name)
 	assert.Equal(t, "env.domain.com", config.Service.Domain)
-	assert.Equal(t, []string{"spiffe://env.domain.com/client2", "spiffe://env.domain.com/client3"}, config.AuthorizedClients)
 
 	// Verify file values remain where no environment override
 	assert.Equal(t, "/tmp/file/socket", config.SPIFFE.SocketPath)
 }
 
-func TestParseCommaSeparatedList(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected []string
-	}{
-		{
-			name:     "empty string",
-			input:    "",
-			expected: nil,
-		},
-		{
-			name:     "single item",
-			input:    "spiffe://example.org/service",
-			expected: []string{"spiffe://example.org/service"},
-		},
-		{
-			name:     "multiple items",
-			input:    "spiffe://example.org/service1,spiffe://example.org/service2",
-			expected: []string{"spiffe://example.org/service1", "spiffe://example.org/service2"},
-		},
-		{
-			name:     "items with whitespace",
-			input:    "spiffe://example.org/service1, spiffe://example.org/service2 , spiffe://example.org/service3",
-			expected: []string{"spiffe://example.org/service1", "spiffe://example.org/service2", "spiffe://example.org/service3"},
-		},
-		{
-			name:     "empty items filtered",
-			input:    "spiffe://example.org/service1,,spiffe://example.org/service2, ,spiffe://example.org/service3",
-			expected: []string{"spiffe://example.org/service1", "spiffe://example.org/service2", "spiffe://example.org/service3"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Use reflection to access private function, or make it public for testing
-			// For now, test through the environment variable loading
-			t.Setenv(ports.EnvServiceName, "test-service")
-			t.Setenv(ports.EnvTrustDomain, "test.local")
-			t.Setenv(ports.EnvAuthorizedClients, tt.input)
-
-			config, err := ports.LoadFromEnvironment()
-			require.NoError(t, err)
-
-			assert.Equal(t, tt.expected, config.AuthorizedClients)
-
-			os.Unsetenv(ports.EnvServiceName)
-			os.Unsetenv(ports.EnvTrustDomain)
-			os.Unsetenv(ports.EnvAuthorizedClients)
-		})
-	}
-}
 
 func TestValidateProductionSecurity(t *testing.T) {
 	tests := []struct {
@@ -316,21 +237,6 @@ func TestValidateProductionSecurity(t *testing.T) {
 			},
 			expectError:   true,
 			errorContains: "SPIFFE socket should be in a secure directory",
-		},
-		{
-			name: "wildcard authorization",
-			config: &ports.Configuration{
-				Service: ports.ServiceConfig{
-					Name:   "payment-service",
-					Domain: "prod.company.com",
-				},
-				SPIFFE: &ports.SPIFFEConfig{
-					SocketPath: "/run/spire/sockets/api.sock",
-				},
-				AuthorizedClients: []string{"spiffe://prod.company.com/*"},
-			},
-			expectError:   true,
-			errorContains: "authorized client contains wildcard",
 		},
 	}
 
@@ -430,8 +336,6 @@ func TestEnvironmentVariableConstants(t *testing.T) {
 		"EPHEMOS_SERVICE_NAME":           ports.EnvServiceName,
 		"EPHEMOS_TRUST_DOMAIN":           ports.EnvTrustDomain,
 		"EPHEMOS_SPIFFE_SOCKET":          ports.EnvSPIFFESocket,
-		"EPHEMOS_AUTHORIZED_CLIENTS":     ports.EnvAuthorizedClients,
-		"EPHEMOS_TRUSTED_SERVERS":        ports.EnvTrustedServers,
 		"EPHEMOS_REQUIRE_AUTHENTICATION": ports.EnvRequireAuth,
 		"EPHEMOS_LOG_LEVEL":              ports.EnvLogLevel,
 		"EPHEMOS_BIND_ADDRESS":           ports.EnvBindAddress,
