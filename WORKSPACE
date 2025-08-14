@@ -30,7 +30,7 @@ http_archive(
     ],
 )
 
-# Bazel skylib - Required by rules_java
+# Bazel skylib - Core Bazel utilities
 http_archive(
     name = "bazel_skylib",
     sha256 = "bc283cdfcd526a52c3201279cda4bc298652efa898b10b4db0837dc51652756f",
@@ -51,7 +51,6 @@ http_archive(
 )
 
 
-# Java rules - Not required for HTTP over mTLS library
 
 # Python rules - Updated to latest stable version compatible with Bazel 7.x
 # This version resolves PyCcLinkParamsProvider issues and provides full Bazel 7 support

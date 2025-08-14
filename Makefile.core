@@ -22,12 +22,12 @@ CLI_BINARY := ephemos
 CONFIG_VALIDATOR_BINARY := config-validator
 
 # PHONY targets - all targets that don't create files
-.PHONY: all build proto proto-ci test clean deps fmt lint help setup \
+.PHONY: all build test clean deps fmt lint help setup \
         check-deps install-deps install-deps-sudo benchmark fmt-only core-help version show-build-info \
         arch-test arch-guard fuzz fuzz-build
 
 # Default target
-all: proto build
+all: build
 
 # Build library and CLI with reproducible builds
 build: check-deps show-build-info
@@ -38,22 +38,6 @@ build: check-deps show-build-info
 	@echo "Build completed!"
 	@echo "Binaries built with version: $(VERSION)"
 
-# Generate protobuf code
-proto: check-deps
-	@echo "Generating protobuf code..."
-	@mkdir -p "$(GO_OUT)"
-	@./scripts/build/generate-proto.sh "$(PROTO_DIR)" "$(GO_OUT)"
-
-# CI-friendly protobuf generation (doesn't fail on missing protoc)
-proto-ci:
-	@echo "Generating protobuf code (CI mode)..."
-	@mkdir -p "$(GO_OUT)"
-	@./scripts/generate-proto-ci.sh "$(PROTO_DIR)" "$(GO_OUT)" || { \
-		echo "⚠️  Protobuf generation failed in CI mode"; \
-		echo "💡 This might be expected in some CI environments"; \
-		echo "💡 Ensure your CI setup includes protoc installation"; \
-		exit 0; \
-	}
 
 # Build example applications with reproducible builds
 

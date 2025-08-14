@@ -23,7 +23,7 @@ validate_test_environment() {
     
     # Validate basic test prerequisites
     validate_step_prerequisites "test-environment" \
-        "go" "workspace" "go-mod" "proto-files"
+        "go" "workspace" "go-mod"
     
     # Validate test-specific requirements
     validate_test_infrastructure

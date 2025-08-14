@@ -209,8 +209,7 @@ jobs:
         echo "Building main packages..."
         go build -v ./pkg/...
         
-        echo "Building examples..."  
-        go build -v ./examples/...
+        # Examples removed - library focuses on HTTP over mTLS without demo code
         
         echo "Building internal packages..."
         go build -v ./internal/...
