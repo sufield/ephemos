@@ -44,9 +44,11 @@ You can verify your security configuration is working by:
 
 | Workflow | Purpose | Triggers |
 |----------|---------|----------|
-| `security.yml` | SAST, dependency scanning, SBOM generation | Push, PR, schedule |
-| `fuzzing.yml` | Security fuzzing with ClusterFuzzLite | Push, PR, schedule |
+| `ci.yml` | Continuous integration tests | Push, PR |
+| `performance.yml` | Benchmarks and memory profiling | Push, PR, schedule |
+| `sast-scan.yml` | Static application security testing | Push, PR, schedule |
 | `scorecard.yml` | OpenSSF Scorecard compliance | Schedule |
+| `secrets-scan.yml` | Secret detection and prevention | Push, PR |
 
 ## Support
 
