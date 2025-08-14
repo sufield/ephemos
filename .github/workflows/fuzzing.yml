@@ -10,7 +10,7 @@ on:
     - cron: '0 2 * * 0'
 
 env:
-  GO_VERSION: '1.21.x'
+  GO_VERSION: '1.24.x'
 
 jobs:
   # Go native fuzzing
@@ -297,7 +297,7 @@ jobs:
           {
             echo "module fuzz-targets"
             echo ""
-            echo "go 1.21"
+            echo "go 1.24"
             echo ""
             echo "require github.com/sufield/ephemos v0.0.0"
             echo ""
