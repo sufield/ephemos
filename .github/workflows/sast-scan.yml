@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - name: Perform ShiftLeft Scan
-        uses: ShiftLeftSecurity/scan-action@77e5a8bf896d471c59b57c9c6230cd78e7de4c9a # Fixed commit
+        uses: ShiftLeftSecurity/scan-action@54980bb9ae2bcd6b2ae1d36b7e4b6a8f5bbc0c94 # v1.3.0
         with:
           type: "credscan,go,depscan"  # credscan for secrets, go for SAST on Go code, depscan for dependencies
         env:
