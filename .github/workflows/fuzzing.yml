@@ -10,7 +10,7 @@ on:
     - cron: '0 2 * * 0'
 
 env:
-  GO_VERSION: '1.24.x'
+  GO_VERSION: '1.21.x'
 
 jobs:
   # Go native fuzzing
@@ -297,7 +297,7 @@ jobs:
           {
             echo "module fuzz-targets"
             echo ""
-            echo "go 1.24"
+            echo "go 1.21"
             echo ""
             echo "require github.com/sufield/ephemos v0.0.0"
             echo ""
@@ -309,38 +309,45 @@ jobs:
         cat go.mod
         
         echo "Running go mod tidy..."
-        go mod tidy -v
+        go mod tidy -v 2>&1 || {
+          echo "❌ go mod tidy failed"
+          echo "Continuing anyway..."
+        }
         
         echo "Checking Go module status..."
-        go list -m all
+        go list -m all 2>&1 || echo "Module list failed"
         
         # Build regular binaries (more compatible with ClusterFuzzLite)
         echo "Building standard Go binaries..."
         
         echo "Building config_fuzz..."
-        go build -v -o ../build-out/config_fuzz ./config_fuzz_main.go
+        go build -v -o ../build-out/config_fuzz ./config_fuzz_main.go 2>&1
         if [ $? -eq 0 ]; then
           echo "✅ config_fuzz built successfully"
         else
-          echo "❌ config_fuzz build failed"
+          echo "❌ config_fuzz build failed with above errors"
+          echo "Attempting to diagnose..."
+          go env
+          ls -la
+          cat go.mod
           exit 1
         fi
         
         echo "Building server_fuzz..."
-        go build -v -o ../build-out/server_fuzz ./server_fuzz_main.go
+        go build -v -o ../build-out/server_fuzz ./server_fuzz_main.go 2>&1
         if [ $? -eq 0 ]; then
           echo "✅ server_fuzz built successfully"
         else
-          echo "❌ server_fuzz build failed"
+          echo "❌ server_fuzz build failed with above errors"
           exit 1
         fi
         
         echo "Building identity_fuzz..."
-        go build -v -o ../build-out/identity_fuzz ./identity_fuzz_main.go
+        go build -v -o ../build-out/identity_fuzz ./identity_fuzz_main.go 2>&1
         if [ $? -eq 0 ]; then
           echo "✅ identity_fuzz built successfully"
         else
-          echo "❌ identity_fuzz build failed"
+          echo "❌ identity_fuzz build failed with above errors"
           exit 1
         fi
         
