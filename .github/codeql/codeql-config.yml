@@ -1,36 +1,12 @@
 # CodeQL Configuration for Ephemos
-# This configuration ensures comprehensive static analysis security scanning
-
 name: "Ephemos Security Analysis"
 
-# Disable default queries to use only our selected query suites
+# Use default queries plus security-extended
 disable-default-queries: false
-
-# Query suites to run for comprehensive security analysis
-queries:
-  - name: "Security and Quality"  
-    uses: security-and-quality
-  - name: "Security Extended"
-    uses: security-extended
-
-# Path filters to focus analysis on relevant code
-paths:
-  - "pkg/"
-  - "internal/" 
-  - "cmd/"
-
-# Exclude paths that don't need security analysis
-paths-ignore:
-  - "**/*_test.go"       # Test files (analyzed separately)
-  - ".github/"           # GitHub workflow files
-  - "scripts/"           # Build scripts
-  - "tools/"             # Development tools
-  - "docs/"              # Documentation
-  - "*.md"               # Markdown files
 
 # Languages to analyze
 languages:
   - go
 
-# Build configuration
+# Build configuration  
 build-mode: manual
