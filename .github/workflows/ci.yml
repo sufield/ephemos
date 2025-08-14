@@ -7,6 +7,10 @@ on:
   # Only manual trigger
   workflow_dispatch:
 
+# Restrict permissions for security best practices
+permissions:
+  contents: read
+
 env:
   GO_VERSION: '1.24.x'
   GOPROXY: https://proxy.golang.org,direct

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+# Restrict permissions for security - only read access needed for SAST scanning
+permissions:
+  contents: read
+
 jobs:
   scan:
     runs-on: ubuntu-latest
