@@ -2,9 +2,12 @@ name: SAST Scan with ShiftLeft
 
 on:
   push:
-    branches: [ main ]  # Adjust to your main branch name
+    branches: [ main ]
   pull_request:
     branches: [ main ]
+
+env:
+  SCAN_WORKSPACE: "https://github.com/sufield/ephemos"
 
 jobs:
   scan:
@@ -12,20 +15,20 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4  # Use the latest version
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - name: Perform ShiftLeft Scan
         uses: ShiftLeftSecurity/scan-action@master
         with:
           type: "credscan,go,depscan"  # credscan for secrets, go for SAST on Go code, depscan for dependencies
         env:
-          WORKSPACE: "https://github.com/${{ github.repository }}/blob/${{ github.sha }}"  # Enables hyperlinks in reports
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Improves dependency lookups
-          SCAN_AUTO_BUILD: true  # Enables automatic build for Go projects
+          WORKSPACE: ${{ env.SCAN_WORKSPACE }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SCAN_AUTO_BUILD: true
 
       - name: Upload scan reports
-        if: always()  # Upload even if scan fails
-        uses: actions/upload-artifact@v4
+        if: always()
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         with:
           name: scan-reports
           path: reports/
