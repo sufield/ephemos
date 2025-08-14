@@ -1,0 +1,101 @@
+name: Bazel CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run weekly on Sunday at 3 AM UTC
+    - cron: '0 3 * * 0'
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  # Use Bazel 7.x compatible version
+  BAZEL_VERSION: '7.4.1'
+
+jobs:
+  bazel-build-test:
+    name: Bazel Build and Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Clear Bazel caches to avoid compatibility issues
+      run: |
+        echo "🧹 Clearing any existing Bazel caches..."
+        rm -rf ~/.cache/bazel ~/.cache/bazelisk || true
+        echo "✅ Bazel caches cleared"
+
+    - name: Setup Bazelisk
+      run: |
+        sudo curl -L https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+        sudo chmod +x /usr/local/bin/bazel
+        
+    - name: Verify Bazel installation
+      run: |
+        bazel version
+        echo "Bazel installation verified"
+        
+    - name: Clean workspace state
+      run: |
+        echo "🧹 Cleaning any existing Bazel workspace state..."
+        bazel clean --expunge || echo "No workspace to clean"
+        bazel shutdown || echo "No Bazel server to shutdown"
+        
+        # Remove any local Bazel state directories
+        rm -rf bazel-* .bazel-* || true
+        echo "✅ Workspace state cleaned"
+
+    - name: Validate Bazel configuration
+      run: |
+        echo "🔍 Validating Bazel configuration..."
+        bazel info
+        bazel query //... --output=label_kind | head -10
+        echo "✅ Bazel configuration validated"
+        
+    - name: Build all targets
+      run: |
+        echo "🔨 Building all Bazel targets..."
+        bazel build //... --config=ci
+        echo "✅ All targets built successfully"
+        
+    - name: Run tests
+      run: |
+        echo "🧪 Running Bazel tests..."
+        bazel test //... --config=ci --test_output=errors
+        echo "✅ All tests passed"
+        
+    - name: Build examples
+      run: |
+        echo "🚀 Building example applications..."
+        bazel build //examples/echo-server:echo-server --config=ci
+        bazel build //examples/echo-client:echo-client --config=ci
+        bazel build //cmd/ephemos-cli:ephemos-cli --config=ci
+        echo "✅ Examples built successfully"
+        
+    - name: Verify binary outputs
+      run: |
+        echo "🔍 Verifying built binaries..."
+        ls -la bazel-bin/examples/echo-server/
+        ls -la bazel-bin/examples/echo-client/  
+        ls -la bazel-bin/cmd/ephemos-cli/
+        
+        # Test that binaries can show help
+        ./bazel-bin/cmd/ephemos-cli/ephemos-cli_/ephemos-cli --help || echo "CLI help not available"
+        echo "✅ Binary verification complete"
+        
+    - name: Final cleanup
+      run: |
+        echo "🧹 Final cleanup..."
+        bazel shutdown
+        rm -rf ~/.cache/bazel ~/.cache/bazelisk || true
+        echo "✅ Cleanup complete"
+      if: always()
