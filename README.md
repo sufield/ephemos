@@ -1,5 +1,7 @@
 # Ephemos
 
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sufield/ephemos/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sufield/ephemos)
+
 **No more plaintext API keys or secrets between your services.** Ephemos handles service-to-service authentication automatically using certificates that rotate every hour - so you never have to manage, store, or worry about API keys again.
 
 ## The Problem with API Keys
