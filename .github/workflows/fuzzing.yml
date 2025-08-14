@@ -117,10 +117,11 @@ jobs:
           echo "🔧 Setting up ClusterFuzzLite environment..."
           # Create directories for ClusterFuzzLite
           mkdir -p .clusterfuzzlite
-          mkdir -p build-out
           # Ensure build-out is in the workspace root for ClusterFuzzLite
           echo "Creating build-out directory structure..."
-          mkdir -p build-out
+          # Create build-out in both locations to ensure ClusterFuzzLite can find it
+          mkdir -p /github/workspace/build-out || mkdir -p ${{ github.workspace }}/build-out || mkdir -p build-out
+          echo "Created build-out directories for ClusterFuzzLite compatibility"
           # Build project
           # Build the project first to ensure everything compiles
           echo "Building project..."
@@ -375,10 +376,10 @@ jobs:
           done
           echo "=== END PRE-BUILD VERIFICATION ==="
           
-          # Ensure build-out directory exists and is writable
-          mkdir -p build-out
-          chmod 755 build-out
-          echo "✅ Prepared build-out directory"
+          # Ensure build-out directory exists and is writable (redundant but safe)
+          mkdir -p /github/workspace/build-out || mkdir -p ${{ github.workspace }}/build-out || mkdir -p build-out
+          chmod 755 /github/workspace/build-out 2>/dev/null || chmod 755 ${{ github.workspace }}/build-out 2>/dev/null || chmod 755 build-out
+          echo "✅ Prepared build-out directory with proper permissions"
           
           # Check Go environment
           echo "Go version: $(go version)"
@@ -395,10 +396,19 @@ jobs:
           }
           EOF
           
-          if go build -v -o build-out/test_build test_build.go; then
+          # Use the same BUILD_DIR logic for consistency
+          TEST_BUILD_DIR="/github/workspace/build-out"
+          if [ ! -d "/github/workspace" ]; then
+            TEST_BUILD_DIR="${{ github.workspace }}/build-out"
+            if [ ! -d "${{ github.workspace }}" ]; then
+              TEST_BUILD_DIR="build-out"
+            fi
+          fi
+          
+          if go build -v -o $TEST_BUILD_DIR/test_build test_build.go; then
             echo "✅ Go build environment working"
-            ./build-out/test_build
-            rm test_build.go build-out/test_build
+            $TEST_BUILD_DIR/test_build
+            rm test_build.go $TEST_BUILD_DIR/test_build
           else
             echo "❌ Go build environment broken"
             go version
@@ -407,21 +417,36 @@ jobs:
           fi
           
           # Build each target with proper error handling and detailed output
+          # Ensure we're in the GitHub workspace directory
+          cd /github/workspace || cd ${{ github.workspace }} || cd $(pwd)
+          echo "Current working directory: $(pwd)"
+          
+          # Ensure build-out directory uses absolute path for ClusterFuzzLite
+          mkdir -p /github/workspace/build-out || mkdir -p ${{ github.workspace }}/build-out || mkdir -p build-out
+          BUILD_DIR="/github/workspace/build-out"
+          if [ ! -d "/github/workspace" ]; then
+            BUILD_DIR="${{ github.workspace }}/build-out"
+            if [ ! -d "${{ github.workspace }}" ]; then
+              BUILD_DIR="build-out"
+            fi
+          fi
+          echo "Using build directory: $BUILD_DIR"
+          
           echo "Building config_fuzz..."
-          echo "Command: go build -v -o build-out/config_fuzz ./fuzz-targets/config_fuzz_main.go"
+          echo "Command: go build -v -o $BUILD_DIR/config_fuzz ./fuzz-targets/config_fuzz_main.go"
           echo "Source file validation:"
           head -10 ./fuzz-targets/config_fuzz_main.go
           
           # Build with full error capture
-          BUILD_OUTPUT=$(go build -v -o build-out/config_fuzz ./fuzz-targets/config_fuzz_main.go 2>&1)
+          BUILD_OUTPUT=$(go build -v -o $BUILD_DIR/config_fuzz ./fuzz-targets/config_fuzz_main.go 2>&1)
           BUILD_EXIT_CODE=$?
           echo "Build output: $BUILD_OUTPUT"
           echo "Build exit code: $BUILD_EXIT_CODE"
           
           if [ $BUILD_EXIT_CODE -eq 0 ]; then
             echo "✅ config_fuzz built successfully"
-            ls -la build-out/config_fuzz
-            ./build-out/config_fuzz 2>/dev/null && echo "✅ config_fuzz runs successfully" || echo "⚠️ config_fuzz execution test failed"
+            ls -la $BUILD_DIR/config_fuzz
+            $BUILD_DIR/config_fuzz 2>/dev/null && echo "✅ config_fuzz runs successfully" || echo "⚠️ config_fuzz execution test failed"
           else
             echo "❌ config_fuzz build failed (exit code: $BUILD_EXIT_CODE)"
             echo "Build error output:"
@@ -432,19 +457,19 @@ jobs:
           fi
           
           echo "Building server_fuzz..."
-          echo "Command: go build -v -o build-out/server_fuzz ./fuzz-targets/server_fuzz_main.go"
+          echo "Command: go build -v -o $BUILD_DIR/server_fuzz ./fuzz-targets/server_fuzz_main.go"
           echo "Source file validation:"
           head -10 ./fuzz-targets/server_fuzz_main.go
           
-          BUILD_OUTPUT=$(go build -v -o build-out/server_fuzz ./fuzz-targets/server_fuzz_main.go 2>&1)
+          BUILD_OUTPUT=$(go build -v -o $BUILD_DIR/server_fuzz ./fuzz-targets/server_fuzz_main.go 2>&1)
           BUILD_EXIT_CODE=$?
           echo "Build output: $BUILD_OUTPUT"
           echo "Build exit code: $BUILD_EXIT_CODE"
           
           if [ $BUILD_EXIT_CODE -eq 0 ]; then
             echo "✅ server_fuzz built successfully"
-            ls -la build-out/server_fuzz
-            ./build-out/server_fuzz 2>/dev/null && echo "✅ server_fuzz runs successfully" || echo "⚠️ server_fuzz execution test failed"
+            ls -la $BUILD_DIR/server_fuzz
+            $BUILD_DIR/server_fuzz 2>/dev/null && echo "✅ server_fuzz runs successfully" || echo "⚠️ server_fuzz execution test failed"
           else
             echo "❌ server_fuzz build failed (exit code: $BUILD_EXIT_CODE)"
             echo "Build error output:"
@@ -455,19 +480,19 @@ jobs:
           fi
           
           echo "Building identity_fuzz..."
-          echo "Command: go build -v -o build-out/identity_fuzz ./fuzz-targets/identity_fuzz_main.go"
+          echo "Command: go build -v -o $BUILD_DIR/identity_fuzz ./fuzz-targets/identity_fuzz_main.go"
           echo "Source file validation:"
           head -10 ./fuzz-targets/identity_fuzz_main.go
           
-          BUILD_OUTPUT=$(go build -v -o build-out/identity_fuzz ./fuzz-targets/identity_fuzz_main.go 2>&1)
+          BUILD_OUTPUT=$(go build -v -o $BUILD_DIR/identity_fuzz ./fuzz-targets/identity_fuzz_main.go 2>&1)
           BUILD_EXIT_CODE=$?
           echo "Build output: $BUILD_OUTPUT"
           echo "Build exit code: $BUILD_EXIT_CODE"
           
           if [ $BUILD_EXIT_CODE -eq 0 ]; then
             echo "✅ identity_fuzz built successfully"
-            ls -la build-out/identity_fuzz
-            ./build-out/identity_fuzz 2>/dev/null && echo "✅ identity_fuzz runs successfully" || echo "⚠️ identity_fuzz execution test failed"
+            ls -la $BUILD_DIR/identity_fuzz
+            $BUILD_DIR/identity_fuzz 2>/dev/null && echo "✅ identity_fuzz runs successfully" || echo "⚠️ identity_fuzz execution test failed"
           else
             echo "❌ identity_fuzz build failed (exit code: $BUILD_EXIT_CODE)"
             echo "Build error output:"
@@ -478,35 +503,42 @@ jobs:
           fi
           # Verify build-out directory has fuzz targets
           echo "Verifying build output..."
-          if [ ! -d "build-out" ]; then
-            echo "❌ build-out directory does not exist"
+          if [ ! -d "$BUILD_DIR" ]; then
+            echo "❌ Build directory $BUILD_DIR does not exist"
             exit 1
           fi
           
-          echo "Contents of build-out directory:"
-          ls -la build-out/
+          echo "Contents of build directory ($BUILD_DIR):"
+          ls -la $BUILD_DIR/
+          
+          # Also check both possible locations for ClusterFuzzLite compatibility
+          echo "Verifying ClusterFuzzLite expected locations:"
+          echo "Checking /github/workspace/build-out:"
+          ls -la /github/workspace/build-out/ 2>/dev/null || echo "Not found"
+          echo "Checking relative build-out:"
+          ls -la build-out/ 2>/dev/null || echo "Not found"
           
           # Count the number of binaries created
-          BINARY_COUNT=$(find build-out/ -type f -executable 2>/dev/null | wc -l)
+          BINARY_COUNT=$(find $BUILD_DIR/ -type f -executable 2>/dev/null | wc -l)
           echo "Number of executable files found: $BINARY_COUNT"
           
           # Check each expected binary exists and is executable
           missing_targets=0
           for binary in config_fuzz server_fuzz identity_fuzz; do
-            if [ -f "build-out/$binary" ]; then
+            if [ -f "$BUILD_DIR/$binary" ]; then
               echo "✅ $binary exists"
               # Check if it's executable
-              if [ -x "build-out/$binary" ]; then
+              if [ -x "$BUILD_DIR/$binary" ]; then
                 echo "✅ $binary is executable"
                 # Test the binary can run
-                if "./build-out/$binary" >/dev/null 2>&1; then
+                if "$BUILD_DIR/$binary" >/dev/null 2>&1; then
                   echo "✅ $binary runs successfully"
                 else
                   echo "⚠️ $binary exists but failed to run"
                 fi
               else
                 echo "⚠️ $binary exists but is not executable"
-                chmod +x "build-out/$binary"
+                chmod +x "$BUILD_DIR/$binary"
                 echo "✅ Made $binary executable"
               fi
             else
