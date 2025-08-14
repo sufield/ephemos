@@ -46,8 +46,6 @@ sh_binary(
     srcs = ["run-demo.sh"],
     data = [
         ":setup_demo",
-        "//examples/echo-client",
-        "//examples/echo-server",
     ],
     tags = ["demo"],
     visibility = ["//visibility:public"],
@@ -151,8 +149,6 @@ sh_binary(
         ":run_demo",
         ":setup_demo",
         "//cmd/ephemos-cli",
-        "//examples/echo-client",
-        "//examples/echo-server",
     ],
     tags = ["demo"],
     visibility = ["//visibility:public"],

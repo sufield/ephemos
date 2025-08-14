@@ -18,20 +18,16 @@ LDFLAGS := -X main.Version=$(VERSION) \
 GO_BUILD_FLAGS := -trimpath -ldflags "$(LDFLAGS)"
 
 # Variables
-PROTO_DIR := examples/proto
-GO_OUT := examples/proto
 CLI_BINARY := ephemos
-SERVER_BINARY := echo-server
-CLIENT_BINARY := echo-client
 CONFIG_VALIDATOR_BINARY := config-validator
 
 # PHONY targets - all targets that don't create files
-.PHONY: all build proto proto-ci examples test clean deps fmt lint help setup \
+.PHONY: all build proto proto-ci test clean deps fmt lint help setup \
         check-deps install-deps install-deps-sudo benchmark fmt-only core-help version show-build-info \
         arch-test arch-guard fuzz fuzz-build
 
 # Default target
-all: proto build examples
+all: proto build
 
 # Build library and CLI with reproducible builds
 build: check-deps show-build-info
@@ -60,12 +56,6 @@ proto-ci:
 	}
 
 # Build example applications with reproducible builds
-examples: proto
-	@echo "Building example applications with reproducible build flags..."
-	@mkdir -p bin
-	go build $(GO_BUILD_FLAGS) -v -o "bin/$(SERVER_BINARY)" ./examples/echo-server
-	go build $(GO_BUILD_FLAGS) -v -o "bin/$(CLIENT_BINARY)" ./examples/echo-client
-	@echo "Examples built with version: $(VERSION)"
 
 # Run tests
 test: check-deps
@@ -132,7 +122,6 @@ core-help:
 	@echo ""
 	@echo "Build targets (with reproducible builds):"
 	@echo "  make build          - Build library and CLI with version info"
-	@echo "  make examples       - Build example applications with version info"
 	@echo "  make clean          - Clean build artifacts"
 	@echo ""
 	@echo "Development targets:"

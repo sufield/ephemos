@@ -57,7 +57,7 @@ ci-security:
 	@echo "Security checks completed!"
 
 # Build all targets
-ci-build: clean-cache build examples
+ci-build: clean-cache build
 	@echo "All builds completed successfully!"
 
 # Clean all caches before building

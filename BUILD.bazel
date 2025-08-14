@@ -39,8 +39,6 @@ filegroup(
     srcs = [
         "//cmd/config-validator",
         "//cmd/ephemos-cli",
-        "//examples/echo-client",
-        "//examples/echo-server",
     ],
 )
 
