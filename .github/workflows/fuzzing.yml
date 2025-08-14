@@ -23,7 +23,7 @@ jobs:
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
     - name: Setup Go Environment
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
       with:
         go-version: ${{ env.GO_VERSION }}
         check-latest: true
@@ -34,6 +34,8 @@ jobs:
         make build
 
     - name: Run fuzzing tests (short duration)
+      env:
+        EVENT_NAME: ${{ github.event_name }}
       run: |
         echo "🔍 Running Go native fuzzing tests..."
         
@@ -42,7 +44,7 @@ jobs:
         # Longer fuzzing runs happen on schedule
         
         FUZZ_DURATION="30s"
-        if [[ "${{ github.event_name }}" == "schedule" ]]; then
+        if [[ "$EVENT_NAME" == "schedule" ]]; then
           FUZZ_DURATION="5m"  # Longer runs on schedule
         fi
         
@@ -74,6 +76,8 @@ jobs:
 
     - name: Collect fuzzing artifacts
       if: always()
+      env:
+        EVENT_NAME: ${{ github.event_name }}
       run: |
         echo "📋 Collecting fuzzing artifacts..."
         
@@ -89,7 +93,7 @@ jobs:
         # Create summary of fuzzing results
         echo "## 🔍 Fuzzing Results Summary" > fuzzing-summary.md
         echo "" >> fuzzing-summary.md
-        echo "- **Fuzzing Duration**: ${{ github.event_name == 'schedule' && '5 minutes' || '30 seconds' }} per test" >> fuzzing-summary.md
+        echo "- **Fuzzing Duration**: $([ "$EVENT_NAME" = 'schedule' ] && echo '5 minutes' || echo '30 seconds') per test" >> fuzzing-summary.md
         echo "- **Tests Run**: Configuration, Server, Identity validation" >> fuzzing-summary.md
         echo "- **Status**: $([ $? -eq 0 ] && echo 'Completed successfully' || echo 'Issues found')" >> fuzzing-summary.md
         echo "" >> fuzzing-summary.md
@@ -117,6 +121,8 @@ jobs:
     timeout-minutes: 45
     # Run on all triggers (push, PR, schedule) to ensure comprehensive security testing
     if: github.event_name == 'schedule' || github.event_name == 'push' || github.event_name == 'pull_request'
+    env:
+      FUZZ_SECONDS: ${{ github.event_name == 'schedule' && '1800' || '600' }}
     permissions:
       contents: read
       security-events: write
@@ -125,7 +131,7 @@ jobs:
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
     - name: Setup Go Environment
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
       with:
         go-version: ${{ env.GO_VERSION }}
         check-latest: true
@@ -375,11 +381,11 @@ EOF
         echo "✅ Fuzz targets successfully created"
 
     - name: Run ClusterFuzzLite
-      uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+      uses: google/clusterfuzzlite/actions/run_fuzzers@cb1488bb74c8ca8d4fcbfc7c0ab2e1efa06c91e3 # v1
       with:
         language: go
         # Run for shorter time in CI to avoid timeouts
-        fuzz-seconds: ${{ github.event_name == 'schedule' && '1800' || '600' }} # 30min scheduled, 10min otherwise
+        fuzz-seconds: ${{ env.FUZZ_SECONDS }}
         mode: 'batch'
         report-unreproducible-crashes: false
         output-sarif: true
@@ -411,7 +417,7 @@ EOF
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
     - name: Setup Go Environment
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
       with:
         go-version: ${{ env.GO_VERSION }}
         check-latest: true
