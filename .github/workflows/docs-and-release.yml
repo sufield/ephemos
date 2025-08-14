@@ -9,7 +9,6 @@ on:
     paths:
       - 'docs/**'
       - '**.md'
-      - 'examples/**'
 
 jobs:
   # Documentation linting and validation
@@ -176,37 +175,6 @@ jobs:
               - goos: windows
                 goarch: arm64
                 
-          - id: echo-server
-            main: ./examples/echo-server
-            binary: echo-server
-            env:
-              - CGO_ENABLED=0
-            goos:
-              - linux
-              - darwin
-              - windows
-            goarch:
-              - amd64
-              - arm64
-            ignore:
-              - goos: windows
-                goarch: arm64
-                
-          - id: echo-client
-            main: ./examples/echo-client
-            binary: echo-client
-            env:
-              - CGO_ENABLED=0
-            goos:
-              - linux
-              - darwin
-              - windows
-            goarch:
-              - amd64
-              - arm64
-            ignore:
-              - goos: windows
-                goarch: arm64
 
         archives:
           - format: tar.gz

@@ -23,7 +23,7 @@ validate_security_environment() {
     
     # Validate basic security prerequisites
     validate_step_prerequisites "security-environment" \
-        "go" "workspace" "go-mod" "proto-files"
+        "go" "workspace" "go-mod"
     
     # Validate security tool availability
     validate_security_tools "$scan_type"

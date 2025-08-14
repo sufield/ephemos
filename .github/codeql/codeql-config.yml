@@ -18,7 +18,6 @@ paths:
   - "pkg/"
   - "internal/" 
   - "cmd/"
-  - "examples/"
 
 # Exclude paths that don't need security analysis
 paths-ignore:

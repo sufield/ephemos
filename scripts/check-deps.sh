@@ -28,29 +28,18 @@ else
     MISSING_DEPS=1
 fi
 
-# Check protoc
-if command_exists protoc; then
-    echo -e "${GREEN}✓ protoc: $(protoc --version | awk '{print $2}')${NC}"
+# Check make
+if command_exists make; then
+    echo -e "${GREEN}✓ make: available${NC}"
 else
-    echo -e "${RED}✗ protoc: not installed${NC}"
-    MISSING_DEPS=1
+    echo -e "${YELLOW}⚠ make: not installed (recommended)${NC}"
 fi
 
-# Check Go protobuf tools
-export PATH="$PATH:$(go env GOPATH)/bin"
-
-if command_exists protoc-gen-go; then
-    echo -e "${GREEN}✓ protoc-gen-go: installed${NC}"
+# Check git
+if command_exists git; then
+    echo -e "${GREEN}✓ git: available${NC}"
 else
-    echo -e "${RED}✗ protoc-gen-go: not installed${NC}"
-    MISSING_DEPS=1
-fi
-
-if command_exists protoc-gen-go-grpc; then
-    echo -e "${GREEN}✓ protoc-gen-go-grpc: installed${NC}"
-else
-    echo -e "${RED}✗ protoc-gen-go-grpc: not installed${NC}"
-    MISSING_DEPS=1
+    echo -e "${YELLOW}⚠ git: not installed (recommended for version info)${NC}"
 fi
 
 # Summary
@@ -60,19 +49,13 @@ if [ $MISSING_DEPS -eq 0 ]; then
 else
     echo -e "\n${RED}❌ Missing dependencies detected!${NC}"
     echo ""
-    echo -e "${YELLOW}The build system will attempt to install Go tools automatically.${NC}"
-    echo "For system packages, choose one of these options:"
+    echo -e "${YELLOW}Required dependencies:${NC}"
+    echo "  - Go 1.24 or later"
     echo ""
-    echo "Option 1 - Automatic installation (requires sudo):"
-    echo "  ./scripts/install-deps-sudo.sh"
-    echo ""
-    echo "Option 2 - Manual installation:"
-    echo "  Ubuntu/Debian: sudo apt-get update && sudo apt-get install -y protobuf-compiler"
-    echo "  CentOS/RHEL:   sudo yum install -y protobuf-compiler"
-    echo "  macOS:         brew install protobuf"
-    echo ""
-    echo "Option 3 - Go tools only (no sudo required):"
-    echo "  go install google.golang.org/protobuf/cmd/protoc-gen-go@latest"
-    echo "  go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest"
+    echo "Installation options:"
+    echo "  Ubuntu/Debian: sudo apt-get update && sudo apt-get install -y golang-go"
+    echo "  CentOS/RHEL:   sudo yum install -y golang"
+    echo "  macOS:         brew install go"
+    echo "  Or download from: https://golang.org/dl/"
     exit 1
 fi
