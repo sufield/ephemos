@@ -12,7 +12,7 @@ include Makefile.security
 .PHONY: demo demo-force demo-version
 
 # Run complete demo with output capture
-demo: proto build
+demo: build
 	@echo "Running Ephemos demo..."
 	@./scripts/demo/run-demo.sh
 
@@ -69,7 +69,6 @@ help:
 	@echo ""
 	@echo "Core targets (Makefile.core):"
 	@echo "  make build            - Build library and CLI"
-	@echo "  make proto            - Generate protobuf code"
 	@echo "  make test             - Run tests"
 	@echo "  make clean            - Clean build artifacts"
 	@echo ""
