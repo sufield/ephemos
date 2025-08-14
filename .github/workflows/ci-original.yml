@@ -1,0 +1,2040 @@
+name: CI/CD Pipeline
+
+# IMPORTANT: All jobs require Protocol Buffers (protoc) to be installed
+# The setup-protobuf action MUST be run in every job that builds or tests code
+# This action will:
+# 1. Install protoc compiler
+# 2. Install Go protobuf generation tools (protoc-gen-go, protoc-gen-go-grpc)
+# 3. Generate all required protobuf files (*.pb.go files)
+# 4. Verify all tools are properly installed
+
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run weekly on Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+
+env:
+  GO_VERSION: '1.24.x'
+  GOPROXY: https://proxy.golang.org,direct
+
+jobs:
+  # ALL JOBS TEMPORARILY DISABLED - Only running Bazel CI workflow for now
+  # Enable these jobs individually once Bazel CI is working
+  disabled-placeholder:
+    name: Lint with Enhanced Diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      
+    - name: Setup Go Environment
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        check-latest: true
+        
+    - name: Setup Protocol Buffers (Required for CI/CD)
+      uses: ./.github/actions/setup-protobuf-fixed
+      
+    - name: Initialize Enhanced Diagnostics
+      shell: bash
+      run: |
+        # Enable enhanced diagnostics
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        
+        # Source diagnostic library
+        source ./.github/scripts/ci-diagnostics.sh
+        
+        # Initialize diagnostics for lint job
+        init_diagnostics "lint" "enhanced-diagnostics-setup"
+        
+        log_diagnostic "INFO" "🔧 Enhanced diagnostics initialized for lint job"
+        log_diagnostic "INFO" "Runner OS: ${{ runner.os }}"
+        log_diagnostic "INFO" "Go Version: ${{ env.GO_VERSION }}"
+        
+        # Validate environment
+        validate_step_prerequisites "lint-environment" \
+          "go" "workspace" "go-mod" "protoc" "protoc-gen-go" "protoc-gen-go-grpc"
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced diagnostics setup completed"
+        
+    - name: Enhanced golangci-lint Analysis
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/security-diagnostics.sh
+        
+        init_diagnostics "lint" "golangci-lint-analysis"
+        
+        log_diagnostic "INFO" "🔍 Starting enhanced golangci-lint analysis"
+        
+        # Start performance monitoring
+        perf_start=$(monitor_step_performance "golangci-lint-analysis" 900 600)
+        
+        # Install golangci-lint if not available (with retry logic for network reliability)
+        if ! command -v golangci-lint >/dev/null 2>&1; then
+          log_diagnostic "INFO" "Installing golangci-lint"
+          
+          # Retry installation up to 3 times for network reliability
+          max_retries=3
+          for attempt in $(seq 1 $max_retries); do
+            if execute_with_diagnostics "install-golangci-lint-attempt-$attempt" \
+              "Installing golangci-lint (attempt $attempt/$max_retries)" \
+              go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.0; then
+              
+              if command -v golangci-lint >/dev/null 2>&1; then
+                log_diagnostic "SUCCESS" "✅ golangci-lint installed successfully"
+                break
+              fi
+            fi
+            
+            if [[ $attempt -lt $max_retries ]]; then
+              log_diagnostic "WARN" "golangci-lint installation attempt $attempt failed, retrying..."
+              sleep 3
+            else
+              fail_with_comprehensive_diagnostics 1 \
+                "Failed to install golangci-lint after $max_retries attempts" \
+                "Network connectivity issue preventing tool installation" \
+                "Check network connectivity and service availability" \
+                "Try re-running the workflow or use a different runner"
+            fi
+          done
+        fi
+        
+        # Enhanced golangci-lint run with comprehensive error analysis
+        lint_args=(
+          "run"
+          "--timeout=10m"
+          "--issues-exit-code=1"
+          "--enable=gosec,gocritic,gocyclo,goconst,goimports,misspell,govet,errcheck"
+          "--enable=ineffassign,staticcheck,unused,unconvert,unparam"
+          "--exclude-use-default=false"
+          "--max-issues-per-linter=50"
+          "--max-same-issues=10"
+          "--out-format=github-actions"
+          "--print-resources-usage"
+        )
+        
+        if execute_with_diagnostics "golangci-lint-enhanced" \
+          "Running enhanced golangci-lint analysis" \
+          golangci-lint "${lint_args[@]}"; then
+          log_diagnostic "SUCCESS" "✅ golangci-lint analysis passed"
+        else
+          lint_exit_code=$?
+          log_diagnostic "ERROR" "❌ golangci-lint analysis failed"
+          
+          # Capture detailed error information
+          log_diagnostic "ERROR" "Exit code: $lint_exit_code"
+          
+          # Run diagnostics to understand failure
+          log_diagnostic "INFO" "Running diagnostic analysis of lint failures"
+          
+          # Re-run with verbose output for diagnostics
+          log_diagnostic "DEBUG" "Re-running golangci-lint with verbose output for analysis"
+          golangci-lint run --timeout=5m --out-format=json > golangci-lint-results.json 2>&1 || true
+          
+          if [[ -f "golangci-lint-results.json" ]]; then
+            log_diagnostic "INFO" "Generated detailed lint results for analysis"
+            
+            # Parse results for specific guidance
+            if command -v jq >/dev/null 2>&1; then
+              issue_count=$(jq '.Issues | length' golangci-lint-results.json 2>/dev/null || echo "unknown")
+              log_diagnostic "ERROR" "Total issues found: $issue_count"
+              
+              # Show top issue types
+              jq -r '.Issues[] | .FromLinter' golangci-lint-results.json 2>/dev/null | sort | uniq -c | sort -nr | head -5 | while read count linter; do
+                log_diagnostic "ERROR" "  $linter: $count issues"
+              done
+            fi
+          fi
+          
+          complete_step_performance_monitoring "golangci-lint-analysis" "$perf_start" 900 600
+          
+          fail_with_comprehensive_diagnostics "$lint_exit_code" \
+            "golangci-lint analysis failed with $lint_exit_code" \
+            "Code quality or security issues found by static analysis" \
+            "Fix linting issues: run 'golangci-lint run' locally and address reported problems" \
+            "Use 'golangci-lint run --fix' for auto-fixable issues"
+        fi
+        
+        complete_step_performance_monitoring "golangci-lint-analysis" "$perf_start" 900 600
+        
+    - name: Enhanced Go Formatting and Vetting
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        
+        init_diagnostics "lint" "go-formatting-vetting"
+        
+        log_diagnostic "INFO" "🔍 Performing enhanced Go formatting and vetting checks"
+        
+        # Go vet with enhanced diagnostics
+        if execute_with_diagnostics "go-vet-enhanced" \
+          "Running enhanced go vet analysis" \
+          go vet ./...; then
+          log_diagnostic "SUCCESS" "✅ go vet analysis passed"
+        else
+          fail_with_comprehensive_diagnostics $? \
+            "go vet analysis failed" \
+            "Go vet found potential issues in the code" \
+            "Fix go vet issues: run 'go vet ./...' locally and address reported problems" \
+            "Go vet finds suspicious constructs and potential bugs"
+        fi
+        
+        # Enhanced formatting check
+        log_diagnostic "INFO" "Checking Go code formatting"
+        unformatted_files=$(gofmt -s -l . | grep -v vendor/ | grep -v .pb.go || true)
+        
+        if [[ -n "$unformatted_files" ]]; then
+          log_diagnostic "ERROR" "❌ Go formatting check failed"
+          log_diagnostic "ERROR" "The following files are not properly formatted:"
+          echo "$unformatted_files" | while IFS= read -r file; do
+            log_diagnostic "ERROR" "  📝 $file"
+          done
+          
+          log_diagnostic "ERROR" "Formatting differences:"
+          echo "$unformatted_files" | while IFS= read -r file; do
+            log_diagnostic "ERROR" "--- $file formatting issues ---"
+            gofmt -s -d "$file" | head -20 | while IFS= read -r line; do
+              log_diagnostic "ERROR" "  $line"
+            done
+          done
+          
+          fail_with_comprehensive_diagnostics 1 \
+            "Go code formatting check failed" \
+            "Code is not formatted according to Go standards" \
+            "Fix formatting: run 'gofmt -s -w .' or 'go fmt ./...' to auto-format code" \
+            "Properly formatted code is required for consistency and readability"
+        else
+          log_diagnostic "SUCCESS" "✅ Go code formatting check passed"
+        fi
+        
+    - name: Upload Enhanced Lint Diagnostics
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: enhanced-lint-diagnostics
+        path: |
+          ci-diagnostic.log
+          golangci-lint-results.json
+          security-report.md
+        retention-days: 7
+
+  # Public API Protection - Ensures examples only use public APIs
+  public-api-check:
+    name: Public API Protection
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      
+    - name: Setup Go Environment
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        check-latest: true
+        
+    - name: Setup Protocol Buffers (Required for CI/CD)
+      uses: ./.github/actions/setup-protobuf-fixed
+      
+    - name: Verify examples use only public APIs
+      run: |
+        echo "🔍 Checking that examples and docs only use public APIs..."
+        echo "This prevents external users from encountering import errors"
+        go test -v ./pkg/ephemos/internal_imports_test.go ./pkg/ephemos/types.go
+      
+    - name: Build all examples to verify they work for external users
+      run: |
+        echo "🏗️ Building all examples to verify external usability..."
+        make build examples
+
+  # Enhanced Security Scanning with Comprehensive Diagnostics
+  security:
+    name: Enhanced Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      
+    - name: Setup Go Environment
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        check-latest: true
+        
+    - name: Setup Protocol Buffers (Required for CI/CD)
+      uses: ./.github/actions/setup-protobuf-fixed
+      
+    - name: Initialize Enhanced Security Diagnostics
+      shell: bash
+      run: |
+        # Enable enhanced diagnostics
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        
+        # Source diagnostic libraries
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/security-diagnostics.sh
+        
+        # Initialize security diagnostics
+        validate_security_environment "enhanced-security" "comprehensive"
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced security diagnostics initialized"
+        
+    - name: Enhanced Vulnerability Scanning
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/security-diagnostics.sh
+        
+        init_diagnostics "enhanced-security" "vulnerability-scanning"
+        
+        log_diagnostic "INFO" "🔒 Enhanced vulnerability scanning"
+        
+        # Execute comprehensive vulnerability scan with detailed reporting
+        execute_security_scan "vulnerability" "true" "medium"
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced vulnerability scanning completed"
+        
+    - name: Enhanced Static Security Analysis
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/security-diagnostics.sh
+        
+        init_diagnostics "enhanced-security" "static-security-analysis"
+        
+        log_diagnostic "INFO" "🔍 Enhanced static security analysis"
+        
+        # Execute comprehensive static analysis scan
+        execute_security_scan "static-analysis" "true" "medium"
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced static security analysis completed"
+        
+    - name: Enhanced Dependency Security Check
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/security-diagnostics.sh
+        
+        init_diagnostics "enhanced-security" "dependency-security-check"
+        
+        log_diagnostic "INFO" "📦 Enhanced dependency security check"
+        
+        # Execute dependency security scan
+        execute_security_scan "dependency" "true" "high"
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced dependency security check completed"
+        
+    - name: Enhanced Secrets Detection
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/security-diagnostics.sh
+        
+        init_diagnostics "enhanced-security" "secrets-detection"
+        
+        log_diagnostic "INFO" "🔐 Enhanced secrets detection scan"
+        
+        # Execute secrets detection with comprehensive patterns
+        execute_security_scan "comprehensive" "true" "high"
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced secrets detection completed"
+        
+    - name: Upload Enhanced Security Diagnostics
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: enhanced-security-diagnostics
+        path: |
+          ci-diagnostic.log
+          security-report.md
+          vulnerability-scan-results.json
+          golangci-lint-results.txt
+          gosec-results.json
+          staticcheck-results.txt
+          failure-report.md
+        retention-days: 14
+
+  # Enhanced Build Matrix with Comprehensive Diagnostics
+  build:
+    name: Enhanced Build with Diagnostics
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true  # Prerequisites must fail fast (protobuf, go setup, config validation)
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go-version: ['1.24.x']
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      
+    - name: Setup Go Environment
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+        check-latest: true
+        
+    - name: Setup Protocol Buffers (Required for CI/CD)
+      uses: ./.github/actions/setup-protobuf-fixed
+      
+    - name: Initialize Enhanced Build Diagnostics
+      shell: bash
+      run: |
+        # Enable enhanced diagnostics
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        
+        # Source diagnostic libraries
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/build-diagnostics.sh
+        
+        # Initialize build diagnostics
+        validate_build_environment "enhanced-build-${{ matrix.os }}" "${{ matrix.os }}"
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced build diagnostics initialized"
+        
+    - name: Enhanced Build Execution
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/build-diagnostics.sh
+        
+        init_diagnostics "enhanced-build-${{ matrix.os }}" "build-execution"
+        
+        log_diagnostic "INFO" "🏗️ Starting enhanced build process"
+        log_diagnostic "INFO" "Matrix OS: ${{ matrix.os }}"
+        log_diagnostic "INFO" "Go Version: ${{ matrix.go-version }}"
+        
+        # Monitor system resources before build
+        monitor_system_resources "pre-build"
+        
+        # Perform enhanced standard build
+        perform_enhanced_build "standard" "${{ matrix.os }}"
+        
+        # Build examples as well
+        perform_enhanced_build "examples" "${{ matrix.os }}"
+        
+        # Monitor system resources after build
+        monitor_system_resources "post-build"
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced build execution completed"
+        
+    - name: Enhanced Binary Verification
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        
+        init_diagnostics "enhanced-build-${{ matrix.os }}" "binary-verification"
+        
+        log_diagnostic "INFO" "🔍 Enhanced binary verification"
+        
+        # Define expected binaries based on OS
+        expected_binaries=("bin/ephemos" "bin/config-validator" "bin/echo-server" "bin/echo-client")
+        
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          # Add .exe extension for Windows
+          windows_binaries=()
+          for binary in "${expected_binaries[@]}"; do
+            windows_binaries+=("${binary}.exe")
+          done
+          expected_binaries=("${windows_binaries[@]}")
+        fi
+        
+        # Validate all expected binaries
+        validate_build_artifacts "cross-platform-build" "${expected_binaries[@]}"
+        
+        # Test binary execution with comprehensive error handling
+        for binary in "${expected_binaries[@]}"; do
+          if [[ -f "$binary" ]]; then
+            log_diagnostic "INFO" "Testing binary execution: $binary"
+            
+            # Test help command with timeout and error handling
+            if execute_with_diagnostics "test-binary-$binary" \
+              "Testing $binary help command" \
+              timeout 10 "$binary" --help; then
+              log_diagnostic "SUCCESS" "✅ $binary executable and responsive"
+            else
+              log_diagnostic "WARN" "⚠️ $binary help command failed or not implemented"
+              
+              # Test basic execution without arguments
+              if timeout 5 "$binary" 2>/dev/null; then
+                log_diagnostic "INFO" "$binary executes but may require arguments"
+              else
+                log_diagnostic "ERROR" "$binary execution failed"
+              fi
+            fi
+            
+            # Check binary properties
+            if command -v file >/dev/null 2>&1; then
+              binary_info=$(file "$binary")
+              log_diagnostic "DEBUG" "$binary file info: $binary_info"
+            fi
+            
+            # Check binary size
+            if command -v stat >/dev/null 2>&1; then
+              if [[ "${{ runner.os }}" == "Windows" ]]; then
+                binary_size=$(stat -c%s "$binary" 2>/dev/null || echo "unknown")
+              else
+                binary_size=$(stat -f%z "$binary" 2>/dev/null || stat -c%s "$binary" 2>/dev/null || echo "unknown")
+              fi
+              log_diagnostic "INFO" "$binary size: $binary_size bytes"
+            fi
+          fi
+        done
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced binary verification completed"
+        
+    - name: Enhanced Package Compilation Verification
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        
+        init_diagnostics "enhanced-build-${{ matrix.os }}" "package-compilation-verification"
+        
+        log_diagnostic "INFO" "🔍 Enhanced package compilation verification"
+        
+        # Start performance monitoring
+        perf_start=$(monitor_step_performance "package-compilation-verification" 600 300)
+        
+        # Test main package compilation
+        if execute_with_diagnostics "compile-main-package" \
+          "Compiling main Ephemos package" \
+          go build -v ./pkg/ephemos; then
+          log_diagnostic "SUCCESS" "✅ Main package compilation successful"
+        else
+          fail_with_comprehensive_diagnostics $? \
+            "Main package compilation failed" \
+            "Compilation errors in pkg/ephemos package" \
+            "Fix compilation errors in pkg/ephemos: check imports, syntax, and dependencies" \
+            "Main package must compile successfully for the build to proceed"
+        fi
+        
+        # Test internal packages compilation
+        if execute_with_diagnostics "compile-internal-packages" \
+          "Compiling internal packages" \
+          go build -v ./internal/...; then
+          log_diagnostic "SUCCESS" "✅ Internal packages compilation successful"
+        else
+          fail_with_comprehensive_diagnostics $? \
+            "Internal packages compilation failed" \
+            "Compilation errors in internal packages" \
+            "Fix compilation errors in internal/: check imports, syntax, and dependencies" \
+            "Internal packages must compile for full functionality"
+        fi
+        
+        # Test example packages compilation  
+        if execute_with_diagnostics "compile-example-packages" \
+          "Compiling example packages" \
+          go build -v ./examples/...; then
+          log_diagnostic "SUCCESS" "✅ Example packages compilation successful"
+        else
+          log_diagnostic "WARN" "⚠️ Example packages compilation had issues"
+          # Don't fail the build for example compilation issues
+        fi
+        
+        # Test command packages compilation
+        if execute_with_diagnostics "compile-command-packages" \
+          "Compiling command packages" \
+          go build -v ./cmd/...; then
+          log_diagnostic "SUCCESS" "✅ Command packages compilation successful"
+        else
+          fail_with_comprehensive_diagnostics $? \
+            "Command packages compilation failed" \
+            "Compilation errors in cmd packages" \
+            "Fix compilation errors in cmd/: check main functions and dependencies" \
+            "Command packages must compile to generate binaries"
+        fi
+        
+        # Test compilation of test files (without running tests)
+        log_diagnostic "INFO" "Testing test file compilation"
+        test_packages=$(go list ./...)
+        test_compilation_failed=0
+        
+        for package in $test_packages; do
+          log_diagnostic "DEBUG" "Compiling tests for $package"
+          if ! go test -c -o /dev/null "$package" 2>/dev/null; then
+            log_diagnostic "ERROR" "Test compilation failed for $package"
+            test_compilation_failed=1
+            
+            # Get detailed error for this package
+            test_error=$(go test -c -o /dev/null "$package" 2>&1 || true)
+            log_diagnostic "ERROR" "Test compilation error: $test_error"
+          fi
+        done
+        
+        if [[ $test_compilation_failed -eq 1 ]]; then
+          fail_with_comprehensive_diagnostics 1 \
+            "Test file compilation failed" \
+            "One or more test files contain compilation errors" \
+            "Fix test compilation errors: check test imports, syntax, and test functions" \
+            "All test files must compile even if tests aren't run in this job"
+        else
+          log_diagnostic "SUCCESS" "✅ All test files compile successfully"
+        fi
+        
+        complete_step_performance_monitoring "package-compilation-verification" "$perf_start" 600 300
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced package compilation verification completed"
+        
+    - name: Upload Enhanced Build Diagnostics
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: enhanced-build-diagnostics-${{ matrix.os }}
+        path: |
+          ci-diagnostic.log
+          failure-report.md
+          bin/
+        retention-days: 7
+
+  # Enhanced Testing with Comprehensive Diagnostics
+  test:
+    name: Enhanced Test with Diagnostics
+    timeout-minutes: 45
+    strategy:
+      fail-fast: true  # Prerequisites must fail fast (protobuf, go setup, test compilation)
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        go-version: ['1.24.x']
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      
+    - name: Setup Go Environment
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+        check-latest: true
+        
+    - name: Setup Protocol Buffers (Required for CI/CD)
+      uses: ./.github/actions/setup-protobuf-fixed
+      
+    - name: Initialize Enhanced Test Diagnostics
+      shell: bash
+      run: |
+        # Enable enhanced diagnostics
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        
+        # Source diagnostic libraries
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/test-diagnostics.sh
+        
+        # Initialize test diagnostics
+        validate_test_environment "enhanced-test-${{ matrix.os }}" "${{ matrix.os }}"
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced test diagnostics initialized"
+        
+    - name: Enhanced Test Compilation Validation
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/test-diagnostics.sh
+        
+        init_diagnostics "enhanced-test-${{ matrix.os }}" "test-compilation-validation"
+        
+        log_diagnostic "INFO" "🧪 Enhanced test compilation validation"
+        log_diagnostic "INFO" "Matrix OS: ${{ matrix.os }}"
+        log_diagnostic "INFO" "Go Version: ${{ matrix.go-version }}"
+        
+        # Start performance monitoring
+        perf_start=$(monitor_step_performance "test-compilation-validation" 600 300)
+        
+        # Validate test infrastructure with comprehensive error reporting
+        validate_test_infrastructure
+        
+        complete_step_performance_monitoring "test-compilation-validation" "$perf_start" 600 300
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced test compilation validation completed"
+        
+    - name: Enhanced Unit Test Execution
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/test-diagnostics.sh
+        
+        init_diagnostics "enhanced-test-${{ matrix.os }}" "unit-test-execution"
+        
+        log_diagnostic "INFO" "🧪 Starting enhanced unit test execution"
+        
+        # Execute comprehensive test suite with coverage and race detection
+        execute_test_suite "unit" "true" "auto"
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced unit test execution completed"
+        
+    - name: Enhanced Coverage Analysis
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/test-diagnostics.sh
+        
+        init_diagnostics "enhanced-test-${{ matrix.os }}" "coverage-analysis"
+        
+        log_diagnostic "INFO" "📊 Enhanced coverage analysis"
+        
+        # Validate and analyze test coverage
+        if [[ -f "coverage.out" ]]; then
+            validate_test_coverage "coverage.out"
+            
+            # Generate HTML coverage report for artifact
+            if execute_with_diagnostics "generate-coverage-html" \
+                "Generating HTML coverage report" \
+                go tool cover -html=coverage.out -o coverage.html; then
+                log_diagnostic "SUCCESS" "✅ HTML coverage report generated: coverage.html"
+            fi
+            
+            # Check coverage thresholds
+            coverage_percent=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | sed 's/%//')
+            log_diagnostic "INFO" "📊 Total coverage: ${coverage_percent}%"
+            
+            # Set coverage as output for potential gating
+            echo "COVERAGE_PERCENT=${coverage_percent}" >> "$GITHUB_ENV"
+            
+        else
+            log_diagnostic "WARN" "⚠️ Coverage file not found - coverage analysis skipped"
+        fi
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced coverage analysis completed"
+      
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        files: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella-${{ matrix.os }}
+        fail_ci_if_error: false
+        
+    - name: Upload Enhanced Test Diagnostics
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: enhanced-test-diagnostics-${{ matrix.os }}
+        path: |
+          ci-diagnostic.log
+          coverage.out
+          coverage.html
+          coverage-report.txt
+          benchmark-results.txt
+        retention-days: 7
+
+  # Enhanced Integration Tests with Comprehensive Diagnostics
+  integration:
+    name: Enhanced Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: github.event_name != 'schedule'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      
+    - name: Setup Go Environment
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        check-latest: true
+        
+    - name: Setup Protocol Buffers (Required for CI/CD)
+      uses: ./.github/actions/setup-protobuf-fixed
+      
+    - name: Initialize Enhanced Integration Diagnostics
+      shell: bash
+      run: |
+        # Enable enhanced diagnostics
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        
+        # Source diagnostic libraries
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/test-diagnostics.sh
+        
+        # Initialize integration test diagnostics
+        init_diagnostics "enhanced-integration" "integration-diagnostics-setup"
+        
+        log_diagnostic "INFO" "🔗 Enhanced integration diagnostics initialized"
+        log_diagnostic "INFO" "Runner OS: ${{ runner.os }}"
+        log_diagnostic "INFO" "Go Version: ${{ env.GO_VERSION }}"
+        
+        # Validate integration test environment
+        validate_step_prerequisites "integration-environment" \
+          "go" "workspace" "go-mod" "protoc" "protoc-gen-go" "protoc-gen-go-grpc"
+        
+        # Check for integration test requirements
+        log_diagnostic "INFO" "Validating integration test specific requirements"
+        
+        # Validate system capabilities for SPIRE
+        if ! command -v systemctl >/dev/null 2>&1; then
+            log_diagnostic "WARN" "systemctl not available - SPIRE service management may be limited"
+        fi
+        
+        # Check available ports for integration tests
+        check_port_conflicts
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced integration diagnostics setup completed"
+        
+    - name: Enhanced SPIRE Installation
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        
+        init_diagnostics "enhanced-integration" "spire-installation"
+        
+        log_diagnostic "INFO" "🔐 Enhanced SPIRE installation process"
+        
+        # Start performance monitoring
+        perf_start=$(monitor_step_performance "spire-installation" 600 300)
+        
+        # Navigate to demo scripts
+        cd scripts/demo
+        
+        # Validate installation script exists
+        if [[ ! -f "install-spire.sh" ]]; then
+            fail_with_comprehensive_diagnostics 1 \
+                "SPIRE installation script not found" \
+                "install-spire.sh missing from scripts/demo directory" \
+                "Ensure install-spire.sh is committed to the repository" \
+                "Script path: scripts/demo/install-spire.sh"
+        fi
+        
+        # Make script executable
+        execute_with_diagnostics "chmod-spire-installer" \
+            "Making SPIRE installer executable" \
+            chmod +x install-spire.sh
+        
+        # Execute SPIRE installation with comprehensive error handling
+        if execute_with_diagnostics "install-spire" \
+            "Installing SPIRE components" \
+            sudo ./install-spire.sh; then
+            log_diagnostic "SUCCESS" "✅ SPIRE installation completed"
+        else
+            fail_with_comprehensive_diagnostics $? \
+                "SPIRE installation failed" \
+                "SPIRE components could not be installed or configured" \
+                "Check network connectivity, system permissions, and installation script" \
+                "SPIRE is required for integration tests to run"
+        fi
+        
+        # Comprehensive SPIRE installation verification
+        log_diagnostic "INFO" "Performing comprehensive SPIRE installation verification"
+        
+        spire_components=("spire-server" "spire-agent")
+        spire_validation_failed=0
+        
+        for component in "${spire_components[@]}"; do
+            if [[ ! -f "/usr/local/bin/$component" ]]; then
+                log_diagnostic "ERROR" "SPIRE component missing: $component"
+                spire_validation_failed=1
+            else
+                # Test component execution
+                if execute_with_diagnostics "test-$component" \
+                    "Testing $component execution" \
+                    timeout 10 "/usr/local/bin/$component" --help; then
+                    log_diagnostic "SUCCESS" "✅ $component installed and functional"
+                else
+                    log_diagnostic "ERROR" "$component installed but not functional"
+                    spire_validation_failed=1
+                fi
+            fi
+        done
+        
+        if [[ $spire_validation_failed -eq 1 ]]; then
+            fail_with_comprehensive_diagnostics 1 \
+                "SPIRE installation verification failed" \
+                "One or more SPIRE components are missing or non-functional" \
+                "Reinstall SPIRE or check installation script for issues" \
+                "Required components: ${spire_components[*]}"
+        fi
+        
+        complete_step_performance_monitoring "spire-installation" "$perf_start" 600 300
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced SPIRE installation completed successfully"
+        
+    - name: Enhanced Application Build for Integration
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/build-diagnostics.sh
+        
+        init_diagnostics "enhanced-integration" "application-build"
+        
+        log_diagnostic "INFO" "🔨 Enhanced application build for integration tests"
+        
+        # Ensure protobuf tools are in PATH and generate files if needed
+        if [ -z "${GOBIN:-}" ]; then
+          export GOBIN="$(go env GOPATH)/bin"
+        fi
+        export PATH="$GOBIN:$PATH"
+        
+        log_diagnostic "INFO" "🔧 Validating protobuf tools and generated files"
+        
+        # Verify protobuf tools are available
+        if ! command -v protoc >/dev/null 2>&1; then
+          fail_with_comprehensive_diagnostics 1 \
+            "protoc not found in PATH" \
+            "Protobuf compiler missing from CI environment" \
+            "Ensure setup-protobuf-fixed action completed successfully" \
+            "PATH: $PATH"
+        fi
+        
+        if ! command -v protoc-gen-go >/dev/null 2>&1; then
+          fail_with_comprehensive_diagnostics 1 \
+            "protoc-gen-go not found in PATH" \
+            "Go protobuf plugin missing from CI environment" \
+            "Ensure protobuf tools installation completed successfully" \
+            "PATH: $PATH, GOBIN: $GOBIN"
+        fi
+        
+        if ! command -v protoc-gen-go-grpc >/dev/null 2>&1; then
+          fail_with_comprehensive_diagnostics 1 \
+            "protoc-gen-go-grpc not found in PATH" \
+            "gRPC protobuf plugin missing from CI environment" \
+            "Ensure protobuf tools installation completed successfully" \
+            "PATH: $PATH, GOBIN: $GOBIN"
+        fi
+        
+        # Ensure protobuf files are generated
+        if [[ ! -f "examples/proto/echo.pb.go" || ! -f "examples/proto/echo_grpc.pb.go" ]]; then
+          log_diagnostic "WARN" "Protobuf files missing, regenerating..."
+          
+          # Generate protobuf files
+          protoc --go_out=examples/proto --go_opt=paths=source_relative \
+                 --go-grpc_out=examples/proto --go-grpc_opt=paths=source_relative \
+                 -I examples/proto examples/proto/echo.proto || \
+            fail_with_comprehensive_diagnostics 1 \
+              "Protobuf generation failed during integration build" \
+              "Could not generate required gRPC code" \
+              "Check protoc and plugin installations" \
+              "Proto file: examples/proto/echo.proto"
+          
+          log_diagnostic "SUCCESS" "✅ Protobuf files regenerated successfully"
+        else
+          log_diagnostic "SUCCESS" "✅ Protobuf files already present"
+        fi
+        
+        # Clean build environment
+        clean_build_environment
+        
+        # Build all components needed for integration tests
+        perform_enhanced_build "standard"
+        perform_enhanced_build "examples"
+        
+        # Validate integration test specific binaries
+        validate_build_artifacts "integration-test" \
+            "bin/ephemos" "bin/config-validator" "bin/echo-server" "bin/echo-client"
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced application build completed"
+      
+    - name: Enhanced SPIRE Service Startup
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        
+        init_diagnostics "enhanced-integration" "spire-service-startup"
+        
+        log_diagnostic "INFO" "🚀 Enhanced SPIRE service startup process"
+        
+        # Start performance monitoring
+        perf_start=$(monitor_step_performance "spire-service-startup" 300 180)
+        
+        cd scripts/demo
+        
+        # Validate startup script
+        if [[ ! -f "start-spire.sh" ]]; then
+            fail_with_comprehensive_diagnostics 1 \
+                "SPIRE startup script not found" \
+                "start-spire.sh missing from scripts/demo directory" \
+                "Ensure start-spire.sh is committed to the repository" \
+                "Script path: scripts/demo/start-spire.sh"
+        fi
+        
+        # Make startup script executable
+        execute_with_diagnostics "chmod-spire-startup" \
+            "Making SPIRE startup script executable" \
+            chmod +x start-spire.sh
+        
+        # Start SPIRE services with comprehensive monitoring
+        if execute_with_diagnostics "start-spire-services" \
+            "Starting SPIRE server and agent services" \
+            sudo ./start-spire.sh; then
+            log_diagnostic "SUCCESS" "✅ SPIRE services startup initiated"
+        else
+            fail_with_comprehensive_diagnostics $? \
+                "SPIRE services startup failed" \
+                "Could not start SPIRE server and/or agent services" \
+                "Check system permissions, socket paths, and service configuration" \
+                "SPIRE services are required for integration tests"
+        fi
+        
+        # Enhanced startup validation with retries
+        log_diagnostic "INFO" "Performing enhanced SPIRE service validation"
+        
+        # Wait for services to initialize with progress monitoring
+        for attempt in {1..6}; do
+            log_diagnostic "INFO" "Service validation attempt $attempt/6"
+            sleep 5
+            
+            # Check if services are responsive
+            server_healthy=false
+            agent_healthy=false
+            
+            # Test SPIRE server health
+            if execute_with_diagnostics "spire-server-healthcheck-$attempt" \
+                "SPIRE server health check (attempt $attempt)" \
+                sudo spire-server healthcheck -socketPath /tmp/spire-server/private/api.sock; then
+                server_healthy=true
+                log_diagnostic "SUCCESS" "✅ SPIRE server is healthy (attempt $attempt)"
+            else
+                log_diagnostic "WARN" "⚠️ SPIRE server health check failed (attempt $attempt)"
+                
+                # Log server information for debugging
+                if [[ -f "spire-server.log" ]]; then
+                    log_diagnostic "DEBUG" "SPIRE server log (last 10 lines):"
+                    tail -10 spire-server.log | while IFS= read -r line; do
+                        log_diagnostic "DEBUG" "  $line"
+                    done
+                fi
+            fi
+            
+            # Test SPIRE agent health
+            if execute_with_diagnostics "spire-agent-healthcheck-$attempt" \
+                "SPIRE agent health check (attempt $attempt)" \
+                sudo spire-agent healthcheck -socketPath /tmp/spire-agent/public/api.sock; then
+                agent_healthy=true
+                log_diagnostic "SUCCESS" "✅ SPIRE agent is healthy (attempt $attempt)"
+            else
+                log_diagnostic "WARN" "⚠️ SPIRE agent health check failed (attempt $attempt)"
+                
+                # Log agent information for debugging
+                if [[ -f "spire-agent.log" ]]; then
+                    log_diagnostic "DEBUG" "SPIRE agent log (last 10 lines):"
+                    tail -10 spire-agent.log | while IFS= read -r line; do
+                        log_diagnostic "DEBUG" "  $line"
+                    done
+                fi
+            fi
+            
+            # Check if both services are healthy
+            if [[ "$server_healthy" == "true" && "$agent_healthy" == "true" ]]; then
+                log_diagnostic "SUCCESS" "✅ Both SPIRE services are healthy"
+                break
+            elif [[ $attempt -eq 6 ]]; then
+                # Final attempt failed - comprehensive failure diagnostics
+                log_diagnostic "ERROR" "Final service validation failed after 6 attempts"
+                
+                # Collect comprehensive diagnostic information
+                log_diagnostic "ERROR" "=== SPIRE Service Diagnostic Information ==="
+                
+                # Check process status
+                log_diagnostic "DEBUG" "Checking SPIRE processes:"
+                ps aux | grep -E "spire-(server|agent)" | grep -v grep | while IFS= read -r line; do
+                    log_diagnostic "DEBUG" "  $line"
+                done
+                
+                # Check socket files
+                for socket_path in "/tmp/spire-server/private/api.sock" "/tmp/spire-agent/public/api.sock"; do
+                    if [[ -S "$socket_path" ]]; then
+                        log_diagnostic "DEBUG" "Socket exists: $socket_path"
+                        ls -la "$socket_path" | while IFS= read -r line; do
+                            log_diagnostic "DEBUG" "  $line"
+                        done
+                    else
+                        log_diagnostic "ERROR" "Socket missing: $socket_path"
+                    fi
+                done
+                
+                # Show recent log entries
+                for log_file in "spire-server.log" "spire-agent.log"; do
+                    if [[ -f "$log_file" ]]; then
+                        log_diagnostic "ERROR" "Recent entries from $log_file:"
+                        tail -20 "$log_file" | while IFS= read -r line; do
+                            log_diagnostic "ERROR" "  $line"
+                        done
+                    fi
+                done
+                
+                fail_with_comprehensive_diagnostics 1 \
+                    "SPIRE services failed to become healthy" \
+                    "SPIRE server: $([[ \"$server_healthy\" == \"true\" ]] && echo \"healthy\" || echo \"unhealthy\"), Agent: $([[ \"$agent_healthy\" == \"true\" ]] && echo \"healthy\" || echo \"unhealthy\")" \
+                    "Check SPIRE configuration, socket permissions, and service logs" \
+                    "Integration tests require both SPIRE server and agent to be healthy"
+            fi
+        done
+        
+        complete_step_performance_monitoring "spire-service-startup" "$perf_start" 300 180
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced SPIRE service startup completed successfully"
+        
+    - name: Enhanced Demo Service Configuration
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        
+        init_diagnostics "enhanced-integration" "demo-service-configuration"
+        
+        log_diagnostic "INFO" "🔧 Enhanced demo service configuration"
+        
+        cd scripts/demo
+        
+        # Validate setup script
+        if [[ ! -f "setup-demo.sh" ]]; then
+            fail_with_comprehensive_diagnostics 1 \
+                "Demo setup script not found" \
+                "setup-demo.sh missing from scripts/demo directory" \
+                "Ensure setup-demo.sh is committed to the repository" \
+                "Script path: scripts/demo/setup-demo.sh"
+        fi
+        
+        # Make setup script executable
+        execute_with_diagnostics "chmod-demo-setup" \
+            "Making demo setup script executable" \
+            chmod +x setup-demo.sh
+        
+        # Execute demo setup with error handling
+        if execute_with_diagnostics "setup-demo-services" \
+            "Configuring demo services and SPIRE entries" \
+            sudo ./setup-demo.sh; then
+            log_diagnostic "SUCCESS" "✅ Demo services configuration completed"
+        else
+            fail_with_comprehensive_diagnostics $? \
+                "Demo service configuration failed" \
+                "Could not configure SPIRE entries or demo services" \
+                "Check SPIRE server connectivity and configuration files" \
+                "Demo configuration is required for integration tests"
+        fi
+        
+        # Enhanced verification of SPIRE registration entries
+        log_diagnostic "INFO" "Performing enhanced SPIRE entry verification"
+        
+        if execute_with_diagnostics "verify-spire-entries" \
+            "Verifying SPIRE registration entries" \
+            sudo spire-server entry show -socketPath /tmp/spire-server/private/api.sock; then
+            log_diagnostic "SUCCESS" "✅ SPIRE registration entries verified"
+        else
+            fail_with_comprehensive_diagnostics $? \
+                "SPIRE entry verification failed" \
+                "Could not retrieve or verify SPIRE registration entries" \
+                "Check SPIRE server status and socket connectivity" \
+                "Valid SPIRE entries are required for service identity"
+        fi
+        
+        # Enhanced socket accessibility validation
+        log_diagnostic "INFO" "Performing enhanced socket accessibility validation"
+        
+        socket_paths=("/tmp/spire-server/private/api.sock" "/tmp/spire-agent/public/api.sock")
+        socket_validation_failed=0
+        
+        for socket_path in "${socket_paths[@]}"; do
+            if [[ ! -S "$socket_path" ]]; then
+                log_diagnostic "ERROR" "SPIRE socket not found: $socket_path"
+                socket_validation_failed=1
+            else
+                # Get socket permissions and ownership
+                socket_info=$(ls -la "$socket_path")
+                log_diagnostic "SUCCESS" "✅ Socket found: $socket_path"
+                log_diagnostic "DEBUG" "  Socket info: $socket_info"
+                
+                # Test socket connectivity
+                socket_name=$(basename "$socket_path")
+                if timeout 5 sudo test -w "$socket_path"; then
+                    log_diagnostic "SUCCESS" "✅ Socket is writable: $socket_name"
+                else
+                    log_diagnostic "WARN" "⚠️ Socket write test failed: $socket_name"
+                fi
+            fi
+        done
+        
+        if [[ $socket_validation_failed -eq 1 ]]; then
+            fail_with_comprehensive_diagnostics 1 \
+                "SPIRE socket validation failed" \
+                "One or more required SPIRE sockets are missing or inaccessible" \
+                "Check SPIRE service status and socket permissions" \
+                "Valid sockets are required for service communication"
+        fi
+        
+        # Log current user context for debugging
+        log_diagnostic "DEBUG" "Current execution context:"
+        log_diagnostic "DEBUG" "  User: $(whoami) (UID: $(id -u), GID: $(id -g))"
+        log_diagnostic "DEBUG" "  Groups: $(id -G)"
+        log_diagnostic "DEBUG" "  Working directory: $(pwd)"
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced demo service configuration completed successfully"
+        
+    - name: Enhanced Integration Test Execution
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/test-diagnostics.sh
+        
+        init_diagnostics "enhanced-integration" "integration-test-execution"
+        
+        log_diagnostic "INFO" "🧪 Enhanced integration test execution"
+        
+        # Start performance monitoring for integration tests
+        perf_start=$(monitor_step_performance "integration-test-execution" 900 600)
+        
+        cd scripts/demo
+        
+        # Comprehensive prerequisite validation
+        log_diagnostic "INFO" "Performing comprehensive integration test prerequisite validation"
+        
+        required_files=(
+            "../../config/echo-server.yaml"
+            "../../config/echo-client.yaml"
+            "../../bin/echo-server"
+            "../../bin/echo-client"
+        )
+        
+        prerequisite_validation_failed=0
+        
+        for required_file in "${required_files[@]}"; do
+            if [[ ! -f "$required_file" ]]; then
+                log_diagnostic "ERROR" "Required file missing: $required_file"
+                prerequisite_validation_failed=1
+            elif [[ "$required_file" =~ bin/ && ! -x "$required_file" ]]; then
+                log_diagnostic "ERROR" "Binary not executable: $required_file"
+                prerequisite_validation_failed=1
+            else
+                if [[ "$required_file" =~ bin/ ]]; then
+                    file_info=$(file "$required_file" 2>/dev/null || echo "unknown")
+                    log_diagnostic "SUCCESS" "✅ Executable ready: $required_file ($file_info)"
+                else
+                    file_size=$(stat -c%s "$required_file" 2>/dev/null || echo "unknown")
+                    log_diagnostic "SUCCESS" "✅ Configuration file ready: $required_file ($file_size bytes)"
+                fi
+            fi
+        done
+        
+        if [[ $prerequisite_validation_failed -eq 1 ]]; then
+            fail_with_comprehensive_diagnostics 1 \
+                "Integration test prerequisites validation failed" \
+                "One or more required files are missing or not executable" \
+                "Ensure all binaries are built and configuration files are present" \
+                "Required files: ${required_files[*]}"
+        fi
+        
+        # Enhanced SPIRE agent socket validation
+        log_diagnostic "INFO" "Enhanced SPIRE agent socket validation"
+        
+        agent_socket="/tmp/spire-agent/public/api.sock"
+        if [[ ! -S "$agent_socket" ]]; then
+            fail_with_comprehensive_diagnostics 1 \
+                "SPIRE agent socket not found" \
+                "Socket file missing or not a valid socket" \
+                "Check SPIRE agent status and socket path configuration" \
+                "Socket path: $agent_socket"
+        fi
+        
+        # Test socket connectivity
+        socket_info=$(ls -la "$agent_socket")
+        log_diagnostic "SUCCESS" "✅ SPIRE agent socket found: $agent_socket"
+        log_diagnostic "DEBUG" "  Socket info: $socket_info"
+        
+        log_diagnostic "DEBUG" "Current execution context:"
+        log_diagnostic "DEBUG" "  User: $(whoami) (UID: $(id -u), GID: $(id -g))"
+        log_diagnostic "DEBUG" "  Groups: $(groups)"
+        
+        # Execute integration tests with comprehensive monitoring
+        log_diagnostic "INFO" "Starting enhanced integration test execution"
+        
+        # Check for dedicated test script first
+        if [[ -f "./test-identity-timing.sh" ]]; then
+            log_diagnostic "INFO" "Using dedicated integration test script"
+            
+            if execute_with_diagnostics "integration-test-script" \
+                "Running integration test script" \
+                ./test-identity-timing.sh; then
+                log_diagnostic "SUCCESS" "✅ Integration test script completed successfully"
+            else
+                fail_with_comprehensive_diagnostics $? \
+                    "Integration test script failed" \
+                    "Dedicated test script encountered errors" \
+                    "Check test script implementation and service connectivity" \
+                    "Script: ./test-identity-timing.sh"
+            fi
+        else
+            log_diagnostic "INFO" "Using enhanced fallback integration test"
+            
+            # Enhanced fallback integration test
+            cd ../..
+            
+            log_diagnostic "INFO" "Starting echo-server for integration testing"
+            
+            # Create test log directory
+            mkdir -p scripts/demo/test-logs
+            
+            # Start echo-server with comprehensive monitoring
+            server_log="scripts/demo/test-logs/integration-test-server.log"
+            
+            log_diagnostic "DEBUG" "Server command: EPHEMOS_CONFIG=config/echo-server.yaml ECHO_SERVER_ADDRESS=:50099 ./bin/echo-server"
+            log_diagnostic "DEBUG" "Server log file: $server_log"
+            
+            # Start server in background with timeout
+            if ! timeout 45 bash -c "EPHEMOS_CONFIG=config/echo-server.yaml ECHO_SERVER_ADDRESS=:50099 ./bin/echo-server > '$server_log' 2>&1 &"; then
+                log_diagnostic "ERROR" "Failed to start echo-server process"
+                fail_with_comprehensive_diagnostics 1 \
+                    "Echo-server startup failed" \
+                    "Could not start echo-server process" \
+                    "Check binary permissions, configuration, and system resources" \
+                    "Server binary: ./bin/echo-server"
+            fi
+            
+            SERVER_PID=$!
+            log_diagnostic "INFO" "Echo-server started with PID: $SERVER_PID"
+            
+            # Enhanced server readiness validation with detailed monitoring
+            log_diagnostic "INFO" "Performing enhanced server readiness validation"
+            
+            server_ready=false
+            max_attempts=15
+            attempt_interval=3
+            
+            for attempt in $(seq 1 $max_attempts); do
+                log_diagnostic "INFO" "Server readiness check: attempt $attempt/$max_attempts"
+                
+                # Check if server process is still running
+                if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+                    log_diagnostic "ERROR" "Echo-server process died unexpectedly"
+                    
+                    if [[ -f "$server_log" ]]; then
+                        log_diagnostic "ERROR" "Server log contents:"
+                        cat "$server_log" | while IFS= read -r line; do
+                            log_diagnostic "ERROR" "  $line"
+                        done
+                    else
+                        log_diagnostic "ERROR" "No server log file found: $server_log"
+                    fi
+                    
+                    fail_with_comprehensive_diagnostics 1 \
+                        "Echo-server process terminated unexpectedly" \
+                        "Server process died during startup or identity acquisition" \
+                        "Check server logs, SPIRE connectivity, and configuration" \
+                        "Server PID was: $SERVER_PID"
+                fi
+                
+                # Check for server readiness indicators in log
+                if [[ -f "$server_log" ]]; then
+                    if grep -q "Server identity created\|Server ready\|gRPC server listening" "$server_log"; then
+                        server_ready=true
+                        log_diagnostic "SUCCESS" "✅ Echo-server is ready (attempt $attempt)"
+                        
+                        # Show successful startup log entries
+                        log_diagnostic "INFO" "Server startup success indicators:"
+                        grep -E "Server identity created|Server ready|gRPC server listening|Identity obtained" "$server_log" | while IFS= read -r line; do
+                            log_diagnostic "INFO" "  $line"
+                        done
+                        
+                        break
+                    else
+                        log_diagnostic "DEBUG" "Server not ready yet (attempt $attempt)"
+                        
+                        # Show recent log entries for debugging
+                        if [[ $((attempt % 5)) -eq 0 ]]; then  # Every 5th attempt
+                            log_diagnostic "DEBUG" "Recent server log entries:"
+                            tail -5 "$server_log" | while IFS= read -r line; do
+                                log_diagnostic "DEBUG" "  $line"
+                            done
+                        fi
+                    fi
+                else
+                    log_diagnostic "WARN" "Server log file not yet created: $server_log"
+                fi
+                
+                # Final attempt check
+                if [[ $attempt -eq $max_attempts ]]; then
+                    log_diagnostic "ERROR" "Server readiness timeout after $max_attempts attempts"
+                    
+                    # Comprehensive failure diagnostics
+                    log_diagnostic "ERROR" "=== Integration Test Failure Diagnostics ==="
+                    
+                    # Server process status
+                    if kill -0 "$SERVER_PID" 2>/dev/null; then
+                        log_diagnostic "ERROR" "Server process is still running but not ready"
+                    else
+                        log_diagnostic "ERROR" "Server process has terminated"
+                    fi
+                    
+                    # Complete server log
+                    if [[ -f "$server_log" ]]; then
+                        log_diagnostic "ERROR" "Complete server log:"
+                        cat "$server_log" | while IFS= read -r line; do
+                            log_diagnostic "ERROR" "  $line"
+                        done
+                    else
+                        log_diagnostic "ERROR" "No server log file available"
+                    fi
+                    
+                    # SPIRE agent status
+                    log_diagnostic "ERROR" "SPIRE agent socket status:"
+                    ls -la /tmp/spire-agent/public/api.sock 2>/dev/null | while IFS= read -r line; do
+                        log_diagnostic "ERROR" "  $line"
+                    done || log_diagnostic "ERROR" "  SPIRE agent socket not accessible"
+                    
+                    # Cleanup server process
+                    kill "$SERVER_PID" 2>/dev/null || true
+                    
+                    fail_with_comprehensive_diagnostics 124 \
+                        "Integration test timeout - server not ready" \
+                        "Echo-server failed to become ready within $(($max_attempts * $attempt_interval)) seconds" \
+                        "Check SPIRE connectivity, server configuration, and identity acquisition" \
+                        "Server log: $server_log"
+                fi
+                
+                log_diagnostic "DEBUG" "Waiting ${attempt_interval}s before next attempt..."
+                sleep $attempt_interval
+            done
+            
+            # Clean shutdown of server
+            log_diagnostic "INFO" "Performing clean server shutdown"
+            if kill "$SERVER_PID" 2>/dev/null; then
+                log_diagnostic "SUCCESS" "✅ Server shutdown completed"
+            else
+                log_diagnostic "WARN" "⚠️ Server was already terminated"
+            fi
+        fi
+        
+        complete_step_performance_monitoring "integration-test-execution" "$perf_start" 900 600
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced integration test execution completed successfully"
+        
+    - name: Enhanced SPIRE Cleanup
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        
+        init_diagnostics "enhanced-integration" "spire-cleanup"
+        
+        log_diagnostic "INFO" "🧽 Enhanced SPIRE cleanup process"
+        
+        cd scripts/demo
+        
+        # Graceful SPIRE service shutdown
+        if [[ -f "stop-spire.sh" ]]; then
+            log_diagnostic "INFO" "Attempting graceful SPIRE shutdown"
+            
+            if execute_with_diagnostics "graceful-spire-shutdown" \
+                "Gracefully stopping SPIRE services" \
+                sudo ./stop-spire.sh; then
+                log_diagnostic "SUCCESS" "✅ Graceful SPIRE shutdown completed"
+            else
+                log_diagnostic "WARN" "⚠️ Graceful SPIRE shutdown failed, proceeding with force cleanup"
+            fi
+        else
+            log_diagnostic "WARN" "stop-spire.sh not found, using force cleanup only"
+        fi
+        
+        # Force cleanup of any remaining SPIRE processes
+        log_diagnostic "INFO" "Performing force cleanup of remaining SPIRE processes"
+        
+        spire_processes=("spire-server" "spire-agent")
+        
+        for process in "${spire_processes[@]}"; do
+            if pgrep -f "$process" >/dev/null 2>&1; then
+                log_diagnostic "INFO" "Force killing remaining $process processes"
+                if execute_with_diagnostics "force-kill-$process" \
+                    "Force killing $process processes" \
+                    sudo pkill -f "$process"; then
+                    log_diagnostic "SUCCESS" "✅ $process processes terminated"
+                else
+                    log_diagnostic "WARN" "⚠️ Failed to terminate $process processes"
+                fi
+                
+                # Wait and verify
+                sleep 2
+                if pgrep -f "$process" >/dev/null 2>&1; then
+                    log_diagnostic "WARN" "$process processes still running after cleanup"
+                else
+                    log_diagnostic "SUCCESS" "✅ All $process processes terminated"
+                fi
+            else
+                log_diagnostic "SUCCESS" "✅ No $process processes found"
+            fi
+        done
+        
+        # Cleanup temporary files and sockets
+        log_diagnostic "INFO" "Cleaning up temporary SPIRE files"
+        
+        temp_paths=(
+            "/tmp/spire-server"
+            "/tmp/spire-agent"
+        )
+        
+        for temp_path in "${temp_paths[@]}"; do
+            if [[ -d "$temp_path" ]]; then
+                log_diagnostic "INFO" "Removing temporary directory: $temp_path"
+                if execute_with_diagnostics "cleanup-$temp_path" \
+                    "Removing temporary SPIRE directory" \
+                    sudo rm -rf "$temp_path"; then
+                    log_diagnostic "SUCCESS" "✅ Removed: $temp_path"
+                else
+                    log_diagnostic "WARN" "⚠️ Failed to remove: $temp_path"
+                fi
+            fi
+        done
+        
+        # Final verification
+        log_diagnostic "INFO" "Performing final cleanup verification"
+        
+        remaining_processes=$(pgrep -f "spire-" | wc -l)
+        if [[ $remaining_processes -eq 0 ]]; then
+            log_diagnostic "SUCCESS" "✅ All SPIRE processes cleaned up successfully"
+        else
+            log_diagnostic "WARN" "⚠️ $remaining_processes SPIRE processes may still be running"
+        fi
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced SPIRE cleanup completed"
+      if: always()
+      
+    - name: Upload Enhanced Integration Test Diagnostics
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: enhanced-integration-diagnostics
+        path: |
+          ci-diagnostic.log
+          failure-report.md
+          scripts/demo/test-logs/
+          scripts/demo/spire-server.log
+          scripts/demo/spire-agent.log
+        retention-days: 7
+
+  # Enhanced Dependency Check with Comprehensive Diagnostics
+  deps:
+    name: Enhanced Dependency Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      
+    - name: Setup Go Environment
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        check-latest: true
+        
+    - name: Setup Protocol Buffers (Required for CI/CD)
+      uses: ./.github/actions/setup-protobuf-fixed
+      
+    - name: Initialize Enhanced Dependency Diagnostics
+      shell: bash
+      run: |
+        # Enable enhanced diagnostics
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        
+        # Source diagnostic libraries
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/security-diagnostics.sh
+        
+        # Initialize dependency check diagnostics
+        init_diagnostics "enhanced-dependency" "dependency-diagnostics-setup"
+        
+        log_diagnostic "INFO" "📦 Enhanced dependency diagnostics initialized"
+        log_diagnostic "INFO" "Go Version: ${{ env.GO_VERSION }}"
+        
+        # Validate dependency check environment
+        validate_step_prerequisites "dependency-check" \
+          "go" "workspace" "go-mod" "protoc" "protoc-gen-go" "protoc-gen-go-grpc"
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced dependency diagnostics setup completed"
+        
+    - name: Enhanced Dependency Tool Installation
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/security-diagnostics.sh
+        
+        init_diagnostics "enhanced-dependency" "dependency-tool-installation"
+        
+        log_diagnostic "INFO" "🔧 Enhanced dependency tool installation"
+        
+        # Install security and dependency checking tools
+        security_tools=("govulncheck" "golangci-lint")
+        install_security_tools "${security_tools[@]}"
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced dependency tool installation completed"
+        
+    - name: Enhanced Module Integrity Verification
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        
+        init_diagnostics "enhanced-dependency" "module-integrity-verification"
+        
+        log_diagnostic "INFO" "🔒 Enhanced module integrity verification"
+        
+        # Start performance monitoring
+        perf_start=$(monitor_step_performance "module-integrity-verification" 600 300)
+        
+        # Comprehensive module verification
+        if execute_with_diagnostics "go-mod-verify" \
+            "Verifying Go module integrity and checksums" \
+            go mod verify; then
+            log_diagnostic "SUCCESS" "✅ All module checksums verified successfully"
+        else
+            fail_with_comprehensive_diagnostics $? \
+                "Go module integrity verification failed" \
+                "One or more module checksums do not match expected values" \
+                "Run 'go mod tidy' and check for corrupted or tampered dependencies" \
+                "This is a critical security issue - dependencies may be compromised"
+        fi
+        
+        # Check for module consistency
+        if execute_with_diagnostics "go-mod-tidy-check" \
+            "Checking module file consistency" \
+            go mod tidy -diff; then
+            log_diagnostic "SUCCESS" "✅ Module files are consistent and tidy"
+        else
+            log_diagnostic "WARN" "⚠️ Module files may not be tidy - this could indicate missing or extra dependencies"
+            
+            # Show what would change
+            log_diagnostic "INFO" "Module inconsistencies detected - showing differences:"
+            go mod tidy -diff 2>&1 | while IFS= read -r line; do
+                log_diagnostic "INFO" "  $line"
+            done
+            
+            # Auto-fix if safe
+            log_diagnostic "INFO" "Auto-fixing module consistency"
+            execute_with_diagnostics "go-mod-tidy-fix" "Fixing module consistency" go mod tidy
+        fi
+        
+        complete_step_performance_monitoring "module-integrity-verification" "$perf_start" 600 300
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced module integrity verification completed"
+        
+    - name: Enhanced Vulnerability Assessment
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        source ./.github/scripts/security-diagnostics.sh
+        
+        init_diagnostics "enhanced-dependency" "vulnerability-assessment"
+        
+        log_diagnostic "INFO" "🔍 Enhanced vulnerability assessment"
+        
+        # Start performance monitoring
+        perf_start=$(monitor_step_performance "vulnerability-assessment" 900 600)
+        
+        # Execute comprehensive vulnerability scan
+        log_diagnostic "INFO" "Executing comprehensive vulnerability scan with govulncheck"
+        
+        vuln_output_file="dependency-vulnerability-results.json"
+        vuln_summary_file="dependency-vulnerability-summary.txt"
+        
+        if vuln_output=$(govulncheck -json ./... 2>&1); then
+            log_diagnostic "SUCCESS" "✅ Vulnerability scan completed - no critical vulnerabilities found"
+            
+            # Save clean results
+            echo "$vuln_output" > "$vuln_output_file"
+            echo "Vulnerability scan completed successfully - no critical issues found" > "$vuln_summary_file"
+            echo "Scan timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$vuln_summary_file"
+            
+        else
+            vuln_exit_code=$?
+            log_diagnostic "ERROR" "❌ Vulnerability scan found security issues"
+            
+            # Save vulnerability results
+            echo "$vuln_output" > "$vuln_output_file"
+            
+            # Parse and report vulnerabilities
+            parse_vulnerability_results "$vuln_output"
+            
+            # Generate summary report
+            {
+                echo "VULNERABILITY SCAN FAILED - CRITICAL ISSUES FOUND"
+                echo "================================================"
+                echo "Exit code: $vuln_exit_code"
+                echo "Scan timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+                echo ""
+                echo "IMMEDIATE ACTION REQUIRED:"
+                echo "1. Review vulnerability details above"
+                echo "2. Update affected dependencies to secure versions"
+                echo "3. Re-run tests to ensure compatibility"
+                echo "4. Re-run this check to verify fixes"
+                echo ""
+                echo "For detailed vulnerability information, see: $vuln_output_file"
+            } > "$vuln_summary_file"
+            
+            fail_with_comprehensive_diagnostics "$vuln_exit_code" \
+                "Critical vulnerabilities detected in dependencies" \
+                "One or more dependencies contain known security vulnerabilities" \
+                "Update vulnerable dependencies to patched versions using 'go get -u'" \
+                "Check https://vuln.go.dev/ for detailed vulnerability information"
+        fi
+        
+        complete_step_performance_monitoring "vulnerability-assessment" "$perf_start" 900 600
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced vulnerability assessment completed"
+        
+    - name: Enhanced Dependency Usage Analysis
+      shell: bash
+      run: |
+        export EPHEMOS_DIAGNOSTIC_VERBOSE=1
+        source ./.github/scripts/ci-diagnostics.sh
+        
+        init_diagnostics "enhanced-dependency" "dependency-usage-analysis"
+        
+        log_diagnostic "INFO" "📊 Enhanced dependency usage analysis"
+        
+        # Start performance monitoring
+        perf_start=$(monitor_step_performance "dependency-usage-analysis" 600 300)
+        
+        # Analyze unused dependencies
+        log_diagnostic "INFO" "Analyzing unused dependencies with enhanced reporting"
+        
+        unused_output_file="unused-dependencies-results.txt"
+        
+        # Run golangci-lint to find unused dependencies
+        unused_args=(
+            "run"
+            "--disable-all"
+            "--enable=unused"
+            "--timeout=10m"
+            "--issues-exit-code=1"
+            "--config=/dev/null"
+            "--out-format=line-number"
+        )
+        
+        if unused_output=$(golangci-lint "${unused_args[@]}" 2>&1); then
+            log_diagnostic "SUCCESS" "✅ No unused dependencies detected"
+            echo "No unused dependencies found - all imports are used" > "$unused_output_file"
+            echo "Analysis timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$unused_output_file"
+        else
+            unused_exit_code=$?
+            log_diagnostic "WARN" "⚠️ Unused dependencies or imports detected"
+            
+            # Save unused dependency results
+            echo "$unused_output" > "$unused_output_file"
+            
+            # Parse and report unused items
+            log_diagnostic "WARN" "Unused dependency analysis results:"
+            unused_count=0
+            while IFS= read -r line; do
+                if [[ "$line" =~ unused ]]; then
+                    unused_count=$((unused_count + 1))
+                    log_diagnostic "WARN" "  $line"
+                fi
+            done <<< "$unused_output"
+            
+            if [[ $unused_count -gt 0 ]]; then
+                log_diagnostic "WARN" "Found $unused_count unused imports or dependencies"
+                log_diagnostic "WARN" "Consider cleaning up unused dependencies to reduce attack surface"
+            fi
+        fi
+        
+        # Generate dependency summary
+        log_diagnostic "INFO" "Generating dependency summary"
+        
+        dependency_summary_file="dependency-analysis-summary.md"
+        
+        {
+            echo "# Enhanced Dependency Analysis Summary"
+            echo ""
+            echo "**Analysis Date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')  "
+            echo "**Repository**: \`${GITHUB_REPOSITORY:-unknown}\`  "
+            echo "**Workflow Run**: [\#${GITHUB_RUN_NUMBER:-unknown}](${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-unknown}/actions/runs/${GITHUB_RUN_ID:-unknown})  "
+            echo ""
+            
+            echo "## 📦 Module Information"
+            echo ""
+            if [[ -f "go.mod" ]]; then
+                echo "**Go Version**: \`$(grep '^go ' go.mod | awk '{print $2}')\`  "
+                echo "**Module Path**: \`$(grep '^module ' go.mod | awk '{print $2}')\`  "
+                echo ""
+                
+                # Count dependencies
+                direct_deps=$(grep -c '^[[:space:]]\+[^[:space:]]\+[[:space:]]\+v' go.mod 2>/dev/null || echo "0")
+                echo "**Direct Dependencies**: $direct_deps  "
+                
+                # Get total number of dependencies (including indirect)
+                total_deps=$(go list -m all | wc -l)
+                indirect_deps=$((total_deps - direct_deps - 1))  # -1 for the module itself
+                echo "**Total Dependencies**: $total_deps  "
+                echo "**Indirect Dependencies**: $indirect_deps  "
+            fi
+            echo ""
+            
+            echo "## 🔒 Security Assessment"
+            echo ""
+            if [[ -f "$vuln_summary_file" ]]; then
+                echo "### Vulnerability Scan Results"
+                echo ""
+                echo '```'
+                cat "$vuln_summary_file"
+                echo '```'
+                echo ""
+            fi
+            
+            echo "## 📊 Usage Analysis"
+            echo ""
+            if [[ -f "$unused_output_file" ]]; then
+                echo "### Unused Dependencies Check"
+                echo ""
+                echo '```'
+                head -20 "$unused_output_file"  # Limit output size
+                echo '```'
+                echo ""
+            fi
+            
+            echo "## 📝 Recommendations"
+            echo ""
+            echo "1. **Regular Updates**: Keep dependencies updated to latest secure versions"
+            echo "2. **Minimal Dependencies**: Remove unused dependencies to reduce attack surface"
+            echo "3. **Vulnerability Monitoring**: Set up automated vulnerability scanning"
+            echo "4. **License Compliance**: Ensure all dependencies have compatible licenses"
+            echo ""
+            echo "---"
+            echo "*Generated by Enhanced Dependency Check*"
+        } > "$dependency_summary_file"
+        
+        complete_step_performance_monitoring "dependency-usage-analysis" "$perf_start" 600 300
+        
+        log_diagnostic "SUCCESS" "✅ Enhanced dependency usage analysis completed"
+        
+    - name: Upload Enhanced Dependency Diagnostics
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: enhanced-dependency-diagnostics
+        path: |
+          ci-diagnostic.log
+          dependency-vulnerability-results.json
+          dependency-vulnerability-summary.txt
+          unused-dependencies-results.txt
+          dependency-analysis-summary.md
+          failure-report.md
+        retention-days: 14
+
+  # Performance Benchmarks
+  benchmark:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      
+    - name: Setup Go Environment
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        check-latest: true
+        
+    - name: Setup Protocol Buffers (Required for CI/CD)
+      uses: ./.github/actions/setup-protobuf-fixed
+        
+    - name: Verify protoc setup
+      run: |
+        echo "🔍 Verifying protoc tools are available..."
+        export GOBIN="${GOBIN:-$(go env GOPATH)/bin}"
+        export PATH="$GOBIN:$PATH"
+        
+        # Verify protoc compiler
+        protoc --version || { echo "❌ protoc not found"; exit 1; }
+        
+        # Verify Go plugins
+        command -v protoc-gen-go >/dev/null || { echo "❌ protoc-gen-go not in PATH"; exit 1; }
+        command -v protoc-gen-go-grpc >/dev/null || { echo "❌ protoc-gen-go-grpc not in PATH"; exit 1; }
+        
+        echo "✅ All protoc tools verified:"
+        echo "  protoc: $(which protoc)"
+        echo "  protoc-gen-go: $(which protoc-gen-go)"
+        echo "  protoc-gen-go-grpc: $(which protoc-gen-go-grpc)"
+        
+    - name: Run benchmarks
+      run: |
+        # Ensure protoc tools are in PATH
+        export GOBIN="${GOBIN:-$(go env GOPATH)/bin}"
+        export PATH="$GOBIN:$PATH"
+        
+        go clean -cache
+        make ci-setup
+        # Use clean benchmark script to avoid log noise issues
+        ./scripts/benchmark.sh
+        # Copy for workflow compatibility
+        cp benchmark-results.txt benchmark.txt
+        echo "## Benchmark Results" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        cat benchmark.txt >> $GITHUB_STEP_SUMMARY  
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # Release Build (on tags)
+  release:
+    name: Release Build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [lint, security, build, test]
+    permissions:
+      contents: write
+      actions: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      with:
+        fetch-depth: 0
+        
+    - name: Setup Go Environment
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        check-latest: true
+        
+    - name: Setup Protocol Buffers (Required for CI/CD)
+      uses: ./.github/actions/setup-protobuf-fixed
+        
+    - name: Install cross-compilation tools
+      run: go install github.com/goreleaser/goreleaser@latest
+        
+    - name: Create release builds
+      run: |
+        make ci-setup
+        mkdir -p dist
+        
+        # Build for multiple platforms
+        PLATFORMS="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
+        
+        for PLATFORM in $PLATFORMS; do
+          OS=${PLATFORM%/*}
+          ARCH=${PLATFORM#*/}
+          
+          echo "Building for $OS/$ARCH..."
+          
+          if [ "$OS" = "windows" ]; then
+            EXT=".exe"
+          else
+            EXT=""
+          fi
+          
+          GOOS=$OS GOARCH=$ARCH go build -o dist/ephemos-$OS-$ARCH$EXT ./cmd/ephemos-cli
+          GOOS=$OS GOARCH=$ARCH go build -o dist/echo-server-$OS-$ARCH$EXT ./examples/echo-server
+          GOOS=$OS GOARCH=$ARCH go build -o dist/echo-client-$OS-$ARCH$EXT ./examples/echo-client
+        done
+        
+    - name: Install Syft for release SBOM
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+        syft --version
+        
+    - name: Generate release SBOM
+      run: |
+        # Get version from tag
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "Generating SBOM for release version: $VERSION"
+        
+        # Generate comprehensive SBOM for the release
+        make sbom-generate
+        
+        # Move SBOM files to dist directory for release
+        if [ -d "sbom" ]; then
+          mkdir -p dist/sbom
+          cp sbom/* dist/sbom/
+          
+          # Rename files to include version
+          cd dist/sbom
+          for file in ephemos-*; do
+            if [[ "$file" != *"$VERSION"* ]]; then
+              mv "$file" "${file/ephemos-/ephemos-v$VERSION-}"
+            fi
+          done
+          cd ../..
+          
+          # Create release-specific summary
+          echo "# Ephemos v$VERSION - Software Bill of Materials" > dist/SBOM_README.md
+          echo "" >> dist/SBOM_README.md
+          echo "This directory contains the Software Bill of Materials (SBOM) for Ephemos v$VERSION." >> dist/SBOM_README.md
+          echo "" >> dist/SBOM_README.md
+          echo "## Files:" >> dist/SBOM_README.md
+          echo "- **SPDX Format**: \`ephemos-v$VERSION-*sbom.spdx.json\`" >> dist/SBOM_README.md
+          echo "- **CycloneDX Format**: \`ephemos-v$VERSION-*sbom.cyclonedx.json\`" >> dist/SBOM_README.md
+          echo "- **Summary**: \`ephemos-v$VERSION-*sbom-summary.txt\`" >> dist/SBOM_README.md
+          echo "- **Checksums**: \`ephemos-v$VERSION-*sbom-checksums.txt\`" >> dist/SBOM_README.md
+          echo "" >> dist/SBOM_README.md
+          echo "## Usage:" >> dist/SBOM_README.md
+          echo "These SBOM files can be used for:" >> dist/SBOM_README.md
+          echo "- Supply chain security analysis" >> dist/SBOM_README.md
+          echo "- Vulnerability scanning" >> dist/SBOM_README.md
+          echo "- Compliance reporting" >> dist/SBOM_README.md
+          echo "- License compliance verification" >> dist/SBOM_README.md
+          echo "" >> dist/SBOM_README.md
+          echo "Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> dist/SBOM_README.md
+        fi
+        
+    - name: Validate release artifacts
+      run: |
+        echo "🔍 Validating release artifacts..."
+        ls -la dist/
+        
+        # Validate SBOM files exist
+        if [ -d "dist/sbom" ]; then
+          echo "✅ SBOM directory present"
+          ls -la dist/sbom/
+          
+          # Validate SBOM file sizes
+          for file in dist/sbom/*.json; do
+            if [ -s "$file" ]; then
+              echo "✅ $file: $(wc -c < "$file") bytes"
+            else
+              echo "❌ $file is empty or missing!"
+              exit 1
+            fi
+          done
+        else
+          echo "⚠️ SBOM directory not found - SBOM generation may have failed"
+        fi
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        files: |
+          dist/*
+          dist/sbom/*
+        body: |
+          ## Release Notes
+          
+          This release includes compiled binaries for multiple platforms and comprehensive Software Bill of Materials (SBOM) for supply chain security.
+          
+          ### 📋 Supply Chain Security
+          - SBOM files included in both SPDX and CycloneDX formats
+          - All dependencies tracked and verified
+          - Checksums provided for integrity verification
+          
+          ### 🛡️ Security Features
+          - Zero plaintext secrets architecture
+          - SPIFFE/SPIRE integration for ephemeral certificates
+          - mTLS authentication for all service communication
+          - Transport-agnostic security framework
+          
+          See `SBOM_README.md` for details on using the included SBOM files.
+        draft: false
+        prerelease: false
