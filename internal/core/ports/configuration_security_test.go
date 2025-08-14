@@ -147,7 +147,6 @@ func TestMergeWithEnvironment(t *testing.T) {
 	assert.Equal(t, "/tmp/file/socket", config.SPIFFE.SocketPath)
 }
 
-
 func TestValidateProductionSecurity(t *testing.T) {
 	tests := []struct {
 		name          string

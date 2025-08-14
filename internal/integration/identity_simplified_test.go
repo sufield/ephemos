@@ -4,7 +4,6 @@ package integration
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -176,7 +175,6 @@ func testValidateServiceConfig(t *testing.T, retrieved, expected *ports.Configur
 		t.Errorf("Expected trust domain '%s', got '%s'", expected.Service.Domain, retrieved.Service.Domain)
 	}
 }
-
 
 func testLogConfigurationDetails(t *testing.T, config *ports.Configuration) {
 	t.Helper()

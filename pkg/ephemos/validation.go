@@ -161,7 +161,7 @@ func (ve *ValidationEngine) validateStructField(
 ) {
 	// Initialize nested structs if they are required and zero
 	ve.initializeRequiredNestedStruct(fieldVal, field, fieldName, errCollection)
-	
+
 	// Set defaults first
 	ve.setDefaults(fieldVal, field, fieldName, errCollection)
 
@@ -527,7 +527,7 @@ func (ve *ValidationEngine) validateRequired(val reflect.Value, _ string) error 
 	if val.Kind() == reflect.Struct {
 		return nil // Structs are always considered "present" once initialized
 	}
-	
+
 	if ve.isZeroValue(val) {
 		return fmt.Errorf("field is required")
 	}

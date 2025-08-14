@@ -50,7 +50,6 @@ type TransportAdapter interface {
 	GetServer() interface{}
 }
 
-
 // HTTPAdapter provides HTTP-specific transport adaptation.
 type HTTPAdapter interface {
 	TransportAdapter

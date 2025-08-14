@@ -5,8 +5,8 @@ package ephemos
 import (
 	"context"
 	"fmt"
-	"net"
 	"log/slog"
+	"net"
 )
 
 // ServiceRegistrar is the interface that service implementations must implement.
@@ -312,7 +312,6 @@ func NewDevelopmentInterceptorConfig(serviceName string) *InterceptorConfig {
 	}
 }
 
-
 // Transport-Agnostic API
 //
 // The following functions are defined in server.go and provide a transport-agnostic
@@ -367,4 +366,3 @@ func IdentityClient() Client {
 	}
 	return client
 }
-

@@ -16,7 +16,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
 	// Internal adapters temporarily removed to eliminate dependencies
 )
 
@@ -134,7 +133,6 @@ func (s *TransportServer) resolveAddress() string {
 	return addr
 }
 
-
 func (s *TransportServer) serveHTTP(ctx, shutdownCtx context.Context, addr string) error {
 	s.httpServer.Addr = addr
 
@@ -175,7 +173,6 @@ func (s *TransportServer) serveHTTP(ctx, shutdownCtx context.Context, addr strin
 	defer errMutex.Unlock()
 	return serverErr
 }
-
 
 // serveHTTPOnListener serves HTTP on a pre-created listener
 func (s *TransportServer) serveHTTPOnListener(ctx context.Context, listener net.Listener) error {
