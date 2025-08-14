@@ -19,7 +19,7 @@ A comprehensive Go-based protocol buffer code generator that replaces bash scrip
 scripts/proto/run-proto-generator.sh
 
 # With specific directories
-scripts/proto/run-proto-generator.sh examples/proto examples/proto
+scripts/proto/run-proto-generator.sh proto_input proto_output
 
 # With options
 scripts/proto/run-proto-generator.sh --verbose --force
@@ -28,7 +28,7 @@ scripts/proto/run-proto-generator.sh --verbose --force
 bazel run //scripts:proto_generator
 
 # Direct Go execution
-go run scripts/proto/main.go examples/proto examples/proto
+go run scripts/proto/main.go proto_input proto_output
 ```
 
 ### Subcommands
@@ -37,10 +37,10 @@ go run scripts/proto/main.go examples/proto examples/proto
 scripts/proto/run-proto-generator.sh install
 
 # Validate proto files only
-scripts/proto/run-proto-generator.sh validate examples/proto --verbose
+scripts/proto/run-proto-generator.sh validate proto_input --verbose
 
 # Clean generated files
-scripts/proto/run-proto-generator.sh clean examples/proto --verbose
+scripts/proto/run-proto-generator.sh clean proto_output --verbose
 ```
 
 ## Command Line Options
@@ -95,13 +95,13 @@ The generator provides structured output with:
 Example output:
 ```
 🔧 Protocol Buffer Code Generation
-Proto directory: examples/proto
-Output directory: examples/proto
+Proto directory: proto_input
+Output directory: proto_output
 
 ✅ protoc-gen-go is available
 ✅ protoc-gen-go-grpc is available
 Using protoc: /usr/bin/protoc (version: libprotoc 3.21.12)
-Processing: examples/proto/echo.proto
+Processing: proto_input/service.proto
 
 ============================================================
 📊 PROTOBUF GENERATION SUMMARY
@@ -111,7 +111,7 @@ Generated files: 1
 Duration: 0.11s
 
 Generated from:
-  examples/proto/echo.proto → echo.pb.go, echo_grpc.pb.go
+  proto_input/service.proto → service.pb.go, service_grpc.pb.go
 
 🎉 Protobuf generation completed successfully!
 ```
@@ -161,7 +161,7 @@ This Go implementation replaces:
 - `scripts/generate-proto-ci.sh` → `proto-generator --check-only`
 - Manual protoc commands → `proto-generator validate`
 
-The bash scripts are still available for compatibility but the Go version is recommended for new usage.
+The Go version is recommended for all new usage.
 
 ## Development
 

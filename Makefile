@@ -12,7 +12,7 @@ include Makefile.security
 .PHONY: demo demo-force demo-version
 
 # Run complete demo with output capture
-demo: proto build examples
+demo: proto build
 	@echo "Running Ephemos demo..."
 	@./scripts/demo/run-demo.sh
 

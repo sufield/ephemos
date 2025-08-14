@@ -3,9 +3,6 @@
 sh_binary(
     name = "test_server",
     srcs = ["test-server.sh"],
-    data = [
-        "//examples/echo-server",
-    ],
     tags = [
         "test",
         "utils",
@@ -48,9 +45,6 @@ sh_test(
     name = "server_test",
     size = "medium",
     srcs = ["test-server.sh"],
-    data = [
-        "//examples/echo-server",
-    ],
     tags = ["utils"],
 )
 
