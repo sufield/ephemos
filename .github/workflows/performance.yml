@@ -133,8 +133,8 @@ jobs:
         echo "🔍 Starting library memory profiling..."
         
         # Ensure we're in a clean state
-        if [ -f memory_profile_test.go ]; then
-          rm -f memory_profile_test.go
+        if [ -f memory_profile.go ]; then
+          rm -f memory_profile.go
         fi
         if [ -f memory-profile-results.txt ]; then
           rm -f memory-profile-results.txt
@@ -142,8 +142,8 @@ jobs:
         
         echo "📝 Creating memory profiling test..."
         
-        # Create a simple memory profiling test with proper error handling
-        cat > memory_profile_test.go << 'EOF'
+        # Create a simple memory profiling program with proper error handling
+        cat > memory_profile.go << 'EOF'
         package main
         
         import (
@@ -238,15 +238,15 @@ jobs:
         
         echo "🔧 Verifying Go code syntax..."
         # Check if the Go code is syntactically valid
-        if ! go fmt memory_profile_test.go > /dev/null 2>&1; then
+        if ! go fmt memory_profile.go > /dev/null 2>&1; then
           echo "❌ Error: Generated Go code has syntax errors"
-          cat memory_profile_test.go
+          cat memory_profile.go
           exit 1
         fi
         
-        echo "▶️  Compiling and running memory profiling test..."
-        # Run the memory profiling test with proper error handling
-        if go run memory_profile_test.go > memory-profile-results.txt 2>&1; then
+        echo "▶️  Running memory profiling program..."
+        # Run the memory profiling program with proper error handling
+        if go run memory_profile.go > memory-profile-results.txt 2>&1; then
           echo "✅ Memory profiling completed successfully"
           
           # Show results in console for debugging
@@ -394,25 +394,66 @@ jobs:
         echo "⏳ Waiting for SPIRE to be ready..."
         sleep 10
         
-        # Verify SPIRE is running
-        if ! sudo systemctl is-active --quiet spire-server; then
-          echo "❌ Error: SPIRE server is not running"
-          sudo systemctl status spire-server || true
+        # Verify SPIRE processes are running (script runs them as background processes, not systemd services)
+        if ! pgrep -f "spire-server.*run" > /dev/null; then
+          echo "❌ Error: SPIRE server process is not running"
+          echo "📋 SPIRE server log:"
+          cat spire-server.log 2>/dev/null || echo "No spire-server.log found"
+          echo "📋 Active SPIRE processes:"
+          pgrep -af spire || echo "No SPIRE processes found"
           exit 1
         fi
         
-        echo "✅ SPIRE server is running"
+        if ! pgrep -f "spire-agent.*run" > /dev/null; then
+          echo "❌ Error: SPIRE agent process is not running"
+          echo "📋 SPIRE agent log:"
+          cat spire-agent.log 2>/dev/null || echo "No spire-agent.log found"
+          echo "📋 Active SPIRE processes:"
+          pgrep -af spire || echo "No SPIRE processes found"
+          exit 1
+        fi
+        
+        echo "✅ SPIRE server and agent processes are running"
+        
+        # Verify SPIRE health using the socket-based health check
+        echo "🔍 Running SPIRE health checks..."
+        if ! sudo spire-server healthcheck -socketPath /tmp/spire-server/private/api.sock; then
+          echo "❌ Error: SPIRE server health check failed"
+          echo "📋 SPIRE server log:"
+          cat spire-server.log 2>/dev/null || echo "No spire-server.log found"
+          exit 1
+        fi
+        
+        if ! sudo spire-agent healthcheck -socketPath /tmp/spire-agent/public/api.sock; then
+          echo "❌ Error: SPIRE agent health check failed"
+          echo "📋 SPIRE agent log:"
+          cat spire-agent.log 2>/dev/null || echo "No spire-agent.log found"
+          exit 1
+        fi
+        
+        echo "✅ SPIRE health checks passed"
         
         # Setup demo services
         echo "⚙️ Setting up demo services..."
         if ! sudo ./setup-demo.sh; then
           echo "❌ Error: Failed to setup demo services"
-          # Show some debugging info
-          sudo spire-server entry show || echo "Could not show SPIRE entries"
+          echo "📋 Debugging information:"
+          echo "  SPIRE server health:"
+          sudo spire-server healthcheck -socketPath /tmp/spire-server/private/api.sock || echo "  Health check failed"
+          echo "  SPIRE entries:"
+          sudo spire-server entry show -socketPath /tmp/spire-server/private/api.sock || echo "  Could not show SPIRE entries"
+          echo "  SPIRE server log (last 20 lines):"
+          tail -20 spire-server.log 2>/dev/null || echo "  No spire-server.log available"
           exit 1
         fi
         
         echo "✅ Demo services setup completed"
+        
+        # Verify SPIRE entries were created successfully
+        echo "📋 Registered SPIRE entries:"
+        sudo spire-server entry show -socketPath /tmp/spire-server/private/api.sock || {
+          echo "⚠️  Warning: Could not verify SPIRE entries, but setup completed"
+        }
         
     - name: Build and start server
       run: |
