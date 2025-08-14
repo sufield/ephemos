@@ -91,10 +91,6 @@ else
     echo -e "${YELLOW}⚠️  Could not query custom toolchains${NC}"
 fi
 
-# Test proto targets (archived, no longer in active build)
-echo ""
-echo "📋 Proto targets archived for 0.1 release - skipping validation..."
-echo -e "${YELLOW}ℹ️  Proto examples moved to archive/ folder${NC}"
 
 echo ""
 echo "🎉 Configuration validation completed!"

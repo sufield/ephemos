@@ -98,12 +98,6 @@ bazel test //pkg/ephemos:ephemos_test
 //cmd/ephemos-cli:ephemos-cli           # CLI application
 //cmd/config-validator:config-validator # Configuration validator
 
-# Example applications
-//examples/echo-server:echo-server       # Echo server example
-//examples/echo-client:echo-client       # Echo client example
-
-# Protocol buffers
-//examples/proto:proto_go_proto          # Generated protobuf code
 ```
 
 ### Script Targets (Converted from Shell Scripts)
