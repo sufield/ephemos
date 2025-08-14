@@ -45,54 +45,15 @@ type TrustBundle struct {
 	Certificates []*x509.Certificate
 }
 
-// AuthenticationPolicy defines auth rules.
+// AuthenticationPolicy defines authentication context.
+// This is now purely for identity-based authentication without authorization.
 type AuthenticationPolicy struct {
-	ServiceIdentity   *ServiceIdentity
-	AuthorizedClients []string
-	TrustedServers    []string
+	ServiceIdentity *ServiceIdentity
 }
 
-// NewAuthenticationPolicy creates a policy.
+// NewAuthenticationPolicy creates a policy for authentication.
 func NewAuthenticationPolicy(identity *ServiceIdentity) *AuthenticationPolicy {
 	return &AuthenticationPolicy{
-		ServiceIdentity:   identity,
-		AuthorizedClients: []string{},
-		TrustedServers:    []string{},
+		ServiceIdentity: identity,
 	}
-}
-
-// AddAuthorizedClient adds a client.
-func (p *AuthenticationPolicy) AddAuthorizedClient(clientName string) {
-	p.AuthorizedClients = append(p.AuthorizedClients, clientName)
-}
-
-// AddTrustedServer adds a server.
-func (p *AuthenticationPolicy) AddTrustedServer(serverName string) {
-	p.TrustedServers = append(p.TrustedServers, serverName)
-}
-
-// IsClientAuthorized checks client.
-func (p *AuthenticationPolicy) IsClientAuthorized(clientName string) bool {
-	if len(p.AuthorizedClients) == 0 {
-		return true
-	}
-	for _, authorized := range p.AuthorizedClients {
-		if authorized == clientName {
-			return true
-		}
-	}
-	return false
-}
-
-// IsServerTrusted checks server.
-func (p *AuthenticationPolicy) IsServerTrusted(serverName string) bool {
-	if len(p.TrustedServers) == 0 {
-		return true
-	}
-	for _, trusted := range p.TrustedServers {
-		if trusted == serverName {
-			return true
-		}
-	}
-	return false
 }

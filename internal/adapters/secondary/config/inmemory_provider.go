@@ -105,15 +105,5 @@ func copyConfiguration(config *ports.Configuration) *ports.Configuration {
 		}
 	}
 
-	if config.AuthorizedClients != nil {
-		cfgCopy.AuthorizedClients = make([]string, len(config.AuthorizedClients))
-		cfgCopy.AuthorizedClients = append(cfgCopy.AuthorizedClients, config.AuthorizedClients...)
-	}
-
-	if config.TrustedServers != nil {
-		cfgCopy.TrustedServers = make([]string, len(config.TrustedServers))
-		cfgCopy.TrustedServers = append(cfgCopy.TrustedServers, config.TrustedServers...)
-	}
-
 	return cfgCopy
 }
