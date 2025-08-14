@@ -42,6 +42,8 @@ cli.test
 interceptors.test
 ports.test
 *.test
+test-*
+*-test
 
 # Go build artifacts and executables (any name without extension in project root)
 /config-patterns
