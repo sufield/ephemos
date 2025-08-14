@@ -41,7 +41,7 @@ func FuzzIdentityParsing(f *testing.F) {
   name: test-service
   domain: example.org
 transport:
-  type: grpc
+  type: http
   address: :50051
 spiffe:
   socket_path: /tmp/spire-agent/public/api.sock
@@ -102,7 +102,7 @@ func FuzzTrustDomain(f *testing.F) {
   name: test-service
   domain: "` + strings.ReplaceAll(trustDomain, `"`, `\"`) + `"
 transport:
-  type: grpc
+  type: http
   address: :50051
 spiffe:
   socket_path: /tmp/spire-agent/public/api.sock`
@@ -160,7 +160,7 @@ func FuzzClientAuthorization(f *testing.F) {
   name: test-service
   domain: example.org
 transport:
-  type: grpc
+  type: http
   address: :50051
 spiffe:
   socket_path: /tmp/spire-agent/public/api.sock
@@ -218,7 +218,7 @@ func FuzzServerTrusts(f *testing.F) {
   name: test-service
   domain: example.org
 transport:
-  type: grpc
+  type: http
   address: :50051
 spiffe:
   socket_path: /tmp/spire-agent/public/api.sock
@@ -263,7 +263,7 @@ func FuzzContextTimeout(f *testing.F) {
   name: test-service
   domain: example.org
 transport:
-  type: grpc
+  type: http
   address: :50051
 spiffe:
   socket_path: /tmp/spire-agent/public/api.sock`
@@ -312,7 +312,7 @@ func BenchmarkIdentityValidation(b *testing.B) {
   name: benchmark-service
   domain: example.org
 transport:
-  type: grpc
+  type: http
   address: :50051
 spiffe:
   socket_path: /tmp/spire-agent/public/api.sock

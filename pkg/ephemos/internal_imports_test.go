@@ -194,8 +194,8 @@ func main() {
 			SocketPath: "/tmp/spire-agent/public/api.sock",
 		},
 		Transport: ephemos.TransportConfig{
-			Type: "grpc",
-			Address: ":50051",
+			Type: "http",
+			Address: ":8080",
 		},
 	}
 	_ = config.Validate()

@@ -145,7 +145,7 @@ func FuzzConfigValidation(f *testing.F) {
   name: test-service
   domain: example.org
 transport:
-  type: grpc
+  type: http
   address: :50051
 spiffe:
   socket_path: /tmp/spire-agent/public/api.sock`,

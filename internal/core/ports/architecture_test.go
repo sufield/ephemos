@@ -49,16 +49,6 @@ func TestDomainPortsHaveNoProtocolDependencies(t *testing.T) {
 // TestAdaptersCanImportProtocolPackages ensures that adapters CAN import
 // protocol packages (this is expected and required).
 func TestAdaptersCanImportProtocolPackages(t *testing.T) {
-	// Test that gRPC adapter imports gRPC packages
-	grpcAdapterPath := "../../../internal/adapters/grpc/adapter.go"
-	requiredGRPCImports := []string{
-		"google.golang.org/grpc",
-	}
-
-	if !fileExistsAndImports(t, grpcAdapterPath, requiredGRPCImports) {
-		t.Error("gRPC adapter should import gRPC packages")
-	}
-
 	// Test that HTTP adapter imports HTTP packages
 	httpAdapterPath := "../../../internal/adapters/http/adapter.go"
 	requiredHTTPImports := []string{

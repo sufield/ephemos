@@ -46,10 +46,10 @@ type SPIFFEConfig struct {
 // TransportConfig contains transport layer configuration.
 type TransportConfig struct {
 	// Type specifies the transport protocol to use.
-	Type string `yaml:"type,omitempty" validate:"oneof=grpc|http|tcp" default:"grpc"`
+	Type string `yaml:"type,omitempty" validate:"oneof=http|tcp" default:"http"`
 
 	// Address specifies the network address to bind to.
-	Address string `yaml:"address,omitempty" validate:"regex=^(:[0-9]+|[^:]+:[0-9]+)$" default:":50051"`
+	Address string `yaml:"address,omitempty" validate:"regex=^(:[0-9]+|[^:]+:[0-9]+)$" default:":8080"`
 
 	// TLS contains TLS configuration for the transport.
 	TLS *TLSConfig `yaml:"tls,omitempty"`
@@ -223,8 +223,8 @@ func GetDefaultConfiguration() *Configuration {
 				SocketPath: "/tmp/spire-agent/public/api.sock",
 			},
 			Transport: TransportConfig{
-				Type:    "grpc",
-				Address: ":50051",
+				Type:    "http",
+				Address: ":8080",
 			},
 			AuthorizedClients: []string{},
 			TrustedServers:    []string{},
