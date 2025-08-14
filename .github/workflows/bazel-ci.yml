@@ -26,70 +26,8 @@ jobs:
       with:
         go-version: '1.24.5'
 
-    - name: Install protoc
-      run: |
-        echo "📦 Installing Protocol Buffer compiler..."
-        sudo apt-get update
-        sudo apt-get install -y protobuf-compiler
-        
-        # Verify installation
-        protoc --version || { echo "❌ protoc installation failed"; exit 1; }
-        echo "✅ protoc installed successfully: $(protoc --version)"
-
     - name: Set Go proxy for reliable module downloads
       run: go env -w GOPROXY=https://proxy.golang.org,direct
-
-    - name: Install protobuf tools with retry logic
-      run: |
-        echo "📦 Installing protobuf tools with retry logic for reliability..."
-        
-        # Install protoc-gen-go with retry logic
-        echo "Installing protoc-gen-go..."
-        for i in {1..3}; do
-          echo "Attempt $i/3 for protoc-gen-go..."
-          if go install google.golang.org/protobuf/cmd/protoc-gen-go@latest; then
-            echo "✅ protoc-gen-go installed successfully"
-            break
-          else
-            echo "⚠️ protoc-gen-go install attempt $i failed"
-            if [ $i -eq 3 ]; then
-              echo "❌ Failed to install protoc-gen-go after 3 attempts"
-              exit 1
-            fi
-            echo "Retrying in 5 seconds..."
-            sleep 5
-          fi
-        done
-        
-        # Install protoc-gen-go-grpc with retry logic
-        echo "Installing protoc-gen-go-grpc..."
-        for i in {1..3}; do
-          echo "Attempt $i/3 for protoc-gen-go-grpc..."
-          if go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest; then
-            echo "✅ protoc-gen-go-grpc installed successfully"
-            break
-          else
-            echo "⚠️ protoc-gen-go-grpc install attempt $i failed"
-            if [ $i -eq 3 ]; then
-              echo "❌ Failed to install protoc-gen-go-grpc after 3 attempts"
-              exit 1
-            fi
-            echo "Retrying in 5 seconds..."
-            sleep 5
-          fi
-        done
-        
-        # Add Go bin to PATH for current and future steps
-        export GOBIN="$(go env GOPATH)/bin"
-        echo "$GOBIN" >> $GITHUB_PATH
-        export PATH="$GOBIN:$PATH"
-        
-        # Verify installation
-        echo "🔍 Verifying protobuf tools installation..."
-        which protoc-gen-go || { echo "❌ protoc-gen-go not found in PATH"; exit 1; }
-        which protoc-gen-go-grpc || { echo "❌ protoc-gen-go-grpc not found in PATH"; exit 1; }
-        
-        echo "✅ All protobuf tools installed and verified successfully"
 
     - name: Setup Bazel
       uses: bazelbuild/setup-bazelisk@v3
@@ -105,8 +43,6 @@ jobs:
         key: bazel-${{ runner.os }}-${{ hashFiles('.bazelrc', 'WORKSPACE', 'BUILD.bazel', '**/*.bzl') }}
         restore-keys: |
           bazel-${{ runner.os }}-
-      # Note: Protobuf optimization configured in WORKSPACE and .bazelrc
-      # Uses prebuilt protoc binaries for 30-60% faster builds
 
     - name: Configure Bazel
       run: |
@@ -159,8 +95,7 @@ jobs:
         echo "Workspace: $(bazel info workspace)"
         echo "Output base: $(bazel info output_base)"
         
-        # Verify protobuf optimization configuration
-        echo "🔧 Verifying protobuf optimization..."
+        # Verify Bazel configuration
         if [ -f "scripts/validate-bazel-config.sh" ]; then
           bash scripts/validate-bazel-config.sh
         fi
@@ -200,12 +135,6 @@ jobs:
           fi
         done
 
-    - name: Verify proto generator tool
-      run: |
-        echo "🔧 Verifying proto generator tool builds correctly..."
-        # Install and verify the proto generator tool builds
-        bazel run //scripts/proto:proto_generator -- install
-        echo "✅ Proto generator tool verified successfully"
 
     - name: Build all targets
       run: |
@@ -256,7 +185,7 @@ jobs:
         bazel info
         
         echo "🏗️ Built Binaries:"
-        find bazel-bin -type f -executable -name "*" | grep -E "(ephemos|echo-)" | head -10 || true
+        find bazel-bin -type f -executable -name "*ephemos*" | head -10 || true
         
         echo "📊 Build Summary:"
         echo "- Built targets: $(bazel query "kind(.*_binary, //...)" --output=label | wc -l)"
@@ -280,8 +209,6 @@ jobs:
         path: |
           bazel-bin/**/ephemos-cli
           bazel-bin/**/config-validator
-          bazel-bin/**/echo-server
-          bazel-bin/**/echo-client
         retention-days: 7
 
     - name: Show build summary
