@@ -148,7 +148,7 @@ func main() {
     
     // Register service - interceptors are automatically applied
     serviceRegistrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-        proto.RegisterMyServiceServer(s, &MyServiceImpl{})
+        myservice.RegisterMyServiceServer(s, &MyServiceImpl{})
     })
     
     if err := server.RegisterService(ctx, serviceRegistrar); err != nil {

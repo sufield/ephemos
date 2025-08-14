@@ -6,17 +6,8 @@ import (
 	"net/http"
 	"reflect"
 	"sync"
-
-	"google.golang.org/grpc"
 )
 
-// grpcAdapterImpl implements GRPCAdapter.
-type grpcAdapterImpl struct {
-	grpcServer   *grpc.Server
-	interceptors []grpc.UnaryServerInterceptor
-	services     map[string]interface{}
-	mu           sync.RWMutex
-}
 
 // httpAdapterImpl implements HTTPAdapter.
 type httpAdapterImpl struct {
@@ -27,16 +18,6 @@ type httpAdapterImpl struct {
 	mu         sync.RWMutex
 }
 
-// NewGRPCAdapter creates a new gRPC adapter.
-func NewGRPCAdapter(opts ...grpc.ServerOption) GRPCAdapter {
-	adapter := &grpcAdapterImpl{
-		services: make(map[string]interface{}),
-	}
-
-	// Create gRPC server with provided options
-	adapter.grpcServer = grpc.NewServer(opts...)
-	return adapter
-}
 
 // NewHTTPAdapter creates a new HTTP adapter.
 func NewHTTPAdapter(addr string) HTTPAdapter {
@@ -52,43 +33,6 @@ func NewHTTPAdapter(addr string) HTTPAdapter {
 	return adapter
 }
 
-// Mount mounts a service implementation.
-func (a *grpcAdapterImpl) Mount(service interface{}) error {
-	if service == nil {
-		return fmt.Errorf("service cannot be nil")
-	}
-
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	// Store the service
-	serviceType := reflect.TypeOf(service).String()
-	a.services[serviceType] = service
-
-	// If it's a ServiceRegistrar, register it with the gRPC server
-	if registrar, ok := service.(ServiceRegistrar); ok {
-		registrar.Register(a.grpcServer)
-	}
-
-	return nil
-}
-
-// GetServer returns the underlying server.
-func (a *grpcAdapterImpl) GetServer() interface{} {
-	return a.grpcServer
-}
-
-// ConfigureInterceptors sets up gRPC interceptors.
-func (a *grpcAdapterImpl) ConfigureInterceptors(interceptors ...grpc.UnaryServerInterceptor) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.interceptors = append(a.interceptors, interceptors...)
-}
-
-// GetGRPCServer returns the underlying gRPC server.
-func (a *grpcAdapterImpl) GetGRPCServer() *grpc.Server {
-	return a.grpcServer
-}
 
 // Mount mounts a service implementation.
 func (a *httpAdapterImpl) Mount(service interface{}) error {

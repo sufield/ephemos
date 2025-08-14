@@ -43,11 +43,11 @@ func TestValidationEngine_ValidateAndSetDefaults(t *testing.T) {
 				if config.Service.Domain != "default.local" {
 					t.Errorf("expected default domain 'default.local', got '%s'", config.Service.Domain)
 				}
-				if config.Transport.Type != "grpc" {
-					t.Errorf("expected default transport type 'grpc', got '%s'", config.Transport.Type)
+				if config.Transport.Type != "http" {
+					t.Errorf("expected default transport type 'http', got '%s'", config.Transport.Type)
 				}
-				if config.Transport.Address != ":50051" {
-					t.Errorf("expected default address ':50051', got '%s'", config.Transport.Address)
+				if config.Transport.Address != ":8080" {
+					t.Errorf("expected default address ':8080', got '%s'", config.Transport.Address)
 				}
 			},
 		},

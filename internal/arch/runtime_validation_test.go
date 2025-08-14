@@ -57,11 +57,6 @@ func TestValidator_ExtractAdapterType(t *testing.T) {
 			want:     "secondary",
 		},
 		{
-			name:     "grpc adapter",
-			funcName: "github.com/sufield/ephemos/internal/adapters/grpc.Server",
-			want:     "grpc",
-		},
-		{
 			name:     "non-adapter function",
 			funcName: "github.com/sufield/ephemos/internal/core/domain.Identity",
 			want:     "",
@@ -156,7 +151,7 @@ func extractAdapterTypeHelper(funcName string) string {
 	}
 
 	adapterPath := parts[1]
-	// Handle case where adapter path might be "grpc.Server" or "primary/api.Handler"
+	// Handle case where adapter path might be "http.Server" or "primary/api.Handler"
 	pathParts := strings.Split(adapterPath, "/")
 	if len(pathParts) > 0 {
 		// Extract just the adapter type, ignoring any struct/method name after dot

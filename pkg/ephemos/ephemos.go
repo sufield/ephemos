@@ -123,8 +123,11 @@ type Client interface {
 //	}
 //	defer server.Close()
 //
-//	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-//		yourservice.RegisterYourServiceServer(s, &myService{})
+//	registrar := ephemos.NewServiceRegistrar(func(s interface{}) {
+//		// Register your HTTP handlers or other transport-specific services
+//		if httpServer, ok := s.(YourHTTPServerInterface); ok {
+//			httpServer.RegisterHandlers(&myService{})
+//		}
 //	})
 //	server.RegisterService(ctx, registrar)
 //	lis, _ := net.Listen("tcp", ":50051")
@@ -309,61 +312,6 @@ func NewDevelopmentInterceptorConfig(serviceName string) *InterceptorConfig {
 	}
 }
 
-// CreateServerInterceptors creates HTTP server interceptors based on configuration.
-func CreateServerInterceptors(
-	config *InterceptorConfig,
-) ([]interface{}, []interface{}) {
-	if config == nil {
-		config = NewDefaultInterceptorConfig()
-	}
-
-	var unaryInterceptors []interface{}
-	var streamInterceptors []interface{}
-
-	// Add logging interceptor
-	if config.EnableLogging && config.Logger != nil {
-		unaryInterceptors = append(unaryInterceptors, createLoggingInterceptor(config.Logger))
-	}
-
-	// Add metrics interceptor
-	if config.EnableMetrics {
-		unaryInterceptors = append(unaryInterceptors, createMetricsInterceptor())
-	}
-
-	// Add auth interceptor
-	if config.EnableAuth {
-		unaryInterceptors = append(unaryInterceptors, createAuthInterceptor())
-	}
-
-	// Add custom interceptors
-	unaryInterceptors = append(unaryInterceptors, config.CustomInterceptors...)
-
-	return unaryInterceptors, streamInterceptors
-}
-
-// CreateClientInterceptors creates HTTP client interceptors based on configuration.
-func CreateClientInterceptors(
-	config *InterceptorConfig,
-) ([]interface{}, []interface{}) {
-	if config == nil {
-		config = NewDefaultInterceptorConfig()
-	}
-
-	var unaryInterceptors []interface{}
-	var streamInterceptors []interface{}
-
-	// Add client-side logging interceptor
-	if config.EnableLogging && config.Logger != nil {
-		unaryInterceptors = append(unaryInterceptors, createClientLoggingInterceptor(config.Logger))
-	}
-
-	// Add client-side metrics interceptor
-	if config.EnableMetrics {
-		unaryInterceptors = append(unaryInterceptors, createClientMetricsInterceptor())
-	}
-
-	return unaryInterceptors, streamInterceptors
-}
 
 // Transport-Agnostic API
 //

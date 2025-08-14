@@ -52,7 +52,7 @@ func (s *testServiceImpl) TestStream(stream TestServiceTestStreamServer) error {
 	}
 }
 
-// Mock proto definitions for testing.
+// Mock message definitions for testing.
 type TestRequest struct {
 	Message string
 }

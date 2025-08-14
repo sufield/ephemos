@@ -110,10 +110,6 @@ func (s *workloadServerImpl) RegisterService(registrar ServiceRegistrar) error {
 	return nil
 }
 
-// GetGRPCServer returns the underlying gRPC server.
-func (s *workloadServerImpl) GetGRPCServer() *grpc.Server {
-	return s.grpcServer
-}
 
 // Close implements the ShutdownableServer interface for graceful shutdown.
 func (s *workloadServerImpl) Close() error {

@@ -263,7 +263,7 @@ func enhanceValidationMessage(err *ValidationError) string {
 		return fmt.Sprintf("SPIFFE socket path '%v' is invalid. Must be an absolute path to a Unix socket file "+
 			"(e.g., '/tmp/spire-agent/public/api.sock').", err.Value)
 	case "transport.type":
-		return fmt.Sprintf("Transport type '%v' is invalid. Must be 'grpc' or 'http'.", err.Value)
+		return fmt.Sprintf("Transport type '%v' is invalid. Must be 'http' or 'tcp'.", err.Value)
 	case "transport.address":
 		return fmt.Sprintf("Transport address '%v' is invalid. Must be in format ':port' or 'host:port' (e.g., ':50051').", err.Value)
 	default:
@@ -284,8 +284,8 @@ func (p *fileProviderCompat) GetDefaultConfiguration(_ context.Context) *Configu
 			SocketPath: "/tmp/spire-agent/public/api.sock",
 		},
 		Transport: TransportConfig{
-			Type:    "grpc",
-			Address: ":50051",
+			Type:    "http",
+			Address: ":8080",
 		},
 		AuthorizedClients: []string{},
 		TrustedServers:    []string{},

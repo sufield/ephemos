@@ -6,8 +6,6 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
-
-	"google.golang.org/grpc"
 )
 
 // WorkloadServer represents a server that manages workload identities.
@@ -20,8 +18,6 @@ type WorkloadServer interface {
 	Close() error
 	// RegisterService registers a service with the server
 	RegisterService(registrar ServiceRegistrar) error
-	// GetGRPCServer returns the underlying gRPC server (if applicable)
-	GetGRPCServer() *grpc.Server
 }
 
 // SPIFFEProvider provides SPIFFE-based identity and certificate management.
@@ -54,14 +50,6 @@ type TransportAdapter interface {
 	GetServer() interface{}
 }
 
-// GRPCAdapter provides gRPC-specific transport adaptation.
-type GRPCAdapter interface {
-	TransportAdapter
-	// ConfigureInterceptors sets up gRPC interceptors
-	ConfigureInterceptors(interceptors ...grpc.UnaryServerInterceptor)
-	// GetGRPCServer returns the underlying gRPC server
-	GetGRPCServer() *grpc.Server
-}
 
 // HTTPAdapter provides HTTP-specific transport adaptation.
 type HTTPAdapter interface {

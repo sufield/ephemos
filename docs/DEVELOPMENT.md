@@ -175,7 +175,6 @@ ephemos/
 ├── pkg/ephemos/           # Main library (public API)
 ├── internal/              # Internal packages
 ├── examples/              # Example applications
-│   └── proto/             # Protobuf definitions
 ├── scripts/               # Build and utility scripts
 ├── .github/               # CI/CD workflows
 └── docs/                  # Documentation

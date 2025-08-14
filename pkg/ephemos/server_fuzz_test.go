@@ -7,8 +7,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"google.golang.org/grpc"
 )
 
 // FuzzServiceName tests service name validation with random inputs.
@@ -41,7 +39,7 @@ func FuzzServiceName(f *testing.F) {
   name: "` + strings.ReplaceAll(serviceName, `"`, `\"`) + `"
   domain: example.org
 transport:
-  type: grpc
+  type: http
   address: :0
 spiffe:
   socket_path: /nonexistent/socket`
@@ -94,7 +92,7 @@ func FuzzTransportAddress(f *testing.F) {
   name: test-service
   domain: example.org
 transport:
-  type: grpc
+  type: http
   address: "` + strings.ReplaceAll(address, `"`, `\"`) + `"
 spiffe:
   socket_path: /nonexistent/socket`
@@ -150,7 +148,7 @@ func FuzzSPIFFESocketPath(f *testing.F) {
   name: test-service
   domain: example.org
 transport:
-  type: grpc
+  type: http
   address: :50051
 spiffe:
   socketPath: "` + strings.ReplaceAll(socketPath, `"`, `\"`) + `"`
@@ -176,17 +174,17 @@ spiffe:
 // FuzzTransportType tests transport type validation.
 func FuzzTransportType(f *testing.F) {
 	// Seed with valid and invalid transport types
-	f.Add("grpc")
 	f.Add("http")
-	f.Add("GRPC")
+	f.Add("tcp")
+	f.Add("HTTP")
 	f.Add("HTTP")
 	f.Add("")
 	f.Add("invalid")
 	f.Add("tcp")
 	f.Add("udp")
 	f.Add("websocket")
-	f.Add("grpc\x00")
-	f.Add("grpc\n")
+	f.Add("http\x00")
+	f.Add("http\n")
 	f.Add("type with spaces")
 	f.Add("very-long-transport-type-name")
 
@@ -212,10 +210,9 @@ spiffe:
 
 		_, err := loadAndValidateConfig(ctx, configFile)
 
-		// Only "grpc", "http", and "tcp" should be valid per struct tag (empty gets default)
+		// Only "http", and "tcp" should be valid per struct tag (empty gets default)
 		// Case sensitive validation
 		validTypes := map[string]bool{
-			"grpc": true,
 			"http": true,
 			"tcp":  true,
 		}
@@ -234,10 +231,10 @@ func FuzzGenericServiceRegistrar(f *testing.F) {
 	f.Add(false) // Nil function
 
 	f.Fuzz(func(t *testing.T, hasValidFunc bool) {
-		var registerFunc func(*grpc.Server)
+		var registerFunc func(interface{})
 
 		if hasValidFunc {
-			registerFunc = func(_ *grpc.Server) {
+			registerFunc = func(_ interface{}) {
 				// Mock registration - do nothing but don't panic
 			}
 		}
@@ -251,8 +248,7 @@ func FuzzGenericServiceRegistrar(f *testing.F) {
 		}
 
 		// Test registration - should handle nil function gracefully
-		mockServer := grpc.NewServer()
-		defer mockServer.Stop()
+		mockServer := "fuzz-mock-server"
 
 		// This should not panic even with nil function
 		if genericRegistrar, ok := registrar.(*GenericServiceRegistrar); ok {
@@ -270,7 +266,7 @@ func BenchmarkConfigValidation(b *testing.B) {
   name: benchmark-service
   domain: example.org
 transport:
-  type: grpc
+  type: http
   address: :50051
 spiffe:
   socket_path: /tmp/spire-agent/public/api.sock`
