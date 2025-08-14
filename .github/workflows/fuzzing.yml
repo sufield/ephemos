@@ -164,154 +164,154 @@ jobs:
         
         # Create config fuzz target binary
         cat > fuzz-targets/config_fuzz_main.go << 'EOF'
-package main
-
-import (
-	"fmt"
-	"os"
-)
-
-// FuzzConfigTarget is the fuzz function for ClusterFuzzLite
-func FuzzConfigTarget(data []byte) int {
-	// Simple validation fuzzing without external dependencies
-	configData := string(data)
-	
-	// Test basic validation logic
-	if len(configData) == 0 {
-		return -1
-	}
-	
-	if len(configData) > 10000 {
-		return -1
-	}
-	
-	// Test for common config patterns
-	for _, pattern := range []string{"yaml", "json", "toml"} {
-		if len(configData) > len(pattern) && configData[:len(pattern)] == pattern {
-			return 1
-		}
-	}
-	
-	return 0
-}
-
-func main() {
-	if len(os.Args) > 1 && os.Args[1] == "fuzz" {
-		// Simple fuzz input for testing
-		testData := []byte("yaml: test config")
-		result := FuzzConfigTarget(testData)
-		fmt.Printf("Fuzz result: %d\n", result)
-	} else {
-		fmt.Println("Config fuzz target ready")
-	}
-}
-EOF
+        package main
+        
+        import (
+        	"fmt"
+        	"os"
+        )
+        
+        // FuzzConfigTarget is the fuzz function for ClusterFuzzLite
+        func FuzzConfigTarget(data []byte) int {
+        	// Simple validation fuzzing without external dependencies
+        	configData := string(data)
+        	
+        	// Test basic validation logic
+        	if len(configData) == 0 {
+        		return -1
+        	}
+        	
+        	if len(configData) > 10000 {
+        		return -1
+        	}
+        	
+        	// Test for common config patterns
+        	for _, pattern := range []string{"yaml", "json", "toml"} {
+        		if len(configData) > len(pattern) && configData[:len(pattern)] == pattern {
+        			return 1
+        		}
+        	}
+        	
+        	return 0
+        }
+        
+        func main() {
+        	if len(os.Args) > 1 && os.Args[1] == "fuzz" {
+        		// Simple fuzz input for testing
+        		testData := []byte("yaml: test config")
+        		result := FuzzConfigTarget(testData)
+        		fmt.Printf("Fuzz result: %d\n", result)
+        	} else {
+        		fmt.Println("Config fuzz target ready")
+        	}
+        }
+        EOF
         
         # Create server fuzz target binary  
         cat > fuzz-targets/server_fuzz_main.go << 'EOF'
-package main
-
-import (
-	"fmt"
-	"os"
-	"strings"
-)
-
-// FuzzServerTarget is the fuzz function for server-related testing
-func FuzzServerTarget(data []byte) int {
-	// Simple server configuration validation fuzzing
-	input := string(data)
-	
-	if len(input) == 0 || len(input) > 5000 {
-		return -1
-	}
-	
-	// Test for server-related patterns
-	serverPatterns := []string{"server", "host", "port", "bind", "listen"}
-	for _, pattern := range serverPatterns {
-		if strings.Contains(strings.ToLower(input), pattern) {
-			return 1
-		}
-	}
-	
-	// Test for invalid characters that might cause issues
-	invalidChars := []byte{0, 1, 2, 3, 4, 5}
-	for _, char := range data {
-		for _, invalid := range invalidChars {
-			if char == invalid {
-				return -1
-			}
-		}
-	}
-	
-	return 0
-}
-
-func main() {
-	if len(os.Args) > 1 && os.Args[1] == "fuzz" {
-		testData := []byte("server: localhost:8080")
-		result := FuzzServerTarget(testData)
-		fmt.Printf("Server fuzz result: %d\n", result)
-	} else {
-		fmt.Println("Server fuzz target ready")
-	}
-}
-EOF
+        package main
+        
+        import (
+        	"fmt"
+        	"os"
+        	"strings"
+        )
+        
+        // FuzzServerTarget is the fuzz function for server-related testing
+        func FuzzServerTarget(data []byte) int {
+        	// Simple server configuration validation fuzzing
+        	input := string(data)
+        	
+        	if len(input) == 0 || len(input) > 5000 {
+        		return -1
+        	}
+        	
+        	// Test for server-related patterns
+        	serverPatterns := []string{"server", "host", "port", "bind", "listen"}
+        	for _, pattern := range serverPatterns {
+        		if strings.Contains(strings.ToLower(input), pattern) {
+        			return 1
+        		}
+        	}
+        	
+        	// Test for invalid characters that might cause issues
+        	invalidChars := []byte{0, 1, 2, 3, 4, 5}
+        	for _, char := range data {
+        		for _, invalid := range invalidChars {
+        			if char == invalid {
+        				return -1
+        			}
+        		}
+        	}
+        	
+        	return 0
+        }
+        
+        func main() {
+        	if len(os.Args) > 1 && os.Args[1] == "fuzz" {
+        		testData := []byte("server: localhost:8080")
+        		result := FuzzServerTarget(testData)
+        		fmt.Printf("Server fuzz result: %d\n", result)
+        	} else {
+        		fmt.Println("Server fuzz target ready")
+        	}
+        }
+        EOF
         
         # Create identity fuzz target binary
         cat > fuzz-targets/identity_fuzz_main.go << 'EOF' 
-package main
-
-import (
-	"fmt"
-	"os"
-	"regexp"
-	"strings"
-)
-
-// FuzzIdentityTarget is the fuzz function for identity-related testing
-func FuzzIdentityTarget(data []byte) int {
-	// Simple identity validation fuzzing
-	input := string(data)
-	
-	if len(input) == 0 || len(input) > 1000 {
-		return -1
-	}
-	
-	// Test for SPIFFE URI patterns
-	spiffePattern := regexp.MustCompile(`^spiffe://[a-zA-Z0-9\.-]+(/[a-zA-Z0-9\._-]*)*$`)
-	if spiffePattern.MatchString(input) {
-		return 1
-	}
-	
-	// Test for identity-related patterns
-	identityPatterns := []string{"spiffe", "identity", "client", "trust", "domain"}
-	for _, pattern := range identityPatterns {
-		if strings.Contains(strings.ToLower(input), pattern) {
-			return 1
-		}
-	}
-	
-	// Test for malformed URIs that might cause issues
-	if strings.HasPrefix(input, "spiffe://") {
-		if strings.Contains(input, "..") || strings.Contains(input, "//") {
-			return -1
-		}
-	}
-	
-	return 0
-}
-
-func main() {
-	if len(os.Args) > 1 && os.Args[1] == "fuzz" {
-		testData := []byte("spiffe://example.com/workload")
-		result := FuzzIdentityTarget(testData)
-		fmt.Printf("Identity fuzz result: %d\n", result)
-	} else {
-		fmt.Println("Identity fuzz target ready")
-	}
-}
-EOF
+        package main
+        
+        import (
+        	"fmt"
+        	"os"
+        	"regexp"
+        	"strings"
+        )
+        
+        // FuzzIdentityTarget is the fuzz function for identity-related testing
+        func FuzzIdentityTarget(data []byte) int {
+        	// Simple identity validation fuzzing
+        	input := string(data)
+        	
+        	if len(input) == 0 || len(input) > 1000 {
+        		return -1
+        	}
+        	
+        	// Test for SPIFFE URI patterns
+        	spiffePattern := regexp.MustCompile(`^spiffe://[a-zA-Z0-9\.-]+(/[a-zA-Z0-9\._-]*)*$`)
+        	if spiffePattern.MatchString(input) {
+        		return 1
+        	}
+        	
+        	// Test for identity-related patterns
+        	identityPatterns := []string{"spiffe", "identity", "client", "trust", "domain"}
+        	for _, pattern := range identityPatterns {
+        		if strings.Contains(strings.ToLower(input), pattern) {
+        			return 1
+        		}
+        	}
+        	
+        	// Test for malformed URIs that might cause issues
+        	if strings.HasPrefix(input, "spiffe://") {
+        		if strings.Contains(input, "..") || strings.Contains(input, "//") {
+        			return -1
+        		}
+        	}
+        	
+        	return 0
+        }
+        
+        func main() {
+        	if len(os.Args) > 1 && os.Args[1] == "fuzz" {
+        		testData := []byte("spiffe://example.com/workload")
+        		result := FuzzIdentityTarget(testData)
+        		fmt.Printf("Identity fuzz result: %d\n", result)
+        	} else {
+        		fmt.Println("Identity fuzz target ready")
+        	}
+        }
+        EOF
         
         # Build the fuzz target binaries
         echo "Building fuzz target binaries..."

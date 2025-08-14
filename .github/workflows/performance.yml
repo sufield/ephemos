@@ -131,53 +131,53 @@ jobs:
         
         # Create a simple memory profiling test
         cat > memory_profile_test.go << 'EOF'
-package main
-
-import (
-    "context"
-    "fmt"
-    "runtime"
-    "time"
-)
-
-func main() {
-    fmt.Println("Starting library memory profiling...")
-    
-    ctx := context.Background()
-    
-    // Collect baseline memory stats
-    var m1 runtime.MemStats
-    runtime.ReadMemStats(&m1)
-    
-    fmt.Printf("Baseline memory: Alloc = %d KB", bToKb(m1.Alloc))
-    fmt.Printf(", TotalAlloc = %d KB", bToKb(m1.TotalAlloc))
-    fmt.Printf(", Sys = %d KB", bToKb(m1.Sys))
-    fmt.Printf(", NumGC = %d\n", m1.NumGC)
-    
-    // Simulate some library operations
-    for i := 0; i < 1000; i++ {
-        _ = context.WithValue(ctx, "test", fmt.Sprintf("value_%d", i))
-        if i%100 == 0 {
-            runtime.GC()
+        package main
+        
+        import (
+            "context"
+            "fmt"
+            "runtime"
+            "time"
+        )
+        
+        func main() {
+            fmt.Println("Starting library memory profiling...")
+            
+            ctx := context.Background()
+            
+            // Collect baseline memory stats
+            var m1 runtime.MemStats
+            runtime.ReadMemStats(&m1)
+            
+            fmt.Printf("Baseline memory: Alloc = %d KB", bToKb(m1.Alloc))
+            fmt.Printf(", TotalAlloc = %d KB", bToKb(m1.TotalAlloc))
+            fmt.Printf(", Sys = %d KB", bToKb(m1.Sys))
+            fmt.Printf(", NumGC = %d\n", m1.NumGC)
+            
+            // Simulate some library operations
+            for i := 0; i < 1000; i++ {
+                _ = context.WithValue(ctx, "test", fmt.Sprintf("value_%d", i))
+                if i%100 == 0 {
+                    runtime.GC()
+                }
+            }
+            
+            // Collect final memory stats
+            var m2 runtime.MemStats
+            runtime.ReadMemStats(&m2)
+            
+            fmt.Printf("Final memory: Alloc = %d KB", bToKb(m2.Alloc))
+            fmt.Printf(", TotalAlloc = %d KB", bToKb(m2.TotalAlloc))
+            fmt.Printf(", Sys = %d KB", bToKb(m2.Sys))
+            fmt.Printf(", NumGC = %d\n", m2.NumGC)
+            
+            fmt.Println("Memory profiling completed successfully")
         }
-    }
-    
-    // Collect final memory stats
-    var m2 runtime.MemStats
-    runtime.ReadMemStats(&m2)
-    
-    fmt.Printf("Final memory: Alloc = %d KB", bToKb(m2.Alloc))
-    fmt.Printf(", TotalAlloc = %d KB", bToKb(m2.TotalAlloc))
-    fmt.Printf(", Sys = %d KB", bToKb(m2.Sys))
-    fmt.Printf(", NumGC = %d\n", m2.NumGC)
-    
-    fmt.Println("Memory profiling completed successfully")
-}
-
-func bToKb(b uint64) uint64 {
-    return b / 1024
-}
-EOF
+        
+        func bToKb(b uint64) uint64 {
+            return b / 1024
+        }
+        EOF
         
         # Run the memory profiling test
         go run memory_profile_test.go > memory-profile-results.txt 2>&1

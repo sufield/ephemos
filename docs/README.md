@@ -23,6 +23,7 @@ Welcome to the Ephemos documentation. This directory contains all documentation 
 - [INTERCEPTORS.md](./development/INTERCEPTORS.md) - gRPC interceptors documentation
 - [TESTING_WITHOUT_MOCKS.md](./development/TESTING_WITHOUT_MOCKS.md) - Testing strategies without mocks
 - [WORKFLOW_IMPROVEMENTS.md](./development/WORKFLOW_IMPROVEMENTS.md) - CI/CD workflow improvements
+- [YAML_VALIDATION_FIXES.md](./development/YAML_VALIDATION_FIXES.md) - YAML syntax error fixes and validation
 - [register-ephimos.md](./development/register-ephimos.md) - Service registration guide
 
 ### 📁 [security/](./security/)
