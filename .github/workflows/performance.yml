@@ -127,51 +127,108 @@ jobs:
     - name: Run library memory profiling
       timeout-minutes: 5
       run: |
-        echo "Running library memory profiling..."
+        set -e  # Exit on any error
+        set -x  # Print commands being executed
         
-        # Create a simple memory profiling test
+        echo "🔍 Starting library memory profiling..."
+        
+        # Ensure we're in a clean state
+        if [ -f memory_profile_test.go ]; then
+          rm -f memory_profile_test.go
+        fi
+        if [ -f memory-profile-results.txt ]; then
+          rm -f memory-profile-results.txt
+        fi
+        
+        echo "📝 Creating memory profiling test..."
+        
+        # Create a simple memory profiling test with proper error handling
         cat > memory_profile_test.go << 'EOF'
         package main
         
         import (
-            "context"
             "fmt"
+            "os"
             "runtime"
             "time"
         )
         
         func main() {
-            fmt.Println("Starting library memory profiling...")
-            
-            ctx := context.Background()
+            fmt.Println("🚀 Starting library memory profiling...")
             
             // Collect baseline memory stats
             var m1 runtime.MemStats
             runtime.ReadMemStats(&m1)
             
-            fmt.Printf("Baseline memory: Alloc = %d KB", bToKb(m1.Alloc))
+            fmt.Printf("📊 Baseline memory: Alloc = %d KB", bToKb(m1.Alloc))
             fmt.Printf(", TotalAlloc = %d KB", bToKb(m1.TotalAlloc))
             fmt.Printf(", Sys = %d KB", bToKb(m1.Sys))
             fmt.Printf(", NumGC = %d\n", m1.NumGC)
             
-            // Simulate some library operations
+            fmt.Println("⚡ Simulating memory operations...")
+            
+            // Simulate realistic memory operations
+            data := make([][]byte, 0, 1000)
+            
             for i := 0; i < 1000; i++ {
-                _ = context.WithValue(ctx, "test", fmt.Sprintf("value_%d", i))
+                // Allocate some memory
+                chunk := make([]byte, 1024)
+                // Use the memory to prevent optimization
+                for j := range chunk {
+                    chunk[j] = byte(i % 256)
+                }
+                data = append(data, chunk)
+                
+                // Periodic cleanup to simulate realistic usage
                 if i%100 == 0 {
+                    fmt.Printf("  🗑️  Running GC at iteration %d\n", i)
                     runtime.GC()
+                    
+                    // Show intermediate stats
+                    var m runtime.MemStats
+                    runtime.ReadMemStats(&m)
+                    fmt.Printf("  📈 Current: Alloc = %d KB, NumGC = %d\n", 
+                        bToKb(m.Alloc), m.NumGC)
                 }
             }
+            
+            // Final garbage collection
+            fmt.Println("🧹 Running final garbage collection...")
+            runtime.GC()
+            runtime.GC() // Run twice to ensure cleanup
+            
+            // Give GC time to complete
+            time.Sleep(100 * time.Millisecond)
             
             // Collect final memory stats
             var m2 runtime.MemStats
             runtime.ReadMemStats(&m2)
             
-            fmt.Printf("Final memory: Alloc = %d KB", bToKb(m2.Alloc))
+            fmt.Printf("📈 Final memory: Alloc = %d KB", bToKb(m2.Alloc))
             fmt.Printf(", TotalAlloc = %d KB", bToKb(m2.TotalAlloc))
             fmt.Printf(", Sys = %d KB", bToKb(m2.Sys))
             fmt.Printf(", NumGC = %d\n", m2.NumGC)
             
-            fmt.Println("Memory profiling completed successfully")
+            // Calculate memory growth
+            allocDiff := int64(m2.Alloc) - int64(m1.Alloc)
+            fmt.Printf("📊 Memory growth: %d KB\n", allocDiff/1024)
+            
+            // Validate results
+            if m2.NumGC < m1.NumGC {
+                fmt.Fprintf(os.Stderr, "❌ Error: GC count decreased, which is impossible\n")
+                os.Exit(1)
+            }
+            
+            // Check for excessive memory usage (>100MB would be concerning)
+            if m2.Alloc > 100*1024*1024 {
+                fmt.Fprintf(os.Stderr, "⚠️  Warning: High memory usage: %d KB\n", bToKb(m2.Alloc))
+            }
+            
+            fmt.Println("✅ Memory profiling completed successfully")
+            
+            // Clear data to help with cleanup
+            data = nil
+            runtime.GC()
         }
         
         func bToKb(b uint64) uint64 {
@@ -179,10 +236,45 @@ jobs:
         }
         EOF
         
-        # Run the memory profiling test
-        go run memory_profile_test.go > memory-profile-results.txt 2>&1
+        echo "🔧 Verifying Go code syntax..."
+        # Check if the Go code is syntactically valid
+        if ! go fmt memory_profile_test.go > /dev/null 2>&1; then
+          echo "❌ Error: Generated Go code has syntax errors"
+          cat memory_profile_test.go
+          exit 1
+        fi
         
-        echo "## Memory Profile Results" >> $GITHUB_STEP_SUMMARY
+        echo "▶️  Compiling and running memory profiling test..."
+        # Run the memory profiling test with proper error handling
+        if go run memory_profile_test.go > memory-profile-results.txt 2>&1; then
+          echo "✅ Memory profiling completed successfully"
+          
+          # Show results in console for debugging
+          echo "📋 Memory profiling results:"
+          cat memory-profile-results.txt
+          
+        else
+          echo "❌ Memory profiling failed with exit code $?"
+          echo "📋 Error output:"
+          cat memory-profile-results.txt
+          
+          echo "🔍 Debugging information:"
+          echo "Go version: $(go version)"
+          echo "Available memory: $(free -h 2>/dev/null || echo 'free command not available')"
+          echo "Current directory: $(pwd)"
+          echo "Files in directory: $(ls -la)"
+          
+          # Still add to summary for debugging
+          echo "## ❌ Memory Profile Failed" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat memory-profile-results.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          exit 1
+        fi
+        
+        echo "📊 Adding results to GitHub summary..."
+        echo "## 📊 Memory Profile Results" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
         cat memory-profile-results.txt >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
@@ -256,23 +348,116 @@ jobs:
         
     - name: Install SPIRE
       run: |
+        set -e  # Exit on any error
+        set -x  # Print commands being executed
+        
+        echo "🔧 Installing SPIRE..."
+        
+        if [ ! -d "scripts/demo" ]; then
+          echo "❌ Error: scripts/demo directory not found"
+          ls -la scripts/ || echo "scripts directory not found"
+          exit 1
+        fi
+        
         cd scripts/demo
+        
+        if [ ! -f "install-spire.sh" ]; then
+          echo "❌ Error: install-spire.sh script not found"
+          ls -la
+          exit 1
+        fi
+        
         chmod +x install-spire.sh
-        sudo ./install-spire.sh
+        
+        if ! sudo ./install-spire.sh; then
+          echo "❌ Error: SPIRE installation failed"
+          exit 1
+        fi
+        
+        echo "✅ SPIRE installed successfully"
         
     - name: Start SPIRE and setup services
       run: |
-        cd scripts/demo  
-        sudo ./start-spire.sh
+        set -e  # Exit on any error
+        set -x  # Print commands being executed
+        
+        echo "🚀 Starting SPIRE services..."
+        
+        cd scripts/demo
+        
+        # Start SPIRE
+        if ! sudo ./start-spire.sh; then
+          echo "❌ Error: Failed to start SPIRE"
+          exit 1
+        fi
+        
+        echo "⏳ Waiting for SPIRE to be ready..."
         sleep 10
-        sudo ./setup-demo.sh
+        
+        # Verify SPIRE is running
+        if ! sudo systemctl is-active --quiet spire-server; then
+          echo "❌ Error: SPIRE server is not running"
+          sudo systemctl status spire-server || true
+          exit 1
+        fi
+        
+        echo "✅ SPIRE server is running"
+        
+        # Setup demo services
+        echo "⚙️ Setting up demo services..."
+        if ! sudo ./setup-demo.sh; then
+          echo "❌ Error: Failed to setup demo services"
+          # Show some debugging info
+          sudo spire-server entry show || echo "Could not show SPIRE entries"
+          exit 1
+        fi
+        
+        echo "✅ Demo services setup completed"
         
     - name: Build and start server
       run: |
-        make build
+        set -e  # Exit on any error
+        set -x  # Print commands being executed
+        
+        echo "🏗️ Building server..."
+        if ! make build; then
+          echo "❌ Error: Failed to build server"
+          exit 1
+        fi
+        
+        echo "✅ Server built successfully"
+        
+        # Verify the server binary exists
+        if [ ! -f "./bin/echo-server" ]; then
+          echo "❌ Error: Server binary not found at ./bin/echo-server"
+          ls -la ./bin/ || echo "bin directory not found"
+          exit 1
+        fi
+        
+        echo "🚀 Starting server..."
+        # Start server with proper environment and logging
         EPHEMOS_CONFIG=config/echo-server.yaml ECHO_SERVER_ADDRESS=:50101 ./bin/echo-server > server-load.log 2>&1 &
-        echo $! > server.pid
-        sleep 5
+        server_pid=$!
+        echo $server_pid > server.pid
+        
+        echo "📝 Server started with PID: $server_pid"
+        
+        # Wait a bit for server to start
+        sleep 3
+        
+        # Verify server is still running
+        if ! kill -0 $server_pid 2>/dev/null; then
+          echo "❌ Error: Server failed to start or crashed immediately"
+          echo "📋 Server logs:"
+          cat server-load.log 2>/dev/null || echo "No server logs available"
+          exit 1
+        fi
+        
+        echo "✅ Server is running successfully"
+        
+        # Show initial server logs for debugging
+        echo "📋 Initial server logs:"
+        head -10 server-load.log 2>/dev/null || echo "No server logs yet"
         
     - name: Install hey (load testing tool)
       run: |
@@ -338,12 +523,66 @@ jobs:
         
     - name: Run load test
       run: |
-        go run loadtest.go > load-test-results.txt 2>&1
+        set -e  # Exit on any error
+        set -x  # Print commands being executed
         
-        echo "## Load Test Results" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        cat load-test-results.txt >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "🚀 Starting load test..."
+        
+        # Verify server is running
+        if ! kill -0 $(cat server.pid) 2>/dev/null; then
+          echo "❌ Error: Server is not running"
+          echo "📋 Server logs:"
+          cat server-load.log 2>/dev/null || echo "No server logs available"
+          exit 1
+        fi
+        
+        echo "✅ Server is running (PID: $(cat server.pid))"
+        
+        # Verify load test code syntax
+        echo "🔧 Verifying load test syntax..."
+        if ! go fmt loadtest.go > /dev/null 2>&1; then
+          echo "❌ Error: Load test Go code has syntax errors"
+          cat loadtest.go
+          exit 1
+        fi
+        
+        # Run the load test with proper error handling
+        echo "▶️  Running load test..."
+        if go run loadtest.go > load-test-results.txt 2>&1; then
+          echo "✅ Load test completed successfully"
+          
+          # Show results in console for debugging
+          echo "📋 Load test results:"
+          cat load-test-results.txt
+          
+          # Add to summary
+          echo "## 🚀 Load Test Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat load-test-results.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+        else
+          echo "❌ Load test failed with exit code $?"
+          echo "📋 Error output:"
+          cat load-test-results.txt
+          
+          echo "🔍 Debugging information:"
+          echo "Server status: $(kill -0 $(cat server.pid) 2>/dev/null && echo 'running' || echo 'not running')"
+          echo "Server logs (last 20 lines):"
+          tail -20 server-load.log 2>/dev/null || echo "No server logs available"
+          
+          # Add failed results to summary for debugging
+          echo "## ❌ Load Test Failed" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "Error output:" >> $GITHUB_STEP_SUMMARY
+          cat load-test-results.txt >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Server logs:" >> $GITHUB_STEP_SUMMARY
+          tail -20 server-load.log 2>/dev/null || echo "No server logs available" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          exit 1
+        fi
         
     - name: Check server logs
       run: |

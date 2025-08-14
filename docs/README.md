@@ -21,6 +21,7 @@ Welcome to the Ephemos documentation. This directory contains all documentation 
 - [ENHANCED_GRPC_CONNECTION_MANAGEMENT.md](./development/ENHANCED_GRPC_CONNECTION_MANAGEMENT.md) - gRPC connection management patterns
 - [IDENTITY_TIMING_FIXES.md](./development/IDENTITY_TIMING_FIXES.md) - Identity timing issue resolutions
 - [INTERCEPTORS.md](./development/INTERCEPTORS.md) - gRPC interceptors documentation
+- [PERFORMANCE_WORKFLOW_FIXES.md](./development/PERFORMANCE_WORKFLOW_FIXES.md) - Performance workflow error handling fixes
 - [TESTING_WITHOUT_MOCKS.md](./development/TESTING_WITHOUT_MOCKS.md) - Testing strategies without mocks
 - [WORKFLOW_IMPROVEMENTS.md](./development/WORKFLOW_IMPROVEMENTS.md) - CI/CD workflow improvements
 - [YAML_VALIDATION_FIXES.md](./development/YAML_VALIDATION_FIXES.md) - YAML syntax error fixes and validation
