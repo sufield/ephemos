@@ -41,8 +41,6 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-bench-
           
-    - name: Setup Protocol Buffers (Required for Build)
-      uses: ./.github/actions/setup-protobuf
         
     - name: Install dependencies
       run: make setup
@@ -123,8 +121,6 @@ jobs:
       with:
         go-version: '1.24.x'
         
-    - name: Setup Protocol Buffers (Required for Build)
-      uses: ./.github/actions/setup-protobuf
         
     - name: Install SPIRE (for realistic profiling)
       run: |
@@ -375,8 +371,6 @@ jobs:
       with:
         go-version: '1.24.x'
         
-    - name: Setup Protocol Buffers (Required for Build)
-      uses: ./.github/actions/setup-protobuf
         
     - name: Install SPIRE
       run: |
