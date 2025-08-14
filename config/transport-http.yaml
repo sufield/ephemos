@@ -1,5 +1,5 @@
-# Configuration for gRPC transport demo
-# This config makes the transport-agnostic server use gRPC
+# Configuration for HTTP transport demo
+# This config makes the transport-agnostic server use HTTP
 
 service:
   name: "transport-demo"

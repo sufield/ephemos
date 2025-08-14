@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-
-	"google.golang.org/grpc"
 )
 
 // createServerWithConfig creates a server with internal dependency injection.
@@ -121,13 +119,10 @@ func (s *transportServerWrapper) createTransportServer() (*TransportServer, erro
 	// Initialize the appropriate transport based on config
 	transportType := s.config.Transport.Type
 	if transportType == "" {
-		transportType = TransportTypeGRPC // default
+		transportType = TransportTypeHTTP // default
 	}
 
 	switch transportType {
-	case TransportTypeGRPC:
-		server.grpcAdapter = NewGRPCAdapter()
-		server.grpcServer = server.grpcAdapter.GetGRPCServer()
 	case TransportTypeHTTP:
 		server.httpAdapter = NewHTTPAdapter(s.config.Transport.Address)
 		server.httpServer = server.httpAdapter.GetHTTPServer()
@@ -168,17 +163,9 @@ func (c *clientImpl) Close() error {
 
 // ClientConnection placeholder type for now
 type ClientConnection struct {
-	// Simple placeholder - in production would contain actual gRPC connection
-	conn *grpc.ClientConn
+	// Simple placeholder - in production would contain actual HTTP connection
 }
 
 func (c *ClientConnection) Close() error {
-	if c.conn != nil {
-		return c.conn.Close()
-	}
 	return nil
-}
-
-func (c *ClientConnection) GetClientConnection() *grpc.ClientConn {
-	return c.conn
 }

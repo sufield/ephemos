@@ -260,13 +260,7 @@ validate_security_packages() {
         print_success "Crypto packages detected: $crypto_packages"
     fi
     
-    # Check for gRPC packages (critical for Ephemos)
-    local grpc_packages=$(jq -r '.packages[] | select(.name | contains("grpc")) | .name' "$spdx_file" 2>/dev/null | wc -l)
-    if [ "$grpc_packages" -gt 0 ]; then
-        print_success "gRPC packages detected: $grpc_packages"
-    else
-        print_warning "No gRPC packages detected - may indicate incomplete scan"
-        ((VALIDATION_WARNINGS++))
+    # Additional security package checks can be added here
     fi
 }
 
