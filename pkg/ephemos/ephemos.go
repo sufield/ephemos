@@ -6,96 +6,43 @@ import (
 	"context"
 	"fmt"
 	"net"
-
-	"google.golang.org/grpc"
 	"log/slog"
 )
 
 // ServiceRegistrar is the interface that service implementations must implement.
-// Implementations should register their gRPC service with the provided server.
-// This interface abstracts away gRPC registration details from service developers.
-//
-// Most developers should use the generic NewServiceRegistrar function instead of
-// implementing this interface directly:
-//
-//	// Recommended approach (no boilerplate):
-//	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-//		proto.RegisterYourServiceServer(s, &yourService{})
-//	})
-//
-// Advanced users can implement this interface directly for custom registration logic.
+// This interface abstracts away transport registration details from service developers.
 type ServiceRegistrar interface {
-	// Register registers the service with the provided gRPC server
-	Register(grpcServer *grpc.Server)
+	// Register registers the service with the appropriate transport
+	Register(transport interface{})
 }
 
-// GenericServiceRegistrar is a generic implementation that can register any gRPC service
+// GenericServiceRegistrar is a generic implementation that can register any service
 // without requiring developers to write service-specific registrars. This eliminates
 // boilerplate code and makes service registration a one-liner.
-//
-// Example usage:
-//
-//	// Instead of writing a custom registrar, use the generic one:
-//	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-//		proto.RegisterYourServiceServer(s, &YourServiceImpl{})
-//	})
-//	server.RegisterService(ctx, registrar)
 type GenericServiceRegistrar struct {
-	registerFunc func(*grpc.Server)
+	registerFunc func(interface{})
 }
 
-// NewServiceRegistrar creates a generic registrar that can be used for any gRPC service.
+// NewServiceRegistrar creates a generic registrar that can be used for any service.
 // This eliminates the need to write service-specific registrars, reducing boilerplate code.
-//
-// Parameters:
-//   - registerFunc: A function that registers your service with the gRPC server.
-//     This is typically just calling your generated Register*Server function.
-//
-// Example:
-//
-//	// For an Echo service:
-//	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-//		proto.RegisterEchoServiceServer(s, &MyEchoServer{})
-//	})
-//
-//	// For any other service:
-//	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-//		proto.RegisterUserServiceServer(s, &MyUserService{})
-//	})
-func NewServiceRegistrar(registerFunc func(*grpc.Server)) ServiceRegistrar {
+func NewServiceRegistrar(registerFunc func(interface{})) ServiceRegistrar {
 	return &GenericServiceRegistrar{
 		registerFunc: registerFunc,
 	}
 }
 
 // Register implements the ServiceRegistrar interface by calling the provided registration function.
-func (r *GenericServiceRegistrar) Register(grpcServer *grpc.Server) {
+func (r *GenericServiceRegistrar) Register(transport interface{}) {
 	if r.registerFunc != nil {
-		r.registerFunc(grpcServer)
+		r.registerFunc(transport)
 	}
 }
 
-// Server represents an identity-aware gRPC server that handles automatic mTLS authentication.
+// Server represents an identity-aware HTTP server that handles automatic mTLS authentication.
 // Services registered with this server will automatically use SPIFFE/SPIRE for identity verification.
 // The server handles all certificate management and peer authentication transparently.
-//
-// Usage:
-//
-//	ctx := context.Background()
-//	server, err := ephemos.NewIdentityServer(ctx, "")
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	defer server.Close() // Ensure proper cleanup
-//
-//	serviceRegistrar := proto.NewYourServiceRegistrar(&yourService{})
-//	server.RegisterService(ctx, serviceRegistrar)
-//
-//	lis, _ := net.Listen("tcp", ":50051")
-//	defer lis.Close() // Ensure listener cleanup
-//	server.Serve(ctx, lis)
 type Server interface {
-	// RegisterService registers a gRPC service implementation with the server.
+	// RegisterService registers a service implementation with the server.
 	// The serviceRegistrar must implement the ServiceRegistrar interface.
 	// The context can be used for cancellation and timeouts during initialization.
 	// Returns an error if registration fails or if serviceRegistrar is nil.
@@ -112,30 +59,15 @@ type Server interface {
 	Close() error
 }
 
-// Client represents an identity-aware gRPC client that handles automatic mTLS authentication.
+// Client represents an identity-aware HTTP client that handles automatic mTLS authentication.
 // Connections made through this client will automatically use SPIFFE/SPIRE for identity verification.
 // The client handles all certificate management and server authentication transparently.
-//
-// Usage:
-//
-//	ctx := context.Background()
-//	client, err := ephemos.NewIdentityClient(ctx, "")
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	defer client.Close() // Ensure proper cleanup
-//
-//	conn, err := client.Connect(ctx, "service-name", "localhost:50051")
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	defer conn.Close() // Always defer connection cleanup
 type Client interface {
 	// Connect establishes a connection to the specified service at the given address.
 	// The serviceName is used for identity verification and must be non-empty.
 	// The address should be in the format "host:port" and must be non-empty.
 	// The context can be used for cancellation and timeouts.
-	// Returns a ClientConnection that provides access to the underlying gRPC connection.
+	// Returns a ClientConnection that provides access to the underlying HTTP connection.
 	// The caller must call Close() on the returned connection to release resources.
 	Connect(ctx context.Context, serviceName, address string) (*ClientConnection, error)
 
@@ -192,7 +124,7 @@ type Client interface {
 //	defer server.Close()
 //
 //	registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-//		proto.RegisterYourServiceServer(s, &myService{})
+//		yourservice.RegisterYourServiceServer(s, &myService{})
 //	})
 //	server.RegisterService(ctx, registrar)
 //	lis, _ := net.Listen("tcp", ":50051")
@@ -285,7 +217,7 @@ func NewIdentityServer(ctx context.Context, configPath string) (Server, error) {
 //	}
 //	defer conn.Close()
 //
-//	serviceClient := proto.NewServiceClient(conn.GetClientConnection())
+//	serviceClient := yourservice.NewServiceClient(conn.GetClientConnection())
 func NewIdentityClient(ctx context.Context, configPath string) (Client, error) {
 	if ctx == nil {
 		return nil, &ValidationError{
@@ -336,7 +268,7 @@ type InterceptorConfig struct {
 	// MetricsConfig for metrics configuration
 	MetricsConfig *MetricsConfig
 	// CustomInterceptors allows adding custom interceptors
-	CustomInterceptors []grpc.UnaryServerInterceptor
+	CustomInterceptors []interface{}
 }
 
 // NewDefaultInterceptorConfig creates a default interceptor configuration.
@@ -377,16 +309,16 @@ func NewDevelopmentInterceptorConfig(serviceName string) *InterceptorConfig {
 	}
 }
 
-// CreateServerInterceptors creates gRPC server interceptors based on configuration.
+// CreateServerInterceptors creates HTTP server interceptors based on configuration.
 func CreateServerInterceptors(
 	config *InterceptorConfig,
-) ([]grpc.UnaryServerInterceptor, []grpc.StreamServerInterceptor) {
+) ([]interface{}, []interface{}) {
 	if config == nil {
 		config = NewDefaultInterceptorConfig()
 	}
 
-	var unaryInterceptors []grpc.UnaryServerInterceptor
-	var streamInterceptors []grpc.StreamServerInterceptor
+	var unaryInterceptors []interface{}
+	var streamInterceptors []interface{}
 
 	// Add logging interceptor
 	if config.EnableLogging && config.Logger != nil {
@@ -409,16 +341,16 @@ func CreateServerInterceptors(
 	return unaryInterceptors, streamInterceptors
 }
 
-// CreateClientInterceptors creates gRPC client interceptors based on configuration.
+// CreateClientInterceptors creates HTTP client interceptors based on configuration.
 func CreateClientInterceptors(
 	config *InterceptorConfig,
-) ([]grpc.UnaryClientInterceptor, []grpc.StreamClientInterceptor) {
+) ([]interface{}, []interface{}) {
 	if config == nil {
 		config = NewDefaultInterceptorConfig()
 	}
 
-	var unaryInterceptors []grpc.UnaryClientInterceptor
-	var streamInterceptors []grpc.StreamClientInterceptor
+	var unaryInterceptors []interface{}
+	var streamInterceptors []interface{}
 
 	// Add client-side logging interceptor
 	if config.EnableLogging && config.Logger != nil {
@@ -436,7 +368,7 @@ func CreateClientInterceptors(
 // Transport-Agnostic API
 //
 // The following functions are defined in server.go and provide a transport-agnostic
-// API where services are written with plain Go types and can run over gRPC, HTTP,
+// API where services are written with plain Go types and can run over HTTP
 // or any future transport without code changes.
 //
 // Example usage:

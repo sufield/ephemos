@@ -29,7 +29,6 @@ Ephemos has migrated from a shell script and Makefile-based build system to [Baz
 ### Before (Shell/Make)
 ```bash
 make build           # Build everything
-make proto           # Generate protobuf
 make test            # Run tests
 ./scripts/ci/lint.sh # Run linting
 ./scripts/security/scan-secrets.sh # Security scan
@@ -39,7 +38,6 @@ make test            # Run tests
 ### After (Bazel)
 ```bash
 ./bazel.sh build         # Build everything
-./bazel.sh proto         # Generate protobuf  
 ./bazel.sh test          # Run tests
 ./bazel.sh lint          # Run linting
 ./bazel.sh security-all  # Run all security scans
@@ -131,7 +129,6 @@ All shell scripts have been converted to Bazel targets for better dependency man
 - `lint.sh` → `//scripts:lint`
 - `build.sh` → `//scripts:build`
 - `check-deps.sh` → `//scripts:check_deps`
-- `generate-proto.sh` → `//scripts:generate_proto`
 
 ### Security Scripts (`scripts/security/BUILD.bazel`)
 - `scan-secrets.sh` → `//scripts/security:scan_secrets`
@@ -313,7 +310,6 @@ bazel analyze-profile profile.json
 ### Phase 1: Core Infrastructure ✅
 - [x] Set up WORKSPACE and .bazelrc
 - [x] Create BUILD files for main components  
-- [x] Set up protobuf generation
 - [x] Create wrapper script (bazel.sh)
 
 ### Phase 2: Script Conversion ✅  

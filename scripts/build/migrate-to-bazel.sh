@@ -95,7 +95,6 @@ compare_systems() {
     echo "│ Task                │ Current (Make)      │ New (Bazel)         │"
     echo "├─────────────────────┼─────────────────────┼─────────────────────┤"
     echo "│ Build everything    │ make build          │ ./bazel.sh build    │"
-    echo "│ Generate protobuf   │ make proto          │ ./bazel.sh proto    │"
     echo "│ Run tests           │ make test           │ ./bazel.sh test     │"
     echo "│ Run with coverage   │ make ci-test        │ ./bazel.sh coverage │"
     echo "│ Build examples      │ make examples       │ ./bazel.sh examples │"

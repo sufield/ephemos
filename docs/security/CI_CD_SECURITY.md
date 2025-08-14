@@ -104,7 +104,6 @@ examples/*/*-example
 !examples/**/*.yaml
 !examples/**/*.yml
 !examples/**/*.json
-!examples/**/*.proto
 !examples/**/*.mod
 !examples/**/*.sum
 !examples/**/*.txt
@@ -133,7 +132,6 @@ make install-deps            # Go tools only, no system packages
 $ make setup
 🔧 Installing Go tools (no sudo required)...
 🔧 Setup partially complete. System packages still needed.
-For system packages (protoc), run: ./scripts/install-deps-sudo.sh
 ```
 
 **CI Environment (Hardened)**:
@@ -198,7 +196,6 @@ fi
 ```bash
 # All scripts tested for automation compatibility
 CI=true scripts/install-deps.sh      # ✅ Returns 0
-CI=true scripts/ensure-protoc.sh     # ✅ Returns 0 
 CI=true make setup                   # ✅ Returns 0
 make clean && make build             # ✅ Full reproducible build
 ```
@@ -210,7 +207,6 @@ make clean && make build             # ✅ Full reproducible build
 ```yaml
 # .github/workflows/ci.yml (unchanged - maintains security)
 - name: Setup Protocol Buffers (Required for CI/CD)
-  uses: ./.github/actions/setup-protobuf  # Handles system dependencies
 
 - name: Build and verify  
   run: |

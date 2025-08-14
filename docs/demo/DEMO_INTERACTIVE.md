@@ -84,7 +84,7 @@ Selector         : unix:uid:0
 ### Step 1: Build the Echo Server
 ```bash
 # Generate protobuf code
-make proto
+make build
 
 # Build example applications
 make examples

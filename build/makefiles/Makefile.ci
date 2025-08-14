@@ -3,7 +3,7 @@
 .PHONY: ci-setup ci-lint ci-test ci-security ci-build ci-all clean-cache
 
 # Setup environment for CI
-ci-setup: proto
+ci-setup:
 	@echo "🧹 Cleaning Go build cache (aggressive)..."
 	go clean -cache
 	go clean -modcache || true

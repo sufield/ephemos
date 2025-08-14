@@ -92,12 +92,12 @@ fi
 **2. Path Safety:**
 ```bash
 # Secure path handling
-readonly PROTO_DIR="$1"
+readonly SERVICE_DIR="$1"
 readonly GO_OUT="$2"
-readonly PROTO_FILE="${PROTO_DIR}/echo.proto"
+readonly SERVICE_FILE="${SERVICE_DIR}/echo.service"
 
-if [[ ! -f "$PROTO_FILE" ]]; then
-    echo "Error: Proto file '$PROTO_FILE' does not exist" >&2
+if [[ ! -f "$SERVICE_FILE" ]]; then
+    echo "Error: Service file '$SERVICE_FILE' does not exist" >&2
     exit 1
 fi
 ```
@@ -133,7 +133,7 @@ cp Makefile.new Makefile
 ```bash
 # Test basic build system
 make build
-make proto
+make build
 make examples
 make test
 
@@ -213,7 +213,7 @@ make release-check
 ```bash
 # Core functionality
 make build && echo "✅ Build works"
-make proto && echo "✅ Proto generation works"  
+make build && echo "✅ Build works"  
 make examples && echo "✅ Examples build"
 make test && echo "✅ Tests pass"
 

@@ -8,7 +8,6 @@ This document outlines the migration from shell scripts and Makefiles to Bazel f
 
 ### 1. Core Bazel Configuration
 
-- **WORKSPACE**: Main Bazel configuration with Go rules, Gazelle, and protobuf support
 - **.bazelrc**: Build configuration with security, performance, and reproducible build settings
   - External dependency mode: `--enable_workspace` with `--noenable_bzlmod`
   - Modern resource flags: `--local_resources=memory=75%,cpu=100%`
@@ -65,7 +64,6 @@ This document outlines the migration from shell scripts and Makefiles to Bazel f
 ### Before (Shell/Make):
 ```bash
 make build           # Build everything
-make proto           # Generate protobuf
 make test            # Run tests
 ./scripts/ci/lint.sh # Run linting
 ./scripts/security/scan-secrets.sh # Security scan
@@ -75,7 +73,6 @@ make test            # Run tests
 ### After (Bazel):
 ```bash
 ./bazel.sh build         # Build everything
-./bazel.sh proto         # Generate protobuf
 ./bazel.sh test          # Run tests
 ./bazel.sh lint          # Run linting
 ./bazel.sh security-all  # Run all security scans
@@ -100,7 +97,6 @@ bazel run //scripts/demo:setup_demo       # Setup demo environment
 ### Phase 1: Core Infrastructure ✅
 - [x] Set up WORKSPACE and .bazelrc
 - [x] Create BUILD files for main components
-- [x] Set up protobuf generation
 - [x] Create wrapper script (bazel.sh)
 
 ### Phase 2: CI/CD Integration ✅

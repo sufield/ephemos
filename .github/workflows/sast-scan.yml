@@ -27,7 +27,7 @@ jobs:
           SCAN_AUTO_BUILD: true
 
       - name: Upload scan reports
-        if: always()
+        if: always()  # Upload even if scan fails
         uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         with:
           name: scan-reports

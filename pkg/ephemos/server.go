@@ -1,8 +1,8 @@
 // Package ephemos provides a transport-agnostic service framework with hexagonal architecture.
-// Services can run over gRPC, HTTP, or any future transport without code changes.
+// Services can run over HTTP or any future transport without code changes.
 //
 // Architecture: This file contains the transport server implementation, which handles
-// protocol-specific concerns (gRPC, HTTP) and delegates business logic to the identity server.
+// protocol-specific concerns (HTTP) and delegates business logic to the identity server.
 // For the production-ready identity server with graceful shutdown, see identity_server.go.
 package ephemos
 
@@ -17,31 +17,24 @@ import (
 	"syscall"
 	"time"
 
-	"google.golang.org/grpc"
 	// Internal adapters temporarily removed to eliminate dependencies
 )
 
 const (
-	// TransportTypeGRPC represents gRPC transport type.
-	TransportTypeGRPC = "grpc"
 	// TransportTypeHTTP represents HTTP transport type.
 	TransportTypeHTTP = "http"
 	// DefaultShutdownTimeout is the default timeout for graceful shutdown.
 	DefaultShutdownTimeout = 30 * time.Second
 	// DefaultHTTPAddress is the default address for HTTP transport.
 	DefaultHTTPAddress = ":8080"
-	// DefaultGRPCAddress is the default address for gRPC transport.
-	DefaultGRPCAddress = ":50051"
 )
 
 // TransportServer represents a transport-agnostic service server.
-// The transport (gRPC, HTTP, etc.) is determined by configuration.
+// The transport (HTTP, etc.) is determined by configuration.
 type TransportServer struct {
 	config *Configuration
 
 	// Transport implementations - only one will be active
-	grpcServer  *grpc.Server
-	grpcAdapter GRPCAdapter
 	httpServer  *http.Server
 	httpMux     *http.ServeMux
 	httpAdapter HTTPAdapter
@@ -63,9 +56,6 @@ func newTransportServer(ctx context.Context, configPath string) (*TransportServe
 
 	// Initialize the appropriate transport based on config
 	switch config.Transport.Type {
-	case TransportTypeGRPC:
-		server.grpcAdapter = NewGRPCAdapter()
-		server.grpcServer = server.grpcAdapter.GetGRPCServer()
 	case TransportTypeHTTP:
 		server.httpAdapter = NewHTTPAdapter(config.Transport.Address)
 		server.httpServer = server.httpAdapter.GetHTTPServer()
@@ -88,11 +78,6 @@ func mount[T any](server *TransportServer, impl T) error {
 // mountService handles the actual service registration based on transport type.
 func (s *TransportServer) mountService(impl any) error {
 	switch s.config.Transport.Type {
-	case TransportTypeGRPC:
-		if s.grpcAdapter == nil {
-			return fmt.Errorf("gRPC adapter not initialized")
-		}
-		return s.grpcAdapter.Mount(impl)
 	case TransportTypeHTTP:
 		if s.httpAdapter == nil {
 			return fmt.Errorf("HTTP adapter not initialized")
@@ -113,8 +98,6 @@ func (s *TransportServer) ListenAndServe(ctx context.Context) error {
 	defer cancel()
 
 	switch s.config.Transport.Type {
-	case TransportTypeGRPC:
-		return s.serveGRPC(ctx, shutdownCtx, addr)
 	case TransportTypeHTTP:
 		return s.serveHTTP(ctx, shutdownCtx, addr)
 	default:
@@ -127,12 +110,10 @@ func (s *TransportServer) ListenAndServe(ctx context.Context) error {
 func (s *TransportServer) serveOnListener(ctx context.Context, listener net.Listener) error {
 	transportType := s.config.Transport.Type
 	if transportType == "" {
-		transportType = TransportTypeGRPC // default
+		transportType = TransportTypeHTTP // default
 	}
 
 	switch transportType {
-	case TransportTypeGRPC:
-		return s.serveGRPCOnListener(ctx, listener)
 	case TransportTypeHTTP:
 		return s.serveHTTPOnListener(ctx, listener)
 	default:
@@ -144,62 +125,15 @@ func (s *TransportServer) resolveAddress() string {
 	addr := s.config.Transport.Address
 	if addr == "" {
 		switch s.config.Transport.Type {
-		case TransportTypeGRPC:
-			addr = DefaultGRPCAddress
 		case TransportTypeHTTP:
 			addr = DefaultHTTPAddress
 		default:
-			addr = DefaultGRPCAddress // fallback to gRPC default
+			addr = DefaultHTTPAddress // fallback to HTTP default
 		}
 	}
 	return addr
 }
 
-func (s *TransportServer) serveGRPC(_, shutdownCtx context.Context, addr string) error {
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("failed to listen on %s: %w", addr, err)
-	}
-	defer func() {
-		if closeErr := lis.Close(); closeErr != nil {
-			// Log the error but don't override the main error
-			// In a real implementation, this would use a logger
-			_ = closeErr
-		}
-	}()
-
-	var wg sync.WaitGroup
-	var serverErr error
-	var errMutex sync.Mutex
-
-	setServerError := func(err error) {
-		errMutex.Lock()
-		defer errMutex.Unlock()
-		if serverErr == nil && err != nil {
-			serverErr = err
-		}
-	}
-
-	// Start gRPC server in a goroutine
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := s.grpcServer.Serve(lis); err != nil {
-			setServerError(fmt.Errorf("gRPC server error: %w", err))
-		}
-	}()
-
-	// Wait for shutdown signal
-	<-shutdownCtx.Done()
-
-	// Graceful shutdown for gRPC server
-	s.grpcServer.GracefulStop()
-	wg.Wait()
-
-	errMutex.Lock()
-	defer errMutex.Unlock()
-	return serverErr
-}
 
 func (s *TransportServer) serveHTTP(ctx, shutdownCtx context.Context, addr string) error {
 	s.httpServer.Addr = addr
@@ -242,48 +176,6 @@ func (s *TransportServer) serveHTTP(ctx, shutdownCtx context.Context, addr strin
 	return serverErr
 }
 
-// serveGRPCOnListener serves gRPC on a pre-created listener
-func (s *TransportServer) serveGRPCOnListener(ctx context.Context, listener net.Listener) error {
-	defer func() {
-		if closeErr := listener.Close(); closeErr != nil {
-			// Log error but don't override main error
-			_ = closeErr
-		}
-	}()
-
-	var wg sync.WaitGroup
-	var serverErr error
-	var errMutex sync.Mutex
-
-	setServerError := func(err error) {
-		errMutex.Lock()
-		defer errMutex.Unlock()
-		if serverErr == nil && err != nil {
-			serverErr = err
-		}
-	}
-
-	// Start gRPC server in a goroutine
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := s.grpcServer.Serve(listener); err != nil {
-			setServerError(fmt.Errorf("gRPC server error: %w", err))
-		}
-	}()
-
-	// Wait for context cancellation
-	go func() {
-		<-ctx.Done()
-		s.grpcServer.GracefulStop()
-	}()
-
-	wg.Wait()
-
-	errMutex.Lock()
-	defer errMutex.Unlock()
-	return serverErr
-}
 
 // serveHTTPOnListener serves HTTP on a pre-created listener
 func (s *TransportServer) serveHTTPOnListener(ctx context.Context, listener net.Listener) error {
@@ -331,10 +223,6 @@ func (s *TransportServer) serveHTTPOnListener(ctx context.Context, listener net.
 // Close gracefully shuts down the server.
 func (s *TransportServer) Close() error {
 	switch s.config.Transport.Type {
-	case TransportTypeGRPC:
-		if s.grpcServer != nil {
-			s.grpcServer.GracefulStop()
-		}
 	case TransportTypeHTTP:
 		if s.httpServer != nil {
 			if err := s.httpServer.Close(); err != nil {
@@ -355,12 +243,10 @@ func loadConfig(ctx context.Context, path string) (*Configuration, error) {
 
 	// Set transport defaults if not specified
 	if cfg.Transport.Type == "" {
-		cfg.Transport.Type = TransportTypeGRPC
+		cfg.Transport.Type = TransportTypeHTTP
 	}
 	if cfg.Transport.Address == "" {
 		switch cfg.Transport.Type {
-		case TransportTypeGRPC:
-			cfg.Transport.Address = DefaultGRPCAddress
 		case TransportTypeHTTP:
 			cfg.Transport.Address = DefaultHTTPAddress
 		}

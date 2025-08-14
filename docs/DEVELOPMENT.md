@@ -12,7 +12,6 @@ make setup
 ```
 
 This will install:
-- Protocol Buffers compiler (`protoc`)
 - Go protobuf generation tools
 - Development and security tools
 - Verify everything works
@@ -53,14 +52,11 @@ brew install protobuf
 
 **Windows:**
 ```bash
-choco install protoc
 ```
 
 ### 3. Go Protobuf Tools
 
 ```bash
-go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 ```
 
 ### 4. Optional Development Tools
@@ -102,7 +98,6 @@ make lint
 
 ## Common Issues
 
-### "protoc not found"
 
 **Problem:** The build fails with protobuf generation errors.
 
@@ -117,7 +112,6 @@ make lint
    make setup    # Installs all development tools
    ```
 
-3. **Manual protoc installation**: 
    ```bash
    sudo apt-get install protobuf-compiler  # Ubuntu/Debian
    brew install protobuf                    # macOS
@@ -125,17 +119,13 @@ make lint
 
 4. **CI Environments**: Use CI-friendly build targets
    ```bash
-   make proto-ci    # Tolerant of missing protoc
    ```
 
-### "protoc-gen-go not found"
 
 **Problem:** Protobuf generation fails with missing Go tools.
 
 **Solution:**
 ```bash
-go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 # Add Go bin to PATH (add to ~/.bashrc or ~/.zshrc)
 export PATH="$PATH:$(go env GOPATH)/bin"
@@ -198,7 +188,6 @@ ephemos/
 | `make setup` | Install all development dependencies |
 | `make check-deps` | Check if dependencies are installed |
 | `make build` | Build CLI tools |
-| `make proto` | Generate protobuf code |
 | `make examples` | Build example applications |
 | `make test` | Run test suite |
 | `make lint` | Run code linting |

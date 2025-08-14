@@ -43,7 +43,6 @@ examples/*/*-example
 !examples/**/*.yaml
 !examples/**/*.yml
 !examples/**/*.json
-!examples/**/*.proto
 !examples/**/*.mod
 !examples/**/*.sum
 !examples/**/*.txt
@@ -129,7 +128,6 @@ $ make setup
 🔧 Setting up Ephemos development environment...
 🔧 Installing Go tools (no sudo required)...
 🔧 Setup partially complete. System packages still needed.
-For system packages (protoc), run: ./scripts/install-deps-sudo.sh
 Or install manually and run 'make setup' again
 ```
 
@@ -137,7 +135,6 @@ Or install manually and run 'make setup' again
 ```bash
 $ CI=true make setup
 🔧 Setting up Ephemos development environment...
-🎉 All dependencies are already available!  # CI uses setup-protobuf action
 ```
 
 ## 🔧 Make Target Reference
@@ -147,9 +144,7 @@ $ CI=true make setup
 | Target | Description | Reproducible Build | Dependencies |
 |--------|-------------|-------------------|--------------|
 | `make build` | Build CLI and config-validator | ✅ | check-deps, show-build-info |
-| `make examples` | Build example applications | ✅ | proto |
 | `make clean` | Remove all build artifacts | - | - |
-| `make proto` | Generate protobuf code | - | check-deps |
 
 ### Development Targets
 
@@ -186,12 +181,9 @@ $ CI=true make setup
 **Solution**: Environment-aware script behavior:
 
 ```bash
-# scripts/build/generate-proto.sh
 if [[ "${CI:-}" == "true" ]] || [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
     echo "CI environment detected. Protoc should be installed by GitHub Actions."
-    echo "If you see this error in CI, check the setup-protobuf action."
 else
-    echo "Install protoc with:"
     echo "  make setup          # Smart setup (Go tools only)"
     echo "  ./scripts/install-deps-sudo.sh  # Full setup (requires sudo)"
 fi
@@ -204,7 +196,6 @@ The build system integrates seamlessly with existing GitHub Actions:
 ```yaml
 # .github/workflows/ci.yml
 - name: Setup Protocol Buffers (Required for CI/CD)
-  uses: ./.github/actions/setup-protobuf
 
 - name: Build and verify
   run: |
@@ -273,10 +264,8 @@ ephemos/
 ├── scripts/
 │   ├── install-deps.sh     # No-sudo setup script (UPDATED)
 │   ├── install-deps-sudo.sh # Full sudo setup script (NEW)
-│   ├── ensure-protoc.sh    # CI-aware protoc installer (UPDATED)
 │   ├── check-deps.sh       # Dependency checker (UPDATED)
 │   └── build/
-│       └── generate-proto.sh # CI-aware protobuf generation (UPDATED)
 └── .gitignore              # Enhanced binary exclusion (UPDATED)
 ```
 
@@ -336,13 +325,11 @@ make examples          # With version info
 
 ### Common Issues
 
-**"make setup fails with missing protoc"**:
 ```bash
 # The setup intentionally doesn't install system packages without sudo
 # Solutions:
 ./scripts/install-deps-sudo.sh  # Automatic with sudo
 # or
-sudo apt-get install protobuf-compiler  # Manual installation
 make setup  # Try again
 ```
 
@@ -351,8 +338,6 @@ make setup  # Try again
 # Verify CI environment detection
 CI=true make setup  # Should not attempt sudo operations
 
-# Check GitHub Actions uses setup-protobuf action:
-uses: ./.github/actions/setup-protobuf
 ```
 
 **"Binary artifacts appearing in git"**:

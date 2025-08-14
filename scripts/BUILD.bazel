@@ -15,17 +15,7 @@ sh_binary(
 
 # ci_lint is now in //scripts/ci:lint_check
 
-sh_binary(
-    name = "generate_proto",
-    srcs = ["build/generate-proto.sh"],
-    visibility = ["//visibility:public"],
-)
 
-sh_binary(
-    name = "generate_proto_ci",
-    srcs = ["generate-proto-ci.sh"],
-    visibility = ["//visibility:public"],
-)
 
 sh_binary(
     name = "benchmark",
@@ -39,11 +29,6 @@ sh_binary(
     visibility = ["//visibility:public"],
 )
 
-sh_binary(
-    name = "ensure_protoc",
-    srcs = ["ensure-protoc.sh"],
-    visibility = ["//visibility:public"],
-)
 
 # CI setup and build
 sh_binary(
@@ -120,7 +105,6 @@ test_suite(
     ],
 )
 
-# Note: Go-based protobuf generator is defined in //scripts/proto:proto_generator
 
 # TODO: Future Go-based tests could be added here
 # go_test(

@@ -13,7 +13,7 @@ func TestConfigBuilder_PureCodeConfiguration(t *testing.T) {
 		WithServiceName("test-service").
 		WithServiceDomain("test.example.com").
 		WithSPIFFESocket("/custom/spiffe/socket").
-		WithTransport("grpc", ":8080").
+		WithTransport("http", ":8080").
 		WithAuthorizedClients([]string{"spiffe://test.com/client1", "spiffe://test.com/client2"}).
 		WithTrustedServers([]string{"spiffe://test.com/server1", "spiffe://test.com/server2"}).
 		Build(ctx)
@@ -31,8 +31,8 @@ func TestConfigBuilder_PureCodeConfiguration(t *testing.T) {
 	if config.SPIFFE.SocketPath != "/custom/spiffe/socket" {
 		t.Errorf("Expected SPIFFE socket '/custom/spiffe/socket', got '%s'", config.SPIFFE.SocketPath)
 	}
-	if config.Transport.Type != TransportTypeGRPC {
-		t.Errorf("Expected transport type 'grpc', got '%s'", config.Transport.Type)
+	if config.Transport.Type != TransportTypeHTTP {
+		t.Errorf("Expected transport type 'http', got '%s'", config.Transport.Type)
 	}
 	if config.Transport.Address != ":8080" {
 		t.Errorf("Expected transport address ':8080', got '%s'", config.Transport.Address)
@@ -127,7 +127,7 @@ func TestLoadConfigFlexible_PureCode(t *testing.T) {
 	config, err := LoadConfigFlexible(ctx,
 		WithPureCodeSource(),
 		WithService("flexible-service", "flexible.example.com"),
-		WithTransportOption("grpc", ":7070"),
+		WithTransportOption("http", ":7070"),
 	)
 	if err != nil {
 		t.Fatalf("Failed to load flexible config: %v", err)
@@ -180,11 +180,11 @@ func TestConfigBuilder_Defaults(t *testing.T) {
 	if config.Service.Name != "ephemos-service" {
 		t.Errorf("Expected default service name 'ephemos-service', got '%s'", config.Service.Name)
 	}
-	if config.Transport.Type != "grpc" {
-		t.Errorf("Expected default transport type 'grpc', got '%s'", config.Transport.Type)
+	if config.Transport.Type != "http" {
+		t.Errorf("Expected default transport type 'http', got '%s'", config.Transport.Type)
 	}
-	if config.Transport.Address != ":50051" {
-		t.Errorf("Expected default transport address ':50051', got '%s'", config.Transport.Address)
+	if config.Transport.Address != ":8080" {
+		t.Errorf("Expected default transport address ':8080', got '%s'", config.Transport.Address)
 	}
 }
 

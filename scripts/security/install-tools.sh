@@ -34,7 +34,7 @@ if command -v gitleaks >/dev/null 2>&1; then
     gitleaks version || echo "  Version info not available"
 else
     echo "Downloading gitleaks..."
-    readonly GITLEAKS_VERSION="v8.18.0"  # Pin to specific version
+    readonly GITLEAKS_VERSION="v8.28.0"  # Pin to specific version
     readonly SYSTEM="$(uname -s)"
     readonly ARCH="$(uname -m)"
     readonly GITLEAKS_URL="https://github.com/gitleaks/gitleaks/releases/download/${GITLEAKS_VERSION}/gitleaks_${SYSTEM}_${ARCH}.tar.gz"
@@ -78,7 +78,7 @@ if command -v trufflehog >/dev/null 2>&1; then
     trufflehog --version || echo "  Version info not available"
 else
     echo "Downloading TruffleHog..."
-    readonly TRUFFLEHOG_VERSION="v3.63.7"  # Pin to specific version
+    readonly TRUFFLEHOG_VERSION="v3.90.4"  # Pin to specific version
     readonly SYSTEM_LOWER="$(uname -s | tr '[:upper:]' '[:lower:]')"
     readonly ARCH_MAPPED="$(uname -m | sed 's/x86_64/amd64/g' | sed 's/aarch64/arm64/g')"
     readonly TRUFFLEHOG_URL="https://github.com/trufflesecurity/trufflehog/releases/download/${TRUFFLEHOG_VERSION}/trufflehog_${TRUFFLEHOG_VERSION}_${SYSTEM_LOWER}_${ARCH_MAPPED}.tar.gz"
