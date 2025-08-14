@@ -407,23 +407,23 @@ jobs:
           fi
           
           # Build each target with proper error handling and detailed output
-          echo "Building fuzz_config..."
-          echo "Command: go build -v -o build-out/fuzz_config ./fuzz-targets/config_fuzz_main.go"
+          echo "Building config_fuzz..."
+          echo "Command: go build -v -o build-out/config_fuzz ./fuzz-targets/config_fuzz_main.go"
           echo "Source file validation:"
           head -10 ./fuzz-targets/config_fuzz_main.go
           
           # Build with full error capture
-          BUILD_OUTPUT=$(go build -v -o build-out/fuzz_config ./fuzz-targets/config_fuzz_main.go 2>&1)
+          BUILD_OUTPUT=$(go build -v -o build-out/config_fuzz ./fuzz-targets/config_fuzz_main.go 2>&1)
           BUILD_EXIT_CODE=$?
           echo "Build output: $BUILD_OUTPUT"
           echo "Build exit code: $BUILD_EXIT_CODE"
           
           if [ $BUILD_EXIT_CODE -eq 0 ]; then
-            echo "✅ fuzz_config built successfully"
-            ls -la build-out/fuzz_config
-            ./build-out/fuzz_config 2>/dev/null && echo "✅ fuzz_config runs successfully" || echo "⚠️ fuzz_config execution test failed"
+            echo "✅ config_fuzz built successfully"
+            ls -la build-out/config_fuzz
+            ./build-out/config_fuzz 2>/dev/null && echo "✅ config_fuzz runs successfully" || echo "⚠️ config_fuzz execution test failed"
           else
-            echo "❌ fuzz_config build failed (exit code: $BUILD_EXIT_CODE)"
+            echo "❌ config_fuzz build failed (exit code: $BUILD_EXIT_CODE)"
             echo "Build error output:"
             echo "$BUILD_OUTPUT"
             echo "Source file content:"
@@ -431,22 +431,22 @@ jobs:
             exit 1
           fi
           
-          echo "Building fuzz_server..."
-          echo "Command: go build -v -o build-out/fuzz_server ./fuzz-targets/server_fuzz_main.go"
+          echo "Building server_fuzz..."
+          echo "Command: go build -v -o build-out/server_fuzz ./fuzz-targets/server_fuzz_main.go"
           echo "Source file validation:"
           head -10 ./fuzz-targets/server_fuzz_main.go
           
-          BUILD_OUTPUT=$(go build -v -o build-out/fuzz_server ./fuzz-targets/server_fuzz_main.go 2>&1)
+          BUILD_OUTPUT=$(go build -v -o build-out/server_fuzz ./fuzz-targets/server_fuzz_main.go 2>&1)
           BUILD_EXIT_CODE=$?
           echo "Build output: $BUILD_OUTPUT"
           echo "Build exit code: $BUILD_EXIT_CODE"
           
           if [ $BUILD_EXIT_CODE -eq 0 ]; then
-            echo "✅ fuzz_server built successfully"
-            ls -la build-out/fuzz_server
-            ./build-out/fuzz_server 2>/dev/null && echo "✅ fuzz_server runs successfully" || echo "⚠️ fuzz_server execution test failed"
+            echo "✅ server_fuzz built successfully"
+            ls -la build-out/server_fuzz
+            ./build-out/server_fuzz 2>/dev/null && echo "✅ server_fuzz runs successfully" || echo "⚠️ server_fuzz execution test failed"
           else
-            echo "❌ fuzz_server build failed (exit code: $BUILD_EXIT_CODE)"
+            echo "❌ server_fuzz build failed (exit code: $BUILD_EXIT_CODE)"
             echo "Build error output:"
             echo "$BUILD_OUTPUT"
             echo "Source file content:"
@@ -454,22 +454,22 @@ jobs:
             exit 1
           fi
           
-          echo "Building fuzz_identity..."
-          echo "Command: go build -v -o build-out/fuzz_identity ./fuzz-targets/identity_fuzz_main.go"
+          echo "Building identity_fuzz..."
+          echo "Command: go build -v -o build-out/identity_fuzz ./fuzz-targets/identity_fuzz_main.go"
           echo "Source file validation:"
           head -10 ./fuzz-targets/identity_fuzz_main.go
           
-          BUILD_OUTPUT=$(go build -v -o build-out/fuzz_identity ./fuzz-targets/identity_fuzz_main.go 2>&1)
+          BUILD_OUTPUT=$(go build -v -o build-out/identity_fuzz ./fuzz-targets/identity_fuzz_main.go 2>&1)
           BUILD_EXIT_CODE=$?
           echo "Build output: $BUILD_OUTPUT"
           echo "Build exit code: $BUILD_EXIT_CODE"
           
           if [ $BUILD_EXIT_CODE -eq 0 ]; then
-            echo "✅ fuzz_identity built successfully"
-            ls -la build-out/fuzz_identity
-            ./build-out/fuzz_identity 2>/dev/null && echo "✅ fuzz_identity runs successfully" || echo "⚠️ fuzz_identity execution test failed"
+            echo "✅ identity_fuzz built successfully"
+            ls -la build-out/identity_fuzz
+            ./build-out/identity_fuzz 2>/dev/null && echo "✅ identity_fuzz runs successfully" || echo "⚠️ identity_fuzz execution test failed"
           else
-            echo "❌ fuzz_identity build failed (exit code: $BUILD_EXIT_CODE)"
+            echo "❌ identity_fuzz build failed (exit code: $BUILD_EXIT_CODE)"
             echo "Build error output:"
             echo "$BUILD_OUTPUT"
             echo "Source file content:"
@@ -492,7 +492,7 @@ jobs:
           
           # Check each expected binary exists and is executable
           missing_targets=0
-          for binary in fuzz_config fuzz_server fuzz_identity; do
+          for binary in config_fuzz server_fuzz identity_fuzz; do
             if [ -f "build-out/$binary" ]; then
               echo "✅ $binary exists"
               # Check if it's executable
