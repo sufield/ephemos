@@ -196,7 +196,7 @@ main() {
     if test_bazel_build; then
         log_success "Bazel build system is working!"
     else
-        log_warning "Bazel build needs checksum fixes (see README_BAZEL.md)"
+        log_warning "Bazel build needs checksum fixes (see docs/build-systems/BAZEL.md)"
         log_info "You can still proceed with migration planning"
     fi
     
@@ -218,7 +218,7 @@ main() {
     echo "4. Gradually replace Makefile usage with Bazel commands"
     echo "5. Remove shell scripts after verifying Bazel equivalents work"
     echo ""
-    echo "📖 See README_BAZEL.md for detailed migration guide"
+    echo "📖 See docs/build-systems/BAZEL.md for detailed migration guide"
 }
 
 # Run main function

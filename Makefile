@@ -4,9 +4,9 @@
 .PHONY: all help
 
 # Include modular makefiles
-include Makefile.core
-include Makefile.ci
-include Makefile.security
+include build/makefiles/Makefile.core
+include build/makefiles/Makefile.ci
+include build/makefiles/Makefile.security
 
 # Demo targets (kept minimal for security)
 .PHONY: demo demo-force demo-version

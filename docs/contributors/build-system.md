@@ -396,7 +396,7 @@ go_test(
 - [Bazel Documentation](https://bazel.build/docs)
 - [Go Rules for Bazel](https://github.com/bazelbuild/rules_go)
 - [Bazel Best Practices](https://bazel.build/concepts/best-practices)
-- [Repository README_BAZEL.md](../../README_BAZEL.md) - Complete migration documentation
+- [Repository Bazel Documentation](../build-systems/BAZEL.md) - Complete migration documentation
 
 ## Support
 
