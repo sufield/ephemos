@@ -115,8 +115,8 @@ jobs:
           # Ensure we're in the workspace directory
           cd ${{ github.workspace }}
           
-          # Create a simple memory profiling test in a safe location
-          cat > ./memory_profile_test.go << 'EOF'
+          # Create a simple memory profiling program in a safe location
+          cat > ./memory_profile.go << 'EOF'
           package main
           import (
             "context"
@@ -156,16 +156,16 @@ jobs:
           EOF
           
           # Verify the Go script was created successfully
-          if [[ ! -f "./memory_profile_test.go" ]]; then
-            echo "❌ Failed to create memory_profile_test.go"
+          if [[ ! -f "./memory_profile.go" ]]; then
+            echo "❌ Failed to create memory_profile.go"
             exit 1
           fi
           
           echo "✅ Created memory profiling script"
           
-          # Run the memory profiling test with proper error handling
+          # Run the memory profiling program with proper error handling
           echo "🔍 Running memory profiling..."
-          if go run ./memory_profile_test.go > memory-profile-results.txt 2>&1; then
+          if go run ./memory_profile.go > memory-profile-results.txt 2>&1; then
             echo "✅ Memory profiling completed successfully"
             cat memory-profile-results.txt
           else
