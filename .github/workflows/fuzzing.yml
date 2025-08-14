@@ -139,6 +139,9 @@ jobs:
 
     - name: Prepare ClusterFuzzLite environment
       run: |
+        set -e  # Exit on any error
+        set -x  # Print commands being executed
+        
         echo "🔧 Setting up ClusterFuzzLite environment..."
         
         # Create directories for ClusterFuzzLite
@@ -150,20 +153,31 @@ jobs:
         mkdir -p build-out
         
         # Build project
+        echo "🏗️ Building project..."
+        if ! make build; then
+          echo "❌ Error: Failed to build project"
+          exit 1
+        fi
         
-        # Build the project first to ensure everything compiles
-        echo "Building project..."
-        make build
+        echo "✅ Project built successfully"
         
         # Create dedicated fuzz target binaries for ClusterFuzzLite
-        echo "Creating fuzz target binaries..."
+        echo "📝 Creating fuzz target binaries..."
         
         # For ClusterFuzzLite with Go, we need to create binaries that wrap our fuzz tests
         # Create a temporary directory for fuzz target source files
-        mkdir -p fuzz-targets
+        if ! mkdir -p fuzz-targets; then
+          echo "❌ Error: Failed to create fuzz-targets directory"
+          exit 1
+        fi
         
-        # Create config fuzz target binary
-        cat > fuzz-targets/config_fuzz_main.go << 'EOF'
+        echo "🎯 Creating config fuzz target binary..."
+        
+        # Create config fuzz target binary with error handling
+        if ! cat > "fuzz-targets/config_fuzz_main.go" << 'EOF'; then
+          echo "❌ Error: Failed to create config fuzz target file"
+          exit 1
+        fi
         package main
         
         import (
@@ -207,8 +221,21 @@ jobs:
         }
         EOF
         
-        # Create server fuzz target binary  
-        cat > fuzz-targets/server_fuzz_main.go << 'EOF'
+        echo "✅ Config fuzz target created successfully"
+        
+        # Verify the file was created correctly
+        if [ ! -f "fuzz-targets/config_fuzz_main.go" ]; then
+          echo "❌ Error: Config fuzz target file was not created"
+          exit 1
+        fi
+        
+        echo "🎯 Creating server fuzz target binary..."
+        
+        # Create server fuzz target binary with error handling
+        if ! cat > "fuzz-targets/server_fuzz_main.go" << 'EOF'; then
+          echo "❌ Error: Failed to create server fuzz target file"
+          exit 1
+        fi
         package main
         
         import (
@@ -258,8 +285,21 @@ jobs:
         }
         EOF
         
-        # Create identity fuzz target binary
-        cat > fuzz-targets/identity_fuzz_main.go << 'EOF' 
+        echo "✅ Server fuzz target created successfully"
+        
+        # Verify the file was created correctly
+        if [ ! -f "fuzz-targets/server_fuzz_main.go" ]; then
+          echo "❌ Error: Server fuzz target file was not created"
+          exit 1
+        fi
+        
+        echo "🎯 Creating identity fuzz target binary..."
+        
+        # Create identity fuzz target binary with error handling
+        if ! cat > "fuzz-targets/identity_fuzz_main.go" << 'EOF'; then
+          echo "❌ Error: Failed to create identity fuzz target file"
+          exit 1
+        fi 
         package main
         
         import (
@@ -313,8 +353,37 @@ jobs:
         }
         EOF
         
+        echo "✅ Identity fuzz target created successfully"
+        
+        # Verify the file was created correctly
+        if [ ! -f "fuzz-targets/identity_fuzz_main.go" ]; then
+          echo "❌ Error: Identity fuzz target file was not created"
+          exit 1
+        fi
+        
+        echo "🔧 Verifying all fuzz target files..."
+        
+        # List all created files for verification
+        echo "📋 Created fuzz target files:"
+        ls -la fuzz-targets/
+        
+        # Verify Go syntax for all generated files
+        echo "🔍 Validating Go syntax for all fuzz targets..."
+        for file in fuzz-targets/*.go; do
+          if [ -f "$file" ]; then
+            echo "  Checking syntax: $file"
+            if ! go fmt "$file" > /dev/null 2>&1; then
+              echo "❌ Error: Syntax error in $file"
+              cat "$file"
+              exit 1
+            fi
+          fi
+        done
+        
+        echo "✅ All fuzz target files have valid syntax"
+        
         # Build the fuzz target binaries
-        echo "Building fuzz target binaries..."
+        echo "🏗️ Building fuzz target binaries..."
         cd fuzz-targets
         
         # Build standalone Go binaries (no external dependencies needed)
@@ -381,7 +450,7 @@ jobs:
         echo "✅ Fuzz targets successfully created"
 
     - name: Run ClusterFuzzLite
-      uses: google/clusterfuzzlite/actions/run_fuzzers@cb1488bb74c8ca8d4fcbfc7c0ab2e1efa06c91e3 # v1
+      uses: google/clusterfuzzlite/actions/run_fuzzers@main
       with:
         language: go
         # Run for shorter time in CI to avoid timeouts
