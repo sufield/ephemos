@@ -95,7 +95,6 @@ func NewIdentityService(
 func (s *IdentityService) CreateServerIdentity() (ports.Server, error) {
 	s.mu.RLock()
 	identity := s.cachedIdentity
-	config := s.config
 	s.mu.RUnlock()
 
 	cert, err := s.getCertificate()
@@ -108,10 +107,8 @@ func (s *IdentityService) CreateServerIdentity() (ports.Server, error) {
 		return nil, fmt.Errorf("failed to get trust bundle for service %s: %w", identity.Name, err)
 	}
 
+	// Create authentication policy without authorization
 	policy := domain.NewAuthenticationPolicy(identity)
-	for _, client := range config.AuthorizedClients {
-		policy.AddAuthorizedClient(client)
-	}
 
 	server, err := s.transportProvider.CreateServer(cert, trustBundle, policy)
 	if err != nil {
@@ -127,7 +124,6 @@ func (s *IdentityService) CreateServerIdentity() (ports.Server, error) {
 func (s *IdentityService) CreateClientIdentity() (ports.Client, error) {
 	s.mu.RLock()
 	identity := s.cachedIdentity
-	config := s.config
 	s.mu.RUnlock()
 
 	cert, err := s.getCertificate()
@@ -140,10 +136,8 @@ func (s *IdentityService) CreateClientIdentity() (ports.Client, error) {
 		return nil, fmt.Errorf("failed to get trust bundle for service %s: %w", identity.Name, err)
 	}
 
+	// Create authentication policy without authorization
 	policy := domain.NewAuthenticationPolicy(identity)
-	for _, server := range config.TrustedServers {
-		policy.AddTrustedServer(server)
-	}
 
 	client, err := s.transportProvider.CreateClient(cert, trustBundle, policy)
 	if err != nil {

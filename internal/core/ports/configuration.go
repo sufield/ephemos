@@ -13,13 +13,11 @@ import (
 
 // YAML tag constants to avoid hardcoding.
 const (
-	ServiceYAMLTag           = "service"
-	SPIFFEYAMLTag            = "spiffe"
-	AuthorizedClientsYAMLTag = "authorized_clients"
-	TrustedServersYAMLTag    = "trusted_servers"
-	NameYAMLTag              = "name"
-	DomainYAMLTag            = "domain"
-	SocketPathYAMLTag        = "socket_path"
+	ServiceYAMLTag    = "service"
+	SPIFFEYAMLTag     = "spiffe"
+	NameYAMLTag       = "name"
+	DomainYAMLTag     = "domain"
+	SocketPathYAMLTag = "socket_path"
 )
 
 // Configuration represents the complete configuration for Ephemos services.
@@ -33,16 +31,6 @@ type Configuration struct {
 	// SPIFFE contains optional SPIFFE/SPIRE integration settings.
 	// If nil, default SPIFFE settings will be used.
 	SPIFFE *SPIFFEConfig `yaml:"spiffe,omitempty"`
-
-	// AuthorizedClients lists SPIFFE IDs that are allowed to connect to this service.
-	// Each entry must be a valid SPIFFE ID (e.g., "spiffe://example.org/client-service").
-	// Empty list means no client authorization is enforced.
-	AuthorizedClients []string `yaml:"authorizedClients,omitempty"`
-
-	// TrustedServers lists SPIFFE IDs of servers this client trusts to connect to.
-	// Each entry must be a valid SPIFFE ID (e.g., "spiffe://example.org/server-service").
-	// Empty list means all servers are trusted (not recommended for production).
-	TrustedServers []string `yaml:"trustedServers,omitempty"`
 
 	// Transport contains the transport layer configuration (gRPC, HTTP, etc.).
 	// If nil, defaults to gRPC transport.
@@ -132,16 +120,6 @@ func (c *Configuration) Validate() error {
 		}
 	}
 
-	// Validate authorized clients
-	if err := c.validateSPIFFEIDs(c.AuthorizedClients, "authorized_clients"); err != nil {
-		return fmt.Errorf("invalid authorized clients: %w", err)
-	}
-
-	// Validate trusted servers
-	if err := c.validateSPIFFEIDs(c.TrustedServers, "trusted_servers"); err != nil {
-		return fmt.Errorf("invalid trusted servers: %w", err)
-	}
-
 	return nil
 }
 
@@ -229,39 +207,6 @@ func (c *Configuration) validateSPIFFE() error {
 	return nil
 }
 
-func (c *Configuration) validateSPIFFEIDs(ids []string, fieldName string) error {
-	for i, id := range ids {
-		id = strings.TrimSpace(id)
-		if id == "" {
-			return &errors.ValidationError{
-				Field:   fmt.Sprintf("%s[%d]", fieldName, i),
-				Value:   ids[i],
-				Message: "SPIFFE ID cannot be empty or whitespace",
-			}
-		}
-
-		// Validate SPIFFE ID format
-		if !strings.HasPrefix(id, "spiffe://") {
-			return &errors.ValidationError{
-				Field:   fmt.Sprintf("%s[%d]", fieldName, i),
-				Value:   ids[i],
-				Message: "SPIFFE ID must start with 'spiffe://' (e.g., 'spiffe://example.org/service')",
-			}
-		}
-
-		// Basic structure validation - must have trust domain and path
-		parts := strings.SplitN(id[9:], "/", 2) // Remove "spiffe://" prefix
-		if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
-			return &errors.ValidationError{
-				Field:   fmt.Sprintf("%s[%d]", fieldName, i),
-				Value:   ids[i],
-				Message: "SPIFFE ID must have format 'spiffe://trust-domain/path' (e.g., 'spiffe://example.org/service')",
-			}
-		}
-	}
-
-	return nil
-}
 
 // ConfigurationProvider defines the interface for loading and providing configurations.
 type ConfigurationProvider interface {
@@ -276,12 +221,10 @@ type ConfigurationProvider interface {
 
 // Environment variable names for configuration.
 const (
-	EnvServiceName       = "EPHEMOS_SERVICE_NAME"
-	EnvTrustDomain       = "EPHEMOS_TRUST_DOMAIN"
-	EnvSPIFFESocket      = "EPHEMOS_SPIFFE_SOCKET"
-	EnvAuthorizedClients = "EPHEMOS_AUTHORIZED_CLIENTS"
-	EnvTrustedServers    = "EPHEMOS_TRUSTED_SERVERS"
-	EnvRequireAuth       = "EPHEMOS_REQUIRE_AUTHENTICATION"
+	EnvServiceName  = "EPHEMOS_SERVICE_NAME"
+	EnvTrustDomain  = "EPHEMOS_TRUST_DOMAIN"
+	EnvSPIFFESocket = "EPHEMOS_SPIFFE_SOCKET"
+	EnvRequireAuth  = "EPHEMOS_REQUIRE_AUTHENTICATION"
 	EnvLogLevel          = "EPHEMOS_LOG_LEVEL"
 	EnvBindAddress       = "EPHEMOS_BIND_ADDRESS"
 	EnvTLSMinVersion     = "EPHEMOS_TLS_MIN_VERSION"
@@ -324,15 +267,6 @@ func LoadFromEnvironment() (*Configuration, error) {
 		SocketPath: spiffeSocket,
 	}
 
-	// Parse comma-separated authorized clients
-	if authorizedClients := os.Getenv(EnvAuthorizedClients); authorizedClients != "" {
-		config.AuthorizedClients = parseCommaSeparatedList(authorizedClients)
-	}
-
-	// Parse comma-separated trusted servers
-	if trustedServers := os.Getenv(EnvTrustedServers); trustedServers != "" {
-		config.TrustedServers = parseCommaSeparatedList(trustedServers)
-	}
 
 	// Validate the configuration
 	if err := config.Validate(); err != nil {
@@ -368,15 +302,6 @@ func (c *Configuration) MergeWithEnvironment() error {
 		c.SPIFFE.SocketPath = spiffeSocket
 	}
 
-	// Override authorized clients if set via environment
-	if authorizedClients := os.Getenv(EnvAuthorizedClients); authorizedClients != "" {
-		c.AuthorizedClients = parseCommaSeparatedList(authorizedClients)
-	}
-
-	// Override trusted servers if set via environment
-	if trustedServers := os.Getenv(EnvTrustedServers); trustedServers != "" {
-		c.TrustedServers = parseCommaSeparatedList(trustedServers)
-	}
 
 	return c.Validate()
 }
@@ -412,10 +337,6 @@ func validateProductionSecurity(config *Configuration) error {
 		errors = append(errors, err.Error())
 	}
 
-	// Check authorization settings
-	if warnings := checkAuthorizationSettings(config.AuthorizedClients); len(warnings) > 0 {
-		errors = append(errors, warnings...)
-	}
 
 	// Check for debug environment variables that shouldn't be enabled in production
 	if debugEnabled := os.Getenv(EnvDebugEnabled); debugEnabled == "true" {
@@ -459,16 +380,6 @@ func validateSocketPath(socketPath string) error {
 	return fmt.Errorf("SPIFFE socket should be in a secure directory (/run, /var/run, or /tmp)")
 }
 
-// checkAuthorizationSettings checks for overly permissive authorization settings.
-func checkAuthorizationSettings(authorizedClients []string) []string {
-	var warnings []string
-	for _, client := range authorizedClients {
-		if strings.Contains(client, "*") {
-			warnings = append(warnings, fmt.Sprintf("authorized client contains wildcard: %s - consider more specific authorization", client))
-		}
-	}
-	return warnings
-}
 
 // IsProductionReady checks if the configuration is suitable for production use.
 func (c *Configuration) IsProductionReady() error {

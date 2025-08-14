@@ -85,7 +85,5 @@ func (p *FileProvider) GetDefaultConfiguration(_ context.Context) *ports.Configu
 		SPIFFE: &ports.SPIFFEConfig{
 			SocketPath: "/tmp/spire-agent/public/api.sock", // Standard SPIRE agent socket path
 		},
-		AuthorizedClients: []string{}, // Empty list - no client restrictions by default
-		TrustedServers:    []string{}, // Empty list - trust all servers by default (not recommended for production)
 	}
 }
