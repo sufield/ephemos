@@ -23,8 +23,6 @@ paths:
 # Exclude paths that don't need security analysis
 paths-ignore:
   - "**/*_test.go"       # Test files (analyzed separately)
-  - "**/*.pb.go"         # Generated protobuf files
-  - "**/*_grpc.pb.go"    # Generated gRPC files
   - ".github/"           # GitHub workflow files
   - "scripts/"           # Build scripts
   - "tools/"             # Development tools
