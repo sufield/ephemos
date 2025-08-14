@@ -98,66 +98,26 @@ func testValidateTrustBundle(t *testing.T, provider ports.IdentityProvider) {
 	t.Logf("✅ Retrieved trust bundle with %d certificates", len(trustBundle.Certificates))
 }
 
-// TestAuthenticationPolicyFlow tests authentication policy creation and validation.
+// TestAuthenticationPolicyFlow tests authentication policy creation.
 func TestAuthenticationPolicyFlow(t *testing.T) {
-	t.Run("PolicyCreationAndValidation", func(t *testing.T) {
+	t.Run("PolicyCreation", func(t *testing.T) {
 		// Step 1: Create service identity
 		serverIdentity := domain.NewServiceIdentity("api-server", "company.com")
 		clientIdentity := domain.NewServiceIdentity("web-client", "company.com")
 
-		// Step 2: Create authentication policy
+		// Step 2: Create authentication policy (now without authorization)
 		policy := domain.NewAuthenticationPolicy(serverIdentity)
 		if policy.ServiceIdentity != serverIdentity {
 			t.Error("Policy does not reference correct service identity")
 		}
 		t.Logf("✅ Created authentication policy for %s", serverIdentity.Name)
 
-		// Step 3: Add authorized clients
-		policy.AddAuthorizedClient(clientIdentity.Name)
-		policy.AddAuthorizedClient("mobile-app")
-		policy.AddAuthorizedClient("batch-processor")
-
-		expectedClients := []string{"web-client", "mobile-app", "batch-processor"}
-		if len(policy.AuthorizedClients) != len(expectedClients) {
-			t.Errorf("Expected %d authorized clients, got %d", len(expectedClients), len(policy.AuthorizedClients))
-		}
-		t.Logf("✅ Added %d authorized clients: %v", len(policy.AuthorizedClients), policy.AuthorizedClients)
-
-		// Step 4: Test client authorization
-		testCases := []struct {
-			clientName string
-			authorized bool
-		}{
-			{"web-client", true},
-			{"mobile-app", true},
-			{"batch-processor", true},
-			{"unauthorized-client", false},
-			{"", false},
-		}
-
-		for _, tc := range testCases {
-			result := policy.IsClientAuthorized(tc.clientName)
-			if result != tc.authorized {
-				t.Errorf("Client %s: expected authorized=%v, got %v", tc.clientName, tc.authorized, result)
-			}
-		}
-		t.Logf("✅ Client authorization validation passed")
-
-		// Step 5: Add trusted servers (for client-side policy)
+		// Step 3: Create client-side policy
 		clientPolicy := domain.NewAuthenticationPolicy(clientIdentity)
-		clientPolicy.AddTrustedServer("api-server")
-		clientPolicy.AddTrustedServer("payment-service")
-
-		if !clientPolicy.IsServerTrusted("api-server") {
-			t.Error("api-server should be trusted")
+		if clientPolicy.ServiceIdentity != clientIdentity {
+			t.Error("Client policy does not reference correct service identity")
 		}
-		if !clientPolicy.IsServerTrusted("payment-service") {
-			t.Error("payment-service should be trusted")
-		}
-		if clientPolicy.IsServerTrusted("untrusted-service") {
-			t.Error("untrusted-service should not be trusted")
-		}
-		t.Logf("✅ Server trust validation passed")
+		t.Logf("✅ Created client authentication policy for %s", clientIdentity.Name)
 	})
 }
 
@@ -186,8 +146,6 @@ func testSetupConfigProvider(t *testing.T) (*config.InMemoryProvider, *ports.Con
 		SPIFFE: &ports.SPIFFEConfig{
 			SocketPath: "/tmp/test-spire-agent/public/api.sock",
 		},
-		AuthorizedClients: []string{"spiffe://test.example.org/client-a", "spiffe://test.example.org/client-b"},
-		TrustedServers:    []string{"spiffe://test.example.org/server-x", "spiffe://test.example.org/server-y"},
 	}
 
 	provider.SetConfiguration("test-config", testConfig)
@@ -205,7 +163,6 @@ func testLoadAndValidateConfig(
 	}
 
 	testValidateServiceConfig(t, retrievedConfig, testConfig)
-	testValidateClientServerLists(t, retrievedConfig)
 	testLogConfigurationDetails(t, retrievedConfig)
 	return retrievedConfig
 }
@@ -220,35 +177,11 @@ func testValidateServiceConfig(t *testing.T, retrieved, expected *ports.Configur
 	}
 }
 
-func testValidateClientServerLists(t *testing.T, config *ports.Configuration) {
-	t.Helper()
-	nonEmptyClients := testFilterEmptyStrings(config.AuthorizedClients)
-	nonEmptyServers := testFilterEmptyStrings(config.TrustedServers)
-
-	if len(nonEmptyClients) != 2 {
-		t.Errorf("Expected 2 authorized clients, got %d: %v", len(nonEmptyClients), nonEmptyClients)
-	}
-	if len(nonEmptyServers) != 2 {
-		t.Errorf("Expected 2 trusted servers, got %d: %v", len(nonEmptyServers), nonEmptyServers)
-	}
-}
-
-func testFilterEmptyStrings(input []string) []string {
-	result := make([]string, 0)
-	for _, item := range input {
-		if strings.TrimSpace(item) != "" {
-			result = append(result, item)
-		}
-	}
-	return result
-}
 
 func testLogConfigurationDetails(t *testing.T, config *ports.Configuration) {
 	t.Helper()
 	t.Logf("✅ Configuration validated successfully")
 	t.Logf("   Service: %s@%s", config.Service.Name, config.Service.Domain)
-	t.Logf("   Authorized clients: %v", config.AuthorizedClients)
-	t.Logf("   Trusted servers: %v", config.TrustedServers)
 }
 
 func testValidateDefaultConfig(ctx context.Context, t *testing.T, provider *config.InMemoryProvider) {

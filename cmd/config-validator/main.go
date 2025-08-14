@@ -65,24 +65,6 @@ func displayConfiguration(cfg *ports.Configuration) {
 	if cfg.SPIFFE != nil {
 		fmt.Printf("   SPIFFE Socket: %s\n", cfg.SPIFFE.SocketPath)
 	}
-
-	if len(cfg.AuthorizedClients) > 0 {
-		fmt.Printf("   Authorized Clients: %d configured\n", len(cfg.AuthorizedClients))
-		for i, client := range cfg.AuthorizedClients {
-			fmt.Printf("     %d. %s\n", i+1, client)
-		}
-	} else {
-		fmt.Println("   Authorized Clients: None (allows all clients)")
-	}
-
-	if len(cfg.TrustedServers) > 0 {
-		fmt.Printf("   Trusted Servers: %d configured\n", len(cfg.TrustedServers))
-		for i, server := range cfg.TrustedServers {
-			fmt.Printf("     %d. %s\n", i+1, server)
-		}
-	} else {
-		fmt.Println("   Trusted Servers: None (trusts all servers)")
-	}
 }
 
 func printProductionTips(err error) {
@@ -125,7 +107,6 @@ func printSecurityRecommendations(envOnly bool) {
 
 	fmt.Println("  🛡️ Optional security environment variables:")
 	fmt.Printf("     export %s=\"/run/spire/sockets/api.sock\"\n", ports.EnvSPIFFESocket)
-	fmt.Printf("     export %s=\"spiffe://your.domain/client1,spiffe://your.domain/client2\"\n", ports.EnvAuthorizedClients)
 	fmt.Printf("     export %s=\"false\"\n", ports.EnvDebugEnabled)
 
 	fmt.Println("  📚 For more details, see:")
