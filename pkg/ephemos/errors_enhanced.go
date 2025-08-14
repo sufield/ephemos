@@ -176,14 +176,14 @@ func IsEnhancedValidationError(err error) bool {
 		errorx.IsOfType(err, CollectionValidationError) {
 		return true
 	}
-	
+
 	// Check wrapped errors
 	if wrapper, ok := err.(*enhancedWrapper); ok {
 		return errorx.IsOfType(wrapper.enhanced, EnhancedValidationError) ||
 			errorx.IsOfType(wrapper.enhanced, FieldValidationError) ||
 			errorx.IsOfType(wrapper.enhanced, CollectionValidationError)
 	}
-	
+
 	return false
 }
 
@@ -195,14 +195,14 @@ func IsEnhancedConfigurationError(err error) bool {
 		errorx.IsOfType(err, ConfigParseError) {
 		return true
 	}
-	
+
 	// Check wrapped errors
 	if wrapper, ok := err.(*enhancedWrapper); ok {
 		return errorx.IsOfType(wrapper.enhanced, EnhancedConfigurationError) ||
 			errorx.IsOfType(wrapper.enhanced, ConfigFileError) ||
 			errorx.IsOfType(wrapper.enhanced, ConfigParseError)
 	}
-	
+
 	return false
 }
 
@@ -214,14 +214,14 @@ func IsEnhancedDomainError(err error) bool {
 		errorx.IsOfType(err, IdentityError) {
 		return true
 	}
-	
+
 	// Check wrapped errors
 	if wrapper, ok := err.(*enhancedWrapper); ok {
 		return errorx.IsOfType(wrapper.enhanced, EnhancedDomainError) ||
 			errorx.IsOfType(wrapper.enhanced, ServiceError) ||
 			errorx.IsOfType(wrapper.enhanced, IdentityError)
 	}
-	
+
 	return false
 }
 
@@ -235,7 +235,7 @@ func IsEnhancedSystemError(err error) bool {
 		errorx.IsOfType(err, TemporaryError) {
 		return true
 	}
-	
+
 	// Check wrapped errors
 	if wrapper, ok := err.(*enhancedWrapper); ok {
 		return errorx.IsOfType(wrapper.enhanced, EnhancedSystemError) ||
@@ -244,7 +244,7 @@ func IsEnhancedSystemError(err error) bool {
 			errorx.IsOfType(wrapper.enhanced, TimeoutError) ||
 			errorx.IsOfType(wrapper.enhanced, TemporaryError)
 	}
-	
+
 	return false
 }
 
@@ -358,10 +358,10 @@ func WrapWithEnhancedContext(err error, errorType *errorx.Type, message string) 
 	if err == nil {
 		return nil
 	}
-	
+
 	// Create the enhanced error with stack trace
 	enhanced := errorType.New("wrapped error: %s", message)
-	
+
 	return &enhancedWrapper{
 		original: err,
 		enhanced: enhanced,

@@ -110,7 +110,6 @@ func (s *workloadServerImpl) RegisterService(registrar ServiceRegistrar) error {
 	return nil
 }
 
-
 // Close implements the ShutdownableServer interface for graceful shutdown.
 func (s *workloadServerImpl) Close() error {
 	return s.Stop()

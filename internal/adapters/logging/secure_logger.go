@@ -22,7 +22,6 @@ func NewSecureLogger(handler slog.Handler) *SecureLogger {
 	}
 }
 
-
 // Debug logs a debug level message.
 func (l *SecureLogger) Debug(ctx context.Context, message string, attrs ...ports.LogAttribute) {
 	l.log(ctx, slog.LevelDebug, message, attrs...)
@@ -48,7 +47,7 @@ func (l *SecureLogger) WithAttrs(attrs ...ports.LogAttribute) ports.Logger {
 	newAttrs := make([]ports.LogAttribute, len(l.attrs)+len(attrs))
 	copy(newAttrs, l.attrs)
 	copy(newAttrs[len(l.attrs):], attrs)
-	
+
 	return &SecureLogger{
 		logger: l.logger,
 		attrs:  newAttrs,
@@ -62,7 +61,7 @@ func (l *SecureLogger) WithGroup(name string) ports.Logger {
 	if l.group != "" {
 		groupName = l.group + "." + name
 	}
-	
+
 	return &SecureLogger{
 		logger: l.logger,
 		attrs:  l.attrs,
@@ -74,23 +73,23 @@ func (l *SecureLogger) WithGroup(name string) ports.Logger {
 func (l *SecureLogger) log(ctx context.Context, level slog.Level, message string, attrs ...ports.LogAttribute) {
 	// Convert ports.LogAttribute to slog.Attr
 	slogAttrs := make([]slog.Attr, len(l.attrs)+len(attrs))
-	
+
 	// Add persistent attributes
 	for i, attr := range l.attrs {
 		slogAttrs[i] = slog.Any(attr.Key, attr.Value)
 	}
-	
+
 	// Add current message attributes
 	for i, attr := range attrs {
 		slogAttrs[len(l.attrs)+i] = slog.Any(attr.Key, attr.Value)
 	}
-	
+
 	// Log with group if specified
 	logger := l.logger
 	if l.group != "" {
 		logger = logger.WithGroup(l.group)
 	}
-	
+
 	logger.LogAttrs(ctx, level, message, slogAttrs...)
 }
 

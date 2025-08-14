@@ -8,7 +8,6 @@ import (
 	"sync"
 )
 
-
 // httpAdapterImpl implements HTTPAdapter.
 type httpAdapterImpl struct {
 	httpServer *http.Server
@@ -17,7 +16,6 @@ type httpAdapterImpl struct {
 	services   map[string]interface{}
 	mu         sync.RWMutex
 }
-
 
 // NewHTTPAdapter creates a new HTTP adapter.
 func NewHTTPAdapter(addr string) HTTPAdapter {
@@ -32,7 +30,6 @@ func NewHTTPAdapter(addr string) HTTPAdapter {
 	}
 	return adapter
 }
-
 
 // Mount mounts a service implementation.
 func (a *httpAdapterImpl) Mount(service interface{}) error {

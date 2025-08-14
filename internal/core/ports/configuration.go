@@ -207,7 +207,6 @@ func (c *Configuration) validateSPIFFE() error {
 	return nil
 }
 
-
 // ConfigurationProvider defines the interface for loading and providing configurations.
 type ConfigurationProvider interface {
 	// LoadConfiguration loads configuration from the specified file path.
@@ -221,14 +220,14 @@ type ConfigurationProvider interface {
 
 // Environment variable names for configuration.
 const (
-	EnvServiceName  = "EPHEMOS_SERVICE_NAME"
-	EnvTrustDomain  = "EPHEMOS_TRUST_DOMAIN"
-	EnvSPIFFESocket = "EPHEMOS_SPIFFE_SOCKET"
-	EnvRequireAuth  = "EPHEMOS_REQUIRE_AUTHENTICATION"
-	EnvLogLevel          = "EPHEMOS_LOG_LEVEL"
-	EnvBindAddress       = "EPHEMOS_BIND_ADDRESS"
-	EnvTLSMinVersion     = "EPHEMOS_TLS_MIN_VERSION"
-	EnvDebugEnabled      = "EPHEMOS_DEBUG_ENABLED"
+	EnvServiceName   = "EPHEMOS_SERVICE_NAME"
+	EnvTrustDomain   = "EPHEMOS_TRUST_DOMAIN"
+	EnvSPIFFESocket  = "EPHEMOS_SPIFFE_SOCKET"
+	EnvRequireAuth   = "EPHEMOS_REQUIRE_AUTHENTICATION"
+	EnvLogLevel      = "EPHEMOS_LOG_LEVEL"
+	EnvBindAddress   = "EPHEMOS_BIND_ADDRESS"
+	EnvTLSMinVersion = "EPHEMOS_TLS_MIN_VERSION"
+	EnvDebugEnabled  = "EPHEMOS_DEBUG_ENABLED"
 )
 
 // LoadFromEnvironment creates a configuration from environment variables.
@@ -267,7 +266,6 @@ func LoadFromEnvironment() (*Configuration, error) {
 		SocketPath: spiffeSocket,
 	}
 
-
 	// Validate the configuration
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("environment configuration validation failed: %w", err)
@@ -302,7 +300,6 @@ func (c *Configuration) MergeWithEnvironment() error {
 		c.SPIFFE.SocketPath = spiffeSocket
 	}
 
-
 	return c.Validate()
 }
 
@@ -336,7 +333,6 @@ func validateProductionSecurity(config *Configuration) error {
 	if err := validateSocketPath(config.SPIFFE.SocketPath); err != nil {
 		errors = append(errors, err.Error())
 	}
-
 
 	// Check for debug environment variables that shouldn't be enabled in production
 	if debugEnabled := os.Getenv(EnvDebugEnabled); debugEnabled == "true" {
@@ -379,7 +375,6 @@ func validateSocketPath(socketPath string) error {
 	}
 	return fmt.Errorf("SPIFFE socket should be in a secure directory (/run, /var/run, or /tmp)")
 }
-
 
 // IsProductionReady checks if the configuration is suitable for production use.
 func (c *Configuration) IsProductionReady() error {
