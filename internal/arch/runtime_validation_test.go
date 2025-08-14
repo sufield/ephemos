@@ -156,9 +156,15 @@ func extractAdapterTypeHelper(funcName string) string {
 	}
 
 	adapterPath := parts[1]
+	// Handle case where adapter path might be "grpc.Server" or "primary/api.Handler"
 	pathParts := strings.Split(adapterPath, "/")
 	if len(pathParts) > 0 {
-		return pathParts[0]
+		// Extract just the adapter type, ignoring any struct/method name after dot
+		adapterType := pathParts[0]
+		if dotIndex := strings.Index(adapterType, "."); dotIndex != -1 {
+			adapterType = adapterType[:dotIndex]
+		}
+		return adapterType
 	}
 
 	return ""

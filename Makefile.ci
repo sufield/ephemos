@@ -4,14 +4,20 @@
 
 # Setup environment for CI
 ci-setup: proto
-	@echo "Cleaning Go build cache (aggressive)..."
+	@echo "🧹 Cleaning Go build cache (aggressive)..."
 	go clean -cache
 	go clean -modcache || true
 	go clean -testcache
-	@echo "Clearing any Go module proxy cache..."
-	go env -w GOPROXY=direct || true
+	@echo "🔧 Setting Go module proxy for reliable downloads..."
+	go env -w GOPROXY=https://proxy.golang.org,direct || true
+	@echo "📦 Refreshing module dependencies..."
 	go mod download
-	@echo "CI setup completed - protobuf files generated and cache cleared"
+	go mod verify
+	@echo "🔍 Verifying package compilation..."
+	@# Test compile all packages to catch early issues
+	@go build ./pkg/ephemos || (echo "❌ pkg/ephemos compilation failed" && exit 1)
+	@go build ./internal/... || (echo "❌ internal packages compilation failed" && exit 1)
+	@echo "✅ CI setup completed - protobuf files generated, cache cleared, and packages verified"
 
 # Run linting checks
 ci-lint:
@@ -21,12 +27,28 @@ ci-lint:
 	@./scripts/ci/lint.sh
 	@echo "Linting checks completed!"
 
-# Run all tests with coverage
+# Run all tests with coverage and detailed reporting
 ci-test:
-	@echo "Running tests with coverage..."
-	go test -race -coverprofile=coverage.out -covermode=atomic ./...
-	go tool cover -html=coverage.out -o coverage.html
-	@echo "Tests completed! Coverage report: coverage.html"
+	@echo "🧪 Running tests with coverage and detailed reporting..."
+	@echo "================================================"
+	@echo ""
+	@# Run tests with JSON output for parsing
+	@go test -race -coverprofile=coverage.out -covermode=atomic -json ./... > test-results.json 2>&1 || true
+	@echo ""
+	@echo "📊 TEST SUMMARY"
+	@echo "================================================"
+	@# Parse test results and show summary
+	@go run scripts/test-summary/main.go test-results.json || \
+		(echo "Using fallback summary..." && \
+		 echo "Total packages tested: $$(go list ./... | wc -l)" && \
+		 echo "Test output:" && tail -20 test-results.json)
+	@echo ""
+	@# Generate coverage report
+	@go tool cover -html=coverage.out -o coverage.html 2>/dev/null || echo "⚠️ Coverage report generation skipped"
+	@echo "✅ Test run completed! Full results in test-results.json"
+	@echo "📈 Coverage report: coverage.html"
+	@# Exit with failure if tests failed
+	@grep -q '"Action":"fail"' test-results.json && exit 1 || exit 0
 
 # Run security checks
 ci-security:
@@ -35,15 +57,19 @@ ci-security:
 	@echo "Security checks completed!"
 
 # Build all targets
-ci-build: clean-cache build examples
+ci-build: clean-cache build
 	@echo "All builds completed successfully!"
 
 # Clean all caches before building
 clean-cache:
-	@echo "Cleaning all Go caches before build..."
+	@echo "🧹 Cleaning all Go caches before build..."
 	go clean -cache
 	go clean -testcache
 	go clean -modcache || true
+	@echo "🗑️  Removing additional cache directories..."
+	rm -rf ~/.cache/go-build 2>/dev/null || true
+	rm -rf $(go env GOCACHE) 2>/dev/null || true
+	@echo "✅ All caches cleared"
 
 # Run all CI checks
 ci-all: ci-lint ci-test ci-security ci-build

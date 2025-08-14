@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "cli",
+    srcs = ["registrar.go"],
+    importpath = "github.com/sufield/ephemos/internal/adapters/primary/cli",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/core/errors",
+        "//internal/core/ports",
+        "@com_github_spiffe_go_spiffe_v2//spiffeid",
+    ],
+)
+
+go_test(
+    name = "cli_test",
+    srcs = ["registrar_test.go"],
+    deps = [
+        ":cli",
+        "//internal/adapters/secondary/config",
+        "//internal/core/errors",
+        "//internal/core/ports",
+    ],
+)

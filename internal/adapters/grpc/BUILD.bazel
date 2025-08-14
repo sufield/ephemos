@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "grpc",
+    srcs = ["adapter.go"],
+    importpath = "github.com/sufield/ephemos/internal/adapters/grpc",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/core/ports",
+        "@org_golang_google_grpc//:grpc",
+    ],
+)

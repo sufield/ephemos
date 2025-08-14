@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "logging",
+    srcs = ["redactor.go"],
+    importpath = "github.com/sufield/ephemos/internal/adapters/logging",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "logging_test",
+    srcs = ["redactor_test.go"],
+    deps = [":logging"],
+)

@@ -77,25 +77,25 @@ type EchoService interface {
 
 // StreamingService demonstrates streaming capabilities.
 type StreamingService interface {
-	ServerStream(ctx context.Context, input string, stream ServerStream[string]) error
-	ClientStream(ctx context.Context, stream ClientStream[string]) (string, error)
-	BidirectionalStream(ctx context.Context, stream BidiStream[string, string]) error
+	ServerStream(ctx context.Context, input string, stream ServerStreamPort[string]) error
+	ClientStream(ctx context.Context, stream ClientStreamPort[string]) (string, error)
+	BidirectionalStream(ctx context.Context, stream BidiStreamPort[string, string]) error
 }
 
-// ServerStream represents a server-side streaming interface.
-type ServerStream[T any] interface {
+// ServerStreamPort represents a server-side streaming interface.
+type ServerStreamPort[T any] interface {
 	Send(T) error
 	Context() context.Context
 }
 
-// ClientStream represents a client-side streaming interface.
-type ClientStream[T any] interface {
+// ClientStreamPort represents a client-side streaming interface.
+type ClientStreamPort[T any] interface {
 	Recv() (T, error)
 	Context() context.Context
 }
 
-// BidiStream represents a bidirectional streaming interface.
-type BidiStream[Req, Resp any] interface {
+// BidiStreamPort represents a bidirectional streaming interface.
+type BidiStreamPort[Req, Resp any] interface {
 	Send(Resp) error
 	Recv() (Req, error)
 	Context() context.Context
@@ -111,7 +111,7 @@ type FileService interface {
 // HealthService provides standardized health checking.
 type HealthService interface {
 	Check(ctx context.Context, service string) (HealthStatus, error)
-	Watch(ctx context.Context, service string, stream ServerStream[HealthStatus]) error
+	Watch(ctx context.Context, service string, stream ServerStreamPort[HealthStatus]) error
 }
 
 // HealthStatus represents the health status of a service.

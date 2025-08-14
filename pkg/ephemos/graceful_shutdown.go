@@ -7,10 +7,7 @@ import (
 	"log/slog"
 	"sync"
 	"time"
-
-	"github.com/sufield/ephemos/internal/adapters/primary/api"
-	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
-	"github.com/sufield/ephemos/internal/core/ports"
+	// Internal dependencies removed for public API compliance
 )
 
 const (
@@ -56,9 +53,9 @@ func DefaultShutdownConfig() *ShutdownConfig {
 type ShutdownCoordinator struct {
 	config          *ShutdownConfig
 	servers         []ShutdownableServer
-	spiffeProviders []*spiffe.Provider
-	clients         []ports.Client
-	listeners       []ports.Listener
+	spiffeProviders []SPIFFEProvider
+	clients         []Client
+	listeners       []Listener
 	cleanupFuncs    []func() error
 	mu              sync.Mutex
 	shutdownOnce    sync.Once
@@ -78,9 +75,9 @@ func NewShutdownCoordinator(config *ShutdownConfig) *ShutdownCoordinator {
 	return &ShutdownCoordinator{
 		config:          config,
 		servers:         make([]ShutdownableServer, 0),
-		spiffeProviders: make([]*spiffe.Provider, 0),
-		clients:         make([]ports.Client, 0),
-		listeners:       make([]ports.Listener, 0),
+		spiffeProviders: make([]SPIFFEProvider, 0),
+		clients:         make([]Client, 0),
+		listeners:       make([]Listener, 0),
 		cleanupFuncs:    make([]func() error, 0),
 	}
 }
@@ -96,7 +93,7 @@ func (m *ShutdownCoordinator) RegisterServer(server ShutdownableServer) {
 }
 
 // RegisterSPIFFEProvider registers a SPIFFE provider for cleanup.
-func (m *ShutdownCoordinator) RegisterSPIFFEProvider(provider *spiffe.Provider) {
+func (m *ShutdownCoordinator) RegisterSPIFFEProvider(provider SPIFFEProvider) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -106,7 +103,7 @@ func (m *ShutdownCoordinator) RegisterSPIFFEProvider(provider *spiffe.Provider) 
 }
 
 // RegisterClient registers a client for cleanup.
-func (m *ShutdownCoordinator) RegisterClient(client ports.Client) {
+func (m *ShutdownCoordinator) RegisterClient(client Client) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -116,7 +113,7 @@ func (m *ShutdownCoordinator) RegisterClient(client ports.Client) {
 }
 
 // RegisterListener registers a listener for cleanup.
-func (m *ShutdownCoordinator) RegisterListener(listener ports.Listener) {
+func (m *ShutdownCoordinator) RegisterListener(listener Listener) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -188,7 +185,7 @@ func (m *ShutdownCoordinator) shutdownListeners(wg *sync.WaitGroup, addError fun
 	slog.Info("Phase 2: Closing listeners")
 	for _, listener := range m.listeners {
 		wg.Add(1)
-		go func(l ports.Listener) {
+		go func(l Listener) {
 			defer wg.Done()
 			if err := l.Close(); err != nil {
 				addError(fmt.Errorf("listener close error: %w", err))
@@ -218,7 +215,7 @@ func (m *ShutdownCoordinator) shutdownClients(addError func(error)) {
 	var clientWg sync.WaitGroup
 	for _, client := range m.clients {
 		clientWg.Add(1)
-		go func(c ports.Client) {
+		go func(c Client) {
 			defer clientWg.Done()
 			if err := c.Close(); err != nil {
 				addError(fmt.Errorf("client close error: %w", err))
@@ -233,7 +230,7 @@ func (m *ShutdownCoordinator) shutdownSpiffeProviders(graceCtx, forceCtx context
 	var spiffeWg sync.WaitGroup
 	for _, provider := range m.spiffeProviders {
 		spiffeWg.Add(1)
-		go func(p *spiffe.Provider) {
+		go func(p SPIFFEProvider) {
 			defer spiffeWg.Done()
 			if err := m.closeSPIFFEProviderWithTimeout(graceCtx, p); err != nil {
 				addError(fmt.Errorf("SPIFFE provider close error: %w", err))
@@ -272,8 +269,16 @@ func (m *ShutdownCoordinator) performShutdown(graceCtx, drainCtx, forceCtx conte
 		"drain_timeout", m.config.DrainTimeout)
 	m.shutdownServers(graceCtx, &wg, addError)
 	m.shutdownListeners(&wg, addError)
-	// Wait for Phase 1 & 2 with drain timeout (no error added on timeout, per original logic)
-	m.waitForShutdown(drainCtx, &wg, "Servers and listeners stopped successfully", "Drain timeout exceeded, continuing shutdown")
+	// Wait for Phase 1 & 2 with grace timeout to ensure server timeout errors are collected
+	serverSuccess := m.waitForShutdown(
+		graceCtx, &wg,
+		"Servers and listeners stopped successfully",
+		"Grace timeout exceeded during server shutdown",
+	)
+	if !serverSuccess {
+		// Add timeout error if servers didn't complete within grace period
+		addError(fmt.Errorf("server shutdown exceeded grace timeout of %v", m.config.GracePeriod))
+	}
 	m.shutdownClients(addError)
 	m.shutdownSpiffeProviders(graceCtx, forceCtx, addError)
 	m.runCleanupFunctions(addError)
@@ -305,7 +310,7 @@ func (m *ShutdownCoordinator) stopServerWithTimeout(ctx context.Context, server 
 	}
 }
 
-func (m *ShutdownCoordinator) closeSPIFFEProviderWithTimeout(ctx context.Context, provider *spiffe.Provider) error {
+func (m *ShutdownCoordinator) closeSPIFFEProviderWithTimeout(ctx context.Context, provider SPIFFEProvider) error {
 	done := make(chan error, 1)
 
 	go func() {
@@ -323,17 +328,33 @@ func (m *ShutdownCoordinator) closeSPIFFEProviderWithTimeout(ctx context.Context
 
 // ExtendedIdentityServer wraps the standard IdentityServer with graceful shutdown support.
 type ExtendedIdentityServer struct {
-	*api.WorkloadServer
+	WorkloadServer      WorkloadServer
 	shutdownCoordinator *ShutdownCoordinator
-	spiffeProvider  *spiffe.Provider
+	spiffeProvider      SPIFFEProvider
 }
 
 // NewExtendedIdentityServer creates an identity server with graceful shutdown support.
 func NewExtendedIdentityServer(ctx context.Context, configPath string, shutdownConfig *ShutdownConfig) (*ExtendedIdentityServer, error) {
-	// Create the base server
-	baseServer, err := api.NewWorkloadServer(ctx, configPath)
+	// Load configuration
+	config, err := loadAndValidateConfig(ctx, configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create identity server: %w", err)
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Create SPIFFE provider
+	var spiffeConfig *SPIFFEConfig
+	if config.SPIFFE != nil {
+		spiffeConfig = config.SPIFFE
+	}
+	spiffeProvider, err := NewSPIFFEProvider(spiffeConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SPIFFE provider: %w", err)
+	}
+
+	// Create the base workload server
+	baseServer, err := NewWorkloadServer(ctx, config, spiffeProvider)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create workload server: %w", err)
 	}
 
 	// Create shutdown coordinator
@@ -341,18 +362,20 @@ func NewExtendedIdentityServer(ctx context.Context, configPath string, shutdownC
 
 	// Create extended server
 	extServer := &ExtendedIdentityServer{
-		WorkloadServer:  baseServer,
+		WorkloadServer:      baseServer,
 		shutdownCoordinator: coordinator,
+		spiffeProvider:      spiffeProvider,
 	}
 
-	// Register the server for shutdown
+	// Register components for shutdown
 	coordinator.RegisterServer(baseServer)
+	coordinator.RegisterSPIFFEProvider(spiffeProvider)
 
 	return extServer, nil
 }
 
 // SetSPIFFEProvider sets the SPIFFE provider for cleanup during shutdown.
-func (s *ExtendedIdentityServer) SetSPIFFEProvider(provider *spiffe.Provider) {
+func (s *ExtendedIdentityServer) SetSPIFFEProvider(provider SPIFFEProvider) {
 	s.spiffeProvider = provider
 	s.shutdownCoordinator.RegisterSPIFFEProvider(provider)
 }

@@ -47,31 +47,9 @@ ports.test
 /config-patterns
 /config-validator
 /transport-agnostic
-examples/*/transport-agnostic
-examples/*/config-patterns
-examples/*/config-validator
-
-# Example executable artifacts (prevent binary commits in examples)
-examples/config-validation/config-validation-example
-examples/interceptors/interceptors
-examples/*/interceptors
-examples/*/main
-examples/*-example
-examples/*/*-example
 
 # All ELF executables (Linux binaries)
 **/*.elf
-# Prevent any binary executable without extension in examples
-examples/**/[!.]* 
-!examples/**/*.go
-!examples/**/*.md
-!examples/**/*.yaml
-!examples/**/*.yml
-!examples/**/*.json
-!examples/**/*.proto
-!examples/**/*.mod
-!examples/**/*.sum
-!examples/**/*.txt
 
 # Benchmark files
 benchmark.txt
@@ -239,4 +217,126 @@ sbom/
 *.spdx.json
 *.cyclonedx.json
 *-sbom*.txt
-*-checksums.txtbin/
+*-checksums.txt
+
+# Bazel build system artifacts
+bazel-*
+.bazel/
+.bazelrc.local
+.bazel-cache/
+.bazelversion
+/bazel-bin/
+/bazel-out/
+/bazel-testlogs/
+/bazel-ephemos/
+bazel-ephemos
+bazel-bin
+bazel-out
+bazel-testlogs
+
+# Bazel output and cache directories
+/convenience-symlinks/
+.ijwb/
+.idea/libraries/Bazel_*
+
+# Act (GitHub Actions local runner) artifacts
+.actrc.local
+.env.act
+.input
+.vars
+act
+/act
+act.exe
+
+# Act runtime artifacts and containers
+.act/
+.cache/act/
+act-*.log
+act-cache/
+
+# Act event files (keep the template)
+!.github/workflows/events/push.json
+
+# Local development binaries and tools
+/tmp/bazel
+~/bin/bazel
+bazel-installer*
+protoc-*
+/protoc
+protoc
+
+# Development caches and temporary files
+.cache/
+cache/
+.tmp-*
+tmp-*
+/tools/cache/
+
+# Performance profiling files
+*.pprof
+profile.json
+profile-*.json
+*.prof
+*.trace
+
+# Security scanning results
+.secrets.local
+.git-secrets-patterns
+git-secrets/
+trufflehog-*.json
+gitleaks-*.json
+semgrep-*.json
+gosec-*.json
+nancy-*.json
+
+# Dependency vulnerability scan results
+vulnerabilities/
+vulnerability-*.json
+security-scan-*.txt
+
+# Fuzzing artifacts
+fuzz/
+*.fuzz
+fuzzdata/
+crashers/
+suppressions/
+corpus/
+
+# Local configuration overrides
+.bazelrc.user
+.bazelrc.local
+.secrets.local
+.env.local
+.actrc.local
+
+# Git hooks and local git configuration
+.git/hooks/pre-commit.local
+.git/hooks/commit-msg.local
+
+# CI/CD debugging artifacts
+workflow-debug/
+github-actions-debug/
+act-debug/
+
+# Development database files
+*.db
+*.sqlite
+*.sqlite3
+test.db
+
+# Local documentation builds
+docs/build/
+_site/
+.jekyll-cache/
+
+# Local benchmarking and testing
+benchmark-results/
+test-results/
+benchmark-*.out
+*.benchmark
+
+# Editor-specific files
+.vscode/launch.json.local
+.vscode/settings.json.local
+.idea/workspace.xml.local
+archive/

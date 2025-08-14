@@ -9,7 +9,6 @@ on:
     paths:
       - 'docs/**'
       - '**.md'
-      - 'examples/**'
 
 jobs:
   # Documentation linting and validation
@@ -52,7 +51,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.24.x'
         
     - name: Install godoc
       run: go install golang.org/x/tools/cmd/godoc@latest
@@ -91,9 +90,9 @@ jobs:
         name: api-documentation
         path: docs/api/
 
-  # Example validation
-  validate-examples:
-    name: Validate Examples
+  # Configuration validation
+  validate-configs:
+    name: Validate Configurations
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -102,226 +101,29 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.24.x'
         
-    - name: Setup Protocol Buffers (Required for Build)
-      uses: ./.github/actions/setup-protobuf
         
-    - name: Build examples
+    - name: Build project
       run: |
-        make build examples
+        make build
         
-    - name: Validate example configuration files
+    - name: Validate configuration files
       run: |
-        # Check YAML syntax
-        for file in config/*.yaml examples/**/*.yaml; do
+        # Check YAML syntax in config directory
+        for file in config/*.yaml; do
           if [[ -f "$file" ]]; then
             echo "Validating $file"
             python3 -c "import yaml; yaml.safe_load(open('$file'))" || echo "Invalid YAML: $file"
           fi
         done
         
-    - name: Test example documentation
+    - name: Verify configuration validator
       run: |
-        # Check if example commands in README work
-        if grep -q "go run examples" README.md; then
-          echo "Found Go run examples in README, validating..."
-          # Extract and test go run commands
-          grep "go run examples" README.md | while read line; do
-            echo "Testing: $line"
-            timeout 5 $line --help || echo "Command failed: $line"
-          done
-        fi
+        # Build and test the config validator tool
+        go build -o config-validator ./cmd/config-validator
+        ./config-validator --help || echo "Config validator help check"
 
-  # Release automation
-  release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [docs-lint, api-docs, validate-examples]
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24'
-        
-    - name: Install GoReleaser
-      uses: goreleaser/goreleaser-action@v5
-      with:
-        distribution: goreleaser
-        version: latest
-        install-only: true
-        
-    - name: Create .goreleaser.yaml
-      run: |
-        cat > .goreleaser.yaml << 'EOF'
-        project_name: ephemos
-        
-        before:
-          hooks:
-            - go mod tidy
-            - go generate ./...
-            
-        builds:
-          - id: ephemos-cli
-            main: ./cmd/ephemos-cli
-            binary: ephemos
-            env:
-              - CGO_ENABLED=0
-            goos:
-              - linux
-              - darwin
-              - windows
-            goarch:
-              - amd64
-              - arm64
-            ignore:
-              - goos: windows
-                goarch: arm64
-                
-          - id: echo-server
-            main: ./examples/echo-server
-            binary: echo-server
-            env:
-              - CGO_ENABLED=0
-            goos:
-              - linux
-              - darwin
-              - windows
-            goarch:
-              - amd64
-              - arm64
-            ignore:
-              - goos: windows
-                goarch: arm64
-                
-          - id: echo-client
-            main: ./examples/echo-client
-            binary: echo-client
-            env:
-              - CGO_ENABLED=0
-            goos:
-              - linux
-              - darwin
-              - windows
-            goarch:
-              - amd64
-              - arm64
-            ignore:
-              - goos: windows
-                goarch: arm64
+  # Release automation removed from this branch - will be added in separate release PR
 
-        archives:
-          - format: tar.gz
-            name_template: >-
-              {{ .ProjectName }}_
-              {{- title .Os }}_
-              {{- if eq .Arch "amd64" }}x86_64
-              {{- else if eq .Arch "386" }}i386
-              {{- else }}{{ .Arch }}{{ end }}
-              {{- if .Arm }}v{{ .Arm }}{{ end }}
-            format_overrides:
-              - goos: windows
-                format: zip
-                
-        checksum:
-          name_template: 'checksums.txt'
-          
-        snapshot:
-          name_template: "{{ incpatch .Version }}-next"
-          
-        changelog:
-          sort: asc
-          filters:
-            exclude:
-              - '^docs:'
-              - '^test:'
-              - '^ci:'
-              - '^chore:'
-              
-        release:
-          github:
-            owner: sufield
-            name: ephemos
-          draft: false
-          prerelease: auto
-          name_template: "Release {{.Tag}}"
-          
-        dockers:
-          - image_templates:
-              - "ghcr.io/sufield/ephemos:{{ .Tag }}"
-              - "ghcr.io/sufield/ephemos:latest"
-            build_flag_templates:
-              - "--platform=linux/amd64"
-              - "--label=org.opencontainers.image.created={{.Date}}"
-              - "--label=org.opencontainers.image.title={{.ProjectName}}"
-              - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-              - "--label=org.opencontainers.image.version={{.Version}}"
-            dockerfile: Dockerfile
-            use: buildx
-        EOF
-        
-    - name: Create Dockerfile
-      run: |
-        cat > Dockerfile << 'EOF'
-        FROM alpine:latest
-        RUN apk --no-cache add ca-certificates
-        WORKDIR /root/
-        COPY ephemos .
-        CMD ["./ephemos"]
-        EOF
-        
-    - name: Run GoReleaser
-      uses: goreleaser/goreleaser-action@v5
-      with:
-        distribution: goreleaser
-        version: latest
-        args: release --clean
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Update documentation site
-      run: |
-        # Generate changelog for documentation
-        echo "## Release Notes for ${GITHUB_REF#refs/tags/}" > release-notes.md
-        echo "" >> release-notes.md
-        
-        # Extract changelog from git log since last tag
-        LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-        if [[ -n "$LAST_TAG" ]]; then
-          git log --oneline ${LAST_TAG}..HEAD --no-merges >> release-notes.md
-        else
-          git log --oneline --no-merges >> release-notes.md
-        fi
-        
-    - name: Upload release artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: release-artifacts
-        path: |
-          dist/
-          release-notes.md
-
-  # Container image security scanning
-  container-scan:
-    name: Container Security Scan
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [release]
-    steps:
-    - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: 'ghcr.io/sufield/ephemos:latest'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-        
-    - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v3
-      with:
-        sarif_file: 'trivy-results.sarif'
+  # Container scanning removed since it depends on release job

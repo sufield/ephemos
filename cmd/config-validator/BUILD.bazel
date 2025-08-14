@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "config-validator_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/sufield/ephemos/cmd/config-validator",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//internal/adapters/secondary/config",
+        "//internal/core/ports",
+    ],
+)
+
+go_binary(
+    name = "config-validator",
+    embed = [":config-validator_lib"],
+    visibility = ["//visibility:public"],
+    x_defs = {
+        "main.Version": "{STABLE_VERSION}",
+        "main.CommitHash": "{STABLE_COMMIT_HASH}",
+        "main.BuildTime": "{STABLE_BUILD_TIME}",
+        "main.BuildUser": "{STABLE_BUILD_USER}",
+        "main.BuildHost": "{STABLE_BUILD_HOST}",
+    },
+)

@@ -1,0 +1,155 @@
+# Demo scripts converted to Bazel targets
+
+sh_binary(
+    name = "install_spire",
+    srcs = ["install-spire.sh"],
+    tags = [
+        "demo",
+        "spire",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "start_spire",
+    srcs = ["start-spire.sh"],
+    tags = [
+        "demo",
+        "spire",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "stop_spire",
+    srcs = ["stop-spire.sh"],
+    tags = [
+        "demo",
+        "spire",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "setup_demo",
+    srcs = ["setup-demo.sh"],
+    data = [
+        ":install_spire",
+        ":start_spire",
+    ],
+    tags = ["demo"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "run_demo",
+    srcs = ["run-demo.sh"],
+    data = [
+        ":setup_demo",
+    ],
+    tags = ["demo"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "cleanup",
+    srcs = ["cleanup.sh"],
+    tags = [
+        "cleanup",
+        "demo",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "cleanup_spire_entries",
+    srcs = ["cleanup-spire-entries.sh"],
+    tags = [
+        "cleanup",
+        "demo",
+        "spire",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "cleanup_all_processes",
+    srcs = ["cleanup-all-processes.sh"],
+    tags = [
+        "cleanup",
+        "demo",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "force_cleanup",
+    srcs = ["force-cleanup.sh"],
+    tags = [
+        "cleanup",
+        "demo",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "test_identity_timing",
+    srcs = ["test-identity-timing.sh"],
+    tags = [
+        "demo",
+        "test",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# Demo test targets
+sh_test(
+    name = "demo_setup_test",
+    size = "large",
+    srcs = ["test-demo-setup.sh"],
+    data = [
+        ":cleanup",
+        ":setup_demo",
+    ],
+    tags = ["demo"],
+)
+
+sh_test(
+    name = "spire_lifecycle_test",
+    size = "large",
+    srcs = ["test-spire-lifecycle.sh"],
+    data = [
+        ":cleanup_spire_entries",
+        ":install_spire",
+        ":start_spire",
+        ":stop_spire",
+    ],
+    tags = [
+        "demo",
+        "spire",
+    ],
+)
+
+# Demo test suite
+test_suite(
+    name = "demo_tests",
+    tags = ["demo"],
+    tests = [
+        ":demo_setup_test",
+        ":spire_lifecycle_test",
+    ],
+)
+
+# Complete demo workflow
+sh_binary(
+    name = "full_demo",
+    srcs = ["full-demo.sh"],
+    data = [
+        ":cleanup",
+        ":run_demo",
+        ":setup_demo",
+        "//cmd/ephemos-cli",
+    ],
+    tags = ["demo"],
+    visibility = ["//visibility:public"],
+)
