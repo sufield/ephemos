@@ -190,12 +190,7 @@ jobs:
       uses: github/codeql-action/init@v3
       with:
         languages: go
-        # Use configuration file for comprehensive security analysis
         config-file: ./.github/codeql/codeql-config.yml
-        # Use default CodeQL queries plus security-extended queries
-        queries: security-extended,security-and-quality
-        # Enable debug mode for troubleshooting if needed
-        debug: false
         
     - name: Build for CodeQL Analysis
       run: |
