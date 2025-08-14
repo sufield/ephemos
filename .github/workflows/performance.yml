@@ -122,7 +122,6 @@ jobs:
             "context"
             "fmt"
             "runtime"
-            "time"
           )
           func main() {
             fmt.Println("Starting library memory profiling...")
