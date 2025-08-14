@@ -1,10 +1,10 @@
 #!/bin/bash
-# Validate Bazel configuration for protobuf optimizations
-# This script checks if the optimization is properly configured
+# Validate Bazel configuration for ephemos library
+# This script checks if the build configuration is properly set
 
 set -euo pipefail
 
-echo "🔧 Validating Bazel protobuf optimization configuration..."
+echo "🔧 Validating Bazel configuration..."
 
 # Colors for output
 RED='\033[0;31m'
@@ -25,46 +25,10 @@ echo "✅ Bazel found: $(bazel version | head -1)"
 echo ""
 echo "📋 Checking WORKSPACE configuration..."
 
-if grep -q "toolchains_protoc" WORKSPACE; then
-    echo -e "${GREEN}✅ toolchains_protoc dependency found${NC}"
+if [ -f "WORKSPACE" ]; then
+    echo -e "${GREEN}✅ WORKSPACE file found${NC}"
 else
-    echo -e "${RED}❌ toolchains_protoc dependency missing${NC}"
-    exit 1
-fi
-
-if grep -q "protoc_toolchains" WORKSPACE; then
-    echo -e "${GREEN}✅ protoc_toolchains registration found${NC}"
-else
-    echo -e "${RED}❌ protoc_toolchains registration missing${NC}"
-    exit 1
-fi
-
-# Validate .bazelrc configuration
-echo ""
-echo "📋 Checking .bazelrc configuration..."
-
-if grep -q "incompatible_enable_proto_toolchain_resolution" .bazelrc; then
-    echo -e "${GREEN}✅ Proto toolchain resolution enabled${NC}"
-else
-    echo -e "${RED}❌ Proto toolchain resolution flag missing${NC}"
-    exit 1
-fi
-
-if grep -q "PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT" .bazelrc; then
-    echo -e "${GREEN}✅ Fail-fast flags for source builds configured${NC}"
-else
-    echo -e "${RED}❌ Fail-fast flags missing${NC}"
-    exit 1
-fi
-
-# Check toolchain files
-echo ""
-echo "📋 Checking custom toolchain files..."
-
-if [ -f "tools/toolchains/BUILD.bazel" ]; then
-    echo -e "${GREEN}✅ Custom toolchain BUILD.bazel found${NC}"
-else
-    echo -e "${RED}❌ Custom toolchain BUILD.bazel missing${NC}"
+    echo -e "${RED}❌ WORKSPACE file missing${NC}"
     exit 1
 fi
 
@@ -80,16 +44,6 @@ else
     exit 1
 fi
 
-# Test toolchain availability
-echo ""
-echo "📋 Testing toolchain registration..."
-
-if bazel query "kind(toolchain, //tools/toolchains:all)" >/dev/null 2>&1; then
-    echo -e "${GREEN}✅ Custom toolchains registered successfully${NC}"
-    bazel query "kind(toolchain, //tools/toolchains:all)"
-else
-    echo -e "${YELLOW}⚠️  Could not query custom toolchains${NC}"
-fi
 
 
 echo ""

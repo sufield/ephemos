@@ -50,36 +50,8 @@ http_archive(
     ],
 )
 
-# Note: Prebuilt protoc toolchain temporarily disabled due to version compatibility issues
-# http_archive(
-#     name = "toolchains_protoc",
-#     sha256 = "3019f9ed1273d547334da2004e634340c896d9e24dd6d899911e03b694fdc1f5",
-#     strip_prefix = "toolchains_protoc-0.4.3", 
-#     urls = [
-#         "https://github.com/aspect-build/toolchains_protoc/releases/download/v0.4.3/toolchains_protoc-v0.4.3.tar.gz",
-#     ],
-# )
 
-# Protocol buffers rules - Using latest stable version for Bazel 7.x
-http_archive(
-    name = "rules_proto",
-    sha256 = "14a225870ab4e91869652cfd69ef2028277fc1dc4910d65d353b62d6e0ae21f4",
-    strip_prefix = "rules_proto-7.1.0",
-    url = "https://github.com/bazelbuild/rules_proto/releases/download/7.1.0/rules_proto-7.1.0.tar.gz",
-)
-
-# Note: Protocol buffers now managed by rules_proto 7.1.0
-# http_archive(
-#     name = "com_google_protobuf",
-#     strip_prefix = "protobuf-27.3",
-#     urls = [
-#         "https://github.com/protocolbuffers/protobuf/archive/v27.3.tar.gz",
-#     ],
-#     sha256 = "1535151efbc7893f38b0578e83cac584f2819974f065698976989ec71c1af84a",
-# )
-
-# Java rules - Using embedded Java rules from protobuf (managed by rules_proto 7.1.0)
-# Note: rules_proto 7.1.0 uses protobuf 29.0 which includes Java proto rules
+# Java rules - Not required for HTTP over mTLS library
 
 # Python rules - Updated to latest stable version compatible with Bazel 7.x
 # This version resolves PyCcLinkParamsProvider issues and provides full Bazel 7 support
@@ -94,9 +66,7 @@ http_archive(
 
 load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies", "rules_cc_toolchains")
 load("@bazel_features//:deps.bzl", "bazel_features_deps")
-load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies")
 load("@rules_python//python:repositories.bzl", "py_repositories", "python_register_toolchains")
-# Note: Java rules loaded from protobuf (managed by rules_proto 7.1.0)
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 
@@ -106,9 +76,7 @@ rules_cc_toolchains()
 
 bazel_features_deps()
 
-rules_proto_dependencies()
-
-# Note: Java rules initialization handled by protobuf (managed by rules_proto 7.1.0)
+# Note: Proto dependencies removed - library uses HTTP over mTLS without protobuf
 
 py_repositories()
 
@@ -123,17 +91,6 @@ go_register_toolchains(version = "1.24.5")
 
 gazelle_dependencies()
 
-# Note: Prebuilt protoc toolchains disabled due to compatibility issues
-# load("@toolchains_protoc//protoc:toolchain.bzl", "protoc_toolchains")
-# 
-# protoc_toolchains(
-#     name = "protoc_toolchains",
-#     version = "27.0",  # Use a stable protoc version supported by toolchains_protoc
-# )
-
-# Note: protobuf_deps no longer needed - managed by rules_proto 7.1.0
-# load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
-# protobuf_deps()
 
 # Go dependencies
 load("//:deps.bzl", "go_dependencies")
@@ -141,10 +98,3 @@ load("//:deps.bzl", "go_dependencies")
 # gazelle:repository_macro deps.bzl%go_dependencies
 go_dependencies()
 
-# Register custom Go proto toolchains for optimized builds
-# Note: Custom toolchains temporarily disabled due to compatibility issues
-# register_toolchains(
-#     "//tools/toolchains:go_proto_toolchain",
-#     "//tools/toolchains:go_grpc_toolchain", 
-#     "//tools/toolchains:go_combined_toolchain",
-# )
