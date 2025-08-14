@@ -62,18 +62,22 @@ Yes, Ephemos uses X.509 certificates for authentication through SPIFFE's impleme
 
 ### What happens when authentication fails?
 
-Authentication failure occurs at the TLS transport layer, not at the application level:
+In the context of using the go-spiffe SDK with SPIFFE and SPIRE, identity-based authentication relies on workloads obtaining and presenting valid SPIFFE Verifiable Identity Documents (SVIDs), typically X.509-SVIDs for mTLS connections or JWT-SVIDs for other authentication flows. These SVIDs are issued by the SPIRE Agent after successful workload attestation, which verifies the workload's identity against pre-registered selectors (e.g., process ID, Kubernetes pod details) defined in registration entries on the SPIRE Server.
 
-1. **Connection Failure**: The client receives a connection/transport error because the mTLS handshake fails before any application messages are exchanged.
+If authentication fails—such as when a service is not registered with the SPIRE Agent (meaning no matching registration entry exists, so attestation fails and no SVID can be issued)—the following occurs:
 
-2. **Typical Error Messages**:
-   - `"transport: authentication handshake failed"`
-   - `"connection error: desc = \"transport: Error while dialing dial tcp: x509: certificate signed by unknown authority\""`
-   - `"rpc error: code = Unavailable desc = connection error"`
+- The workload cannot fetch a valid SVID from the SPIFFE Workload API.
+- In practical usage with the go-spiffe SDK (e.g., during mTLS setup via functions like `spiffetls.Dial` or `spiffetls.Listen`), this results in an error being returned, preventing the secure connection from being established. For instance, the TLS handshake fails if the peer cannot present or validate an SVID against the trust bundle, leading to a connection refusal or termination.
+- No further processing of the request proceeds, as the identity cannot be verified.
 
-3. **No Application Response**: The server's application code (like the Echo service) is never reached - the connection is rejected during the mTLS handshake.
+Your understanding is correct: no authorization is performed. SPIFFE and SPIRE primarily handle authentication (AuthN: verifying *who* the workload is via SVIDs), while authorization (AuthZ: deciding *what* the authenticated workload can do) is a separate concern typically implemented on top of successful authentication, often using external tools like Open Policy Agent (OPA) or application-level policies based on the verified SPIFFE ID. If authentication fails, the process does not reach the authorization stage, as there is no trusted identity to authorize.
 
-4. **Security Benefit**: Unauthorized clients cannot establish connections, providing defense in depth.
+**Typical Error Messages when authentication fails:**
+- `"transport: authentication handshake failed"`
+- `"connection error: desc = \"transport: Error while dialing dial tcp: x509: certificate signed by unknown authority\""`
+- `"rpc error: code = Unavailable desc = connection error"`
+
+**Security Benefit**: Unauthorized clients cannot establish connections, providing defense in depth.
 
 ### What does the echo server respond to echo client requests?
 
