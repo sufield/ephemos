@@ -129,12 +129,20 @@ jobs:
           echo "Creating fuzz target binaries..."
           # For ClusterFuzzLite with Go, we need to create binaries that wrap our fuzz tests
           # Create a temporary directory for fuzz target source files
-          mkdir -p fuzz-targets
+          echo "Creating fuzz-targets directory..."
+          mkdir -p fuzz-targets || { echo "❌ Failed to create fuzz-targets directory"; exit 1; }
+          ls -la fuzz-targets/
           echo "✅ Created fuzz-targets directory"
+          
+          # Verify write permissions
+          echo "Testing write permissions in fuzz-targets..."
+          echo "test" > fuzz-targets/test-write.txt || { echo "❌ Cannot write to fuzz-targets directory"; exit 1; }
+          rm fuzz-targets/test-write.txt
+          echo "✅ Write permissions confirmed"
           
           # Create config fuzz target binary
           echo "Creating config_fuzz_main.go..."
-          cat > fuzz-targets/config_fuzz_main.go << 'EOF'
+          cat > fuzz-targets/config_fuzz_main.go << 'EOF' || { echo "❌ Failed to create config_fuzz_main.go"; exit 1; }
           package main
           import (
             "fmt"
@@ -170,11 +178,18 @@ jobs:
             }
           }
           EOF
-          echo "✅ Created config_fuzz_main.go"
+          # Verify config_fuzz_main.go was created successfully
+          if [ -f "fuzz-targets/config_fuzz_main.go" ]; then
+            echo "✅ Created config_fuzz_main.go ($(wc -l < fuzz-targets/config_fuzz_main.go) lines)"
+          else
+            echo "❌ Failed to create config_fuzz_main.go"
+            ls -la fuzz-targets/
+            exit 1
+          fi
           
           # Create server fuzz target binary
           echo "Creating server_fuzz_main.go..."
-          cat > fuzz-targets/server_fuzz_main.go << 'EOF'
+          cat > fuzz-targets/server_fuzz_main.go << 'EOF' || { echo "❌ Failed to create server_fuzz_main.go"; exit 1; }
           package main
           import (
             "fmt"
@@ -216,11 +231,18 @@ jobs:
             }
           }
           EOF
-          echo "✅ Created server_fuzz_main.go"
+          # Verify server_fuzz_main.go was created successfully
+          if [ -f "fuzz-targets/server_fuzz_main.go" ]; then
+            echo "✅ Created server_fuzz_main.go ($(wc -l < fuzz-targets/server_fuzz_main.go) lines)"
+          else
+            echo "❌ Failed to create server_fuzz_main.go"
+            ls -la fuzz-targets/
+            exit 1
+          fi
           
           # Create identity fuzz target binary
           echo "Creating identity_fuzz_main.go..."
-          cat > fuzz-targets/identity_fuzz_main.go << 'EOF'
+          cat > fuzz-targets/identity_fuzz_main.go << 'EOF' || { echo "❌ Failed to create identity_fuzz_main.go"; exit 1; }
           package main
           import (
             "fmt"
@@ -265,7 +287,14 @@ jobs:
             }
           }
           EOF
-          echo "✅ Created identity_fuzz_main.go"
+          # Verify identity_fuzz_main.go was created successfully
+          if [ -f "fuzz-targets/identity_fuzz_main.go" ]; then
+            echo "✅ Created identity_fuzz_main.go ($(wc -l < fuzz-targets/identity_fuzz_main.go) lines)"
+          else
+            echo "❌ Failed to create identity_fuzz_main.go"
+            ls -la fuzz-targets/
+            exit 1
+          fi
           
           # Verify all source files were created successfully
           echo "Verifying all fuzz target source files were created..."
@@ -298,16 +327,53 @@ jobs:
           
           # Prepare Go module environment for standalone fuzz targets
           echo "Preparing Go module environment..."
-          cd fuzz-targets
+          cd fuzz-targets || { echo "❌ Cannot cd to fuzz-targets"; exit 1; }
+          
+          # Debug: Show current directory and contents
+          echo "Current directory: $(pwd)"
+          echo "Contents of fuzz-targets directory:"
+          ls -la
+          
           # Initialize a minimal go.mod for the fuzz targets if one doesn't exist
           if [ ! -f go.mod ]; then
-            go mod init fuzz-targets
+            echo "Initializing go.mod..."
+            go mod init fuzz-targets || { echo "❌ Failed to initialize go.mod"; exit 1; }
             echo "✅ Initialized go.mod for fuzz targets"
+          else
+            echo "✅ go.mod already exists"
           fi
-          cd ..
+          
+          # Verify go.mod was created
+          if [ -f go.mod ]; then
+            echo "✅ go.mod confirmed present:"
+            cat go.mod
+          else
+            echo "❌ go.mod missing after initialization"
+            exit 1
+          fi
+          
+          cd .. || { echo "❌ Cannot return to parent directory"; exit 1; }
           
           # Build the fuzz target binaries
           echo "Building fuzz target binaries..."
+          
+          # Final verification before build
+          echo "=== PRE-BUILD VERIFICATION ==="
+          echo "Working directory: $(pwd)"
+          echo "Contents of fuzz-targets directory:"
+          ls -la fuzz-targets/
+          echo "Contents of fuzz-targets/go.mod:"
+          cat fuzz-targets/go.mod || echo "❌ go.mod not found"
+          echo "First few lines of each source file:"
+          for file in fuzz-targets/*.go; do
+            if [ -f "$file" ]; then
+              echo "--- $file ---"
+              head -3 "$file"
+            else
+              echo "❌ $file not found"
+            fi
+          done
+          echo "=== END PRE-BUILD VERIFICATION ==="
           
           # Ensure build-out directory exists and is writable
           mkdir -p build-out
