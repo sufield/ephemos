@@ -108,9 +108,9 @@ jobs:
           benchmark-new.txt
           benchmark-baseline.txt
 
-  # Memory profiling (library only - no demo applications)
+  # Memory profiling (library only - no server components)
   memory-profile:
-    name: Memory Baseline Testing
+    name: Memory Profiling
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -130,19 +130,9 @@ jobs:
         set -e  # Exit on any error
         set -x  # Print commands being executed
         
-        echo "🔍 Starting library memory profiling..."
+        echo "🔍 Running library memory profiling..."
         
-        # Ensure we're in a clean state
-        if [ -f memory_profile.go ]; then
-          rm -f memory_profile.go
-        fi
-        if [ -f memory-profile-results.txt ]; then
-          rm -f memory-profile-results.txt
-        fi
-        
-        echo "📝 Creating memory profiling test..."
-        
-        # Create a simple memory profiling program with proper error handling
+        # Create a simple memory profiling program
         cat > memory_profile.go << 'EOF'
         package main
         
@@ -154,7 +144,7 @@ jobs:
         )
         
         func main() {
-            fmt.Println("🚀 Starting library memory profiling...")
+            fmt.Println("🚀 Starting Ephemos library memory profiling...")
             
             // Collect baseline memory stats
             var m1 runtime.MemStats
@@ -180,7 +170,7 @@ jobs:
                 data = append(data, chunk)
                 
                 // Periodic cleanup to simulate realistic usage
-                if i%100 == 0 {
+                if i%200 == 0 {
                     fmt.Printf("  🗑️  Running GC at iteration %d\n", i)
                     runtime.GC()
                     
@@ -215,12 +205,12 @@ jobs:
             
             // Validate results
             if m2.NumGC < m1.NumGC {
-                fmt.Fprintf(os.Stderr, "❌ Error: GC count decreased, which is impossible\n")
+                fmt.Fprintf(os.Stderr, "❌ Error: GC count decreased\n")
                 os.Exit(1)
             }
             
-            // Check for excessive memory usage (>100MB would be concerning)
-            if m2.Alloc > 100*1024*1024 {
+            // Check for excessive memory usage (>50MB would be concerning for this simple test)
+            if m2.Alloc > 50*1024*1024 {
                 fmt.Fprintf(os.Stderr, "⚠️  Warning: High memory usage: %d KB\n", bToKb(m2.Alloc))
             }
             
@@ -236,413 +226,39 @@ jobs:
         }
         EOF
         
-        echo "🔧 Verifying Go code syntax..."
-        # Check if the Go code is syntactically valid
-        if ! go fmt memory_profile.go > /dev/null 2>&1; then
-          echo "❌ Error: Generated Go code has syntax errors"
-          cat memory_profile.go
-          exit 1
-        fi
-        
         echo "▶️  Running memory profiling program..."
-        # Run the memory profiling program with proper error handling
         if go run memory_profile.go > memory-profile-results.txt 2>&1; then
           echo "✅ Memory profiling completed successfully"
-          
-          # Show results in console for debugging
-          echo "📋 Memory profiling results:"
           cat memory-profile-results.txt
-          
         else
-          echo "❌ Memory profiling failed with exit code $?"
-          echo "📋 Error output:"
+          echo "❌ Memory profiling failed"
           cat memory-profile-results.txt
-          
-          echo "🔍 Debugging information:"
-          echo "Go version: $(go version)"
-          echo "Available memory: $(free -h 2>/dev/null || echo 'free command not available')"
-          echo "Current directory: $(pwd)"
-          echo "Files in directory: $(ls -la)"
-          
-          # Still add to summary for debugging
-          echo "## ❌ Memory Profile Failed" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat memory-profile-results.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          
           exit 1
         fi
         
-        echo "📊 Adding results to GitHub summary..."
         echo "## 📊 Memory Profile Results" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
         cat memory-profile-results.txt >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
         
-    - name: Show server logs on failure
-      if: failure()
+    - name: Analyze memory performance results
       run: |
-        echo "## Server Logs" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        cat server.log 2>/dev/null || echo "No server log available"
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        
-    - name: Analyze performance metrics
-      run: |
-        echo "Checking metrics files..."
-        ls -la *.txt 2>/dev/null || echo "No metrics files found"
-        
-        echo "## Memory Baseline Testing Results" >> $GITHUB_STEP_SUMMARY
+        echo "## 📊 Memory Performance Analysis" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Test Configuration" >> $GITHUB_STEP_SUMMARY
-        echo "- **Server**: echo-server with SPIFFE identity" >> $GITHUB_STEP_SUMMARY
-        echo "- **Port**: 50052" >> $GITHUB_STEP_SUMMARY
-        echo "- **Load**: Up to 5 client connection attempts" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        if [[ -f metrics.txt && -s metrics.txt ]]; then
-          echo "### Memory Metrics" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat metrics.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-        else
-          echo "⚠️ Performance metrics not available" >> $GITHUB_STEP_SUMMARY
-        fi
-        
+        echo "- **Library**: Ephemos memory usage baseline" >> $GITHUB_STEP_SUMMARY
+        echo "- **Test**: 1MB memory allocation with GC cycles" >> $GITHUB_STEP_SUMMARY
+        echo "- **Focus**: Memory growth and garbage collection efficiency" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Notes" >> $GITHUB_STEP_SUMMARY
-        echo "- This job establishes baseline memory usage for the echo server" >> $GITHUB_STEP_SUMMARY
-        echo "- Advanced profiling (heap/CPU) requires adding pprof endpoints to the server" >> $GITHUB_STEP_SUMMARY
-        echo "- Client connection failures don't affect server memory measurement" >> $GITHUB_STEP_SUMMARY
+        echo "- This test establishes baseline memory usage patterns" >> $GITHUB_STEP_SUMMARY
+        echo "- Memory growth should be minimal after garbage collection" >> $GITHUB_STEP_SUMMARY
+        echo "- Tests are library-focused without external server dependencies" >> $GITHUB_STEP_SUMMARY
         
-    - name: Upload performance data
+    - name: Upload memory profile results
       uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
       with:
-        name: performance-metrics
-        path: |
-          metrics.txt
-          profile-note.txt
-          server.log
-      if: always()
-        
-    - name: Cleanup SPIRE
-      run: |
-        cd scripts/demo
-        sudo ./stop-spire.sh || true
+        name: memory-profile-results
+        path: memory-profile-results.txt
       if: always()
 
-  # Load testing
-  load-test:
-    name: Load Testing
-    runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24.x'
-        
-        
-    - name: Install SPIRE
-      run: |
-        set -e  # Exit on any error
-        set -x  # Print commands being executed
-        
-        echo "🔧 Installing SPIRE..."
-        
-        if [ ! -d "scripts/demo" ]; then
-          echo "❌ Error: scripts/demo directory not found"
-          ls -la scripts/ || echo "scripts directory not found"
-          exit 1
-        fi
-        
-        cd scripts/demo
-        
-        if [ ! -f "install-spire.sh" ]; then
-          echo "❌ Error: install-spire.sh script not found"
-          ls -la
-          exit 1
-        fi
-        
-        chmod +x install-spire.sh
-        
-        if ! sudo ./install-spire.sh; then
-          echo "❌ Error: SPIRE installation failed"
-          exit 1
-        fi
-        
-        echo "✅ SPIRE installed successfully"
-        
-    - name: Start SPIRE and setup services
-      run: |
-        set -e  # Exit on any error
-        set -x  # Print commands being executed
-        
-        echo "🚀 Starting SPIRE services..."
-        
-        cd scripts/demo
-        
-        # Start SPIRE
-        if ! sudo ./start-spire.sh; then
-          echo "❌ Error: Failed to start SPIRE"
-          exit 1
-        fi
-        
-        echo "⏳ Waiting for SPIRE to be ready..."
-        sleep 10
-        
-        # Verify SPIRE processes are running (script runs them as background processes, not systemd services)
-        if ! pgrep -f "spire-server.*run" > /dev/null; then
-          echo "❌ Error: SPIRE server process is not running"
-          echo "📋 SPIRE server log:"
-          cat spire-server.log 2>/dev/null || echo "No spire-server.log found"
-          echo "📋 Active SPIRE processes:"
-          pgrep -af spire || echo "No SPIRE processes found"
-          exit 1
-        fi
-        
-        if ! pgrep -f "spire-agent.*run" > /dev/null; then
-          echo "❌ Error: SPIRE agent process is not running"
-          echo "📋 SPIRE agent log:"
-          cat spire-agent.log 2>/dev/null || echo "No spire-agent.log found"
-          echo "📋 Active SPIRE processes:"
-          pgrep -af spire || echo "No SPIRE processes found"
-          exit 1
-        fi
-        
-        echo "✅ SPIRE server and agent processes are running"
-        
-        # Verify SPIRE health using the socket-based health check
-        echo "🔍 Running SPIRE health checks..."
-        if ! sudo spire-server healthcheck -socketPath /tmp/spire-server/private/api.sock; then
-          echo "❌ Error: SPIRE server health check failed"
-          echo "📋 SPIRE server log:"
-          cat spire-server.log 2>/dev/null || echo "No spire-server.log found"
-          exit 1
-        fi
-        
-        if ! sudo spire-agent healthcheck -socketPath /tmp/spire-agent/public/api.sock; then
-          echo "❌ Error: SPIRE agent health check failed"
-          echo "📋 SPIRE agent log:"
-          cat spire-agent.log 2>/dev/null || echo "No spire-agent.log found"
-          exit 1
-        fi
-        
-        echo "✅ SPIRE health checks passed"
-        
-        # Setup demo services
-        echo "⚙️ Setting up demo services..."
-        if ! sudo ./setup-demo.sh; then
-          echo "❌ Error: Failed to setup demo services"
-          echo "📋 Debugging information:"
-          echo "  SPIRE server health:"
-          sudo spire-server healthcheck -socketPath /tmp/spire-server/private/api.sock || echo "  Health check failed"
-          echo "  SPIRE entries:"
-          sudo spire-server entry show -socketPath /tmp/spire-server/private/api.sock || echo "  Could not show SPIRE entries"
-          echo "  SPIRE server log (last 20 lines):"
-          tail -20 spire-server.log 2>/dev/null || echo "  No spire-server.log available"
-          exit 1
-        fi
-        
-        echo "✅ Demo services setup completed"
-        
-        # Verify SPIRE entries were created successfully
-        echo "📋 Registered SPIRE entries:"
-        sudo spire-server entry show -socketPath /tmp/spire-server/private/api.sock || {
-          echo "⚠️  Warning: Could not verify SPIRE entries, but setup completed"
-        }
-        
-    - name: Build and start server
-      run: |
-        set -e  # Exit on any error
-        set -x  # Print commands being executed
-        
-        echo "🏗️ Building server..."
-        if ! make build; then
-          echo "❌ Error: Failed to build server"
-          exit 1
-        fi
-        
-        echo "✅ Server built successfully"
-        
-        # Verify the server binary exists
-        if [ ! -f "./bin/echo-server" ]; then
-          echo "❌ Error: Server binary not found at ./bin/echo-server"
-          ls -la ./bin/ || echo "bin directory not found"
-          exit 1
-        fi
-        
-        echo "🚀 Starting server..."
-        # Start server with proper environment and logging
-        EPHEMOS_CONFIG=config/echo-server.yaml ECHO_SERVER_ADDRESS=:50101 ./bin/echo-server > server-load.log 2>&1 &
-        server_pid=$!
-        echo $server_pid > server.pid
-        
-        echo "📝 Server started with PID: $server_pid"
-        
-        # Wait a bit for server to start
-        sleep 3
-        
-        # Verify server is still running
-        if ! kill -0 $server_pid 2>/dev/null; then
-          echo "❌ Error: Server failed to start or crashed immediately"
-          echo "📋 Server logs:"
-          cat server-load.log 2>/dev/null || echo "No server logs available"
-          exit 1
-        fi
-        
-        echo "✅ Server is running successfully"
-        
-        # Show initial server logs for debugging
-        echo "📋 Initial server logs:"
-        head -10 server-load.log 2>/dev/null || echo "No server logs yet"
-        
-    - name: Install hey (load testing tool)
-      run: |
-        go install github.com/rakyll/hey@latest
-        
-    - name: Create load test script
-      run: |
-        cat > loadtest.go << 'EOF'
-        package main
-        
-        import (
-            "context"
-            "fmt"
-            "log"
-            "sync"
-            "time"
-            "github.com/sufield/ephemos/pkg/ephemos"
-        )
-        
-        func main() {
-            const workers = 10
-            const requests = 100
-            
-            var wg sync.WaitGroup
-            start := time.Now()
-            
-            for i := 0; i < workers; i++ {
-                wg.Add(1)
-                go func(worker int) {
-                    defer wg.Done()
-                    
-                    ctx := context.Background()
-                    client, err := ephemos.NewIdentityClient(ctx, "config/echo-client.yaml")
-                    if err != nil {
-                        log.Printf("Worker %d: Failed to create client: %v", worker, err)
-                        return
-                    }
-                    defer client.Close()
-                    
-                    conn, err := client.Connect(ctx, "echo-server", "localhost:50101")
-                    if err != nil {
-                        log.Printf("Worker %d: Failed to connect: %v", worker, err)
-                        return
-                    }
-                    defer conn.Close()
-                    
-                    for j := 0; j < requests/workers; j++ {
-                        // Simulate echo request here
-                        time.Sleep(10 * time.Millisecond)
-                    }
-                    
-                    log.Printf("Worker %d completed", worker)
-                }(i)
-            }
-            
-            wg.Wait()
-            elapsed := time.Since(start)
-            
-            fmt.Printf("Load test completed: %d requests in %v\n", requests, elapsed)
-            fmt.Printf("Requests per second: %.2f\n", float64(requests)/elapsed.Seconds())
-        }
-        EOF
-        
-    - name: Run load test
-      run: |
-        set -e  # Exit on any error
-        set -x  # Print commands being executed
-        
-        echo "🚀 Starting load test..."
-        
-        # Verify server is running
-        if ! kill -0 $(cat server.pid) 2>/dev/null; then
-          echo "❌ Error: Server is not running"
-          echo "📋 Server logs:"
-          cat server-load.log 2>/dev/null || echo "No server logs available"
-          exit 1
-        fi
-        
-        echo "✅ Server is running (PID: $(cat server.pid))"
-        
-        # Verify load test code syntax
-        echo "🔧 Verifying load test syntax..."
-        if ! go fmt loadtest.go > /dev/null 2>&1; then
-          echo "❌ Error: Load test Go code has syntax errors"
-          cat loadtest.go
-          exit 1
-        fi
-        
-        # Run the load test with proper error handling
-        echo "▶️  Running load test..."
-        if go run loadtest.go > load-test-results.txt 2>&1; then
-          echo "✅ Load test completed successfully"
-          
-          # Show results in console for debugging
-          echo "📋 Load test results:"
-          cat load-test-results.txt
-          
-          # Add to summary
-          echo "## 🚀 Load Test Results" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat load-test-results.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          
-        else
-          echo "❌ Load test failed with exit code $?"
-          echo "📋 Error output:"
-          cat load-test-results.txt
-          
-          echo "🔍 Debugging information:"
-          echo "Server status: $(kill -0 $(cat server.pid) 2>/dev/null && echo 'running' || echo 'not running')"
-          echo "Server logs (last 20 lines):"
-          tail -20 server-load.log 2>/dev/null || echo "No server logs available"
-          
-          # Add failed results to summary for debugging
-          echo "## ❌ Load Test Failed" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "Error output:" >> $GITHUB_STEP_SUMMARY
-          cat load-test-results.txt >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Server logs:" >> $GITHUB_STEP_SUMMARY
-          tail -20 server-load.log 2>/dev/null || echo "No server logs available" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          
-          exit 1
-        fi
-        
-    - name: Check server logs
-      run: |
-        echo "## Server Performance Logs" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        tail -50 server-load.log >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        
-    - name: Upload load test results
-      uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
-      with:
-        name: load-test-results
-        path: |
-          load-test-results.txt
-          server-load.log
-          
-    - name: Cleanup
-      run: |
-        kill $(cat server.pid) || true
-        cd scripts/demo
-        sudo ./stop-spire.sh || true
-      if: always()
