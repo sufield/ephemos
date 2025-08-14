@@ -385,49 +385,95 @@ jobs:
           echo "Go environment:"
           go env | grep -E "(GOROOT|GOPATH|GOCACHE|GOMOD)"
           
+          # Test Go build environment with a simple program first
+          echo "Testing Go build environment..."
+          cat > test_build.go << 'EOF'
+          package main
+          import "fmt"
+          func main() {
+              fmt.Println("Build test successful")
+          }
+          EOF
+          
+          if go build -v -o build-out/test_build test_build.go; then
+            echo "✅ Go build environment working"
+            ./build-out/test_build
+            rm test_build.go build-out/test_build
+          else
+            echo "❌ Go build environment broken"
+            go version
+            go env
+            exit 1
+          fi
+          
           # Build each target with proper error handling and detailed output
           echo "Building config_fuzz..."
           echo "Command: go build -v -o build-out/config_fuzz ./fuzz-targets/config_fuzz_main.go"
-          if go build -v -o build-out/config_fuzz ./fuzz-targets/config_fuzz_main.go 2>&1; then
+          echo "Source file validation:"
+          head -10 ./fuzz-targets/config_fuzz_main.go
+          
+          # Build with full error capture
+          BUILD_OUTPUT=$(go build -v -o build-out/config_fuzz ./fuzz-targets/config_fuzz_main.go 2>&1)
+          BUILD_EXIT_CODE=$?
+          echo "Build output: $BUILD_OUTPUT"
+          echo "Build exit code: $BUILD_EXIT_CODE"
+          
+          if [ $BUILD_EXIT_CODE -eq 0 ]; then
             echo "✅ config_fuzz built successfully"
             ls -la build-out/config_fuzz
             ./build-out/config_fuzz 2>/dev/null && echo "✅ config_fuzz runs successfully" || echo "⚠️ config_fuzz execution test failed"
           else
-            echo "❌ config_fuzz build failed"
-            echo "Detailed error output:"
-            go build -v -o build-out/config_fuzz ./fuzz-targets/config_fuzz_main.go
-            echo "Source file content check:"
-            head -5 ./fuzz-targets/config_fuzz_main.go
+            echo "❌ config_fuzz build failed (exit code: $BUILD_EXIT_CODE)"
+            echo "Build error output:"
+            echo "$BUILD_OUTPUT"
+            echo "Source file content:"
+            cat ./fuzz-targets/config_fuzz_main.go
             exit 1
           fi
           
           echo "Building server_fuzz..."
           echo "Command: go build -v -o build-out/server_fuzz ./fuzz-targets/server_fuzz_main.go"
-          if go build -v -o build-out/server_fuzz ./fuzz-targets/server_fuzz_main.go 2>&1; then
+          echo "Source file validation:"
+          head -10 ./fuzz-targets/server_fuzz_main.go
+          
+          BUILD_OUTPUT=$(go build -v -o build-out/server_fuzz ./fuzz-targets/server_fuzz_main.go 2>&1)
+          BUILD_EXIT_CODE=$?
+          echo "Build output: $BUILD_OUTPUT"
+          echo "Build exit code: $BUILD_EXIT_CODE"
+          
+          if [ $BUILD_EXIT_CODE -eq 0 ]; then
             echo "✅ server_fuzz built successfully"
             ls -la build-out/server_fuzz
             ./build-out/server_fuzz 2>/dev/null && echo "✅ server_fuzz runs successfully" || echo "⚠️ server_fuzz execution test failed"
           else
-            echo "❌ server_fuzz build failed"
-            echo "Detailed error output:"
-            go build -v -o build-out/server_fuzz ./fuzz-targets/server_fuzz_main.go
-            echo "Source file content check:"
-            head -5 ./fuzz-targets/server_fuzz_main.go
+            echo "❌ server_fuzz build failed (exit code: $BUILD_EXIT_CODE)"
+            echo "Build error output:"
+            echo "$BUILD_OUTPUT"
+            echo "Source file content:"
+            cat ./fuzz-targets/server_fuzz_main.go
             exit 1
           fi
           
           echo "Building identity_fuzz..."
           echo "Command: go build -v -o build-out/identity_fuzz ./fuzz-targets/identity_fuzz_main.go"
-          if go build -v -o build-out/identity_fuzz ./fuzz-targets/identity_fuzz_main.go 2>&1; then
+          echo "Source file validation:"
+          head -10 ./fuzz-targets/identity_fuzz_main.go
+          
+          BUILD_OUTPUT=$(go build -v -o build-out/identity_fuzz ./fuzz-targets/identity_fuzz_main.go 2>&1)
+          BUILD_EXIT_CODE=$?
+          echo "Build output: $BUILD_OUTPUT"
+          echo "Build exit code: $BUILD_EXIT_CODE"
+          
+          if [ $BUILD_EXIT_CODE -eq 0 ]; then
             echo "✅ identity_fuzz built successfully"
             ls -la build-out/identity_fuzz
             ./build-out/identity_fuzz 2>/dev/null && echo "✅ identity_fuzz runs successfully" || echo "⚠️ identity_fuzz execution test failed"
           else
-            echo "❌ identity_fuzz build failed"
-            echo "Detailed error output:"
-            go build -v -o build-out/identity_fuzz ./fuzz-targets/identity_fuzz_main.go
-            echo "Source file content check:"
-            head -5 ./fuzz-targets/identity_fuzz_main.go
+            echo "❌ identity_fuzz build failed (exit code: $BUILD_EXIT_CODE)"
+            echo "Build error output:"
+            echo "$BUILD_OUTPUT"
+            echo "Source file content:"
+            cat ./fuzz-targets/identity_fuzz_main.go
             exit 1
           fi
           # Verify build-out directory has fuzz targets
