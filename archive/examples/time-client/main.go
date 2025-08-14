@@ -1,3 +1,4 @@
+//go:build ignore
 // Time Client Example - Backend developer using Ephemos library
 //
 // A client that requests current time in different timezones from time-server.

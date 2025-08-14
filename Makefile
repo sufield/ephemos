@@ -70,7 +70,6 @@ help:
 	@echo "Core targets (Makefile.core):"
 	@echo "  make build            - Build library and CLI"
 	@echo "  make proto            - Generate protobuf code"
-	@echo "  make examples         - Build example applications" 
 	@echo "  make test             - Run tests"
 	@echo "  make clean            - Clean build artifacts"
 	@echo ""

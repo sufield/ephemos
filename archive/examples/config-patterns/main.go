@@ -1,3 +1,4 @@
+//go:build ignore
 // Package main demonstrates different configuration patterns with Ephemos.
 package main
 

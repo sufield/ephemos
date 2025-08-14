@@ -1,3 +1,4 @@
+//go:build ignore
 // Package main demonstrates the new struct tag-based validation system with defaults and aggregated error handling.
 package main
 

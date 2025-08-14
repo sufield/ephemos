@@ -1,3 +1,4 @@
+//go:build ignore
 // Time Server Example - Backend developer using Ephemos library
 //
 // A simple time service that returns current time in requested timezone.
