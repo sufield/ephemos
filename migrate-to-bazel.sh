@@ -63,14 +63,8 @@ show_migration_plan() {
 test_bazel_build() {
     log_info "Testing Bazel build..."
     
-    # Test protobuf generation
-    log_info "Testing protobuf generation..."
-    if bazel build //examples/proto:proto_go_proto; then
-        log_success "Protobuf generation works"
-    else
-        log_warning "Protobuf generation failed (this is expected if checksums need fixing)"
-        return 1
-    fi
+    # Skip protobuf generation (examples archived for 0.1 release)
+    log_info "Protobuf examples archived - skipping protobuf generation test"
     
     # Test main library build
     log_info "Testing library build..."

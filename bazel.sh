@@ -49,9 +49,6 @@ show_help() {
     echo "Build commands:"
     echo "  build         - Build all targets"
     echo "  build-cli     - Build CLI binary only"
-    echo "  build-server  - Build echo server only"
-    echo "  build-client  - Build echo client only"
-    echo "  proto         - Generate protobuf files"
     echo ""
     echo "Test commands:"
     echo "  test          - Run all tests"
@@ -77,7 +74,6 @@ show_help() {
     echo "  demo          - Run complete demo"
     echo "  demo-setup    - Setup demo environment"
     echo "  demo-cleanup  - Cleanup demo environment"
-    echo "  examples      - Build example applications"
     echo ""
     echo "Script commands:"
     echo "  scripts-build - Run build script tests"
@@ -104,23 +100,6 @@ case "${1:-help}" in
         log_success "CLI built!"
         ;;
     
-    "build-server")
-        log_info "Building echo server..."
-        bazel build //examples/echo-server:echo-server
-        log_success "Echo server built!"
-        ;;
-    
-    "build-client")
-        log_info "Building echo client..."
-        bazel build //examples/echo-client:echo-client
-        log_success "Echo client built!"
-        ;;
-    
-    "proto")
-        log_info "Generating protobuf files..."
-        bazel build //examples/proto:proto_go_proto
-        log_success "Protobuf files generated!"
-        ;;
     
     "test")
         log_info "Running all tests..."

@@ -91,24 +91,15 @@ else
     echo -e "${YELLOW}⚠️  Could not query custom toolchains${NC}"
 fi
 
-# Test proto targets
+# Test proto targets (archived, no longer in active build)
 echo ""
-echo "📋 Testing proto target availability..."
-
-if bazel query "kind(proto_library, //examples/proto:*)" >/dev/null 2>&1; then
-    echo -e "${GREEN}✅ Proto targets available${NC}"
-    bazel query "kind(proto_library, //examples/proto:*)"
-else
-    echo -e "${YELLOW}⚠️  Could not find proto targets${NC}"
-fi
+echo "📋 Proto targets archived for 0.1 release - skipping validation..."
+echo -e "${YELLOW}ℹ️  Proto examples moved to archive/ folder${NC}"
 
 echo ""
 echo "🎉 Configuration validation completed!"
 echo ""
-echo "To test the optimization:"
+echo "To test Bazel build:"
 echo "  1. Run: bazel clean --expunge"  
-echo "  2. Run: bazel build //examples/proto:proto"
-echo "  3. Compare build times with previous builds"
-echo ""
-echo "To debug toolchain usage:"
-echo "  bazel build //examples/proto:proto --toolchain_resolution_debug"
+echo "  2. Run: bazel build //..."
+echo "  3. Run: bazel test //..."
