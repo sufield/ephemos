@@ -60,7 +60,7 @@ proto-ci:
 # Run tests
 test: check-deps
 	@echo "Running tests..."
-	go test -v ./...
+	go test -v $(shell go list ./... | grep -v /archive/)
 	@echo "Tests completed!"
 
 # Run benchmarks

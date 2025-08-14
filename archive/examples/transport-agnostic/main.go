@@ -1,3 +1,4 @@
+//go:build ignore
 // Package main demonstrates the new transport-agnostic API for Ephemos.
 // This example shows how to create a service that can run over gRPC or HTTP
 // without changing any code - just configuration.

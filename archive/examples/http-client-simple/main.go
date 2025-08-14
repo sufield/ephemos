@@ -1,3 +1,4 @@
+//go:build ignore
 // HTTP Client Example - Lightweight HTTP over mTLS with X.509 SVIDs  
 //
 // Simple abstraction over go-spiffe HTTP example:

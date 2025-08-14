@@ -1,3 +1,4 @@
+//go:build ignore
 // HTTP Client Example - Backend developer using Ephemos library
 //
 // This shows how a backend developer creates a client with identity-based authentication.

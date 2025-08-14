@@ -47,31 +47,9 @@ ports.test
 /config-patterns
 /config-validator
 /transport-agnostic
-examples/*/transport-agnostic
-examples/*/config-patterns
-examples/*/config-validator
-
-# Example executable artifacts (prevent binary commits in examples)
-examples/config-validation/config-validation-example
-examples/interceptors/interceptors
-examples/*/interceptors
-examples/*/main
-examples/*-example
-examples/*/*-example
 
 # All ELF executables (Linux binaries)
 **/*.elf
-# Prevent any binary executable without extension in examples
-examples/**/[!.]* 
-!examples/**/*.go
-!examples/**/*.md
-!examples/**/*.yaml
-!examples/**/*.yml
-!examples/**/*.json
-!examples/**/*.proto
-!examples/**/*.mod
-!examples/**/*.sum
-!examples/**/*.txt
 
 # Benchmark files
 benchmark.txt
@@ -361,3 +339,4 @@ benchmark-*.out
 .vscode/launch.json.local
 .vscode/settings.json.local
 .idea/workspace.xml.local
+archive/

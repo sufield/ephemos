@@ -1,3 +1,4 @@
+//go:build ignore
 // Package main demonstrates how to use built-in interceptors with ephemos.
 // This example shows different interceptor configurations for various environments.
 package main
