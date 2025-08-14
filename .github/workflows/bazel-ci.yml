@@ -21,6 +21,13 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Clear Bazel cache to fix rules_java compatibility issues
+      run: |
+        echo "🧹 Clearing Bazel cache to resolve _has_launcher_maker_toolchain error..."
+        rm -rf ~/.cache/bazel
+        rm -rf ~/.cache/bazelisk
+        echo "✅ Bazel cache cleared"
+
     - name: Setup Go
       uses: actions/setup-go@v5
       with:
@@ -40,9 +47,9 @@ jobs:
         path: |
           ~/.cache/bazel
           ~/.cache/bazelisk
-        key: bazel-${{ runner.os }}-${{ hashFiles('.bazelrc', 'WORKSPACE', 'BUILD.bazel', '**/*.bzl') }}
+        key: bazel-v2-${{ runner.os }}-${{ hashFiles('.bazelrc', 'WORKSPACE', 'BUILD.bazel', '**/*.bzl') }}
         restore-keys: |
-          bazel-${{ runner.os }}-
+          bazel-v2-${{ runner.os }}-
 
     - name: Configure Bazel
       run: |
@@ -88,6 +95,18 @@ jobs:
         echo "🔍 Validating Bazel file syntax before build..."
         scripts/check-bazel-syntax.sh
         
+    - name: Clean Bazel workspace to fix rules_java issues
+      run: |
+        echo "🧹 Performing complete Bazel workspace cleanup..."
+        bazel clean --expunge || echo "Clean command failed, continuing..."
+        bazel shutdown || echo "Shutdown command failed, continuing..."
+        
+        # Remove any local Bazel state
+        rm -rf bazel-*
+        rm -rf .bazel-*
+        
+        echo "✅ Bazel workspace cleaned"
+
     - name: Verify Bazel setup
       run: |
         bazel version
