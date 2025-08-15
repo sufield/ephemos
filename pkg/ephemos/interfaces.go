@@ -8,8 +8,9 @@ import (
 	"net/http"
 )
 
-// WorkloadServer represents a server that manages workload identities.
-type WorkloadServer interface {
+// workloadServer represents a server that manages workload identities.
+// This is an internal interface used by the ephemos package implementation.
+type workloadServer interface {
 	// Start starts the server on the given listener
 	Start(ctx context.Context, listener net.Listener) error
 	// Stop gracefully stops the server

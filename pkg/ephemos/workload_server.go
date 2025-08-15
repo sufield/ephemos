@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-// workloadServerImpl is the concrete implementation of WorkloadServer.
+// workloadServerImpl is the concrete implementation of workloadServer.
 type workloadServerImpl struct {
 	grpcServer      *grpc.Server
 	spiffeProvider  SPIFFEProvider
@@ -21,8 +21,9 @@ type workloadServerImpl struct {
 	serviceRegistry map[string]ServiceRegistrar
 }
 
-// NewWorkloadServer creates a new workload server.
-func NewWorkloadServer(ctx context.Context, config *Configuration, provider SPIFFEProvider) (WorkloadServer, error) {
+// newWorkloadServer creates a new workload server.
+// This is an internal function used by the ephemos package implementation.
+func newWorkloadServer(ctx context.Context, config *Configuration, provider SPIFFEProvider) (workloadServer, error) {
 	if config == nil {
 		return nil, fmt.Errorf("configuration cannot be nil")
 	}
