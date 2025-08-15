@@ -7,44 +7,94 @@ import (
 	"time"
 
 	"github.com/sufield/ephemos/internal/adapters/primary/api"
+	"github.com/sufield/ephemos/internal/core/ports"
 )
 
-func TestWorkloadServer_NewWorkloadServer(t *testing.T) {
+// Mock implementations for server testing
+type mockServerIdentityProvider struct{}
+
+func (m *mockServerIdentityProvider) GetIdentity(ctx context.Context) (ports.Identity, error) {
+	return &mockIdentity{}, nil
+}
+
+func (m *mockServerIdentityProvider) Close() error {
+	return nil
+}
+
+type mockServerTransportProvider struct{}
+
+func (m *mockServerTransportProvider) CreateServer(identity ports.Identity, config *ports.Configuration) (ports.Server, error) {
+	return &mockServer{}, nil
+}
+
+func (m *mockServerTransportProvider) CreateClient(identity ports.Identity, config *ports.Configuration) (ports.Client, error) {
+	return nil, nil
+}
+
+type mockConfigProvider struct{}
+
+func (m *mockConfigProvider) GetConfiguration(ctx context.Context) (*ports.Configuration, error) {
+	return &ports.Configuration{}, nil
+}
+
+type mockServer struct{}
+
+func (m *mockServer) Serve(listener net.Listener) error {
+	return nil
+}
+
+func (m *mockServer) RegisterService(service interface{}) error {
+	return nil
+}
+
+func (m *mockServer) Close() error {
+	return nil
+}
+
+func TestServer_WorkloadServer(t *testing.T) {
 	tests := []struct {
-		name       string
-		configPath string
-		wantErr    bool
+		name              string
+		identityProvider  ports.IdentityProvider
+		transportProvider ports.TransportProvider
+		configProvider    ports.ConfigurationProvider
+		config            *ports.Configuration
+		wantErr           bool
 	}{
 		{
-			name:       "empty config path",
-			configPath: "",
-			wantErr:    true, // Default config may not be valid without proper SPIFFE setup
+			name:              "nil config",
+			identityProvider:  &mockServerIdentityProvider{},
+			transportProvider: &mockServerTransportProvider{},
+			configProvider:    &mockConfigProvider{},
+			config:            nil,
+			wantErr:           true,
 		},
 		{
-			name:       "invalid config path",
-			configPath: "/nonexistent/path",
-			wantErr:    true,
+			name:              "nil identity provider",
+			identityProvider:  nil,
+			transportProvider: &mockServerTransportProvider{},
+			configProvider:    &mockConfigProvider{},
+			config:            &ports.Configuration{Service: &ports.ServiceConfig{Name: "test"}},
+			wantErr:           true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := t.Context()
-			server, err := api.NewWorkloadServer(ctx, tt.configPath)
+			server, err := api.WorkloadServer(tt.identityProvider, tt.transportProvider, tt.configProvider, tt.config)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("api.NewWorkloadServer() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("api.WorkloadServer() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && server == nil {
-				t.Error("api.NewWorkloadServer() returned nil server")
+				t.Error("api.WorkloadServer() returned nil server")
 			}
 		})
 	}
 }
 
-func TestWorkloadServer_RegisterService(t *testing.T) {
-	ctx := t.Context()
-	server, err := api.NewWorkloadServer(ctx, "")
+func TestServer_RegisterService(t *testing.T) {
+	config := &ports.Configuration{Service: &ports.ServiceConfig{Name: "test"}}
+	server, err := api.WorkloadServer(&mockServerIdentityProvider{}, &mockServerTransportProvider{}, &mockConfigProvider{}, config)
 	if err != nil {
 		t.Skip("Skipping RegisterService tests - could not create server:", err)
 	}
@@ -62,9 +112,9 @@ func TestWorkloadServer_RegisterService(t *testing.T) {
 	}
 }
 
-func TestWorkloadServer_Serve(t *testing.T) {
-	ctx := t.Context()
-	server, err := api.NewWorkloadServer(ctx, "")
+func TestServer_Serve(t *testing.T) {
+	config := &ports.Configuration{Service: &ports.ServiceConfig{Name: "test"}}
+	server, err := api.WorkloadServer(&mockServerIdentityProvider{}, &mockServerTransportProvider{}, &mockConfigProvider{}, config)
 	if err != nil {
 		t.Skip("Skipping Serve tests - could not create server:", err)
 	}
@@ -112,9 +162,9 @@ func TestWorkloadServer_Serve(t *testing.T) {
 	})
 }
 
-func TestWorkloadServer_Close(t *testing.T) {
-	ctx := t.Context()
-	server, err := api.NewWorkloadServer(ctx, "")
+func TestServer_Close(t *testing.T) {
+	config := &ports.Configuration{Service: &ports.ServiceConfig{Name: "test"}}
+	server, err := api.WorkloadServer(&mockServerIdentityProvider{}, &mockServerTransportProvider{}, &mockConfigProvider{}, config)
 	if err != nil {
 		t.Skip("Skipping Close test - could not create server:", err)
 	}
@@ -133,9 +183,9 @@ func TestWorkloadServer_Close(t *testing.T) {
 // TestServiceRegistrar is now defined in test_helpers.go
 // It provides a real implementation instead of a mock
 
-func TestWorkloadServer_RegisterService_WithRealService(t *testing.T) {
-	ctx := t.Context()
-	server, err := api.NewWorkloadServer(ctx, "")
+func TestServer_RegisterService_WithRealService(t *testing.T) {
+	config := &ports.Configuration{Service: &ports.ServiceConfig{Name: "test"}}
+	server, err := api.WorkloadServer(&mockServerIdentityProvider{}, &mockServerTransportProvider{}, &mockConfigProvider{}, config)
 	if err != nil {
 		t.Skip("Skipping RegisterService test - could not create server:", err)
 	}
