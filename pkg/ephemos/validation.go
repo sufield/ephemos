@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 )
 
 // Validation rule constants.
@@ -780,15 +782,11 @@ func (ve *ValidationEngine) validateSPIFFEID(val reflect.Value, _ string) error 
 		return nil // Empty SPIFFE IDs are allowed unless required
 	}
 
-	// Validate SPIFFE ID format
-	if !strings.HasPrefix(id, "spiffe://") {
-		return fmt.Errorf("SPIFFE ID must start with 'spiffe://' (e.g., 'spiffe://example.org/service')")
-	}
-
-	// Basic structure validation - must have trust domain and path
-	parts := strings.SplitN(id[9:], "/", 2) // Remove "spiffe://" prefix
-	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
-		return fmt.Errorf("SPIFFE ID must have format 'spiffe://trust-domain/path' (e.g., 'spiffe://example.org/service')")
+	// Use official go-spiffe/v2 SDK for proper SPIFFE ID validation
+	// This provides full SPIFFE specification compliance
+	_, err := spiffeid.FromString(id)
+	if err != nil {
+		return fmt.Errorf("invalid SPIFFE ID: %w", err)
 	}
 
 	return nil
