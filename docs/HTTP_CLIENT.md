@@ -5,7 +5,6 @@ The ephemos library now provides an HTTP client with built-in SPIFFE certificate
 ## Features
 
 - 🔒 **SPIFFE Certificate Authentication**: HTTP requests use the same SPIFFE certificates as gRPC connections
-- 🌐 **Service Discovery**: Automatic discovery of service endpoints
 - 🔄 **Certificate Rotation**: Automatic handling of certificate lifecycle
 - ⚡ **Connection Pooling**: Optimized HTTP transport configuration
 - 🛡️ **Security by Default**: Secure TLS configuration with proper validation
@@ -62,48 +61,28 @@ func main() {
 }
 ```
 
-### Service Discovery
+### Using with Existing Service Discovery
 
-The HTTP client supports automatic service discovery, eliminating the need to hardcode service addresses:
+Ephemos focuses on authentication - use your existing service discovery solution:
 
 ```go
-// Connect using service discovery (no address needed)
-conn, err := client.ConnectByName(ctx, "payment-service")
+// Use your existing service discovery (Kubernetes, Consul, etc.)
+address, err := myServiceRegistry.Lookup("payment-service")
 if err != nil {
-    log.Fatalf("Service discovery failed: %v", err)
+    log.Fatalf("Service lookup failed: %v", err)
+}
+
+// Ephemos handles authentication to the discovered service
+conn, err := client.Connect(ctx, "payment-service", address)
+if err != nil {
+    log.Fatalf("Connection failed: %v", err)
 }
 defer conn.Close()
 
-// Use HTTP client as normal
+// Use authenticated HTTP client
 httpClient := conn.HTTPClient()
-resp, err := httpClient.Get("/api/balance") // Relative URL - uses discovered endpoint
+resp, err := httpClient.Get("https://" + address + "/api/balance")
 ```
-
-### Alternative: Connect with Empty Address
-
-```go
-// Connect with empty address triggers service discovery
-conn, err := client.Connect(ctx, "payment-service", "")
-if err != nil {
-    log.Fatalf("Service discovery failed: %v", err)
-}
-defer conn.Close()
-```
-
-## Service Discovery
-
-The HTTP client includes built-in service discovery that attempts to locate services using common patterns:
-
-### Discovery Patterns
-
-1. **Kubernetes**: `{service}.default.svc.cluster.local:443`
-2. **Consul**: `{service}.service.consul:443`
-3. **AWS/Cloud**: `{service}.internal:443`
-4. **Direct DNS**: `{service}:443`
-
-### Custom Discovery
-
-For custom service discovery, extend the `discoverService` method or configure external service registries.
 
 ## Security Features
 
@@ -173,43 +152,54 @@ client := &http.Client{
 ### Multiple Service Connections
 
 ```go
-// Connect to multiple services
-paymentConn, err := client.ConnectByName(ctx, "payment-service")
+// Look up service addresses using your service registry
+paymentAddr, _ := serviceRegistry.Lookup("payment-service") 
+orderAddr, _ := serviceRegistry.Lookup("order-service")
+
+// Connect to multiple services with authentication
+paymentConn, err := client.Connect(ctx, "payment-service", paymentAddr)
 if err != nil {
     log.Fatalf("Failed to connect to payment service: %v", err)
 }
 defer paymentConn.Close()
 
-orderConn, err := client.ConnectByName(ctx, "order-service")
+orderConn, err := client.Connect(ctx, "order-service", orderAddr)
 if err != nil {
     log.Fatalf("Failed to connect to order service: %v", err)
 }
 defer orderConn.Close()
 
-// Each connection has its own HTTP client
+// Each connection has its own authenticated HTTP client
 paymentClient := paymentConn.HTTPClient()
 orderClient := orderConn.HTTPClient()
 
-// Make requests to different services
-paymentResp, _ := paymentClient.Get("/api/balance")
-orderResp, _ := orderClient.Get("/api/orders")
+// Make authenticated requests to different services
+paymentResp, _ := paymentClient.Get("https://" + paymentAddr + "/api/balance")
+orderResp, _ := orderClient.Get("https://" + orderAddr + "/api/orders")
 ```
 
 ### Error Handling
 
 ```go
-conn, err := client.ConnectByName(ctx, "payment-service")
+// Service discovery is handled by your infrastructure
+address, err := serviceRegistry.Lookup("payment-service")
+if err != nil {
+    log.Printf("Service discovery failed: %v", err)
+    return
+}
+
+conn, err := client.Connect(ctx, "payment-service", address)
 if err != nil {
     switch {
-    case strings.Contains(err.Error(), "service discovery failed"):
-        log.Printf("Service not found: %v", err)
-        // Handle service discovery failure
     case strings.Contains(err.Error(), "certificate"):
         log.Printf("Certificate error: %v", err)
         // Handle certificate issues
-    default:
+    case strings.Contains(err.Error(), "connection"):
         log.Printf("Connection error: %v", err)
-        // Handle other connection errors
+        // Handle connection errors
+    default:
+        log.Printf("Authentication error: %v", err)
+        // Handle other authentication errors
     }
     return
 }
@@ -251,14 +241,17 @@ resp, err := httpClient.Get("https://payment.example.com/api/balance")
 
 **After:**
 ```go
-conn, err := ephemosClient.ConnectByName(ctx, "payment-service")
+// Use existing service discovery
+address, _ := serviceRegistry.Lookup("payment-service")
+
+conn, err := ephemosClient.Connect(ctx, "payment-service", address)
 if err != nil {
     log.Fatalf("Failed to connect: %v", err)
 }
 defer conn.Close()
 
 httpClient := conn.HTTPClient() // Now with SPIFFE authentication
-resp, err := httpClient.Get("/api/balance")
+resp, err := httpClient.Get("https://" + address + "/api/balance")
 ```
 
 ### Framework Integration
@@ -298,19 +291,19 @@ resp, err := restyClient.R().
 1. **Connection Pooling**: Leverage built-in connection pooling
 2. **Keep-Alive**: Use persistent connections when possible
 3. **Request Batching**: Batch related requests when appropriate
-4. **Service Discovery Caching**: Cache discovered service addresses
+4. **Connection Reuse**: Reuse connections when making multiple requests
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Service Discovery Failures**
+1. **Service Connection Failures**
    ```
-   Error: service payment-service not found via discovery
+   Error: failed to connect to service payment-service at address
    ```
-   - Verify service is running and accessible
-   - Check DNS resolution for discovery patterns
-   - Ensure network connectivity
+   - Verify service is running and accessible at the address
+   - Check network connectivity
+   - Ensure address format is correct (host:port)
 
 2. **Certificate Errors**
    ```
@@ -351,18 +344,18 @@ httpClient := conn.HTTPClient()
 | Feature | Ephemos HTTP Client | Standard HTTP | gRPC |
 |---------|-------------------|---------------|------|
 | SPIFFE Authentication | ✅ | ❌ | ✅ |
-| Service Discovery | ✅ | ❌ | ❌ |
 | Certificate Rotation | ✅ | ❌ | ✅ |
 | REST API Support | ✅ | ✅ | ❌ |
 | Binary Protocol | ❌ | ❌ | ✅ |
 | Browser Compatible | ✅ | ✅ | ❌ |
+| Identity-based Auth | ✅ | ❌ | ✅ |
 
 ## Future Enhancements
 
 - [ ] Load balancing support
 - [ ] Circuit breaker integration
 - [ ] Metrics and tracing
-- [ ] Custom service discovery providers
+- [ ] Advanced connection pooling strategies
 - [ ] WebSocket support with SPIFFE authentication
 
 ## See Also

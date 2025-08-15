@@ -81,40 +81,14 @@ func TestClientConnection_HTTPClient(t *testing.T) {
 	})
 }
 
-func TestClientWrapper_ServiceDiscovery(t *testing.T) {
-	t.Run("Connect with empty address triggers discovery", func(t *testing.T) {
-		// This test would require a more complex setup with mocked internal client
-		// For now, test the interface
-		t.Skip("Requires mocked internal client for full testing")
-	})
-
-	t.Run("ConnectByName interface", func(t *testing.T) {
-		// Test that the interface exists and can be called
-		// This verifies the API contract
+func TestClientConnection_Interface(t *testing.T) {
+	t.Run("Client interface methods", func(t *testing.T) {
+		// Test that the Client interface is correctly defined
 		var client Client
-		_ = client // Ensure Client interface includes ConnectByName method
+		_ = client // Ensure Client interface compilation
 		
 		// This compilation test ensures the interface is correctly defined
-		assert.True(t, true, "ConnectByName method exists in Client interface")
-	})
-}
-
-func TestServiceDiscovery(t *testing.T) {
-	t.Run("service discovery patterns", func(t *testing.T) {
-		serviceName := "payment-service"
-		
-		expectedPatterns := []string{
-			"payment-service.default.svc.cluster.local:443",
-			"payment-service.service.consul:443",
-			"payment-service.internal:443",
-			"payment-service:443",
-		}
-		
-		// Verify the discovery patterns make sense
-		for _, pattern := range expectedPatterns {
-			assert.Contains(t, pattern, serviceName)
-			assert.Contains(t, pattern, ":443")
-		}
+		assert.True(t, true, "Client interface is properly defined")
 	})
 }
 
@@ -156,8 +130,8 @@ func TestHTTPClientIntegration(t *testing.T) {
 		assert.True(t, true, "Usage pattern is well-defined")
 	})
 
-	t.Run("service discovery usage pattern", func(t *testing.T) {
-		// This demonstrates service discovery usage
+	t.Run("external service discovery usage pattern", func(t *testing.T) {
+		// This demonstrates using ephemos with external service discovery
 		/*
 		client, err := IdentityClient(ctx, "config.yaml")
 		if err != nil {
@@ -165,18 +139,24 @@ func TestHTTPClientIntegration(t *testing.T) {
 		}
 		defer client.Close()
 
-		// Connect using service discovery (no address needed)
-		conn, err := client.ConnectByName(ctx, "payment-service")
+		// Use external service discovery (Kubernetes, Consul, etc.)
+		address, err := serviceRegistry.Lookup("payment-service")
 		if err != nil {
 			t.Fatalf("Service discovery failed: %v", err)
 		}
+
+		// Ephemos handles authentication to the discovered service
+		conn, err := client.Connect(ctx, "payment-service", address)
+		if err != nil {
+			t.Fatalf("Connection failed: %v", err)
+		}
 		defer conn.Close()
 
-		// Use HTTP client as normal
+		// Use authenticated HTTP client
 		httpClient := conn.HTTPClient()
-		// ... make requests
+		// ... make requests with SPIFFE authentication
 		*/
 		
-		assert.True(t, true, "Service discovery pattern is well-defined")
+		assert.True(t, true, "External service discovery integration pattern is well-defined")
 	})
 }
