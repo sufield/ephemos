@@ -285,7 +285,7 @@ ephemos/
 **scripts/install-deps.sh --system**: New file:
 - Complete installation including system packages
 - Explicit sudo usage
-- Maintains backward compatibility for users who want full automation
+- Provides full installation including system packages
 
 ### For Contributors
 
