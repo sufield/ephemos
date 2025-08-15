@@ -253,7 +253,7 @@ func TestClientConnection_ConnectionVerifiers(t *testing.T) {
 
 		// Test with valid connection state
 		state := tls.ConnectionState{
-			Version:          tls.VersionTLS12,
+			Version:          tls.VersionTLS13,
 			PeerCertificates: []*x509.Certificate{testCert},
 		}
 		err = verifier(state)
@@ -261,7 +261,7 @@ func TestClientConnection_ConnectionVerifiers(t *testing.T) {
 
 		// Test with no peer certificates
 		state = tls.ConnectionState{
-			Version:          tls.VersionTLS12,
+			Version:          tls.VersionTLS13,
 			PeerCertificates: []*x509.Certificate{},
 		}
 		err = verifier(state)

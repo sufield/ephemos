@@ -298,7 +298,7 @@ func (c *ClientConnection) extractTLSConfig() (*tls.Config, error) {
 		InsecureSkipVerify: false,
 		
 		// Set minimum TLS version
-		MinVersion: tls.VersionTLS12,
+		MinVersion: tls.VersionTLS13,
 		
 		// Configure cipher suites for security
 		CipherSuites: []uint16{
@@ -446,7 +446,7 @@ func (c *ClientConnection) createConnectionVerifier() func(tls.ConnectionState) 
 		}
 
 		// Ensure TLS version is secure
-		if state.Version < tls.VersionTLS12 {
+		if state.Version < tls.VersionTLS13 {
 			return fmt.Errorf("insecure TLS version: %d", state.Version)
 		}
 
@@ -465,7 +465,7 @@ func (c *ClientConnection) createSecureTLSConfig() *tls.Config {
 		InsecureSkipVerify: false,
 		
 		// Set minimum TLS version
-		MinVersion: tls.VersionTLS12,
+		MinVersion: tls.VersionTLS13,
 		
 		// Configure cipher suites for security
 		CipherSuites: []uint16{
