@@ -114,7 +114,7 @@ examples/*/*-example
 # Build system security hierarchy (most secure to least secure)
 make setup                    # Smart setup, Go tools only, no sudo
 make install-deps            # Go tools only, no system packages  
-./scripts/install-deps-sudo.sh # Explicit sudo for system packages
+./scripts/install-deps.sh --system # Explicit sudo for system packages
 ```
 
 **Security Principles**:

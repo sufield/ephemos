@@ -51,11 +51,7 @@ sh_binary(
     visibility = ["//visibility:public"],
 )
 
-sh_binary(
-    name = "install_deps_sudo",
-    srcs = ["install-deps-sudo.sh"],
-    visibility = ["//visibility:public"],
-)
+# install_deps_sudo target removed - use install_deps with --system flag instead
 
 sh_binary(
     name = "install_bazel",
