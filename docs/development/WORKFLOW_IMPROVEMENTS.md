@@ -149,7 +149,7 @@ jobs:
 
 ## Migration Path
 
-The refactoring maintains backward compatibility:
+The refactoring ensures smooth migration:
 
 1. **Existing workflows continue to work** (no breaking changes)
 2. **Gradual migration possible** (can update jobs one by one)

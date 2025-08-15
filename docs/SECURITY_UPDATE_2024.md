@@ -264,6 +264,6 @@ This update brings Ephemos into compliance with:
 
 ---
 
-**This security update represents a significant hardening of Ephemos while maintaining full backward compatibility and improving the developer experience. All changes are production-ready and extensively tested.**
+**This security update represents a significant hardening of Ephemos and improving the developer experience. All changes are production-ready and extensively tested.**
 
 *For questions or security concerns, please refer to the technical documentation or contact the security team.*
