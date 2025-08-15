@@ -1,0 +1,6 @@
+service:
+  name: "development-service"
+  domain: "dev.example.org"
+
+agent:
+  socketPath: "/tmp/agent.sock"

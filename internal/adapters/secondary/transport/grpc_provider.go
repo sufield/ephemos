@@ -67,10 +67,11 @@ func (p *GRPCProvider) CreateServer(cert *domain.Certificate, bundle *domain.Tru
 
 // createClientTLSConfig creates TLS configuration for gRPC client with SPIFFE certs.
 func (p *GRPCProvider) createClientTLSConfig(cert *domain.Certificate, bundle *domain.TrustBundle) (*tls.Config, error) {
-	// Use effective certificate validation setting (production-aware)
+	// Certificate validation is disabled ONLY in development environments
+	// Production, staging, and all other environments always validate certificates
 	insecureSkipVerify := false
 	if p.config != nil {
-		insecureSkipVerify = p.config.GetEffectiveCertificateValidationDisabled()
+		insecureSkipVerify = p.config.ShouldSkipCertificateValidation()
 	}
 
 	// For now, create a basic TLS config
@@ -82,10 +83,11 @@ func (p *GRPCProvider) createClientTLSConfig(cert *domain.Certificate, bundle *d
 
 // createServerTLSConfig creates TLS configuration for gRPC server with SPIFFE certs.
 func (p *GRPCProvider) createServerTLSConfig(cert *domain.Certificate, bundle *domain.TrustBundle) (*tls.Config, error) {
-	// Use effective certificate validation setting (production-aware)
+	// Certificate validation is disabled ONLY in development environments
+	// Production, staging, and all other environments always validate certificates
 	insecureSkipVerify := false
 	if p.config != nil {
-		insecureSkipVerify = p.config.GetEffectiveCertificateValidationDisabled()
+		insecureSkipVerify = p.config.ShouldSkipCertificateValidation()
 	}
 
 	// For now, create a basic TLS config

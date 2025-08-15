@@ -21,8 +21,7 @@ const (
 )
 
 // Configuration represents the complete configuration for Ephemos services.
-// It contains all necessary settings for service identity, agent connection,
-// and security policies.
+// It contains all necessary settings for service identity and agent connection.
 type Configuration struct {
 	// Service contains the core service identification settings.
 	// This is required and must include at least a service name.
@@ -31,10 +30,6 @@ type Configuration struct {
 	// Agent contains the connection settings for the identity agent.
 	// If nil, default agent settings will be used.
 	Agent *AgentConfig `yaml:"agent,omitempty"`
-
-	// Security contains security configuration settings.
-	// If nil, secure defaults will be used.
-	Security *SecurityConfig `yaml:"security,omitempty"`
 }
 
 // ServiceConfig contains the core service identification settings.
@@ -58,15 +53,6 @@ type AgentConfig struct {
 	SocketPath string `yaml:"socketPath"`
 }
 
-
-// SecurityConfig contains security configuration settings.
-type SecurityConfig struct {
-	// CertificateValidationDisabled controls whether certificate validation is disabled.
-	// Development: Setting this to true disables certificate validation for local testing.
-	// Production: This setting is automatically ignored - certificates are always validated.
-	// Default: false (certificate validation enabled)
-	CertificateValidationDisabled bool `yaml:"certificate_validation_disabled,omitempty"`
-}
 
 // Validate checks if the configuration is valid and returns any validation errors.
 // This method ensures all required fields are present and properly formatted.
@@ -305,10 +291,6 @@ func validateProductionSecurity(config *Configuration) error {
 		errors = append(errors, err.Error())
 	}
 
-	// Check TLS security settings
-	if err := validateTLSSecurity(config); err != nil {
-		errors = append(errors, err.Error())
-	}
 
 	// Check for debug environment variables that shouldn't be enabled in production
 	if debugEnabled := os.Getenv(EnvDebugEnabled); debugEnabled == "true" {
@@ -352,64 +334,46 @@ func validateSocketPath(socketPath string) error {
 	return fmt.Errorf("agent socket should be in a secure directory (/run, /var/run, or /tmp)")
 }
 
-// validateTLSSecurity checks security configuration for production security issues.
-func validateTLSSecurity(config *Configuration) error {
-	if config.Security != nil && config.Security.CertificateValidationDisabled {
-		return fmt.Errorf("certificate_validation_disabled is enabled - certificate validation must be enabled in production")
-	}
-	return nil
-}
-
-// IsProductionEnvironment detects if we're running in a production environment.
-// Production is detected by secure domain names and standard production paths.
-func (c *Configuration) IsProductionEnvironment() bool {
-	// Production indicators
+// IsDevEnvironment detects if we're running in a development environment.
+// Development environments are the ONLY ones where certificate validation is disabled.
+func (c *Configuration) IsDevEnvironment() bool {
+	// Development indicators in domain
 	if c.Service.Domain != "" {
 		domain := strings.ToLower(c.Service.Domain)
-		// Production domains (not development)
-		if !strings.Contains(domain, "dev") && 
-		   !strings.Contains(domain, "test") && 
-		   !strings.Contains(domain, "local") &&
-		   !strings.Contains(domain, "example") {
+		if strings.Contains(domain, "dev") || 
+		   strings.Contains(domain, "test") || 
+		   strings.Contains(domain, "local") ||
+		   strings.Contains(domain, "example") {
 			return true
 		}
 	}
 	
-	// Production socket paths
+	// Development socket paths
 	if c.Agent != nil {
 		socketPath := strings.ToLower(c.Agent.SocketPath)
-		if strings.HasPrefix(socketPath, "/run/") || 
-		   strings.HasPrefix(socketPath, "/var/run/") {
+		if strings.HasPrefix(socketPath, "/tmp/") {
 			return true
 		}
 	}
 	
-	// Environment variable indicators
-	if os.Getenv("NODE_ENV") == "production" ||
-	   os.Getenv("ENVIRONMENT") == "production" ||
-	   os.Getenv("STAGE") == "prod" ||
-	   os.Getenv("STAGE") == "production" {
+	// Development environment variable indicators
+	nodeEnv := strings.ToLower(os.Getenv("NODE_ENV"))
+	environment := strings.ToLower(os.Getenv("ENVIRONMENT"))
+	stage := strings.ToLower(os.Getenv("STAGE"))
+	
+	if nodeEnv == "development" || nodeEnv == "dev" ||
+	   environment == "development" || environment == "dev" ||
+	   stage == "development" || stage == "dev" {
 		return true
 	}
 	
 	return false
 }
 
-// GetEffectiveCertificateValidationDisabled returns whether certificate validation 
-// should be disabled, but ALWAYS returns false in production environments.
-// This makes production foolproof regardless of configuration.
-func (c *Configuration) GetEffectiveCertificateValidationDisabled() bool {
-	// PRODUCTION OVERRIDE: Always validate certificates in production
-	if c.IsProductionEnvironment() {
-		return false
-	}
-	
-	// Development: Honor the configuration setting
-	if c.Security != nil {
-		return c.Security.CertificateValidationDisabled
-	}
-	
-	return false // Secure default
+// ShouldSkipCertificateValidation returns true ONLY in development environments.
+// All other environments (production, staging, etc.) always validate certificates.
+func (c *Configuration) ShouldSkipCertificateValidation() bool {
+	return c.IsDevEnvironment()
 }
 
 // IsProductionReady checks if the configuration is suitable for production use.

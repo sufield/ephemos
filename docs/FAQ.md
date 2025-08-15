@@ -850,73 +850,50 @@ For production use, consider:
 
 The performance impact is negligible compared to the security benefits provided.
 
-### Can I disable certificate validation for development?
+### How does certificate validation work?
 
-**Yes, but only for development environments.**
+**Certificate validation is automatic and environment-based - no configuration required.**
 
-Ephemos supports disabling certificate validation for local development through the `certificate_validation_disabled` configuration option:
+Ephemos automatically determines when to skip certificate validation based on the environment:
 
-#### **Development Configuration** (Allowed)
+#### **Development Configuration**
 ```yaml
 service:
   name: "dev-service"
-  domain: "dev.example.org"
+  domain: "dev.example.org"     # Contains "dev" - detected as development
 
 agent:
-  socketPath: "/run/sockets/agent.sock"
-
-security:
-  certificate_validation_disabled: true  # Development only - ignored in production
+  socketPath: "/tmp/agent.sock"  # /tmp path - detected as development
 ```
+**Result**: Certificate validation disabled for easy local testing
 
-#### **Production Configuration** (Secure by default)
+#### **Production Configuration**  
 ```yaml
 service:
-  name: "payment-service"  
-  domain: "prod.company.com"
+  name: "payment-service"
+  domain: "company.com"          # Production domain
 
 agent:
-  socketPath: "/run/sockets/agent.sock"
-
-# Certificate validation is enabled by default - no security section needed
+  socketPath: "/run/sockets/agent.sock"  # /run path - detected as production
 ```
+**Result**: Certificate validation always enabled
 
-#### **Security Enforcement**
+#### **Environment Detection**
 
-Ephemos is **foolproof in production** and automatically enforces secure certificate validation:
+**Development environments** (certificate validation disabled):
+- Domains containing: `dev`, `test`, `local`, `example`
+- Socket paths starting with: `/tmp/`
+- Environment variables: `NODE_ENV=development`, `ENVIRONMENT=dev`, `STAGE=dev`
 
-```go
-// Production environments ALWAYS validate certificates regardless of configuration
-config := loadConfig("production.yaml") // Even if this sets certificate_validation_disabled: true
-
-// Production override: Always returns false in production environments
-isDisabled := config.GetEffectiveCertificateValidationDisabled() // false
-
-// Production validation also catches configuration errors
-err := config.IsProductionReady()
-if err != nil {
-    // Error: "certificate_validation_disabled is enabled - certificate validation must be enabled in production"
-}
-```
-
-**Production Detection:**
-- Production domains (not containing "dev", "test", "local", "example")
-- Standard production paths (`/run/sockets/`, `/var/run/`)
-- Environment variables: `NODE_ENV=production`, `ENVIRONMENT=production`, `STAGE=prod`
-
-#### **Industry Best Practices**
-
-This follows the same pattern as other successful Go projects, but with business-focused configuration:
-
-- **Business-Focused Terminology**: Uses `certificate_validation_disabled` instead of implementation terms like `insecure_skip_verify`
-- **Secure by Default**: Certificate validation enabled unless explicitly disabled
-- **Development Productivity**: Simple flag to disable validation for local testing
-- **Production Safety**: Automatic validation prevents insecure production deployments
+**All other environments** (certificate validation enabled):
+- Production, staging, and any other environment
+- Standard paths: `/run/`, `/var/run/`
+- Environment variables: `NODE_ENV=production`, `ENVIRONMENT=production`, etc.
 
 #### **Why This Approach?**
 
-✅ **Development Productivity** - Developers can quickly test locally without certificate setup  
-✅ **Foolproof Production** - **Impossible** to disable certificate validation in production, even with misconfigured YAML  
-✅ **Clear Intent** - Configuration explicitly shows when security is relaxed  
-✅ **Audit Trail** - Security teams can easily identify and review insecure configurations  
-✅ **Defense in Depth** - Multiple layers detect and prevent production security bypasses
+✅ **Zero Configuration** - No security flags or settings to configure  
+✅ **Foolproof** - Impossible to accidentally disable validation in production  
+✅ **Development Friendly** - Automatic detection for easy local testing  
+✅ **Environment Aware** - Works correctly across all deployment environments  
+✅ **Secure by Default** - Production always validates certificates
