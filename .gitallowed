@@ -61,6 +61,10 @@ AllowedServices.*spiffe://
 # Test patterns in direct_test.go  
 pattern:.*spiffe://
 
+# SPIFFE URI test patterns in spiffe_validation_test.go
+spiffe://trust-domain\.org/.*
+spiffe://trust-domain\.org/my-service
+
 # Configuration test patterns
 ports\.Env.*spiffe://
 
