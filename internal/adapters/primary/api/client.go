@@ -3,6 +3,7 @@ package api
 
 import (
 	"context"
+	"crypto"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -18,6 +19,11 @@ import (
 	"github.com/sufield/ephemos/internal/adapters/secondary/config"
 	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
 	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
+	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
+	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
+
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
@@ -265,7 +271,7 @@ func (c *ClientConnection) HTTPClient() *http.Client {
 	}
 }
 
-// extractTLSConfig extracts TLS configuration from the domain connection
+// extractTLSConfig extracts TLS configuration using official go-spiffe tlsconfig
 // This provides the same SPIFFE certificate authentication for HTTP as gRPC uses
 func (c *ClientConnection) extractTLSConfig() (*tls.Config, error) {
 	if c.conn == nil {
@@ -278,182 +284,132 @@ func (c *ClientConnection) extractTLSConfig() (*tls.Config, error) {
 		return nil, fmt.Errorf("gRPC connection is shut down")
 	}
 
-	// Extract SPIFFE certificates and trust bundle from the identity service
-	// This ensures HTTP and gRPC use the same authentication credentials
-	spiffeConfig, err := c.extractSPIFFEConfig()
+	// Create adapters for go-spiffe interfaces
+	svidSource, err := c.createSVIDSource()
 	if err != nil {
 		// Fallback to basic secure TLS configuration
 		return c.createSecureTLSConfig(), nil
 	}
 
-	// Create TLS config with SPIFFE certificates
-	tlsConfig := &tls.Config{
-		// Configure client certificates from SPIFFE
-		Certificates: spiffeConfig.ClientCertificates,
-		
-		// Configure root CAs from SPIFFE trust bundle
-		RootCAs: spiffeConfig.RootCAs,
-		
-		// Enable certificate verification
-		InsecureSkipVerify: false,
-		
-		// Set minimum TLS version
-		MinVersion: tls.VersionTLS13,
-		
-		// Configure cipher suites for security
-		CipherSuites: []uint16{
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-		},
-		
-		// Custom certificate verification for SPIFFE IDs
-		VerifyPeerCertificate: spiffeConfig.VerifyPeerCertificate,
-		
-		// Connection verification
-		VerifyConnection: spiffeConfig.VerifyConnection,
+	bundleSource, err := c.createBundleSource()
+	if err != nil {
+		// Fallback to basic secure TLS configuration
+		return c.createSecureTLSConfig(), nil
 	}
+
+	// Use official go-spiffe tlsconfig for mutual TLS with SPIFFE authentication
+	// This provides the standard SPIFFE peer verification with proper authorizers
+	authorizer := tlsconfig.AuthorizeAny() // For now, authorize any valid SPIFFE ID
+	tlsConfig := tlsconfig.MTLSClientConfig(svidSource, bundleSource, authorizer)
+
+	// Ensure TLS 1.3 minimum version (go-spiffe uses 1.2 by default)
+	tlsConfig.MinVersion = tls.VersionTLS13
 
 	return tlsConfig, nil
 }
 
-// SPIFFEConfig holds SPIFFE-specific TLS configuration
-type SPIFFEConfig struct {
-	ClientCertificates    []tls.Certificate
-	RootCAs              *x509.CertPool
-	VerifyPeerCertificate func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error
-	VerifyConnection     func(tls.ConnectionState) error
+// svidSourceAdapter adapts the domain certificate to go-spiffe x509svid.Source
+type svidSourceAdapter struct {
+	identityService CertificateProvider
 }
 
-// extractSPIFFEConfig extracts SPIFFE configuration from the connection
-func (c *ClientConnection) extractSPIFFEConfig() (*SPIFFEConfig, error) {
+// GetX509SVID implements x509svid.Source interface
+func (s *svidSourceAdapter) GetX509SVID() (*x509svid.SVID, error) {
+	cert, err := s.identityService.GetCertificate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get certificate: %w", err)
+	}
+
+	if cert.Cert == nil {
+		return nil, fmt.Errorf("certificate is nil")
+	}
+
+	// Build certificate chain
+	var certChain []*x509.Certificate
+	certChain = append(certChain, cert.Cert)
+	certChain = append(certChain, cert.Chain...)
+
+	// Ensure private key implements crypto.Signer
+	signer, ok := cert.PrivateKey.(crypto.Signer)
+	if !ok {
+		return nil, fmt.Errorf("private key does not implement crypto.Signer")
+	}
+
+	// Create X509SVID from domain certificate
+	svid := &x509svid.SVID{
+		ID:           extractSPIFFEIDFromCert(cert.Cert),
+		Certificates: certChain,
+		PrivateKey:   signer,
+	}
+
+	return svid, nil
+}
+
+// bundleSourceAdapter adapts the domain trust bundle to go-spiffe x509bundle.Source  
+type bundleSourceAdapter struct {
+	identityService CertificateProvider
+	trustDomain     spiffeid.TrustDomain
+}
+
+// GetX509BundleForTrustDomain implements x509bundle.Source interface
+func (b *bundleSourceAdapter) GetX509BundleForTrustDomain(td spiffeid.TrustDomain) (*x509bundle.Bundle, error) {
+	trustBundle, err := b.identityService.GetTrustBundle()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get trust bundle: %w", err)
+	}
+
+	if len(trustBundle.Certificates) == 0 {
+		return nil, fmt.Errorf("trust bundle is empty")
+	}
+
+	// Create bundle for the requested trust domain
+	bundle := x509bundle.FromX509Authorities(td, trustBundle.Certificates)
+	return bundle, nil
+}
+
+// createSVIDSource creates an x509svid.Source adapter
+func (c *ClientConnection) createSVIDSource() (x509svid.Source, error) {
 	if c.identityService == nil {
 		return nil, fmt.Errorf("no identity service available")
 	}
 
-	// Extract SPIFFE certificate from identity service
-	cert, err := c.identityService.GetCertificate()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get SPIFFE certificate: %w", err)
-	}
-
-	// Extract trust bundle from identity service
-	trustBundle, err := c.identityService.GetTrustBundle()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get SPIFFE trust bundle: %w", err)
-	}
-
-	// Convert domain certificate to TLS certificate
-	tlsCerts, err := c.convertToTLSCertificates(cert)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert certificate to TLS format: %w", err)
-	}
-
-	// Convert trust bundle to certificate pool
-	rootCAs, err := c.convertToX509CertPool(trustBundle)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert trust bundle to certificate pool: %w", err)
-	}
-
-	return &SPIFFEConfig{
-		ClientCertificates:    tlsCerts,
-		RootCAs:              rootCAs,
-		VerifyPeerCertificate: c.createPeerCertificateVerifier(trustBundle),
-		VerifyConnection:     c.createConnectionVerifier(),
+	return &svidSourceAdapter{
+		identityService: c.identityService,
 	}, nil
 }
 
-// convertToTLSCertificates converts a domain.Certificate to []tls.Certificate
-func (c *ClientConnection) convertToTLSCertificates(cert *domain.Certificate) ([]tls.Certificate, error) {
-	if cert == nil || cert.Cert == nil {
-		return nil, fmt.Errorf("certificate is nil")
+// createBundleSource creates an x509bundle.Source adapter
+func (c *ClientConnection) createBundleSource() (x509bundle.Source, error) {
+	if c.identityService == nil {
+		return nil, fmt.Errorf("no identity service available")
 	}
 
-	if cert.PrivateKey == nil {
-		return nil, fmt.Errorf("private key is nil")
+	// For now, use a default trust domain. In production, this should be configurable
+	trustDomain, err := spiffeid.TrustDomainFromString("example.org")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create trust domain: %w", err)
 	}
 
-	// Build certificate chain
-	certChain := [][]byte{cert.Cert.Raw}
-	for _, chainCert := range cert.Chain {
-		certChain = append(certChain, chainCert.Raw)
-	}
-
-	tlsCert := tls.Certificate{
-		Certificate: certChain,
-		PrivateKey:  cert.PrivateKey,
-		Leaf:        cert.Cert,
-	}
-
-	return []tls.Certificate{tlsCert}, nil
+	return &bundleSourceAdapter{
+		identityService: c.identityService,
+		trustDomain:     trustDomain,
+	}, nil
 }
 
-// convertToX509CertPool converts a domain.TrustBundle to *x509.CertPool
-func (c *ClientConnection) convertToX509CertPool(bundle *domain.TrustBundle) (*x509.CertPool, error) {
-	if bundle == nil || len(bundle.Certificates) == 0 {
-		return nil, fmt.Errorf("trust bundle is empty")
+// extractSPIFFEIDFromCert extracts SPIFFE ID from certificate URI SAN
+func extractSPIFFEIDFromCert(cert *x509.Certificate) spiffeid.ID {
+	for _, uri := range cert.URIs {
+		if uri.Scheme == "spiffe" {
+			id, err := spiffeid.FromURI(uri)
+			if err == nil {
+				return id
+			}
+		}
 	}
-
-	certPool := x509.NewCertPool()
-	for _, cert := range bundle.Certificates {
-		certPool.AddCert(cert)
-	}
-
-	return certPool, nil
+	// Return zero value if no valid SPIFFE ID found
+	return spiffeid.ID{}
 }
 
-// createPeerCertificateVerifier creates a function to verify peer certificates using SPIFFE trust bundle
-func (c *ClientConnection) createPeerCertificateVerifier(trustBundle *domain.TrustBundle) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-		// Basic SPIFFE certificate verification
-		// In a full implementation, this would validate SPIFFE IDs and other SPIFFE-specific properties
-		if len(rawCerts) == 0 {
-			return fmt.Errorf("no peer certificates provided")
-		}
-
-		// Parse the peer certificate
-		peerCert, err := x509.ParseCertificate(rawCerts[0])
-		if err != nil {
-			return fmt.Errorf("failed to parse peer certificate: %w", err)
-		}
-
-		// Verify against trust bundle
-		certPool, err := c.convertToX509CertPool(trustBundle)
-		if err != nil {
-			return fmt.Errorf("failed to create certificate pool: %w", err)
-		}
-
-		opts := x509.VerifyOptions{
-			Roots: certPool,
-		}
-
-		_, err = peerCert.Verify(opts)
-		if err != nil {
-			return fmt.Errorf("peer certificate verification failed: %w", err)
-		}
-
-		return nil
-	}
-}
-
-// createConnectionVerifier creates a function to verify TLS connection state
-func (c *ClientConnection) createConnectionVerifier() func(tls.ConnectionState) error {
-	return func(state tls.ConnectionState) error {
-		// Verify basic TLS connection properties
-		if len(state.PeerCertificates) == 0 {
-			return fmt.Errorf("no peer certificates in connection")
-		}
-
-		// Ensure TLS version is secure
-		if state.Version < tls.VersionTLS13 {
-			return fmt.Errorf("insecure TLS version: %d", state.Version)
-		}
-
-		// Additional SPIFFE-specific connection verification can be added here
-		return nil
-	}
-}
 
 // createSecureTLSConfig creates a secure TLS configuration as fallback
 func (c *ClientConnection) createSecureTLSConfig() *tls.Config {
