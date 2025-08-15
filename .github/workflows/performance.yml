@@ -246,7 +246,6 @@ jobs:
           cd scripts/demo
           sudo ./start-spire.sh
           sleep 10
-          sudo ./setup-demo.sh
       - name: Build and start server
         run: |
           make build
