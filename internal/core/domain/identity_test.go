@@ -40,17 +40,17 @@ func TestNewServiceIdentity(t *testing.T) {
 				return
 			}
 
-			if identity.Name != tt.serviceName {
-				t.Errorf("Name = %v, want %v", identity.Name, tt.serviceName)
+			if identity.Name() != tt.serviceName {
+				t.Errorf("Name = %v, want %v", identity.Name(), tt.serviceName)
 			}
 
-			if identity.Domain != tt.domain {
-				t.Errorf("Domain = %v, want %v", identity.Domain, tt.domain)
+			if identity.Domain() != tt.domain {
+				t.Errorf("Domain = %v, want %v", identity.Domain(), tt.domain)
 			}
 
 			expectedURI := fmt.Sprintf("spiffe://%s/%s", tt.domain, tt.serviceName)
-			if identity.URI != expectedURI {
-				t.Errorf("URI = %v, want %v", identity.URI, expectedURI)
+			if identity.URI() != expectedURI {
+				t.Errorf("URI = %v, want %v", identity.URI(), expectedURI)
 			}
 		})
 	}
@@ -149,8 +149,8 @@ func TestServiceIdentity_URIGeneration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			identity := domain.NewServiceIdentity(tt.serviceName, tt.domain)
 
-			if identity.URI != tt.expectedURI {
-				t.Errorf("URI = %v, want %v", identity.URI, tt.expectedURI)
+			if identity.URI() != tt.expectedURI {
+				t.Errorf("URI = %v, want %v", identity.URI(), tt.expectedURI)
 			}
 		})
 	}
@@ -168,17 +168,17 @@ func TestServiceIdentity_Fields(t *testing.T) {
 
 	identity := domain.NewServiceIdentity(serviceName, domainName)
 
-	if identity.Name != serviceName {
-		t.Errorf("Name = %v, want %v", identity.Name, serviceName)
+	if identity.Name() != serviceName {
+		t.Errorf("Name = %v, want %v", identity.Name(), serviceName)
 	}
 
-	if identity.Domain != domainName {
-		t.Errorf("Domain = %v, want %v", identity.Domain, domainName)
+	if identity.Domain() != domainName {
+		t.Errorf("Domain = %v, want %v", identity.Domain(), domainName)
 	}
 
 	expectedURI := fmt.Sprintf("spiffe://%s/%s", domainName, serviceName)
-	if identity.URI != expectedURI {
-		t.Errorf("URI = %v, want %v", identity.URI, expectedURI)
+	if identity.URI() != expectedURI {
+		t.Errorf("URI = %v, want %v", identity.URI(), expectedURI)
 	}
 }
 
@@ -186,20 +186,20 @@ func TestServiceIdentity_Immutability(t *testing.T) {
 	// Test that the identity remains immutable after creation
 	identity := domain.NewServiceIdentity("test-service", "example.com")
 
-	originalName := identity.Name
-	originalDomain := identity.Domain
-	originalURI := identity.URI
+	originalName := identity.Name()
+	originalDomain := identity.Domain()
+	originalURI := identity.URI()
 
 	// Values should remain the same on multiple accesses
-	if identity.Name != originalName {
+	if identity.Name() != originalName {
 		t.Error("Name changed after creation")
 	}
 
-	if identity.Domain != originalDomain {
+	if identity.Domain() != originalDomain {
 		t.Error("Domain changed after creation")
 	}
 
-	if identity.URI != originalURI {
+	if identity.URI() != originalURI {
 		t.Error("URI changed after creation")
 	}
 }
@@ -252,18 +252,18 @@ func TestServiceIdentity_EdgeCases(t *testing.T) {
 				return
 			}
 
-			if identity.Name != tt.serviceName {
-				t.Errorf("Name = %v, want %v", identity.Name, tt.serviceName)
+			if identity.Name() != tt.serviceName {
+				t.Errorf("Name = %v, want %v", identity.Name(), tt.serviceName)
 			}
 
-			if identity.Domain != tt.domain {
-				t.Errorf("Domain = %v, want %v", identity.Domain, tt.domain)
+			if identity.Domain() != tt.domain {
+				t.Errorf("Domain = %v, want %v", identity.Domain(), tt.domain)
 			}
 
 			// URI should be properly formatted
 			expectedURI := fmt.Sprintf("spiffe://%s/%s", tt.domain, tt.serviceName)
-			if identity.URI != expectedURI {
-				t.Errorf("URI = %v, want %v", identity.URI, expectedURI)
+			if identity.URI() != expectedURI {
+				t.Errorf("URI = %v, want %v", identity.URI(), expectedURI)
 			}
 		})
 	}
@@ -299,7 +299,7 @@ func BenchmarkServiceIdentity_URIAccess(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		uri := identity.URI
+		uri := identity.URI()
 		if uri == "" {
 			b.Error("URI is empty")
 		}
@@ -310,19 +310,19 @@ func TestServiceIdentity_String(t *testing.T) {
 	// Test string representation through URI field
 	identity := domain.NewServiceIdentity("test-service", "example.com")
 
-	if identity.URI == "" {
+	if identity.URI() == "" {
 		t.Error("URI should not be empty")
 	}
 
-	if !strings.Contains(identity.URI, "spiffe://") {
+	if !strings.Contains(identity.URI(), "spiffe://") {
 		t.Error("URI should contain SPIFFE scheme")
 	}
 
-	if !strings.Contains(identity.URI, "example.com") {
+	if !strings.Contains(identity.URI(), "example.com") {
 		t.Error("URI should contain domain")
 	}
 
-	if !strings.Contains(identity.URI, "test-service") {
+	if !strings.Contains(identity.URI(), "test-service") {
 		t.Error("URI should contain service name")
 	}
 }
@@ -339,9 +339,9 @@ func TestServiceIdentity_Concurrent(t *testing.T) {
 			defer func() { done <- true }()
 
 			for j := 0; j < 100; j++ {
-				name := identity.Name
-				domain := identity.Domain
-				uri := identity.URI
+				name := identity.Name()
+				domain := identity.Domain()
+				uri := identity.URI()
 
 				if name != "test-service" {
 					t.Errorf("Name = %v, want test-service", name)

@@ -1,83 +1,39 @@
 package ephemos
 
 import (
-	"context"
-	"net/http"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestClientConnection_HTTPClient(t *testing.T) {
-	t.Run("HTTPClient returns configured client", func(t *testing.T) {
-		// Create a client connection with nil internal connection (fallback mode)
+	t.Run("HTTPClient requires SPIFFE authentication", func(t *testing.T) {
+		// Create a client connection with nil internal connection (should fail)
 		conn := &ClientConnection{
 			internalConn: nil,
 		}
 
-		httpClient := conn.HTTPClient()
+		httpClient, err := conn.HTTPClient()
 		
-		// Verify we get a valid HTTP client
-		assert.NotNil(t, httpClient)
-		assert.Equal(t, 30*time.Second, httpClient.Timeout)
-		assert.NotNil(t, httpClient.Transport)
+		// Should error with no SPIFFE authentication available
+		assert.Error(t, err)
+		assert.Nil(t, httpClient)
+		assert.Contains(t, err.Error(), "no SPIFFE authentication available")
 	})
 
-	t.Run("HTTPClient has secure configuration", func(t *testing.T) {
+	t.Run("HTTPClient enforces SPIFFE security", func(t *testing.T) {
+		// Test that HTTPClient consistently requires SPIFFE authentication
+		// and does not fall back to insecure configurations
 		conn := &ClientConnection{
 			internalConn: nil,
 		}
 
-		httpClient := conn.HTTPClient()
-		transport, ok := httpClient.Transport.(*http.Transport)
+		httpClient, err := conn.HTTPClient()
 		
-		// Verify transport configuration
-		assert.True(t, ok)
-		assert.Equal(t, 100, transport.MaxIdleConns)
-		assert.Equal(t, 90*time.Second, transport.IdleConnTimeout)
-		assert.Equal(t, 10*time.Second, transport.TLSHandshakeTimeout)
-	})
-
-	t.Run("HTTPClient has proper timeouts", func(t *testing.T) {
-		conn := &ClientConnection{
-			internalConn: nil,
-		}
-
-		httpClient := conn.HTTPClient()
-		transport, ok := httpClient.Transport.(*http.Transport)
-		
-		assert.True(t, ok)
-		assert.Equal(t, 90*time.Second, transport.IdleConnTimeout)
-		assert.Equal(t, 10*time.Second, transport.TLSHandshakeTimeout)
-		assert.Equal(t, 1*time.Second, transport.ExpectContinueTimeout)
-	})
-
-	t.Run("HTTPClient limits redirects", func(t *testing.T) {
-		conn := &ClientConnection{
-			internalConn: nil,
-		}
-
-		httpClient := conn.HTTPClient()
-		
-		// Test redirect limiting
-		var redirectCount int
-		for i := 0; i < 15; i++ {
-			req := &http.Request{}
-			var via []*http.Request
-			for j := 0; j < i; j++ {
-				via = append(via, &http.Request{})
-			}
-			
-			err := httpClient.CheckRedirect(req, via)
-			if err != nil {
-				redirectCount = i
-				break
-			}
-		}
-		
-		// Should stop at 10 redirects
-		assert.Equal(t, 10, redirectCount)
+		// Should always error when SPIFFE authentication cannot be configured
+		assert.Error(t, err)
+		assert.Nil(t, httpClient)
+		assert.Contains(t, err.Error(), "SPIFFE authentication")
 	})
 }
 
@@ -98,7 +54,7 @@ func TestHTTPClientIntegration(t *testing.T) {
 		// Even though we can't test the full flow without a real service,
 		// we can verify the API design
 		
-		_ = context.Background() // Would be used in real implementation
+		// In a real implementation, a context would be used for the connection
 		
 		// This is how developers would use the HTTP client functionality:
 		/*
@@ -116,7 +72,10 @@ func TestHTTPClientIntegration(t *testing.T) {
 		defer conn.Close()
 
 		// Get HTTP client with SPIFFE authentication
-		httpClient := conn.HTTPClient()
+		httpClient, err := conn.HTTPClient()
+		if err != nil {
+			t.Fatalf("Failed to create SPIFFE HTTP client: %v", err)
+		}
 		
 		// Make authenticated HTTP requests
 		resp, err := httpClient.Get("https://payment.example.com/api/balance")
@@ -161,8 +120,11 @@ func TestHTTPClientIntegration(t *testing.T) {
 		}
 		defer conn.Close()
 
-		// Use authenticated HTTP client
-		httpClient := conn.HTTPClient()
+		// Use authenticated HTTP client with SPIFFE mTLS
+		httpClient, err := conn.HTTPClient()
+		if err != nil {
+			t.Fatalf("Failed to create SPIFFE HTTP client: %v", err)
+		}
 		// ... make requests with SPIFFE authentication
 		*/
 		

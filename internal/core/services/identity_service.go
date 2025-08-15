@@ -4,6 +4,7 @@ package services
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/errors"
@@ -29,14 +30,22 @@ import (
 //   - Authentication happens BEFORE any application code runs
 //
 // 3. CERTIFICATE VALIDATION:
-//   - ValidateServiceIdentity() ensures certificates are valid and not expired
-//   - Certificates are automatically verified against SPIRE trust bundle
+//   - ValidateServiceIdentity() explicitly checks certificate validity and expiry
+//   - Validates SPIFFE ID matches expected service identity
+//   - Warns when certificates are near expiry (within 1 hour)
 //   - Invalid/expired certificates cause immediate connection failure
 //
 // 4. AUTHORIZATION ENFORCEMENT:
-//   - Service checks 'authorized_clients' config for server connections
-//   - Service checks 'trusted_servers' config for client connections
+//   - Checks 'authorized_clients' config for server-side authorization
+//   - Checks 'trusted_servers' config for client-side authorization  
+//   - Creates AuthorizationPolicy when rules are configured
+//   - Falls back to trust domain authorization when no explicit rules
 //   - Unauthorized services are rejected at transport layer
+//
+// 5. CERTIFICATE ROTATION:
+//   - Caches certificates with TTL to avoid excessive fetching
+//   - Automatically refreshes expired cached certificates
+//   - Validates certificates on each fetch to ensure freshness
 //
 // Security Properties:
 // - Zero Trust: Every connection requires valid certificate authentication
@@ -46,13 +55,21 @@ import (
 // - Cryptographic: Uses X.509 certificates, not plaintext secrets
 //
 // It handles certificate management, identity validation, and secure connection establishment.
-// The service caches validated identities for performance and thread-safety.
+// The service caches validated identities and certificates for performance and thread-safety.
 type IdentityService struct {
 	identityProvider  ports.IdentityProvider
 	transportProvider ports.TransportProvider
 	config            *ports.Configuration
 	cachedIdentity    *domain.ServiceIdentity
-	mu                sync.RWMutex
+	
+	// Certificate caching for rotation support
+	cachedCert       *domain.Certificate
+	cachedBundle     *domain.TrustBundle
+	certCachedAt     time.Time
+	bundleCachedAt   time.Time
+	cacheTTL         time.Duration
+	
+	mu               sync.RWMutex
 }
 
 // NewIdentityService creates a new IdentityService with the provided configuration.
@@ -86,6 +103,7 @@ func NewIdentityService(
 		transportProvider: transportProvider,
 		config:            config,
 		cachedIdentity:    identity,
+		cacheTTL:          30 * time.Minute, // Cache certificates for 30 minutes (half of typical 1-hour SPIFFE cert lifetime)
 	}, nil
 }
 
@@ -99,20 +117,32 @@ func (s *IdentityService) CreateServerIdentity() (ports.ServerPort, error) {
 
 	cert, err := s.getCertificate()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get certificate for service %s: %w", identity.Name, err)
+		return nil, fmt.Errorf("failed to get certificate for service %s: %w", identity.Name(), err)
+	}
+
+	// Explicitly validate certificate as described in architecture documentation
+	if err := s.ValidateServiceIdentity(cert); err != nil {
+		return nil, fmt.Errorf("certificate validation failed for service %s: %w", identity.Name(), err)
 	}
 
 	trustBundle, err := s.getTrustBundle()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get trust bundle for service %s: %w", identity.Name, err)
+		return nil, fmt.Errorf("failed to get trust bundle for service %s: %w", identity.Name(), err)
 	}
 
-	// Create authentication policy without authorization
-	policy := domain.NewAuthenticationPolicy(identity)
+	// Create authentication policy with authorization based on configuration
+	var policy *domain.AuthenticationPolicy
+	if len(s.config.Service.AuthorizedClients) > 0 || len(s.config.Service.TrustedServers) > 0 {
+		// Use authorization policy when rules are configured
+		policy = domain.NewAuthorizationPolicy(identity, s.config.Service.AuthorizedClients, s.config.Service.TrustedServers)
+	} else {
+		// Fall back to authentication-only policy
+		policy = domain.NewAuthenticationPolicy(identity)
+	}
 
 	server, err := s.transportProvider.CreateServer(cert, trustBundle, policy)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create server transport for service %s: %w", identity.Name, err)
+		return nil, fmt.Errorf("failed to create server transport for service %s: %w", identity.Name(), err)
 	}
 
 	return server, nil
@@ -128,44 +158,99 @@ func (s *IdentityService) CreateClientIdentity() (ports.ClientPort, error) {
 
 	cert, err := s.getCertificate()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get certificate for service %s: %w", identity.Name, err)
+		return nil, fmt.Errorf("failed to get certificate for service %s: %w", identity.Name(), err)
+	}
+
+	// Explicitly validate certificate as described in architecture documentation
+	if err := s.ValidateServiceIdentity(cert); err != nil {
+		return nil, fmt.Errorf("certificate validation failed for service %s: %w", identity.Name(), err)
 	}
 
 	trustBundle, err := s.getTrustBundle()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get trust bundle for service %s: %w", identity.Name, err)
+		return nil, fmt.Errorf("failed to get trust bundle for service %s: %w", identity.Name(), err)
 	}
 
-	// Create authentication policy without authorization
-	policy := domain.NewAuthenticationPolicy(identity)
+	// Create authentication policy with authorization based on configuration
+	var policy *domain.AuthenticationPolicy
+	if len(s.config.Service.AuthorizedClients) > 0 || len(s.config.Service.TrustedServers) > 0 {
+		// Use authorization policy when rules are configured
+		policy = domain.NewAuthorizationPolicy(identity, s.config.Service.AuthorizedClients, s.config.Service.TrustedServers)
+	} else {
+		// Fall back to authentication-only policy
+		policy = domain.NewAuthenticationPolicy(identity)
+	}
 
 	client, err := s.transportProvider.CreateClient(cert, trustBundle, policy)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create client transport for service %s: %w", identity.Name, err)
+		return nil, fmt.Errorf("failed to create client transport for service %s: %w", identity.Name(), err)
 	}
 
 	return client, nil
 }
 
-// getCertificate retrieves the certificate from the identity provider.
+// getCertificate retrieves the certificate from the identity provider with TTL-based caching.
 func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
-	// In a pure domain service, we delegate to the port without exposing context
-	// The adapter layer will handle context management
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
+	// Check if cached certificate is still valid
+	if s.cachedCert != nil && time.Since(s.certCachedAt) < s.cacheTTL {
+		// Validate the cached certificate is not expired
+		if err := s.validateCertificateExpiry(s.cachedCert); err == nil {
+			return s.cachedCert, nil
+		}
+		// Certificate is expired, clear cache and fetch new one
+		s.cachedCert = nil
+	}
+	
+	// Fetch fresh certificate from provider
 	cert, err := s.identityProvider.GetCertificate()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get certificate: %w", err)
 	}
+	
+	// Cache the new certificate
+	s.cachedCert = cert
+	s.certCachedAt = time.Now()
+	
 	return cert, nil
 }
 
-// getTrustBundle retrieves the trust bundle from the identity provider.
+// validateCertificateExpiry checks if a certificate is still valid (not expired).
+func (s *IdentityService) validateCertificateExpiry(cert *domain.Certificate) error {
+	if cert == nil || cert.Cert == nil {
+		return fmt.Errorf("certificate is nil")
+	}
+	
+	now := time.Now()
+	if now.After(cert.Cert.NotAfter) {
+		return fmt.Errorf("certificate has expired")
+	}
+	
+	return nil
+}
+
+// getTrustBundle retrieves the trust bundle from the identity provider with TTL-based caching.
 func (s *IdentityService) getTrustBundle() (*domain.TrustBundle, error) {
-	// In a pure domain service, we delegate to the port without exposing context
-	// The adapter layer will handle context management
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
+	// Check if cached trust bundle is still valid
+	if s.cachedBundle != nil && time.Since(s.bundleCachedAt) < s.cacheTTL {
+		return s.cachedBundle, nil
+	}
+	
+	// Fetch fresh trust bundle from provider
 	bundle, err := s.identityProvider.GetTrustBundle()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get trust bundle: %w", err)
 	}
+	
+	// Cache the new trust bundle
+	s.cachedBundle = bundle
+	s.bundleCachedAt = time.Now()
+	
 	return bundle, nil
 }
 
@@ -179,4 +264,60 @@ func (s *IdentityService) GetCertificate() (*domain.Certificate, error) {
 // This is exposed for use by HTTP client connections to get SPIFFE trust bundles.
 func (s *IdentityService) GetTrustBundle() (*domain.TrustBundle, error) {
 	return s.getTrustBundle()
+}
+
+// ValidateServiceIdentity validates that a certificate is valid, not expired, and matches expected identity.
+// This ensures certificates are cryptographically valid and within their validity period.
+func (s *IdentityService) ValidateServiceIdentity(cert *domain.Certificate) error {
+	if cert == nil {
+		return fmt.Errorf("certificate is nil")
+	}
+
+	if cert.Cert == nil {
+		return fmt.Errorf("X.509 certificate is nil")
+	}
+
+	// Check certificate validity period
+	now := time.Now()
+	if now.Before(cert.Cert.NotBefore) {
+		return fmt.Errorf("certificate is not yet valid (NotBefore: %v, now: %v)", 
+			cert.Cert.NotBefore, now)
+	}
+
+	if now.After(cert.Cert.NotAfter) {
+		return fmt.Errorf("certificate has expired (NotAfter: %v, now: %v)", 
+			cert.Cert.NotAfter, now)
+	}
+
+	// Warn if certificate expires within the next hour (SPIFFE certs typically have 1-hour TTL)
+	if now.Add(time.Hour).After(cert.Cert.NotAfter) {
+		// In production, this should use structured logging
+		fmt.Printf("Warning: Certificate expires soon (NotAfter: %v, now: %v)\n", 
+			cert.Cert.NotAfter, now)
+	}
+
+	// Validate SPIFFE ID matches expected service identity
+	s.mu.RLock()
+	expectedSPIFFEID := s.cachedIdentity.URI()
+	s.mu.RUnlock()
+
+	// Extract SPIFFE ID from certificate
+	var certSPIFFEID string
+	for _, uri := range cert.Cert.URIs {
+		if uri.Scheme == "spiffe" {
+			certSPIFFEID = uri.String()
+			break
+		}
+	}
+
+	if certSPIFFEID == "" {
+		return fmt.Errorf("certificate contains no SPIFFE ID in URI SANs")
+	}
+
+	if certSPIFFEID != expectedSPIFFEID {
+		return fmt.Errorf("certificate SPIFFE ID mismatch: expected %s, got %s", 
+			expectedSPIFFEID, certSPIFFEID)
+	}
+
+	return nil
 }

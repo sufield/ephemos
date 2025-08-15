@@ -139,8 +139,8 @@ func (i *IdentityPropagationInterceptor) propagateIdentity(ctx context.Context, 
 	md := metadata.MD{}
 
 	// Add current service identity
-	md.Set(MetadataKeyServiceName, identity.Name)
-	md.Set(MetadataKeyTrustDomain, identity.Domain)
+	md.Set(MetadataKeyServiceName, identity.Name())
+	md.Set(MetadataKeyTrustDomain, identity.Domain())
 	md.Set(MetadataKeyTimestamp, fmt.Sprintf("%d", time.Now().Unix()))
 
 	// Generate or extract request ID
@@ -149,13 +149,13 @@ func (i *IdentityPropagationInterceptor) propagateIdentity(ctx context.Context, 
 
 	// Handle original caller propagation
 	if i.config.PropagateOriginalCaller {
-		originalCaller := i.getOriginalCaller(ctx, identity.URI)
+		originalCaller := i.getOriginalCaller(ctx, identity.URI())
 		md.Set(MetadataKeyOriginalCaller, originalCaller)
 	}
 
 	// Handle call chain propagation
 	if i.config.PropagateCallChain {
-		callChain, err := i.buildCallChain(ctx, identity.URI)
+		callChain, err := i.buildCallChain(ctx, identity.URI())
 		if err != nil {
 			return nil, fmt.Errorf("failed to build call chain: %w", err)
 		}

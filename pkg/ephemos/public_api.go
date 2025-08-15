@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"time"
 
 	"github.com/sufield/ephemos/internal/adapters/primary/api"
 )
@@ -67,29 +66,16 @@ type ClientConnection struct {
 //   if err != nil { ... }
 //   defer conn.Close()
 //   
-//   httpClient := conn.HTTPClient()
+//   httpClient, err := conn.HTTPClient()
+//   if err != nil { return err }
 //   resp, err := httpClient.Get("https://payment.example.com/api/balance")
-func (c *ClientConnection) HTTPClient() *http.Client {
+func (c *ClientConnection) HTTPClient() (*http.Client, error) {
 	if c.internalConn != nil {
 		return c.internalConn.HTTPClient()
 	}
 	
-	// Return a basic secure HTTP client if internal connection is not available
-	return &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-		},
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
-				return fmt.Errorf("stopped after 10 redirects")
-			}
-			return nil
-		},
-	}
+	// Return error if no SPIFFE authentication is available
+	return nil, fmt.Errorf("no SPIFFE authentication available for HTTP client")
 }
 
 // Close closes the connection and releases resources.

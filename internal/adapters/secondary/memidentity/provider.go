@@ -2,8 +2,13 @@
 package memidentity
 
 import (
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
+	"io"
 	"sync"
+	"time"
 
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
@@ -18,24 +23,44 @@ type Provider struct {
 	closed   bool
 }
 
+// fakePrivateKey implements crypto.Signer for testing purposes.
+type fakePrivateKey struct{}
+
+func (f *fakePrivateKey) Public() crypto.PublicKey {
+	// Return a simple placeholder public key
+	key, _ := rsa.GenerateKey(rand.Reader, 512) // Small key for testing
+	return &key.PublicKey
+}
+
+func (f *fakePrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	return []byte("fake-signature"), nil
+}
+
 // New creates a new in-memory IdentityProvider with default test data.
 func New() *Provider {
 	// Create fake X.509 certificate for testing
-	fakeCert := &x509.Certificate{}
+	fakeCert := &x509.Certificate{
+		NotBefore: time.Now().Add(-time.Hour),
+		NotAfter:  time.Now().Add(time.Hour),
+		IsCA:      false,
+	}
+
+	// Create fake CA certificate for trust bundle
+	fakeCACert := &x509.Certificate{
+		NotBefore: time.Now().Add(-time.Hour),
+		NotAfter:  time.Now().Add(time.Hour),
+		IsCA:      true,
+	}
 
 	return &Provider{
-		identity: &domain.ServiceIdentity{
-			Name:   "test-service",
-			Domain: "example.com",
-			URI:    "spiffe://example.com/test-service",
-		},
+		identity: domain.NewServiceIdentity("test-service", "example.com"),
 		cert: &domain.Certificate{
 			Cert:       fakeCert,
-			PrivateKey: "fake-private-key",
-			Chain:      []*x509.Certificate{fakeCert},
+			PrivateKey: &fakePrivateKey{}, // Now properly implements crypto.Signer
+			Chain:      []*x509.Certificate{},
 		},
 		bundle: &domain.TrustBundle{
-			Certificates: []*x509.Certificate{fakeCert},
+			Certificates: []*x509.Certificate{fakeCACert},
 		},
 	}
 }

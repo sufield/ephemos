@@ -57,11 +57,7 @@ func (p *Provider) GetServiceIdentity() (*domain.ServiceIdentity, error) {
 		}
 	}
 
-	return &domain.ServiceIdentity{
-		Name:   serviceName,
-		Domain: id.TrustDomain().String(),
-		URI:    id.String(),
-	}, nil
+	return domain.NewServiceIdentity(serviceName, id.TrustDomain().String()), nil
 }
 
 // GetCertificate fetches cert.

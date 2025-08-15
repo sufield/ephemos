@@ -43,6 +43,16 @@ type ServiceConfig struct {
 	// Optional field that defaults to the SPIRE trust domain if not specified.
 	// Must be a valid domain name format if provided.
 	Domain string `yaml:"domain,omitempty"`
+
+	// AuthorizedClients is a list of SPIFFE IDs that are authorized to connect to this service.
+	// Used for server-side authorization enforcement.
+	// If empty, all clients from the same trust domain are authorized.
+	AuthorizedClients []string `yaml:"authorized_clients,omitempty"`
+
+	// TrustedServers is a list of SPIFFE IDs that this service trusts as servers.
+	// Used for client-side authorization when connecting to services.
+	// If empty, all servers from the same trust domain are trusted.
+	TrustedServers []string `yaml:"trusted_servers,omitempty"`
 }
 
 // AgentConfig contains identity agent connection settings.

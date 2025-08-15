@@ -175,10 +175,38 @@ func (c *Client) Connect(ctx context.Context, serviceName, address string) (*Cli
 		return nil, fmt.Errorf("unexpected connection type from domain client")
 	}
 
+	// Create a secure default authorizer based on the service name
+	// In production, this should be configurable through the configuration system
+	var authorizer tlsconfig.Authorizer
+	
+	// Try to create a strict authorizer based on service name if it looks like a SPIFFE ID
+	if strings.Contains(serviceName, "/") {
+		// Assume serviceName might be a full SPIFFE ID path component
+		expectedID := fmt.Sprintf("spiffe://example.org/%s", strings.TrimPrefix(serviceName, "/"))
+		if id, err := spiffeid.FromString(expectedID); err == nil {
+			authorizer = tlsconfig.AuthorizeID(id)
+		} else {
+			// Fall back to trust domain authorization
+			if td, err := spiffeid.TrustDomainFromString("example.org"); err == nil {
+				authorizer = tlsconfig.AuthorizeMemberOf(td)
+			} else {
+				authorizer = tlsconfig.AuthorizeAny()
+			}
+		}
+	} else {
+		// For simple service names, use trust domain authorization
+		if td, err := spiffeid.TrustDomainFromString("example.org"); err == nil {
+			authorizer = tlsconfig.AuthorizeMemberOf(td)
+		} else {
+			authorizer = tlsconfig.AuthorizeAny()
+		}
+	}
+
 	return &ClientConnection{
 		conn:            grpcConn,
 		domainConn:      domainConn,
 		identityService: c.identityService,
+		authorizer:      authorizer,
 	}, nil
 }
 
@@ -208,6 +236,7 @@ type ClientConnection struct {
 	conn            *grpc.ClientConn
 	domainConn      ports.ConnectionPort
 	identityService CertificateProvider
+	authorizer      tlsconfig.Authorizer
 }
 
 // Close terminates the client connection and cleans up resources.
@@ -228,24 +257,16 @@ func (c *ClientConnection) GetClientConnection() *grpc.ClientConn {
 // HTTPClient returns an HTTP client configured with SPIFFE certificate authentication.
 // This creates a new HTTP client that uses the same SPIFFE certificates and trust bundle
 // as the gRPC connection for secure HTTP communication.
-func (c *ClientConnection) HTTPClient() *http.Client {
+func (c *ClientConnection) HTTPClient() (*http.Client, error) {
 	if c.domainConn == nil {
-		// Return basic HTTP client as fallback
-		return &http.Client{
-			Timeout: 30 * time.Second,
-		}
+		return nil, fmt.Errorf("no domain connection available for SPIFFE authentication")
 	}
 
 	// Extract SPIFFE certificates and trust configuration from the domain connection
 	// This uses the same security context as the gRPC connection
 	tlsConfig, err := c.extractTLSConfig()
 	if err != nil {
-		// Log error and return basic client as fallback
-		// In production, this should use structured logging
-		fmt.Printf("Warning: Failed to extract TLS config for HTTP client: %v\n", err)
-		return &http.Client{
-			Timeout: 30 * time.Second,
-		}
+		return nil, fmt.Errorf("failed to configure SPIFFE authentication for HTTP client: %w", err)
 	}
 
 	// Create HTTP transport with SPIFFE certificate authentication
@@ -268,7 +289,7 @@ func (c *ClientConnection) HTTPClient() *http.Client {
 			}
 			return nil
 		},
-	}
+	}, nil
 }
 
 // extractTLSConfig extracts TLS configuration using official go-spiffe tlsconfig
@@ -287,20 +308,17 @@ func (c *ClientConnection) extractTLSConfig() (*tls.Config, error) {
 	// Create adapters for go-spiffe interfaces
 	svidSource, err := c.createSVIDSource()
 	if err != nil {
-		// Fallback to basic secure TLS configuration
-		return c.createSecureTLSConfig(), nil
+		return nil, fmt.Errorf("failed to create SVID source for SPIFFE authentication: %w", err)
 	}
 
 	bundleSource, err := c.createBundleSource()
 	if err != nil {
-		// Fallback to basic secure TLS configuration
-		return c.createSecureTLSConfig(), nil
+		return nil, fmt.Errorf("failed to create bundle source for SPIFFE authentication: %w", err)
 	}
 
 	// Use official go-spiffe tlsconfig for mutual TLS with SPIFFE authentication
 	// This provides the standard SPIFFE peer verification with proper authorizers
-	authorizer := tlsconfig.AuthorizeAny() // For now, authorize any valid SPIFFE ID
-	tlsConfig := tlsconfig.MTLSClientConfig(svidSource, bundleSource, authorizer)
+	tlsConfig := tlsconfig.MTLSClientConfig(svidSource, bundleSource, c.authorizer)
 
 	// Ensure TLS 1.3 minimum version (go-spiffe uses 1.2 by default)
 	tlsConfig.MinVersion = tls.VersionTLS13
@@ -335,9 +353,15 @@ func (s *svidSourceAdapter) GetX509SVID() (*x509svid.SVID, error) {
 		return nil, fmt.Errorf("private key does not implement crypto.Signer")
 	}
 
+	// Extract SPIFFE ID from certificate
+	spiffeID, err := extractSPIFFEIDFromCert(cert.Cert)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract SPIFFE ID: %w", err)
+	}
+
 	// Create X509SVID from domain certificate
 	svid := &x509svid.SVID{
-		ID:           extractSPIFFEIDFromCert(cert.Cert),
+		ID:           spiffeID,
 		Certificates: certChain,
 		PrivateKey:   signer,
 	}
@@ -348,7 +372,6 @@ func (s *svidSourceAdapter) GetX509SVID() (*x509svid.SVID, error) {
 // bundleSourceAdapter adapts the domain trust bundle to go-spiffe x509bundle.Source  
 type bundleSourceAdapter struct {
 	identityService CertificateProvider
-	trustDomain     spiffeid.TrustDomain
 }
 
 // GetX509BundleForTrustDomain implements x509bundle.Source interface
@@ -363,6 +386,7 @@ func (b *bundleSourceAdapter) GetX509BundleForTrustDomain(td spiffeid.TrustDomai
 	}
 
 	// Create bundle for the requested trust domain
+	// Note: In production, the trust bundle should be domain-aware
 	bundle := x509bundle.FromX509Authorities(td, trustBundle.Certificates)
 	return bundle, nil
 }
@@ -384,51 +408,22 @@ func (c *ClientConnection) createBundleSource() (x509bundle.Source, error) {
 		return nil, fmt.Errorf("no identity service available")
 	}
 
-	// For now, use a default trust domain. In production, this should be configurable
-	trustDomain, err := spiffeid.TrustDomainFromString("example.org")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create trust domain: %w", err)
-	}
-
 	return &bundleSourceAdapter{
 		identityService: c.identityService,
-		trustDomain:     trustDomain,
 	}, nil
 }
 
 // extractSPIFFEIDFromCert extracts SPIFFE ID from certificate URI SAN
-func extractSPIFFEIDFromCert(cert *x509.Certificate) spiffeid.ID {
+func extractSPIFFEIDFromCert(cert *x509.Certificate) (spiffeid.ID, error) {
 	for _, uri := range cert.URIs {
 		if uri.Scheme == "spiffe" {
 			id, err := spiffeid.FromURI(uri)
 			if err == nil {
-				return id
+				return id, nil
 			}
 		}
 	}
-	// Return zero value if no valid SPIFFE ID found
-	return spiffeid.ID{}
+	// Return error if no valid SPIFFE ID found
+	return spiffeid.ID{}, fmt.Errorf("no valid SPIFFE ID found in certificate URI SANs")
 }
 
-
-// createSecureTLSConfig creates a secure TLS configuration as fallback
-func (c *ClientConnection) createSecureTLSConfig() *tls.Config {
-	return &tls.Config{
-		// Use system certificate pool as base
-		RootCAs: nil, // nil means use system root CAs
-		
-		// Enable certificate verification
-		InsecureSkipVerify: false,
-		
-		// Set minimum TLS version
-		MinVersion: tls.VersionTLS13,
-		
-		// Configure cipher suites for security
-		CipherSuites: []uint16{
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-		},
-	}
-}
