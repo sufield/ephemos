@@ -1,45 +1,100 @@
 package api_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/sufield/ephemos/internal/adapters/primary/api"
+	"github.com/sufield/ephemos/internal/core/ports"
 )
 
-func TestIdentityClient_NewIdentityClient(t *testing.T) {
+// Mock implementations for testing
+type mockIdentityProvider struct{}
+
+func (m *mockIdentityProvider) GetIdentity(ctx context.Context) (ports.Identity, error) {
+	return &mockIdentity{}, nil
+}
+
+func (m *mockIdentityProvider) Close() error {
+	return nil
+}
+
+type mockTransportProvider struct{}
+
+func (m *mockTransportProvider) CreateServer(identity ports.Identity, config *ports.Configuration) (ports.ServerPort, error) {
+	return nil, nil
+}
+
+func (m *mockTransportProvider) CreateClient(identity ports.Identity, config *ports.Configuration) (ports.ClientPort, error) {
+	return &mockClient{}, nil
+}
+
+type mockIdentity struct{}
+
+func (m *mockIdentity) GetSPIFFEID() string {
+	return "spiffe://example.org/test"
+}
+
+func (m *mockIdentity) GetCertificate() interface{} {
+	return nil
+}
+
+type mockClient struct{}
+
+func (m *mockClient) Connect(serviceName, address string) (ports.ConnectionPort, error) {
+	return nil, nil
+}
+
+func (m *mockClient) Close() error {
+	return nil
+}
+
+func TestClient_IdentityClient(t *testing.T) {
 	tests := []struct {
-		name       string
-		configPath string
-		wantErr    bool
+		name              string
+		identityProvider  ports.IdentityProvider
+		transportProvider ports.TransportProvider
+		config            *ports.Configuration
+		wantErr           bool
 	}{
 		{
-			name:       "empty config path",
-			configPath: "",
-			wantErr:    true, // Default config may not be valid without proper SPIFFE setup
+			name:              "nil config",
+			identityProvider:  &mockIdentityProvider{},
+			transportProvider: &mockTransportProvider{},
+			config:            nil,
+			wantErr:           true,
 		},
 		{
-			name:       "invalid config path",
-			configPath: "/nonexistent/path",
-			wantErr:    true,
+			name:              "nil identity provider",
+			identityProvider:  nil,
+			transportProvider: &mockTransportProvider{},
+			config:            &ports.Configuration{},
+			wantErr:           true,
+		},
+		{
+			name:              "nil transport provider",
+			identityProvider:  &mockIdentityProvider{},
+			transportProvider: nil,
+			config:            &ports.Configuration{},
+			wantErr:           true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := t.Context()
-			client, err := api.NewIdentityClient(ctx, tt.configPath)
+			client, err := api.IdentityClient(tt.identityProvider, tt.transportProvider, tt.config)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewIdentityClient() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("IdentityClient() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && client == nil {
-				t.Error("NewIdentityClient() returned nil client")
+				t.Error("IdentityClient() returned nil client")
 			}
 		})
 	}
 }
 
-func TestIdentityClient_Connect(t *testing.T) {
+func TestClient_Connect(t *testing.T) {
 	// Note: This is a basic test structure. In production, you would use mocks
 	// and dependency injection to test without actual SPIFFE infrastructure.
 
@@ -75,9 +130,8 @@ func TestIdentityClient_Connect(t *testing.T) {
 		},
 	}
 
-	// Create a client for testing (this may fail without proper SPIFFE setup)
-	ctx := t.Context()
-	client, err := api.NewIdentityClient(ctx, "")
+	// Create a client for testing with mock dependencies
+	client, err := api.IdentityClient(&mockIdentityProvider{}, &mockTransportProvider{}, &ports.Configuration{})
 	if err != nil {
 		t.Skip("Skipping Connect tests - could not create client:", err)
 	}
@@ -97,9 +151,8 @@ func TestIdentityClient_Connect(t *testing.T) {
 	}
 }
 
-func TestIdentityClient_Close(t *testing.T) {
-	ctx := t.Context()
-	client, err := api.NewIdentityClient(ctx, "")
+func TestClient_Close(t *testing.T) {
+	client, err := api.IdentityClient(&mockIdentityProvider{}, &mockTransportProvider{}, &ports.Configuration{})
 	if err != nil {
 		t.Skip("Skipping Close test - could not create client:", err)
 	}
@@ -118,7 +171,7 @@ func TestIdentityClient_Close(t *testing.T) {
 func TestClientConnection_Close(t *testing.T) {
 	// Test close operation
 	// Note: Since we're in an external test package, we can only test the public API
-	// This test would need a real connection from api.NewIdentityClient() and Connect()
+	// This test would need a real connection from api.IdentityClient() and Connect()
 	// For now, we'll skip this specific test case that requires access to private fields
 	t.Skip("Skipping test that requires access to unexported fields - use internal package tests for this")
 }
@@ -126,7 +179,7 @@ func TestClientConnection_Close(t *testing.T) {
 func TestClientConnection_GetClientConnection(t *testing.T) {
 	// Test GetClientConnection operation
 	// Note: Since we're in an external test package, we can only test the public API
-	// This test would need a real connection from api.NewIdentityClient() and Connect()
+	// This test would need a real connection from api.IdentityClient() and Connect()
 	// For now, we'll skip this specific test case that requires access to private fields
 	t.Skip("Skipping test that requires access to unexported fields - use internal package tests for this")
 }

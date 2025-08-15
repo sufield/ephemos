@@ -14,35 +14,23 @@ import (
 	"github.com/sufield/ephemos/internal/core/services"
 )
 
-// WorkloadServer provides a secure gRPC server with SPIFFE-based workload identity management.
-type WorkloadServer struct {
+// Server provides a secure gRPC server with SPIFFE-based workload identity management.
+type Server struct {
 	identityService *services.IdentityService
 	configProvider  ports.ConfigurationProvider
 	serviceName     string
-	domainServer    ports.Server
+	domainServer    ports.ServerPort
 	mu              sync.Mutex
 }
 
-// NewWorkloadServer creates a new workload server with the given configuration.
-// Deprecated: Use NewWorkloadServerWithDependencies for proper dependency injection.
-func NewWorkloadServer(ctx context.Context, configPath string) (*WorkloadServer, error) {
-	// This is a legacy method maintained for backward compatibility.
-	// For new code, use NewWorkloadServerWithDependencies instead.
-	return nil, &errors.ValidationError{
-		Field:   "constructor",
-		Value:   "NewWorkloadServer",
-		Message: "deprecated constructor - use NewWorkloadServerWithDependencies instead",
-	}
-}
-
-// NewWorkloadServerWithDependencies creates a new workload server with injected dependencies.
+// WorkloadServer creates a new workload server with injected dependencies.
 // This constructor follows proper dependency injection and hexagonal architecture principles.
-func NewWorkloadServerWithDependencies(
+func WorkloadServer(
 	identityProvider ports.IdentityProvider,
 	transportProvider ports.TransportProvider,
 	configProvider ports.ConfigurationProvider,
 	cfg *ports.Configuration,
-) (*WorkloadServer, error) {
+) (*Server, error) {
 	if cfg == nil {
 		return nil, &errors.ValidationError{
 			Field:   "configuration",
@@ -84,7 +72,7 @@ func NewWorkloadServerWithDependencies(
 		return nil, fmt.Errorf("failed to create identity service: %w", err)
 	}
 
-	return &WorkloadServer{
+	return &Server{
 		identityService: identityService,
 		configProvider:  configProvider,
 		serviceName:     cfg.Service.Name,
@@ -92,7 +80,7 @@ func NewWorkloadServerWithDependencies(
 }
 
 // RegisterService registers a gRPC service with the identity server.
-func (s *WorkloadServer) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
+func (s *Server) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
 	// Input validation
 	if serviceRegistrar == nil {
 		return &errors.ValidationError{
@@ -111,7 +99,7 @@ func (s *WorkloadServer) RegisterService(ctx context.Context, serviceRegistrar S
 		}
 	}
 
-	// Adapt our ServiceRegistrar to ports.ServiceRegistrar
+	// Adapt our ServiceRegistrar to ports.ServiceRegistrarPort
 	portServiceRegistrar := &serviceRegistrarAdapter{registrar: serviceRegistrar}
 	if err := s.domainServer.RegisterService(portServiceRegistrar); err != nil {
 		return fmt.Errorf("failed to register service: %w", err)
@@ -122,7 +110,7 @@ func (s *WorkloadServer) RegisterService(ctx context.Context, serviceRegistrar S
 }
 
 // Serve starts the identity server on the provided listener.
-func (s *WorkloadServer) Serve(ctx context.Context, listener net.Listener) error {
+func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
 	// Input validation
 	if listener == nil {
 		return &errors.ValidationError{
@@ -143,7 +131,7 @@ func (s *WorkloadServer) Serve(ctx context.Context, listener net.Listener) error
 
 	slog.Info("Server ready", "service", s.serviceName, "address", listener.Addr().String())
 
-	// Adapt net.Listener to ports.Listener
+	// Adapt net.Listener to ports.ListenerPort
 	portListener := &netListenerAdapter{listener: listener}
 	if err := s.domainServer.Start(portListener); err != nil {
 		return fmt.Errorf("failed to serve domain server: %w", err)
@@ -152,7 +140,7 @@ func (s *WorkloadServer) Serve(ctx context.Context, listener net.Listener) error
 }
 
 // Close gracefully shuts down the identity server.
-func (s *WorkloadServer) Close() error {
+func (s *Server) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -166,7 +154,7 @@ func (s *WorkloadServer) Close() error {
 	return nil
 }
 
-func (s *WorkloadServer) initializeServer(_ context.Context) error {
+func (s *Server) initializeServer(_ context.Context) error {
 	server, err := s.identityService.CreateServerIdentity()
 	if err != nil {
 		return fmt.Errorf("failed to create server identity: %w", err)
@@ -176,7 +164,7 @@ func (s *WorkloadServer) initializeServer(_ context.Context) error {
 	return nil
 }
 
-// serviceRegistrarAdapter adapts our API ServiceRegistrar to ports.ServiceRegistrar.
+// serviceRegistrarAdapter adapts our API ServiceRegistrar to ports.ServiceRegistrarPort.
 type serviceRegistrarAdapter struct {
 	registrar ServiceRegistrar
 }
@@ -187,7 +175,7 @@ func (a *serviceRegistrarAdapter) Register(server interface{}) {
 	}
 }
 
-// netListenerAdapter adapts net.Listener to ports.Listener.
+// netListenerAdapter adapts net.Listener to ports.ListenerPort.
 type netListenerAdapter struct {
 	listener net.Listener
 }

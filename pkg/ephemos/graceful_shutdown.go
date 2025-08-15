@@ -328,7 +328,7 @@ func (m *ShutdownCoordinator) closeSPIFFEProviderWithTimeout(ctx context.Context
 
 // ExtendedIdentityServer wraps the standard IdentityServer with graceful shutdown support.
 type ExtendedIdentityServer struct {
-	WorkloadServer      WorkloadServer
+	workloadServer      workloadServer
 	shutdownCoordinator *ShutdownCoordinator
 	spiffeProvider      SPIFFEProvider
 }
@@ -352,7 +352,7 @@ func NewExtendedIdentityServer(ctx context.Context, configPath string, shutdownC
 	}
 
 	// Create the base workload server
-	baseServer, err := NewWorkloadServer(ctx, config, spiffeProvider)
+	baseServer, err := newWorkloadServer(ctx, config, spiffeProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create workload server: %w", err)
 	}
@@ -362,7 +362,7 @@ func NewExtendedIdentityServer(ctx context.Context, configPath string, shutdownC
 
 	// Create extended server
 	extServer := &ExtendedIdentityServer{
-		WorkloadServer:      baseServer,
+		workloadServer:      baseServer,
 		shutdownCoordinator: coordinator,
 		spiffeProvider:      spiffeProvider,
 	}

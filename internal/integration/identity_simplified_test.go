@@ -516,25 +516,25 @@ type mockTransportProvider struct{}
 
 func (m *mockTransportProvider) CreateServer(
 	_ *domain.Certificate, _ *domain.TrustBundle, _ *domain.AuthenticationPolicy,
-) (ports.Server, error) {
+) (ports.ServerPort, error) {
 	return &mockServer{}, nil
 }
 
 func (m *mockTransportProvider) CreateClient(
 	_ *domain.Certificate, _ *domain.TrustBundle, _ *domain.AuthenticationPolicy,
-) (ports.Client, error) {
+) (ports.ClientPort, error) {
 	return &mockClient{}, nil
 }
 
 type mockServer struct{}
 
-func (m *mockServer) RegisterService(_ ports.ServiceRegistrar) error { return nil }
-func (m *mockServer) Start(_ ports.Listener) error                   { return nil }
+func (m *mockServer) RegisterService(_ ports.ServiceRegistrarPort) error { return nil }
+func (m *mockServer) Start(_ ports.ListenerPort) error                   { return nil }
 func (m *mockServer) Stop() error                                    { return nil }
 
 type mockClient struct{}
 
-func (m *mockClient) Connect(_, _ string) (ports.Connection, error) {
+func (m *mockClient) Connect(_, _ string) (ports.ConnectionPort, error) {
 	return &mockConnection{}, nil
 }
 func (m *mockClient) Close() error { return nil }

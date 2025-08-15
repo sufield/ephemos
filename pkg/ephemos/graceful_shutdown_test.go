@@ -382,9 +382,9 @@ func TestIdentityOrchestrator_ServeWithShutdown(t *testing.T) {
 	}
 	defer listener.Close()
 
-	// Note: This test would need proper mocking of the api.WorkloadServer
+	// Note: This test would need proper mocking of the server
 	// For now, we're testing the shutdown coordinator independently
-	t.Skip("Requires proper mocking of api.WorkloadServer")
+	t.Skip("Requires proper mocking of server implementation")
 }
 
 func TestShutdownConfig_Defaults(t *testing.T) {

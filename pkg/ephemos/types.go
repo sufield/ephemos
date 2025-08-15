@@ -18,11 +18,6 @@ type Configuration struct {
 	// SPIFFE contains optional SPIFFE/SPIRE integration settings.
 	SPIFFE *SPIFFEConfig `yaml:"spiffe,omitempty"`
 
-	// AuthorizedClients lists SPIFFE IDs that are allowed to connect to this service.
-	AuthorizedClients []string `yaml:"authorizedClients,omitempty" validate:"spiffe_id"`
-
-	// TrustedServers lists SPIFFE IDs of servers this client trusts to connect to.
-	TrustedServers []string `yaml:"trustedServers,omitempty" validate:"spiffe_id"`
 
 	// Transport contains the transport layer configuration.
 	Transport TransportConfig `yaml:"transport,omitempty"`
@@ -98,8 +93,6 @@ const (
 	EnvServiceName       = "EPHEMOS_SERVICE_NAME"
 	EnvTrustDomain       = "EPHEMOS_TRUST_DOMAIN"
 	EnvSPIFFESocket      = "EPHEMOS_SPIFFE_SOCKET"
-	EnvAuthorizedClients = "EPHEMOS_AUTHORIZED_CLIENTS"
-	EnvTrustedServers    = "EPHEMOS_TRUSTED_SERVERS"
 	EnvRequireAuth       = "EPHEMOS_REQUIRE_AUTHENTICATION"
 	EnvLogLevel          = "EPHEMOS_LOG_LEVEL"
 	EnvBindAddress       = "EPHEMOS_BIND_ADDRESS"
@@ -129,17 +122,6 @@ func LoadFromEnvironment() (*Configuration, error) {
 		config.SPIFFE.SocketPath = spiffeSocket
 	}
 
-	// Parse comma-separated authorized clients
-	if authorizedClients := os.Getenv(EnvAuthorizedClients); authorizedClients != "" {
-		// Note: parseCommaSeparatedList is defined in config_enhanced.go in the same package
-		config.AuthorizedClients = ParseCommaSeparatedList(authorizedClients)
-	}
-
-	// Parse comma-separated trusted servers
-	if trustedServers := os.Getenv(EnvTrustedServers); trustedServers != "" {
-		// Note: parseCommaSeparatedList is defined in config_enhanced.go in the same package
-		config.TrustedServers = ParseCommaSeparatedList(trustedServers)
-	}
 
 	// Validate and set defaults using the new validation engine
 	if err := config.ValidateAndSetDefaults(); err != nil {
@@ -170,17 +152,6 @@ func (c *Configuration) MergeWithEnvironment() error {
 		c.SPIFFE.SocketPath = spiffeSocket
 	}
 
-	// Override authorized clients if set via environment
-	if authorizedClients := os.Getenv(EnvAuthorizedClients); authorizedClients != "" {
-		// Note: parseCommaSeparatedList is defined in config_enhanced.go in the same package
-		c.AuthorizedClients = ParseCommaSeparatedList(authorizedClients)
-	}
-
-	// Override trusted servers if set via environment
-	if trustedServers := os.Getenv(EnvTrustedServers); trustedServers != "" {
-		// Note: parseCommaSeparatedList is defined in config_enhanced.go in the same package
-		c.TrustedServers = ParseCommaSeparatedList(trustedServers)
-	}
 
 	// Validate and set defaults using the new validation engine
 	return c.ValidateAndSetDefaults()
@@ -226,8 +197,6 @@ func GetDefaultConfiguration() *Configuration {
 				Type:    "http",
 				Address: ":8080",
 			},
-			AuthorizedClients: []string{},
-			TrustedServers:    []string{},
 		}
 	}
 

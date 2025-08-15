@@ -15,34 +15,20 @@ import (
 	"github.com/sufield/ephemos/internal/core/services"
 )
 
-// IdentityClient provides a high-level API for connecting to SPIFFE-secured services.
-type IdentityClient struct {
+// Client provides a high-level API for connecting to SPIFFE-secured services.
+type Client struct {
 	identityService *services.IdentityService
-	domainClient    ports.Client
+	domainClient    ports.ClientPort
 	mu              sync.Mutex
 }
 
-// TODO: Deprecation is not needed. Remove this
-// NewIdentityClient creates a new IdentityClient with the given configuration file path.
-// Deprecated: Use NewIdentityClientWithDependencies for proper dependency injection.
-func NewIdentityClient(ctx context.Context, configPath string) (*IdentityClient, error) {
-	// This is a legacy method maintained for backward compatibility.
-	// For new code, use NewIdentityClientWithDependencies instead.
-	return nil, &errors.ValidationError{
-		Field:   "constructor",
-		Value:   "NewIdentityClient",
-		Message: "deprecated constructor - use NewIdentityClientWithDependencies instead",
-	}
-}
-
-// TODO: Rename this to NewIdentityClient
-// NewIdentityClientWithDependencies creates a new identity client with injected dependencies.
+// IdentityClient creates a new identity client with injected dependencies.
 // This constructor follows proper dependency injection and hexagonal architecture principles.
-func NewIdentityClientWithDependencies(
+func IdentityClient(
 	identityProvider ports.IdentityProvider,
 	transportProvider ports.TransportProvider,
 	cfg *ports.Configuration,
-) (*IdentityClient, error) {
+) (*Client, error) {
 	if cfg == nil {
 		return nil, &errors.ValidationError{
 			Field:   "configuration",
@@ -76,13 +62,13 @@ func NewIdentityClientWithDependencies(
 		return nil, fmt.Errorf("failed to create identity service: %w", err)
 	}
 
-	return &IdentityClient{
+	return &Client{
 		identityService: identityService,
 	}, nil
 }
 
 // Connect establishes a secure connection to a remote service using SPIFFE identities.
-func (c *IdentityClient) Connect(ctx context.Context, serviceName, address string) (*ClientConnection, error) {
+func (c *Client) Connect(ctx context.Context, serviceName, address string) (*ClientConnection, error) {
 	// Input validation
 	if ctx == nil {
 		return nil, &errors.ValidationError{
@@ -147,7 +133,7 @@ func (c *IdentityClient) Connect(ctx context.Context, serviceName, address strin
 }
 
 // Close cleans up the client resources and closes any connections.
-func (c *IdentityClient) Close() error {
+func (c *Client) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -164,7 +150,7 @@ func (c *IdentityClient) Close() error {
 // ClientConnection represents a secure client connection to a remote service.
 type ClientConnection struct {
 	conn       *grpc.ClientConn
-	domainConn ports.Connection
+	domainConn ports.ConnectionPort
 }
 
 // Close terminates the client connection and cleans up resources.

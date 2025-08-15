@@ -14,7 +14,3 @@ transport:
   tls:
     enabled: false  # For demo purposes - enable in production
     useSpiffe: false
-
-# For demo - empty auth lists (not recommended for production)
-authorizedClients: []
-trustedServers: []

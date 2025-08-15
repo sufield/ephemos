@@ -76,7 +76,7 @@ type Client interface {
 	Close() error
 }
 
-// NewIdentityServer creates a new identity-aware server instance with automatic authentication enforcement.
+// IdentityServer creates a new identity-aware server instance with automatic authentication enforcement.
 //
 // IDENTITY AUTHENTICATION ENFORCEMENT:
 // This function sets up transport-layer authentication using SPIFFE/SPIRE X.509 certificates.
@@ -117,7 +117,7 @@ type Client interface {
 // Example:
 //
 //	ctx := context.Background()
-//	server, err := ephemos.NewIdentityServer(ctx, "")
+//	server, err := ephemos.IdentityServer(ctx, "config/service.yaml")
 //	if err != nil {
 //		return fmt.Errorf("failed to create server: %w", err)
 //	}
@@ -133,7 +133,7 @@ type Client interface {
 //	lis, _ := net.Listen("tcp", ":50051")
 //	defer lis.Close()
 //	server.Serve(ctx, lis)
-func NewIdentityServer(ctx context.Context, configPath string) (Server, error) {
+func IdentityServer(ctx context.Context, configPath string) (Server, error) {
 	if ctx == nil {
 		return nil, &ValidationError{
 			Field:   "context",
@@ -161,7 +161,7 @@ func NewIdentityServer(ctx context.Context, configPath string) (Server, error) {
 	return server, nil
 }
 
-// NewIdentityClient creates a new identity-aware client instance with automatic authentication.
+// IdentityClient creates a new identity-aware client instance with automatic authentication.
 //
 // IDENTITY AUTHENTICATION ENFORCEMENT:
 // This function sets up transport-layer authentication using SPIFFE/SPIRE X.509 certificates.
@@ -208,7 +208,7 @@ func NewIdentityServer(ctx context.Context, configPath string) (Server, error) {
 // Example:
 //
 //	ctx := context.Background()
-//	client, err := ephemos.NewIdentityClient(ctx, "")
+//	client, err := ephemos.IdentityClient(ctx, "config/client.yaml")
 //	if err != nil {
 //		return fmt.Errorf("failed to create client: %w", err)
 //	}
@@ -221,7 +221,7 @@ func NewIdentityServer(ctx context.Context, configPath string) (Server, error) {
 //	defer conn.Close()
 //
 //	serviceClient := yourservice.NewServiceClient(conn.GetClientConnection())
-func NewIdentityClient(ctx context.Context, configPath string) (Client, error) {
+func IdentityClient(ctx context.Context, configPath string) (Client, error) {
 	if ctx == nil {
 		return nil, &ValidationError{
 			Field:   "context",
@@ -343,26 +343,3 @@ func Mount[T any](server *TransportServer, impl T) error {
 	return mount[T](server, impl)
 }
 
-// Legacy compatibility functions - deprecated, use New* functions instead
-// Remov NewIdentityServer and change this implementation to be the new IdentityServer
-// IdentityServer creates a new identity-aware server instance.
-// Deprecated: Use NewIdentityServer for better error handling.
-func IdentityServer() Server {
-	ctx := context.Background()
-	server, err := NewIdentityServer(ctx, "")
-	if err != nil {
-		panic(fmt.Sprintf("Failed to create identity server: %v", err))
-	}
-	return server
-}
-
-// IdentityClient creates a new identity-aware client instance.
-// Deprecated: Use NewIdentityClient for better error handling.
-func IdentityClient() Client {
-	ctx := context.Background()
-	client, err := NewIdentityClient(ctx, "")
-	if err != nil {
-		panic(fmt.Sprintf("Failed to create identity client: %v", err))
-	}
-	return client
-}

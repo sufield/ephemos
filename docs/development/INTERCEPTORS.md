@@ -129,7 +129,7 @@ func main() {
     ctx := context.Background()
     
     // Create server with automatic interceptor configuration
-    server, err := ephemos.NewIdentityServer(ctx, "")
+    server, err := ephemos.IdentityServer(ctx, "")
     if err != nil {
         panic(err)
     }

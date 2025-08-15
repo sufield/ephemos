@@ -260,8 +260,8 @@ trusted_servers:
 2. **Automatic Identity Retrieval** (after registration):
    ```go
    // Once registered, these automatically retrieve SPIFFE identities:
-   server := ephemos.NewIdentityServer(ctx, "config.yaml") 
-   client := ephemos.NewIdentityClient(ctx, "config.yaml")
+   server := ephemos.IdentityServer(ctx, "config.yaml") 
+   client := ephemos.IdentityClient(ctx, "config.yaml")
    ```
 
 **Registration Workflow:**
@@ -270,8 +270,8 @@ trusted_servers:
 ephemos register --config service.yaml
 
 # Step 2: AUTOMATIC - Service retrieves its identity when started
-server := ephemos.NewIdentityServer(ctx, "service.yaml")  # Gets registered identity
-client := ephemos.NewIdentityClient(ctx, "client.yaml")   # Gets registered identity
+server := ephemos.IdentityServer(ctx, "service.yaml")  # Gets registered identity
+client := ephemos.IdentityClient(ctx, "client.yaml")   # Gets registered identity
 ```
 
 **Demo Script Registration:**
@@ -363,7 +363,7 @@ ephemos register --name payment-service --domain prod.company.com
 **Automatic Identity Retrieval (Runtime):**
 ```go
 // Step 2: Service code automatically retrieves registered identity
-server := ephemos.NewIdentityServer(ctx, "config.yaml")
+server := ephemos.IdentityServer(ctx, "config.yaml")
 // - Connects to SPIRE Agent via Unix socket
 // - Gets X.509-SVID certificate for spiffe://prod.company.com/payment-service
 // - Sets up mTLS with automatic certificate rotation
@@ -389,7 +389,7 @@ server := ephemos.NewIdentityServer(ctx, "config.yaml")
 | Step | Component | Action | Method |
 |------|-----------|--------|---------|
 | 1 | **Admin/Developer** | Register service identity | `ephemos register --config service.yaml` |
-| 2 | **Service Runtime** | Retrieve identity automatically | `ephemos.NewIdentityServer(ctx, "config.yaml")` |
+| 2 | **Service Runtime** | Retrieve identity automatically | `ephemos.IdentityServer(ctx, "config.yaml")` |
 | 3 | **SPIRE Agent** | Provide certificates | Automatic (background) |
 | 4 | **Authentication** | mTLS between services | Automatic (transparent) |
 
@@ -431,7 +431,7 @@ func main() {
     ctx := context.Background()
     
     // Automatically gets spiffe://prod.company.com/payment-service identity
-    server, err := ephemos.NewIdentityServer(ctx, "payment-service.yaml")
+    server, err := ephemos.IdentityServer(ctx, "payment-service.yaml")
     if err != nil {
         log.Fatal(err)
     }
@@ -452,7 +452,7 @@ func main() {
 **4. Client Usage:**
 ```go
 // order-service connecting to payment-service
-client, err := ephemos.NewIdentityClient(ctx, "order-service.yaml")
+client, err := ephemos.IdentityClient(ctx, "order-service.yaml")
 if err != nil {
     log.Fatal(err)
 }
@@ -545,8 +545,8 @@ Your application code using Ephemos remains **identical** in both environments:
 
 ```go
 // This code works in BOTH demo and production:
-server := ephemos.NewIdentityServer(ctx, configPath)
-client := ephemos.NewIdentityClient(ctx, configPath)
+server := ephemos.IdentityServer(ctx, configPath)
+client := ephemos.IdentityClient(ctx, configPath)
 ```
 
 The differences are only in:
