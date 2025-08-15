@@ -9,6 +9,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/sufield/ephemos/internal/core/services"
@@ -21,6 +22,19 @@ type Server struct {
 	serviceName     string
 	domainServer    ports.ServerPort
 	mu              sync.Mutex
+}
+
+// NewServer creates a new workload server with minimal dependencies.
+// Uses default transport provider internally to hide implementation details from public API.
+func NewServer(
+	identityProvider ports.IdentityProvider,
+	configProvider ports.ConfigurationProvider,
+	cfg *ports.Configuration,
+) (*Server, error) {
+	// Create default transport provider internally
+	transportProvider := transport.NewGRPCProvider(cfg)
+	
+	return WorkloadServer(identityProvider, transportProvider, configProvider, cfg)
 }
 
 // WorkloadServer creates a new workload server with injected dependencies.

@@ -10,6 +10,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/sufield/ephemos/internal/core/services"
@@ -20,6 +21,15 @@ type Client struct {
 	identityService *services.IdentityService
 	domainClient    ports.ClientPort
 	mu              sync.Mutex
+}
+
+// NewClient creates a new identity client with minimal dependencies.
+// Uses default transport provider internally to hide implementation details from public API.
+func NewClient(identityProvider ports.IdentityProvider, cfg *ports.Configuration) (*Client, error) {
+	// Create default transport provider internally
+	transportProvider := transport.NewGRPCProvider(cfg)
+	
+	return IdentityClient(identityProvider, transportProvider, cfg)
 }
 
 // IdentityClient creates a new identity client with injected dependencies.
