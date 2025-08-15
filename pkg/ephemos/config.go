@@ -169,8 +169,7 @@ func validateFileAccess(path string) error {
 func loadConfigFile(ctx context.Context, path string) (*Configuration, error) {
 	// If no config file, return default configuration
 	if path == "" {
-		provider := &fileProviderCompat{}
-		return provider.GetDefaultConfiguration(ctx), nil
+		return getDefaultConfiguration(), nil
 	}
 
 	// Check for context cancellation
@@ -271,10 +270,8 @@ func enhanceValidationMessage(err *ValidationError) string {
 	}
 }
 
-// fileProviderCompat provides compatibility with the existing file provider interface.
-type fileProviderCompat struct{}
-
-func (p *fileProviderCompat) GetDefaultConfiguration(_ context.Context) *Configuration {
+// getDefaultConfiguration returns a default configuration.
+func getDefaultConfiguration() *Configuration {
 	return &Configuration{
 		Service: ServiceConfig{
 			Name:   "ephemos-service",

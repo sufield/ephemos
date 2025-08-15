@@ -294,7 +294,6 @@ func (b *ConfigBuilder) getSliceOrDefault(value, defaultValue []string) []string
 }
 
 // LoadConfigFlexible provides a convenient function for flexible configuration loading.
-// This maintains backward compatibility while enabling new configuration patterns.
 func LoadConfigFlexible(ctx context.Context, options ...ConfigOption) (*Configuration, error) {
 	builder := NewConfigBuilder()
 

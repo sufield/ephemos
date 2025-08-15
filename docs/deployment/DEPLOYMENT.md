@@ -509,7 +509,6 @@ features:
 
 ### Phase 3: Complete Migration
 ```go
-// Remove legacy auth code
 server = ephemos.IdentityServer(ctx, config)
 ```
 

@@ -78,7 +78,7 @@ func Run(t *testing.T, newImpl Factory, deps TestDeps) {
 }
 
 // ServerFactory creates a Server implementation for testing.
-type ServerFactory func(t *testing.T) ports.Server
+type ServerFactory func(t *testing.T) ports.ServerPort
 
 // RunServerSuite tests Server interface compliance.
 func RunServerSuite(t *testing.T, newServer ServerFactory) {
@@ -127,7 +127,7 @@ func RunServerSuite(t *testing.T, newServer ServerFactory) {
 }
 
 // ClientFactory creates a Client implementation for testing.
-type ClientFactory func(t *testing.T) ports.Client
+type ClientFactory func(t *testing.T) ports.ClientPort
 
 // RunClientSuite tests Client interface compliance.
 func RunClientSuite(t *testing.T, newClient ClientFactory) {

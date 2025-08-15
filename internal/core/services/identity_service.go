@@ -92,7 +92,7 @@ func NewIdentityService(
 // CreateServerIdentity creates a server with identity-based authentication.
 // Uses the cached identity and configuration to avoid redundant validation.
 // Returns a configured server ready for service registration.
-func (s *IdentityService) CreateServerIdentity() (ports.Server, error) {
+func (s *IdentityService) CreateServerIdentity() (ports.ServerPort, error) {
 	s.mu.RLock()
 	identity := s.cachedIdentity
 	s.mu.RUnlock()
@@ -121,7 +121,7 @@ func (s *IdentityService) CreateServerIdentity() (ports.Server, error) {
 // CreateClientIdentity creates a client connection with identity-based authentication.
 // Uses the cached identity and configuration to avoid redundant validation.
 // Returns a client ready for establishing secure connections to servers.
-func (s *IdentityService) CreateClientIdentity() (ports.Client, error) {
+func (s *IdentityService) CreateClientIdentity() (ports.ClientPort, error) {
 	s.mu.RLock()
 	identity := s.cachedIdentity
 	s.mu.RUnlock()

@@ -18,7 +18,7 @@ import (
 // Client provides a high-level API for connecting to SPIFFE-secured services.
 type Client struct {
 	identityService *services.IdentityService
-	domainClient    ports.Client
+	domainClient    ports.ClientPort
 	mu              sync.Mutex
 }
 
@@ -150,7 +150,7 @@ func (c *Client) Close() error {
 // ClientConnection represents a secure client connection to a remote service.
 type ClientConnection struct {
 	conn       *grpc.ClientConn
-	domainConn ports.Connection
+	domainConn ports.ConnectionPort
 }
 
 // Close terminates the client connection and cleans up resources.

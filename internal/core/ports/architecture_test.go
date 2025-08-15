@@ -66,8 +66,7 @@ func TestPublicAPIHasNoDirectProtocolDependencies(t *testing.T) {
 	// It should only depend on domain interfaces and adapters
 	prohibited := []string{
 		"google.golang.org/protobuf", // protobuf should not leak to public API
-		// Note: google.golang.org/grpc is allowed for the legacy Server interface
-		// but the new TransportServer should be protocol-agnostic
+		"google.golang.org/grpc",     // gRPC should not leak to public API
 	}
 
 	publicAPIPath := "../../../pkg/ephemos"

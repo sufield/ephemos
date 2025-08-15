@@ -19,7 +19,7 @@ type Server struct {
 	identityService *services.IdentityService
 	configProvider  ports.ConfigurationProvider
 	serviceName     string
-	domainServer    ports.Server
+	domainServer    ports.ServerPort
 	mu              sync.Mutex
 }
 
@@ -99,7 +99,7 @@ func (s *Server) RegisterService(ctx context.Context, serviceRegistrar ServiceRe
 		}
 	}
 
-	// Adapt our ServiceRegistrar to ports.ServiceRegistrar
+	// Adapt our ServiceRegistrar to ports.ServiceRegistrarPort
 	portServiceRegistrar := &serviceRegistrarAdapter{registrar: serviceRegistrar}
 	if err := s.domainServer.RegisterService(portServiceRegistrar); err != nil {
 		return fmt.Errorf("failed to register service: %w", err)
@@ -131,7 +131,7 @@ func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
 
 	slog.Info("Server ready", "service", s.serviceName, "address", listener.Addr().String())
 
-	// Adapt net.Listener to ports.Listener
+	// Adapt net.Listener to ports.ListenerPort
 	portListener := &netListenerAdapter{listener: listener}
 	if err := s.domainServer.Start(portListener); err != nil {
 		return fmt.Errorf("failed to serve domain server: %w", err)
@@ -164,7 +164,7 @@ func (s *Server) initializeServer(_ context.Context) error {
 	return nil
 }
 
-// serviceRegistrarAdapter adapts our API ServiceRegistrar to ports.ServiceRegistrar.
+// serviceRegistrarAdapter adapts our API ServiceRegistrar to ports.ServiceRegistrarPort.
 type serviceRegistrarAdapter struct {
 	registrar ServiceRegistrar
 }
@@ -175,7 +175,7 @@ func (a *serviceRegistrarAdapter) Register(server interface{}) {
 	}
 }
 
-// netListenerAdapter adapts net.Listener to ports.Listener.
+// netListenerAdapter adapts net.Listener to ports.ListenerPort.
 type netListenerAdapter struct {
 	listener net.Listener
 }

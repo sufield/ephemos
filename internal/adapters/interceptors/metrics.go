@@ -164,18 +164,4 @@ func DefaultAuthMetricsConfig(serviceName string) *AuthMetricsConfig {
 	}
 }
 
-// MetricsConfig is an alias for AuthMetricsConfig to maintain backward compatibility.
-type MetricsConfig = AuthMetricsConfig
 
-// MetricsInterceptor is an alias for AuthMetricsInterceptor to maintain backward compatibility.
-type MetricsInterceptor = AuthMetricsInterceptor
-
-// DefaultMetricsConfig returns a default metrics configuration.
-func DefaultMetricsConfig(serviceName string) *MetricsConfig {
-	return DefaultAuthMetricsConfig(serviceName)
-}
-
-// NewMetricsInterceptor creates a new metrics interceptor.
-func NewMetricsInterceptor(config *MetricsConfig) *MetricsInterceptor {
-	return NewAuthMetricsInterceptor(config)
-}

@@ -23,11 +23,11 @@ func (m *mockServerIdentityProvider) Close() error {
 
 type mockServerTransportProvider struct{}
 
-func (m *mockServerTransportProvider) CreateServer(identity ports.Identity, config *ports.Configuration) (ports.Server, error) {
+func (m *mockServerTransportProvider) CreateServer(identity ports.Identity, config *ports.Configuration) (ports.ServerPort, error) {
 	return &mockServer{}, nil
 }
 
-func (m *mockServerTransportProvider) CreateClient(identity ports.Identity, config *ports.Configuration) (ports.Client, error) {
+func (m *mockServerTransportProvider) CreateClient(identity ports.Identity, config *ports.Configuration) (ports.ClientPort, error) {
 	return nil, nil
 }
 
