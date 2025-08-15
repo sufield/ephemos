@@ -13,7 +13,6 @@ import (
 // TestService is a simple gRPC service for testing purposes.
 // It provides real functionality rather than mocks.
 type TestService struct {
-	UnimplementedTestServiceServer
 	mu         sync.RWMutex
 	callCount  int
 	lastInput  string
@@ -146,10 +145,3 @@ func (r *TestResponse) GetOutput() string {
 	return ""
 }
 
-// UnimplementedTestServiceServer is a minimal implementation for forward compatibility.
-type UnimplementedTestServiceServer struct{}
-
-// TestMethod provides an unimplemented test method for forward compatibility.
-func (UnimplementedTestServiceServer) TestMethod(context.Context, *TestRequest) (*TestResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method TestMethod not implemented")
-}
