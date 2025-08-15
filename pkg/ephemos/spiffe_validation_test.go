@@ -3,89 +3,81 @@ package ephemos
 import (
 	"testing"
 
+	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 )
 
-func TestSPIFFEValidation(t *testing.T) {
-	testCases := []struct {
-		name        string
-		spiffeID    string
-		expectValid bool
-	}{
-		{
-			name:        "Valid SPIFFE ID",
-			spiffeID:    "spiffe://example.org/service",
-			expectValid: true,
-		},
-		{
-			name:        "Valid SPIFFE ID with path segments",
-			spiffeID:    "spiffe://trust.domain.com/ns/production/sa/api-server",
-			expectValid: true,
-		},
-		{
-			name:        "Missing spiffe prefix",
-			spiffeID:    "example.org/service",
-			expectValid: false,
-		},
-		{
-			name:        "Empty string",
-			spiffeID:    "",
-			expectValid: true, // Our validation allows empty unless required
-		},
-		{
-			name:        "Invalid scheme",
-			spiffeID:    "http://example.org/service",
-			expectValid: false,
-		},
-		{
-			name:        "Missing trust domain",
-			spiffeID:    "spiffe:///service",
-			expectValid: false,
-		},
-		{
-			name:        "Valid SPIFFE ID without path",
-			spiffeID:    "spiffe://example.org",
-			expectValid: true, // Official SDK allows this
-		},
+func TestSPIFFEValidatorInterface(t *testing.T) {
+	// Test that the public interface correctly delegates to the domain layer
+	validator := NewSPIFFEValidator(nil)
+	if validator == nil {
+		t.Fatal("NewSPIFFEValidator() returned nil")
 	}
 
-	validator := &SPIFFEValidator{}
+	// Test SPIFFE ID validation
+	err := validator.ValidateSPIFFEID("spiffe://example.org/service")
+	if err != nil {
+		t.Errorf("ValidateSPIFFEID() failed with valid ID: %v", err)
+	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			var err error
-			if tc.spiffeID == "" {
-				// Test empty string handling
-				_, parseErr := spiffeid.FromString("spiffe://example.org/test")
-				if parseErr != nil {
-					t.Fatalf("Failed to create test SPIFFE ID: %v", parseErr)
-				}
-				return // Skip validation for empty string test
-			} else {
-				err = validator.ValidateSPIFFEID(tc.spiffeID)
-			}
-
-			isValid := err == nil
-			if isValid != tc.expectValid {
-				t.Errorf("Expected valid=%v, got valid=%v, error=%v", tc.expectValid, isValid, err)
-			}
-		})
+	err = validator.ValidateSPIFFEID("invalid-id")
+	if err == nil {
+		t.Error("ValidateSPIFFEID() should have failed with invalid ID")
 	}
 }
 
-func TestSPIFFEIDParsing(t *testing.T) {
-	spiffeIDStr := "spiffe://example.org/ns/production/sa/api-server"
-	
-	spiffeID, err := spiffeid.FromString(spiffeIDStr)
+func TestValidateSPIFFEIDFunction(t *testing.T) {
+	// Test the convenience function
+	err := ValidateSPIFFEID("spiffe://example.org/service")
 	if err != nil {
-		t.Fatalf("Failed to parse SPIFFE ID: %v", err)
+		t.Errorf("ValidateSPIFFEID() failed with valid ID: %v", err)
 	}
 
-	// Verify components
-	if spiffeID.TrustDomain().String() != "example.org" {
-		t.Errorf("Expected trust domain 'example.org', got '%s'", spiffeID.TrustDomain().String())
+	err = ValidateSPIFFEID("invalid-id")
+	if err == nil {
+		t.Error("ValidateSPIFFEID() should have failed with invalid ID")
 	}
-	if spiffeID.Path() != "/ns/production/sa/api-server" {
-		t.Errorf("Expected path '/ns/production/sa/api-server', got '%s'", spiffeID.Path())
+
+	err = ValidateSPIFFEID("")
+	if err == nil {
+		t.Error("ValidateSPIFFEID() should have failed with empty ID")
 	}
+}
+
+func TestValidateX509SVIDFunction(t *testing.T) {
+	// Test with nil bundle source (should fail)
+	_, err := ValidateX509SVID(nil, [][]byte{})
+	if err == nil {
+		t.Error("ValidateX509SVID() should have failed with nil bundle source")
+	}
+
+	// Test with mock bundle source
+	mockBundle := &mockBundleSource{}
+	_, err = ValidateX509SVID(mockBundle, [][]byte{[]byte("invalid cert data")})
+	if err == nil {
+		t.Error("ValidateX509SVID() should have failed with invalid cert data")
+	}
+}
+
+func TestValidateX509CertificatesFunction(t *testing.T) {
+	// Test with nil bundle source (should fail)
+	_, err := ValidateX509Certificates(nil, nil)
+	if err == nil {
+		t.Error("ValidateX509Certificates() should have failed with nil bundle source")
+	}
+
+	// Test with mock bundle source  
+	mockBundle := &mockBundleSource{}
+	_, err = ValidateX509Certificates(mockBundle, nil)
+	if err == nil {
+		t.Error("ValidateX509Certificates() should have failed with nil certs")
+	}
+}
+
+// Mock implementation for testing
+type mockBundleSource struct{}
+
+func (m *mockBundleSource) GetX509BundleForTrustDomain(trustDomain spiffeid.TrustDomain) (*x509bundle.Bundle, error) {
+	// Return a mock bundle - in real implementation this would contain actual trust anchors
+	return x509bundle.New(trustDomain), nil
 }

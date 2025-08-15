@@ -1,66 +1,37 @@
-// Package ephemos provides SPIFFE SVID validation using the official go-spiffe/v2 SDK.
+// Package ephemos provides simple SPIFFE validation interfaces that delegate to the core domain layer.
 package ephemos
 
 import (
 	"crypto/x509"
-	"fmt"
-	"time"
 
-	"github.com/spiffe/go-spiffe/v2/spiffeid"
-	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
+
+	"github.com/sufield/ephemos/internal/core/domain"
 )
 
-// SPIFFEValidator provides SPIFFE-compliant validation using the official SDK.
-type SPIFFEValidator struct {
-	bundleSource x509bundle.Source
-}
+// SPIFFEValidator is a public interface that delegates to the domain layer.
+type SPIFFEValidator = domain.SPIFFEValidator
 
-// NewSPIFFEValidator creates a new validator with the given bundle source.
+// NewSPIFFEValidator creates a new SPIFFE validator.
 func NewSPIFFEValidator(bundleSource x509bundle.Source) *SPIFFEValidator {
-	return &SPIFFEValidator{
-		bundleSource: bundleSource,
-	}
+	return domain.NewSPIFFEValidator(bundleSource)
 }
 
-// ValidateSPIFFEID validates a SPIFFE ID string using the official SDK.
-func (v *SPIFFEValidator) ValidateSPIFFEID(spiffeIDStr string) error {
-	if spiffeIDStr == "" {
-		return fmt.Errorf("SPIFFE ID cannot be empty")
-	}
-
-	_, err := spiffeid.FromString(spiffeIDStr)
-	if err != nil {
-		return fmt.Errorf("invalid SPIFFE ID format: %w", err)
-	}
-
-	return nil
+// ValidateSPIFFEID validates a SPIFFE ID string.
+func ValidateSPIFFEID(spiffeIDStr string) error {
+	validator := domain.NewSPIFFEValidator(nil)
+	return validator.ValidateSPIFFEID(spiffeIDStr)
 }
 
-// ValidateX509SVID validates an X.509 SVID certificate chain against trust bundles.
-func (v *SPIFFEValidator) ValidateX509SVID(certChain [][]byte) (*spiffeid.ID, error) {
-	if v.bundleSource == nil {
-		return nil, fmt.Errorf("bundle source not configured")
-	}
-
-	spiffeID, _, err := x509svid.ParseAndVerify(certChain, v.bundleSource)
-	if err != nil {
-		return nil, fmt.Errorf("SVID verification failed: %w", err)
-	}
-
-	return &spiffeID, nil
+// ValidateX509SVID validates an X.509 SVID certificate chain.
+func ValidateX509SVID(bundleSource x509bundle.Source, certChain [][]byte) (*spiffeid.ID, error) {
+	validator := domain.NewSPIFFEValidator(bundleSource)
+	return validator.ValidateX509SVID(certChain)
 }
 
-// ValidateX509Certificates validates parsed X.509 certificates against trust bundles.
-func (v *SPIFFEValidator) ValidateX509Certificates(certs []*x509.Certificate) (*spiffeid.ID, error) {
-	if v.bundleSource == nil {
-		return nil, fmt.Errorf("bundle source not configured")
-	}
-
-	spiffeID, _, err := x509svid.Verify(certs, v.bundleSource, x509svid.WithTime(time.Now()))
-	if err != nil {
-		return nil, fmt.Errorf("certificate verification failed: %w", err)
-	}
-
-	return &spiffeID, nil
+// ValidateX509Certificates validates parsed X.509 certificates.
+func ValidateX509Certificates(bundleSource x509bundle.Source, certs []*x509.Certificate) (*spiffeid.ID, error) {
+	validator := domain.NewSPIFFEValidator(bundleSource)
+	return validator.ValidateX509Certificates(certs)
 }

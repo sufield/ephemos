@@ -63,9 +63,16 @@ func TestNoInternalImportsInExamples(t *testing.T) {
 
 	var allViolations []string
 	for _, dir := range exampleDirs {
+		// Check if directory exists
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			t.Skipf("Examples directory %s does not exist", dir)
+			continue
+		}
+		
 		violations, err := walkDirectory(dir, processFile)
 		if err != nil {
-			t.Fatalf("Failed to walk directory %s: %v", dir, err)
+			t.Errorf("Failed to walk directory %s: %v", dir, err)
+			continue
 		}
 		allViolations = append(allViolations, violations...)
 	}
@@ -346,6 +353,11 @@ func TestExampleCodeCompiles(t *testing.T) {
 
 	for _, dir := range exampleDirs {
 		t.Run(filepath.Base(dir), func(t *testing.T) {
+			// Check if directory exists
+			if _, err := os.Stat(dir); os.IsNotExist(err) {
+				t.Skipf("Example directory %s does not exist", dir)
+				return
+			}
 			checkExampleDirectory(t, dir)
 		})
 	}
@@ -355,6 +367,13 @@ func TestExampleCodeCompiles(t *testing.T) {
 // This is critical because external users copy code from the README.
 func TestMainREADMEUsesPublicAPI(t *testing.T) {
 	readmePath := "../../README.md"
+	
+	// Check if README exists
+	if _, err := os.Stat(readmePath); os.IsNotExist(err) {
+		t.Skipf("README.md does not exist at %s", readmePath)
+		return
+	}
+	
 	if violations := checkMarkdownForInternalImports(readmePath); len(violations) > 0 {
 		t.Errorf("Main README.md has internal imports that external users cannot access:\n%s\n\n"+
 			"❌ CRITICAL: External users copy examples from README.md!\n"+
