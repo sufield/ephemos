@@ -7,14 +7,27 @@ import (
 	"time"
 
 	"github.com/sufield/ephemos/internal/adapters/primary/api"
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
 // Mock implementations for server testing
 type mockServerIdentityProvider struct{}
 
-func (m *mockServerIdentityProvider) GetIdentity(ctx context.Context) (ports.Identity, error) {
-	return &mockIdentity{}, nil
+func (m *mockServerIdentityProvider) GetServiceIdentity() (*domain.ServiceIdentity, error) {
+	return &domain.ServiceIdentity{
+		Name:   "test-service",
+		Domain: "test.local",
+		URI:    "spiffe://test.local/test-service",
+	}, nil
+}
+
+func (m *mockServerIdentityProvider) GetCertificate() (*domain.Certificate, error) {
+	return &domain.Certificate{}, nil
+}
+
+func (m *mockServerIdentityProvider) GetTrustBundle() (*domain.TrustBundle, error) {
+	return &domain.TrustBundle{}, nil
 }
 
 func (m *mockServerIdentityProvider) Close() error {
@@ -23,27 +36,35 @@ func (m *mockServerIdentityProvider) Close() error {
 
 type mockServerTransportProvider struct{}
 
-func (m *mockServerTransportProvider) CreateServer(identity ports.Identity, config *ports.Configuration) (ports.ServerPort, error) {
+func (m *mockServerTransportProvider) CreateServer(cert *domain.Certificate, bundle *domain.TrustBundle, policy *domain.AuthenticationPolicy) (ports.ServerPort, error) {
 	return &mockServer{}, nil
 }
 
-func (m *mockServerTransportProvider) CreateClient(identity ports.Identity, config *ports.Configuration) (ports.ClientPort, error) {
+func (m *mockServerTransportProvider) CreateClient(cert *domain.Certificate, bundle *domain.TrustBundle, policy *domain.AuthenticationPolicy) (ports.ClientPort, error) {
 	return nil, nil
 }
 
 type mockConfigProvider struct{}
 
-func (m *mockConfigProvider) GetConfiguration(ctx context.Context) (*ports.Configuration, error) {
+func (m *mockConfigProvider) LoadConfiguration(ctx context.Context, path string) (*ports.Configuration, error) {
 	return &ports.Configuration{}, nil
+}
+
+func (m *mockConfigProvider) GetDefaultConfiguration(ctx context.Context) *ports.Configuration {
+	return &ports.Configuration{}
 }
 
 type mockServer struct{}
 
-func (m *mockServer) Serve(listener net.Listener) error {
+func (m *mockServer) Start(listener ports.ListenerPort) error {
 	return nil
 }
 
-func (m *mockServer) RegisterService(service interface{}) error {
+func (m *mockServer) Stop() error {
+	return nil
+}
+
+func (m *mockServer) RegisterService(serviceRegistrar ports.ServiceRegistrarPort) error {
 	return nil
 }
 
@@ -73,7 +94,7 @@ func TestServer_WorkloadServer(t *testing.T) {
 			identityProvider:  nil,
 			transportProvider: &mockServerTransportProvider{},
 			configProvider:    &mockConfigProvider{},
-			config:            &ports.Configuration{Service: &ports.ServiceConfig{Name: "test"}},
+			config:            &ports.Configuration{Service: ports.ServiceConfig{Name: "test"}},
 			wantErr:           true,
 		},
 	}
@@ -93,16 +114,17 @@ func TestServer_WorkloadServer(t *testing.T) {
 }
 
 func TestServer_RegisterService(t *testing.T) {
-	config := &ports.Configuration{Service: &ports.ServiceConfig{Name: "test"}}
+	config := &ports.Configuration{Service: ports.ServiceConfig{Name: "test"}}
 	server, err := api.WorkloadServer(&mockServerIdentityProvider{}, &mockServerTransportProvider{}, &mockConfigProvider{}, config)
 	if err != nil {
 		t.Skip("Skipping RegisterService tests - could not create server:", err)
 	}
 
 	// Test with nil context
-	err = server.RegisterService(t.Context(), nil)
+	ctx := context.Background()
+	err = server.RegisterService(nil, nil)
 	if err == nil {
-		t.Error("RegisterService() with nil registrar should return error")
+		t.Error("RegisterService() with nil context should return error")
 	}
 
 	// Test with nil registrar
@@ -113,16 +135,17 @@ func TestServer_RegisterService(t *testing.T) {
 }
 
 func TestServer_Serve(t *testing.T) {
-	config := &ports.Configuration{Service: &ports.ServiceConfig{Name: "test"}}
+	config := &ports.Configuration{Service: ports.ServiceConfig{Name: "test"}}
 	server, err := api.WorkloadServer(&mockServerIdentityProvider{}, &mockServerTransportProvider{}, &mockConfigProvider{}, config)
 	if err != nil {
 		t.Skip("Skipping Serve tests - could not create server:", err)
 	}
 
 	// Test with nil context
-	err = server.Serve(t.Context(), nil)
+	ctx := context.Background()
+	err = server.Serve(nil, nil)
 	if err == nil {
-		t.Error("Serve() with nil listener should return error")
+		t.Error("Serve() with nil context should return error")
 	}
 
 	// Test with nil listener
@@ -141,7 +164,7 @@ func TestServer_Serve(t *testing.T) {
 		defer lis.Close()
 
 		// Create a context that will be canceled quickly
-		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 
 		// Start serving in a goroutine
@@ -163,7 +186,7 @@ func TestServer_Serve(t *testing.T) {
 }
 
 func TestServer_Close(t *testing.T) {
-	config := &ports.Configuration{Service: &ports.ServiceConfig{Name: "test"}}
+	config := &ports.Configuration{Service: ports.ServiceConfig{Name: "test"}}
 	server, err := api.WorkloadServer(&mockServerIdentityProvider{}, &mockServerTransportProvider{}, &mockConfigProvider{}, config)
 	if err != nil {
 		t.Skip("Skipping Close test - could not create server:", err)
@@ -184,7 +207,7 @@ func TestServer_Close(t *testing.T) {
 // It provides a real implementation instead of a mock
 
 func TestServer_RegisterService_WithRealService(t *testing.T) {
-	config := &ports.Configuration{Service: &ports.ServiceConfig{Name: "test"}}
+	config := &ports.Configuration{Service: ports.ServiceConfig{Name: "test"}}
 	server, err := api.WorkloadServer(&mockServerIdentityProvider{}, &mockServerTransportProvider{}, &mockConfigProvider{}, config)
 	if err != nil {
 		t.Skip("Skipping RegisterService test - could not create server:", err)
@@ -194,6 +217,7 @@ func TestServer_RegisterService_WithRealService(t *testing.T) {
 	testService := api.NewTestService()
 	registrar := api.NewTestServiceRegistrar(testService)
 
+	ctx := context.Background()
 	err = server.RegisterService(ctx, registrar)
 	if err != nil {
 		t.Errorf("RegisterService() returned error: %v", err)

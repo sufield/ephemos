@@ -5,14 +5,27 @@ import (
 	"testing"
 
 	"github.com/sufield/ephemos/internal/adapters/primary/api"
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
 // Mock implementations for testing
 type mockIdentityProvider struct{}
 
-func (m *mockIdentityProvider) GetIdentity(ctx context.Context) (ports.Identity, error) {
-	return &mockIdentity{}, nil
+func (m *mockIdentityProvider) GetServiceIdentity() (*domain.ServiceIdentity, error) {
+	return &domain.ServiceIdentity{
+		Name:   "test-service",
+		Domain: "test.local",
+		URI:    "spiffe://test.local/test-service",
+	}, nil
+}
+
+func (m *mockIdentityProvider) GetCertificate() (*domain.Certificate, error) {
+	return &domain.Certificate{}, nil
+}
+
+func (m *mockIdentityProvider) GetTrustBundle() (*domain.TrustBundle, error) {
+	return &domain.TrustBundle{}, nil
 }
 
 func (m *mockIdentityProvider) Close() error {
@@ -21,22 +34,12 @@ func (m *mockIdentityProvider) Close() error {
 
 type mockTransportProvider struct{}
 
-func (m *mockTransportProvider) CreateServer(identity ports.Identity, config *ports.Configuration) (ports.ServerPort, error) {
+func (m *mockTransportProvider) CreateServer(cert *domain.Certificate, bundle *domain.TrustBundle, policy *domain.AuthenticationPolicy) (ports.ServerPort, error) {
 	return nil, nil
 }
 
-func (m *mockTransportProvider) CreateClient(identity ports.Identity, config *ports.Configuration) (ports.ClientPort, error) {
+func (m *mockTransportProvider) CreateClient(cert *domain.Certificate, bundle *domain.TrustBundle, policy *domain.AuthenticationPolicy) (ports.ClientPort, error) {
 	return &mockClient{}, nil
-}
-
-type mockIdentity struct{}
-
-func (m *mockIdentity) GetSPIFFEID() string {
-	return "spiffe://example.org/test"
-}
-
-func (m *mockIdentity) GetCertificate() interface{} {
-	return nil
 }
 
 type mockClient struct{}
@@ -138,7 +141,7 @@ func TestClient_Connect(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := t.Context()
+			ctx := context.Background()
 			if tt.name == "nil context" {
 				ctx = nil
 			}
