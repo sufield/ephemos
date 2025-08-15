@@ -95,6 +95,12 @@ type TLSConfig struct {
 	// UseSPIFFE determines whether to use SPIFFE X.509 certificates for TLS.
 	// When true, certificates are obtained from the SPIRE agent.
 	UseSPIFFE bool `yaml:"useSpiffe,omitempty"`
+
+	// InsecureSkipVerify controls whether TLS certificate verification is skipped.
+	// WARNING: This should ONLY be set to true in development environments.
+	// In production, this MUST be false to ensure proper certificate validation.
+	// Default: false (secure certificate validation enabled)
+	InsecureSkipVerify bool `yaml:"insecure_skip_verify,omitempty"`
 }
 
 // Validate checks if the configuration is valid and returns any validation errors.
@@ -334,6 +340,11 @@ func validateProductionSecurity(config *Configuration) error {
 		errors = append(errors, err.Error())
 	}
 
+	// Check TLS security settings
+	if err := validateTLSSecurity(config); err != nil {
+		errors = append(errors, err.Error())
+	}
+
 	// Check for debug environment variables that shouldn't be enabled in production
 	if debugEnabled := os.Getenv(EnvDebugEnabled); debugEnabled == "true" {
 		errors = append(errors, "debug mode is enabled via EPHEMOS_DEBUG_ENABLED - should be disabled in production")
@@ -374,6 +385,14 @@ func validateSocketPath(socketPath string) error {
 		}
 	}
 	return fmt.Errorf("SPIFFE socket should be in a secure directory (/run, /var/run, or /tmp)")
+}
+
+// validateTLSSecurity checks TLS configuration for production security issues.
+func validateTLSSecurity(config *Configuration) error {
+	if config.Transport.TLS != nil && config.Transport.TLS.InsecureSkipVerify {
+		return fmt.Errorf("insecure_skip_verify is enabled - certificate validation must be enabled in production")
+	}
+	return nil
 }
 
 // IsProductionReady checks if the configuration is suitable for production use.

@@ -87,6 +87,8 @@ r.Use(gin.IdentityMiddleware(config))
 - Service discovery for target service endpoints
 - Proper certificate validation and rotation
 
+Developers should only be exposed to Certificate (not Spiffe Certificate)
+
 ## 🔧 Administrative (CLI Implementation)
 
 ### 5. Service Registration CLI Commands

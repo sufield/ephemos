@@ -1,0 +1,16 @@
+service:
+  name: "development-service"
+  domain: "dev.example.org"
+
+spiffe:
+  socketPath: "/tmp/spire-agent/public/api.sock"
+
+transport:
+  type: "grpc"
+  address: ":50051"
+  tls:
+    enabled: true
+    useSpiffe: true
+    # WARNING: This is ONLY for development environments
+    # Certificate validation is disabled - NOT secure for production
+    insecure_skip_verify: true

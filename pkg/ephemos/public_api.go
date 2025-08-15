@@ -92,7 +92,7 @@ func IdentityClient(ctx context.Context, configPath string) (Client, error) {
 	}
 
 	// Create transport provider
-	transportProvider := transport.NewGRPCProvider()
+	transportProvider := transport.NewGRPCProvider(cfg)
 
 	// Create client using internal API
 	internalClient, err := api.IdentityClient(identityProvider, transportProvider, cfg)
@@ -142,7 +142,7 @@ func IdentityServer(ctx context.Context, configPath string) (Server, error) {
 	}
 
 	// Create transport provider
-	transportProvider := transport.NewGRPCProvider()
+	transportProvider := transport.NewGRPCProvider(cfg)
 
 	// Create server using internal API
 	internalServer, err := api.WorkloadServer(identityProvider, transportProvider, configProvider, cfg)

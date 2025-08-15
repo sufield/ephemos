@@ -14,11 +14,13 @@ import (
 )
 
 // GRPCProvider provides gRPC-based transport with SPIFFE mTLS authentication.
-type GRPCProvider struct{}
+type GRPCProvider struct {
+	config *ports.Configuration
+}
 
-// NewGRPCProvider creates a new gRPC transport provider.
-func NewGRPCProvider() *GRPCProvider {
-	return &GRPCProvider{}
+// NewGRPCProvider creates a new gRPC transport provider with configuration.
+func NewGRPCProvider(config *ports.Configuration) *GRPCProvider {
+	return &GRPCProvider{config: config}
 }
 
 // CreateClient creates a gRPC client with SPIFFE-based mTLS authentication.
@@ -65,19 +67,31 @@ func (p *GRPCProvider) CreateServer(cert *domain.Certificate, bundle *domain.Tru
 
 // createClientTLSConfig creates TLS configuration for gRPC client with SPIFFE certs.
 func (p *GRPCProvider) createClientTLSConfig(cert *domain.Certificate, bundle *domain.TrustBundle) (*tls.Config, error) {
+	// Determine if certificate verification should be skipped
+	insecureSkipVerify := false
+	if p.config != nil && p.config.Transport.TLS != nil {
+		insecureSkipVerify = p.config.Transport.TLS.InsecureSkipVerify
+	}
+
 	// For now, create a basic TLS config
 	// In a real implementation, this would use the SPIFFE certificates properly
 	return &tls.Config{
-		InsecureSkipVerify: true, // TODO: Use proper certificate validation with SPIFFE certs
+		InsecureSkipVerify: insecureSkipVerify,
 	}, nil
 }
 
 // createServerTLSConfig creates TLS configuration for gRPC server with SPIFFE certs.
 func (p *GRPCProvider) createServerTLSConfig(cert *domain.Certificate, bundle *domain.TrustBundle) (*tls.Config, error) {
+	// Determine if certificate verification should be skipped
+	insecureSkipVerify := false
+	if p.config != nil && p.config.Transport.TLS != nil {
+		insecureSkipVerify = p.config.Transport.TLS.InsecureSkipVerify
+	}
+
 	// For now, create a basic TLS config
 	// In a real implementation, this would use the SPIFFE certificates properly
 	return &tls.Config{
-		InsecureSkipVerify: true, // TODO: Use proper certificate validation with SPIFFE certs
+		InsecureSkipVerify: insecureSkipVerify,
 	}, nil
 }
 

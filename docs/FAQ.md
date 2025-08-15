@@ -849,3 +849,66 @@ For production use, consider:
 - **Optimized libraries**: Uses efficient go-spiffe implementation
 
 The performance impact is negligible compared to the security benefits provided.
+
+### Can I disable certificate validation for development?
+
+**Yes, but only for development environments.**
+
+Ephemos supports disabling certificate validation for local development through the `insecure_skip_verify` configuration option:
+
+#### **Development Configuration** (Allowed)
+```yaml
+service:
+  name: "dev-service"
+  domain: "dev.example.org"
+
+transport:
+  type: "grpc"
+  tls:
+    enabled: true
+    useSpiffe: true
+    insecure_skip_verify: true  # ⚠️ Development only!
+```
+
+#### **Production Configuration** (Secure by default)
+```yaml
+service:
+  name: "payment-service"  
+  domain: "prod.company.com"
+
+transport:
+  type: "grpc"
+  tls:
+    enabled: true
+    useSpiffe: true
+    # insecure_skip_verify: false  # Default: secure certificate validation
+```
+
+#### **Security Enforcement**
+
+Ephemos **automatically prevents** insecure configurations in production:
+
+```go
+// Production validation will fail if insecure_skip_verify is true
+config := loadConfig("production.yaml")
+err := config.IsProductionReady()
+if err != nil {
+    // Error: "insecure_skip_verify is enabled - certificate validation must be enabled in production"
+}
+```
+
+#### **Industry Best Practices**
+
+This follows the same pattern as other successful Go projects:
+
+- **OpenTelemetry Collector**: `insecure: true` for development only
+- **Kubernetes**: `insecure-skip-tls-verify` flag for kubectl (dev/testing only)  
+- **Istio**: `PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION` (development mode)
+- **gRPC**: `grpc.WithInsecure()` deprecated in favor of explicit TLS config
+
+#### **Why This Approach?**
+
+✅ **Development Productivity** - Developers can quickly test locally without certificate setup  
+✅ **Production Security** - Impossible to accidentally deploy with disabled certificate validation  
+✅ **Clear Intent** - Configuration explicitly shows when security is relaxed  
+✅ **Audit Trail** - Security teams can easily identify and review insecure configurations
