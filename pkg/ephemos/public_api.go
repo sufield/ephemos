@@ -138,7 +138,6 @@ func (c *clientWrapper) Connect(ctx context.Context, serviceName, address string
 	}, nil
 }
 
-
 // Close releases any resources held by the client.
 func (c *clientWrapper) Close() error {
 	return c.client.Close()

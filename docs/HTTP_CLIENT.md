@@ -83,7 +83,6 @@ defer conn.Close()
 httpClient := conn.HTTPClient()
 resp, err := httpClient.Get("https://" + address + "/api/balance")
 ```
-
 ## Security Features
 
 ### SPIFFE Certificate Authentication
