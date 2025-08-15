@@ -79,3 +79,7 @@ spiffe://unicode-域名\.org/.*
 spiffe:///.*
 spiffe://\./.*
 spiffe://env\.com/.*
+
+# Chi middleware test SPIFFE URIs (contrib/middleware/chi/identity_test.go)
+spiffe://untrusted\.com/.*
+spiffe://any-domain\.com/.*
