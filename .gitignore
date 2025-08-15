@@ -205,6 +205,9 @@ kubernetes-secrets/
 scripts/demo/*.log
 scripts/demo/*.pid
 
+# Smoke test artifacts (temporary demo applications)
+scripts/smoke/
+
 # Docker
 .dockerignore
 

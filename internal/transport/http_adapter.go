@@ -1,5 +1,5 @@
-// Package ephemos provides transport adapter implementations.
-package ephemos
+// Package transport provides internal transport layer implementations.
+package transport
 
 import (
 	"fmt"
@@ -7,6 +7,18 @@ import (
 	"reflect"
 	"sync"
 )
+
+// HTTPAdapter provides HTTP-specific transport adaptation.
+type HTTPAdapter interface {
+	// Mount mounts a service implementation
+	Mount(service interface{}) error
+	// GetServer returns the underlying server
+	GetServer() interface{}
+	// ConfigureMiddleware sets up HTTP middleware
+	ConfigureMiddleware(middleware ...func(http.Handler) http.Handler)
+	// GetHTTPServer returns the underlying HTTP server
+	GetHTTPServer() *http.Server
+}
 
 // httpAdapterImpl implements HTTPAdapter.
 type httpAdapterImpl struct {

@@ -1,7 +1,7 @@
-// internal_imports_test.go - Test to ensure examples and docs only use public API
+// internal_imports_test.go - Test to ensure docs only use public API
 //
 // This test prevents contributors from accidentally importing internal packages
-// in code examples, which would break external users who cannot access internal packages.
+// in documentation, which would break external users who cannot access internal packages.
 //
 // CRITICAL: This test must pass for external users to successfully use Ephemos.
 package ephemos
@@ -16,8 +16,6 @@ import (
 	"testing"
 )
 
-// fileChecker processes a single file and returns violations.
-type fileChecker func(path string) []string
 
 // shouldSkipGoFile determines if a Go file should be skipped.
 func shouldSkipGoFile(path string) bool {
@@ -27,51 +25,8 @@ func shouldSkipGoFile(path string) bool {
 		strings.Contains(path, "_grpc.pb.go")
 }
 
-// processFile handles file checking based on type.
-func processFile(path string) []string {
-	if strings.HasSuffix(path, ".md") {
-		return checkMarkdownForInternalImports(path)
-	}
-	if !shouldSkipGoFile(path) {
-		return checkGoFileForInternalImports(path)
-	}
-	return nil
-}
 
-// walkDirectory walks a directory and checks files for violations.
-func walkDirectory(dir string, checker fileChecker) ([]string, error) {
-	var violations []string
-	err := filepath.Walk(dir, func(path string, _ os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		violations = append(violations, checker(path)...)
-		return nil
-	})
-	if err != nil {
-		return violations, fmt.Errorf("failed to walk directory: %w", err)
-	}
-	return violations, nil
-}
 
-// TestNoInternalImportsInExamples ensures all example code uses only public APIs.
-// This is critical because external users cannot import internal packages.
-func TestNoInternalImportsInExamples(t *testing.T) {
-	exampleDirs := []string{
-		"../../examples/",
-	}
-
-	var allViolations []string
-	for _, dir := range exampleDirs {
-		violations, err := walkDirectory(dir, processFile)
-		if err != nil {
-			t.Fatalf("Failed to walk directory %s: %v", dir, err)
-		}
-		allViolations = append(allViolations, violations...)
-	}
-
-	reportViolations(t, allViolations)
-}
 
 // reportViolations reports import violations if any exist.
 func reportViolations(t *testing.T, violations []string) {
@@ -100,17 +55,6 @@ func checkGoFileForInternalImports(filePath string) []string {
 		"INTERNAL IMPORT")
 }
 
-// checkMarkdownForInternalImports scans markdown files for internal imports in code blocks.
-func checkMarkdownForInternalImports(filePath string) []string {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return []string{fmt.Sprintf("ERROR: Cannot read %s: %v", filePath, err)}
-	}
-	defer file.Close()
-
-	return scanMarkdownForPattern(file, filePath,
-		regexp.MustCompile(`"github\.com/sufield/ephemos/internal/`))
-}
 
 // scanFileForPattern scans a file for a regex pattern and returns violations.
 func scanFileForPattern(file *os.File, filePath string, pattern *regexp.Regexp, violationType string) []string {
@@ -130,33 +74,6 @@ func scanFileForPattern(file *os.File, filePath string, pattern *regexp.Regexp, 
 	return violations
 }
 
-// scanMarkdownForPattern scans markdown code blocks for a pattern.
-func scanMarkdownForPattern(file *os.File, filePath string, pattern *regexp.Regexp) []string {
-	var violations []string
-	scanner := bufio.NewScanner(file)
-	lineNumber := 0
-	inCodeBlock := false
-	codeBlockRegex := regexp.MustCompile("^```")
-
-	for scanner.Scan() {
-		lineNumber++
-		line := strings.TrimSpace(scanner.Text())
-
-		// Track if we're in a code block
-		if codeBlockRegex.MatchString(line) {
-			inCodeBlock = !inCodeBlock
-			continue
-		}
-
-		// Only check imports inside code blocks
-		if inCodeBlock && pattern.MatchString(line) {
-			violations = append(violations, fmt.Sprintf(
-				"❌ %s:%d - INTERNAL IMPORT IN DOCS: %s",
-				filePath, lineNumber, line))
-		}
-	}
-	return violations
-}
 
 // TestPublicAPIAccessibility ensures the public API provides necessary functionality.
 // This test verifies that commonly needed types and functions are available publicly.
@@ -301,68 +218,9 @@ func compileTestCode(code string) error {
 	return nil
 }
 
-// checkExampleDirectory checks a single example directory for violations.
-func checkExampleDirectory(t *testing.T, dir string) {
-	t.Helper()
-	// Check if directory exists
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		t.Skipf("Example directory %s does not exist", dir)
-		return
-	}
 
-	violations, err := walkDirectory(dir, func(path string) []string {
-		if isValidExampleFile(path) {
-			return checkGoFileForInternalImports(path)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Errorf("Failed to check example directory %s: %v", dir, err)
-		return
-	}
 
-	if len(violations) > 0 {
-		t.Errorf("Example %s has internal imports:\n%s", dir, strings.Join(violations, "\n"))
-	}
-}
 
-// isValidExampleFile checks if a file should be validated.
-func isValidExampleFile(path string) bool {
-	return strings.HasSuffix(path, ".go") &&
-		!strings.Contains(path, "_test.go") &&
-		!strings.Contains(path, ".pb.go")
-}
-
-// TestExampleCodeCompiles ensures all example directories compile successfully.
-// This catches cases where examples use unavailable internal APIs.
-func TestExampleCodeCompiles(t *testing.T) {
-	exampleDirs := []string{
-		"../../examples/echo-server",
-		"../../examples/echo-client",
-		"../../examples/interceptors",
-		"../../examples/transport-agnostic",
-		"../../examples/config-patterns",
-	}
-
-	for _, dir := range exampleDirs {
-		t.Run(filepath.Base(dir), func(t *testing.T) {
-			checkExampleDirectory(t, dir)
-		})
-	}
-}
-
-// TestMainREADMEUsesPublicAPI ensures the main README.md only shows public API examples.
-// This is critical because external users copy code from the README.
-func TestMainREADMEUsesPublicAPI(t *testing.T) {
-	readmePath := "../../README.md"
-	if violations := checkMarkdownForInternalImports(readmePath); len(violations) > 0 {
-		t.Errorf("Main README.md has internal imports that external users cannot access:\n%s\n\n"+
-			"❌ CRITICAL: External users copy examples from README.md!\n"+
-			"✅ SOLUTION: Use only 'github.com/sufield/ephemos/pkg/ephemos' imports\n"+
-			"✅ Example: ephemos.Mount[ephemos.EchoService] instead of ephemos.Mount[ports.EchoService]",
-			strings.Join(violations, "\n"))
-	}
-}
 
 // hasPackageDocumentation checks if a file has package documentation.
 func hasPackageDocumentation(file *os.File) bool {

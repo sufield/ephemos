@@ -1,5 +1,5 @@
-// Package ephemos provides comprehensive validation using struct tags with defaults and aggregated error handling.
-package ephemos
+// Package domain provides comprehensive validation using struct tags with defaults and aggregated error handling.
+package domain
 
 import (
 	"errors"
@@ -88,6 +88,18 @@ func (vec *ValidationCollectionError) GetFieldErrors(field string) []ValidationE
 		}
 	}
 	return fieldErrors
+}
+
+// ValidationError represents a single validation error with context.
+type ValidationError struct {
+	Field   string
+	Message string
+	Value   interface{}
+}
+
+// Error implements the error interface.
+func (ve *ValidationError) Error() string {
+	return fmt.Sprintf("validation failed for field '%s': %s", ve.Field, ve.Message)
 }
 
 // ValidateAndSetDefaults validates a struct and sets default values based on struct tags.
@@ -777,21 +789,12 @@ func (ve *ValidationEngine) validateSPIFFEID(val reflect.Value, _ string) error 
 
 	id := strings.TrimSpace(val.String())
 	if id == "" {
-		return nil // Empty SPIFFE IDs are allowed unless required
+		return nil // Empty values handled by 'required' rule
 	}
 
-	// Validate SPIFFE ID format
-	if !strings.HasPrefix(id, "spiffe://") {
-		return fmt.Errorf("SPIFFE ID must start with 'spiffe://' (e.g., 'spiffe://example.org/service')")
-	}
-
-	// Basic structure validation - must have trust domain and path
-	parts := strings.SplitN(id[9:], "/", 2) // Remove "spiffe://" prefix
-	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
-		return fmt.Errorf("SPIFFE ID must have format 'spiffe://trust-domain/path' (e.g., 'spiffe://example.org/service')")
-	}
-
-	return nil
+	// Delegate to the dedicated SPIFFEValidator for consistency
+	validator := NewSPIFFEValidator(nil)
+	return validator.ValidateSPIFFEID(id)
 }
 
 func (ve *ValidationEngine) validateDomain(val reflect.Value, _ string) error {
@@ -1013,6 +1016,36 @@ func (ve *ValidationEngine) setSliceDefault(val reflect.Value, defaultValue, fie
 	return nil
 }
 
+// initializeRequiredNestedStruct initializes nested structs that are marked as required.
+func (ve *ValidationEngine) initializeRequiredNestedStruct(
+	fieldVal reflect.Value,
+	field *reflect.StructField,
+	fieldName string,
+	errCollection *ValidationCollectionError,
+) {
+	if !fieldVal.CanSet() {
+		return
+	}
+
+	// Check if this field is required
+	validateTag := field.Tag.Get(ve.TagName)
+	if validateTag == "" {
+		return
+	}
+
+	rules := ve.parseValidationRules(validateTag)
+	if _, isRequired := rules[validationRuleRequired]; !isRequired {
+		return
+	}
+
+	// Initialize nested struct if it's zero and a struct type
+	if fieldVal.Kind() == reflect.Struct && ve.isZeroValue(fieldVal) {
+		// Create a new instance of the struct type
+		newStruct := reflect.New(fieldVal.Type()).Elem()
+		fieldVal.Set(newStruct)
+	}
+}
+
 // GlobalValidationEngine provides a default validation engine instance.
 //
 //nolint:gochecknoglobals // Global instance for convenience
@@ -1042,34 +1075,4 @@ func GetValidationErrors(err error) []ValidationError {
 	}
 
 	return nil
-}
-
-// initializeRequiredNestedStruct initializes nested structs that are marked as required.
-func (ve *ValidationEngine) initializeRequiredNestedStruct(
-	fieldVal reflect.Value,
-	field *reflect.StructField,
-	fieldName string,
-	errCollection *ValidationCollectionError,
-) {
-	if !fieldVal.CanSet() {
-		return
-	}
-
-	// Check if this field is required
-	validateTag := field.Tag.Get(ve.TagName)
-	if validateTag == "" {
-		return
-	}
-
-	rules := ve.parseValidationRules(validateTag)
-	if _, isRequired := rules[validationRuleRequired]; !isRequired {
-		return
-	}
-
-	// Initialize nested struct if it's zero and a struct type
-	if fieldVal.Kind() == reflect.Struct && ve.isZeroValue(fieldVal) {
-		// Create a new instance of the struct type
-		newStruct := reflect.New(fieldVal.Type()).Elem()
-		fieldVal.Set(newStruct)
-	}
 }
