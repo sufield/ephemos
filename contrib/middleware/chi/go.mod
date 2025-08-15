@@ -3,7 +3,7 @@ module github.com/sufield/ephemos/contrib/middleware/chi
 go 1.24
 
 require (
-	github.com/go-chi/chi/v5 v5.1.0
+	github.com/go-chi/chi/v5 v5.2.2
 	github.com/spiffe/go-spiffe/v2 v2.5.0
 	github.com/stretchr/testify v1.10.0
 	github.com/sufield/ephemos v0.0.0-00010101000000-000000000000
