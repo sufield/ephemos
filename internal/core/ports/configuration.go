@@ -22,7 +22,7 @@ const (
 
 // Configuration represents the complete configuration for Ephemos services.
 // It contains all necessary settings for service identity, SPIFFE integration,
-// and authorization policies.
+// and security policies.
 type Configuration struct {
 	// Service contains the core service identification settings.
 	// This is required and must include at least a service name.
@@ -32,9 +32,9 @@ type Configuration struct {
 	// If nil, default SPIFFE settings will be used.
 	SPIFFE *SPIFFEConfig `yaml:"spiffe,omitempty"`
 
-	// Transport contains the transport layer configuration (gRPC, HTTP, etc.).
-	// If nil, defaults to gRPC transport.
-	Transport TransportConfig `yaml:"transport,omitempty"`
+	// Security contains security configuration settings.
+	// If nil, secure defaults will be used.
+	Security *SecurityConfig `yaml:"security,omitempty"`
 }
 
 // ServiceConfig contains the core service identification settings.
@@ -58,49 +58,14 @@ type SPIFFEConfig struct {
 	SocketPath string `yaml:"socketPath"`
 }
 
-// TransportConfig contains transport layer configuration.
-type TransportConfig struct {
-	// Type specifies the transport protocol to use.
-	// Supported values: "grpc", "http"
-	// Defaults to "grpc" if not specified.
-	Type string `yaml:"type,omitempty"`
 
-	// Address specifies the network address to bind to.
-	// Format depends on transport type:
-	// - gRPC: ":port" or "host:port" (e.g., ":50051")
-	// - HTTP: ":port" or "host:port" (e.g., ":8080")
-	// Defaults to ":50051" for gRPC, ":8080" for HTTP.
-	Address string `yaml:"address,omitempty"`
-
-	// TLS contains TLS configuration for the transport.
-	// Optional - if not specified, transport-specific defaults apply.
-	TLS *TLSConfig `yaml:"tls,omitempty"`
-}
-
-// TLSConfig contains TLS/SSL configuration settings.
-type TLSConfig struct {
-	// Enabled determines whether TLS is enabled.
-	// For gRPC, this enables TLS transport security.
-	// For HTTP, this enables HTTPS.
-	Enabled bool `yaml:"enabled,omitempty"`
-
-	// CertFile is the path to the TLS certificate file.
-	// Required if Enabled is true and not using SPIFFE-based mTLS.
-	CertFile string `yaml:"certFile,omitempty"`
-
-	// KeyFile is the path to the TLS private key file.
-	// Required if Enabled is true and not using SPIFFE-based mTLS.
-	KeyFile string `yaml:"keyFile,omitempty"`
-
-	// UseSPIFFE determines whether to use SPIFFE X.509 certificates for TLS.
-	// When true, certificates are obtained from the SPIRE agent.
-	UseSPIFFE bool `yaml:"useSpiffe,omitempty"`
-
-	// InsecureSkipVerify controls whether TLS certificate verification is skipped.
+// SecurityConfig contains security configuration settings.
+type SecurityConfig struct {
+	// CertificateValidationDisabled controls whether certificate validation is disabled.
 	// WARNING: This should ONLY be set to true in development environments.
 	// In production, this MUST be false to ensure proper certificate validation.
-	// Default: false (secure certificate validation enabled)
-	InsecureSkipVerify bool `yaml:"insecure_skip_verify,omitempty"`
+	// Default: false (certificate validation enabled)
+	CertificateValidationDisabled bool `yaml:"certificate_validation_disabled,omitempty"`
 }
 
 // Validate checks if the configuration is valid and returns any validation errors.
@@ -387,10 +352,10 @@ func validateSocketPath(socketPath string) error {
 	return fmt.Errorf("SPIFFE socket should be in a secure directory (/run, /var/run, or /tmp)")
 }
 
-// validateTLSSecurity checks TLS configuration for production security issues.
+// validateTLSSecurity checks security configuration for production security issues.
 func validateTLSSecurity(config *Configuration) error {
-	if config.Transport.TLS != nil && config.Transport.TLS.InsecureSkipVerify {
-		return fmt.Errorf("insecure_skip_verify is enabled - certificate validation must be enabled in production")
+	if config.Security != nil && config.Security.CertificateValidationDisabled {
+		return fmt.Errorf("certificate_validation_disabled is enabled - certificate validation must be enabled in production")
 	}
 	return nil
 }

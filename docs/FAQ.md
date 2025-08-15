@@ -854,7 +854,7 @@ The performance impact is negligible compared to the security benefits provided.
 
 **Yes, but only for development environments.**
 
-Ephemos supports disabling certificate validation for local development through the `insecure_skip_verify` configuration option:
+Ephemos supports disabling certificate validation for local development through the `certificate_validation_disabled` configuration option:
 
 #### **Development Configuration** (Allowed)
 ```yaml
@@ -862,12 +862,11 @@ service:
   name: "dev-service"
   domain: "dev.example.org"
 
-transport:
-  type: "grpc"
-  tls:
-    enabled: true
-    useSpiffe: true
-    insecure_skip_verify: true  # ⚠️ Development only!
+spiffe:
+  socketPath: "/tmp/spire-agent/public/api.sock"
+
+security:
+  certificate_validation_disabled: true  # ⚠️ Development only!
 ```
 
 #### **Production Configuration** (Secure by default)
@@ -876,12 +875,10 @@ service:
   name: "payment-service"  
   domain: "prod.company.com"
 
-transport:
-  type: "grpc"
-  tls:
-    enabled: true
-    useSpiffe: true
-    # insecure_skip_verify: false  # Default: secure certificate validation
+spiffe:
+  socketPath: "/run/spire/sockets/agent.sock"
+
+# Certificate validation is enabled by default - no security section needed
 ```
 
 #### **Security Enforcement**
@@ -889,22 +886,22 @@ transport:
 Ephemos **automatically prevents** insecure configurations in production:
 
 ```go
-// Production validation will fail if insecure_skip_verify is true
+// Production validation will fail if certificate_validation_disabled is true
 config := loadConfig("production.yaml")
 err := config.IsProductionReady()
 if err != nil {
-    // Error: "insecure_skip_verify is enabled - certificate validation must be enabled in production"
+    // Error: "certificate_validation_disabled is enabled - certificate validation must be enabled in production"
 }
 ```
 
 #### **Industry Best Practices**
 
-This follows the same pattern as other successful Go projects:
+This follows the same pattern as other successful Go projects, but with business-focused configuration:
 
-- **OpenTelemetry Collector**: `insecure: true` for development only
-- **Kubernetes**: `insecure-skip-tls-verify` flag for kubectl (dev/testing only)  
-- **Istio**: `PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION` (development mode)
-- **gRPC**: `grpc.WithInsecure()` deprecated in favor of explicit TLS config
+- **Business-Focused Terminology**: Uses `certificate_validation_disabled` instead of implementation terms like `insecure_skip_verify`
+- **Secure by Default**: Certificate validation enabled unless explicitly disabled
+- **Development Productivity**: Simple flag to disable validation for local testing
+- **Production Safety**: Automatic validation prevents insecure production deployments
 
 #### **Why This Approach?**
 

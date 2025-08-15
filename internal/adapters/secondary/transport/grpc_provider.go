@@ -69,8 +69,8 @@ func (p *GRPCProvider) CreateServer(cert *domain.Certificate, bundle *domain.Tru
 func (p *GRPCProvider) createClientTLSConfig(cert *domain.Certificate, bundle *domain.TrustBundle) (*tls.Config, error) {
 	// Determine if certificate verification should be skipped
 	insecureSkipVerify := false
-	if p.config != nil && p.config.Transport.TLS != nil {
-		insecureSkipVerify = p.config.Transport.TLS.InsecureSkipVerify
+	if p.config != nil && p.config.Security != nil {
+		insecureSkipVerify = p.config.Security.CertificateValidationDisabled
 	}
 
 	// For now, create a basic TLS config
@@ -84,8 +84,8 @@ func (p *GRPCProvider) createClientTLSConfig(cert *domain.Certificate, bundle *d
 func (p *GRPCProvider) createServerTLSConfig(cert *domain.Certificate, bundle *domain.TrustBundle) (*tls.Config, error) {
 	// Determine if certificate verification should be skipped
 	insecureSkipVerify := false
-	if p.config != nil && p.config.Transport.TLS != nil {
-		insecureSkipVerify = p.config.Transport.TLS.InsecureSkipVerify
+	if p.config != nil && p.config.Security != nil {
+		insecureSkipVerify = p.config.Security.CertificateValidationDisabled
 	}
 
 	// For now, create a basic TLS config
