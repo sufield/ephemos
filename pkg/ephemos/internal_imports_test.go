@@ -82,7 +82,7 @@ func reportViolations(t *testing.T, violations []string) {
 			"✅ SOLUTION: Use only 'github.com/sufield/ephemos/pkg/ephemos' imports\n"+
 			"✅ For logging: Use standard 'log/slog' instead of internal logging\n"+
 			"✅ For interceptors: Use ephemos.NewProductionInterceptorConfig() presets\n"+
-			"✅ For configuration: Use ephemos.Configuration and ephemos.ConfigBuilder",
+			"✅ For configuration: Use ephemos.Configuration and ephemos.IdentityServer/IdentityClient",
 			len(violations), strings.Join(violations, "\n"))
 	}
 }
@@ -167,7 +167,7 @@ func TestPublicAPIAccessibility(t *testing.T) {
 	}{
 		{"Configuration Types Available", testConfigurationTypesAvailable},
 		{"Service Interfaces Available", testServiceInterfacesAvailable},
-		{"Builder Patterns Available", testBuilderPatternsAvailable},
+		{"Simple Configuration Available", testSimpleConfigurationAvailable},
 		{"Preset Configurations Available", testPresetConfigurationsAvailable},
 	}
 
@@ -233,9 +233,9 @@ func main() {
 	}
 }
 
-func testBuilderPatternsAvailable(t *testing.T) {
+func testSimpleConfigurationAvailable(t *testing.T) {
 	t.Helper()
-	// Test that builder patterns are available
+	// Test that simple configuration is available
 	code := `
 package main
 import (
@@ -244,19 +244,20 @@ import (
 )
 func main() {
 	ctx := context.Background()
-	builder := ephemos.NewConfigBuilder()
-	config, err := builder.
-		WithServiceName("test").
-		WithServiceDomain("example.com").
-		WithSource(ephemos.ConfigSourcePureCode).
-		Build(ctx)
-	if err != nil || config == nil {
-		panic("builder not working")
+	server, err := ephemos.IdentityServer(ctx, "")
+	if err != nil {
+		panic("server creation failed")
 	}
+	defer server.Close()
+	client, err := ephemos.IdentityClient(ctx, "")
+	if err != nil {
+		panic("client creation failed")
+	}
+	defer client.Close()
 }
 `
 	if err := compileTestCode(code); err != nil {
-		t.Errorf("Public builder patterns not accessible: %v", err)
+		t.Errorf("Public simple configuration not accessible: %v", err)
 	}
 }
 
