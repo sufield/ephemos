@@ -289,7 +289,7 @@ ephemos/
 
 ### For Contributors
 
-**Workflow**
+**Workflow**:
 ```bash
 make setup             # Smart setup
 make build             # Reproducible builds
