@@ -49,7 +49,7 @@ func (m *mockClient) Close() error {
 	return nil
 }
 
-func TestIdentityClient_NewIdentityClient(t *testing.T) {
+func TestClient_IdentityClient(t *testing.T) {
 	tests := []struct {
 		name              string
 		identityProvider  ports.IdentityProvider
@@ -82,19 +82,19 @@ func TestIdentityClient_NewIdentityClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, err := api.NewIdentityClient(tt.identityProvider, tt.transportProvider, tt.config)
+			client, err := api.IdentityClient(tt.identityProvider, tt.transportProvider, tt.config)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewIdentityClient() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("IdentityClient() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && client == nil {
-				t.Error("NewIdentityClient() returned nil client")
+				t.Error("IdentityClient() returned nil client")
 			}
 		})
 	}
 }
 
-func TestIdentityClient_Connect(t *testing.T) {
+func TestClient_Connect(t *testing.T) {
 	// Note: This is a basic test structure. In production, you would use mocks
 	// and dependency injection to test without actual SPIFFE infrastructure.
 
@@ -131,7 +131,7 @@ func TestIdentityClient_Connect(t *testing.T) {
 	}
 
 	// Create a client for testing with mock dependencies
-	client, err := api.NewIdentityClient(&mockIdentityProvider{}, &mockTransportProvider{}, &ports.Configuration{})
+	client, err := api.IdentityClient(&mockIdentityProvider{}, &mockTransportProvider{}, &ports.Configuration{})
 	if err != nil {
 		t.Skip("Skipping Connect tests - could not create client:", err)
 	}
@@ -151,8 +151,8 @@ func TestIdentityClient_Connect(t *testing.T) {
 	}
 }
 
-func TestIdentityClient_Close(t *testing.T) {
-	client, err := api.NewIdentityClient(&mockIdentityProvider{}, &mockTransportProvider{}, &ports.Configuration{})
+func TestClient_Close(t *testing.T) {
+	client, err := api.IdentityClient(&mockIdentityProvider{}, &mockTransportProvider{}, &ports.Configuration{})
 	if err != nil {
 		t.Skip("Skipping Close test - could not create client:", err)
 	}
@@ -171,7 +171,7 @@ func TestIdentityClient_Close(t *testing.T) {
 func TestClientConnection_Close(t *testing.T) {
 	// Test close operation
 	// Note: Since we're in an external test package, we can only test the public API
-	// This test would need a real connection from api.NewIdentityClient() and Connect()
+	// This test would need a real connection from api.IdentityClient() and Connect()
 	// For now, we'll skip this specific test case that requires access to private fields
 	t.Skip("Skipping test that requires access to unexported fields - use internal package tests for this")
 }
@@ -179,7 +179,7 @@ func TestClientConnection_Close(t *testing.T) {
 func TestClientConnection_GetClientConnection(t *testing.T) {
 	// Test GetClientConnection operation
 	// Note: Since we're in an external test package, we can only test the public API
-	// This test would need a real connection from api.NewIdentityClient() and Connect()
+	// This test would need a real connection from api.IdentityClient() and Connect()
 	// For now, we'll skip this specific test case that requires access to private fields
 	t.Skip("Skipping test that requires access to unexported fields - use internal package tests for this")
 }

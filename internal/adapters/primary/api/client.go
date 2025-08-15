@@ -15,8 +15,8 @@ import (
 	"github.com/sufield/ephemos/internal/core/services"
 )
 
-// IdentityClient provides a high-level API for connecting to SPIFFE-secured services.
-type IdentityClient struct {
+// Client provides a high-level API for connecting to SPIFFE-secured services.
+type Client struct {
 	identityService *services.IdentityService
 	domainClient    ports.Client
 	mu              sync.Mutex
@@ -28,7 +28,7 @@ func IdentityClient(
 	identityProvider ports.IdentityProvider,
 	transportProvider ports.TransportProvider,
 	cfg *ports.Configuration,
-) (*IdentityClient, error) {
+) (*Client, error) {
 	if cfg == nil {
 		return nil, &errors.ValidationError{
 			Field:   "configuration",
@@ -62,13 +62,13 @@ func IdentityClient(
 		return nil, fmt.Errorf("failed to create identity service: %w", err)
 	}
 
-	return &IdentityClient{
+	return &Client{
 		identityService: identityService,
 	}, nil
 }
 
 // Connect establishes a secure connection to a remote service using SPIFFE identities.
-func (c *IdentityClient) Connect(ctx context.Context, serviceName, address string) (*ClientConnection, error) {
+func (c *Client) Connect(ctx context.Context, serviceName, address string) (*ClientConnection, error) {
 	// Input validation
 	if ctx == nil {
 		return nil, &errors.ValidationError{
@@ -133,7 +133,7 @@ func (c *IdentityClient) Connect(ctx context.Context, serviceName, address strin
 }
 
 // Close cleans up the client resources and closes any connections.
-func (c *IdentityClient) Close() error {
+func (c *Client) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
