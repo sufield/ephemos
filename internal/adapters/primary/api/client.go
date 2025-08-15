@@ -10,6 +10,8 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/sufield/ephemos/internal/adapters/secondary/config"
+	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
 	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
@@ -21,6 +23,28 @@ type Client struct {
 	identityService *services.IdentityService
 	domainClient    ports.ClientPort
 	mu              sync.Mutex
+}
+
+// NewClientFromConfig creates a new identity client from configuration path.
+// Handles all provider creation internally to hide implementation details from public API.
+func NewClientFromConfig(ctx context.Context, configPath string) (*Client, error) {
+	// Load configuration
+	configProvider := config.NewFileProvider()
+	cfg, err := configProvider.LoadConfiguration(ctx, configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Create identity provider
+	identityProvider, err := spiffe.NewProvider(cfg.Agent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create identity provider: %w", err)
+	}
+
+	// Create default transport provider
+	transportProvider := transport.NewGRPCProvider(cfg)
+	
+	return IdentityClient(identityProvider, transportProvider, cfg)
 }
 
 // NewClient creates a new identity client with minimal dependencies.
