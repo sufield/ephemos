@@ -344,7 +344,7 @@ func Mount[T any](server *TransportServer, impl T) error {
 }
 
 // Legacy compatibility functions - deprecated, use New* functions instead
-
+// Remov NewIdentityServer and change this implementation to be the new IdentityServer
 // IdentityServer creates a new identity-aware server instance.
 // Deprecated: Use NewIdentityServer for better error handling.
 func IdentityServer() Server {

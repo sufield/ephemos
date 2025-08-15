@@ -2,7 +2,7 @@
 
 ## Hexagonal Architecture (Ports & Adapters)
 
-Ephemos follows a clean hexagonal architecture pattern that enforces strict dependency rules and separation of concerns.
+Ephemos follows a hexagonal architecture pattern that enforces strict dependency rules and separation of concerns.
 
 ## Dependency Rule Diagram
 
@@ -11,7 +11,6 @@ graph TB
     subgraph "External World"
         CLI[CLI Interface]
         API[API Interface]
-        GRPC[gRPC Transport]
         HTTP[HTTP Transport]
         SPIFFE[SPIFFE/SPIRE]
         CONFIG[Config Files]
@@ -24,7 +23,6 @@ graph TB
         end
         
         subgraph "Secondary Adapters (Driven)"
-            SA_GRPC[gRPC Adapter<br/>internal/adapters/grpc]
             SA_HTTP[HTTP Adapter<br/>internal/adapters/http]
             SA_SPIFFE[SPIFFE Adapter<br/>internal/adapters/secondary/spiffe]
             SA_CONFIG[Config Adapter<br/>internal/adapters/secondary/config]
@@ -74,13 +72,11 @@ graph TB
     OP_IDENTITY --> SA_SPIFFE
     OP_IDENTITY --> SA_MEMID
     OP_TRANSPORT --> SA_TRANSPORT
-    SA_TRANSPORT --> SA_GRPC
     SA_TRANSPORT --> SA_HTTP
     
     %% Secondary Adapters to External
     SA_CONFIG --> CONFIG
     SA_SPIFFE --> SPIFFE
-    SA_GRPC --> GRPC
     SA_HTTP --> HTTP
     
     style DOMAIN fill:#f9f,stroke:#333,stroke-width:4px
@@ -127,7 +123,6 @@ graph LR
     end
     
     subgraph "Transport Adapters"
-        ADAPT_GRPC[internal/adapters/grpc]
         ADAPT_HTTP[internal/adapters/http]
         ADAPT_INTERCEPTORS[internal/adapters/<br/>interceptors]
         ADAPT_LOGGING[internal/adapters/logging]
@@ -164,11 +159,9 @@ graph LR
     SEC_MEMIDENTITY --> CORE_DOMAIN
     
     SEC_TRANSPORT --> CORE_PORTS
-    SEC_TRANSPORT --> ADAPT_GRPC
     SEC_TRANSPORT --> ADAPT_HTTP
     
     %% Transport adapter dependencies
-    ADAPT_GRPC -.->|uses| GRPC_LIBS[google.golang.org/grpc]
     ADAPT_HTTP -.->|uses| HTTP_LIBS[net/http]
     ADAPT_INTERCEPTORS --> ADAPT_GRPC
     ADAPT_LOGGING --> CORE_DOMAIN
@@ -235,7 +228,6 @@ Secondary Adapters:
 └── internal/adapters/secondary/transport   → Imports core + transport adapters ✅
 
 Transport Implementations:
-├── internal/adapters/grpc         → External gRPC libraries ✅
 ├── internal/adapters/http         → Standard net/http ✅
 ├── internal/adapters/interceptors → gRPC interceptors ✅
 └── internal/adapters/logging      → Logging utilities ✅
@@ -246,7 +238,7 @@ Transport Implementations:
 1. **Dependency Inversion**: Core domain defines interfaces (ports) that adapters implement
 2. **Single Responsibility**: Each adapter has one clear responsibility
 3. **Interface Segregation**: Ports are small and focused
-4. **Clean Boundaries**: No circular dependencies between layers
+4. **Clear Boundaries**: No circular dependencies between layers
 5. **Testability**: Core can be tested without any external dependencies
 
 ## Testing Architecture Compliance

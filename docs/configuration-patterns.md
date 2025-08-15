@@ -46,8 +46,6 @@ config, err := ephemos.NewConfigBuilder().
     WithServiceDomain("production.company.com").
     WithSPIFFESocket("/tmp/spire-agent/public/api.sock").
     WithTransport("grpc", ":443").
-    WithAuthorizedClients([]string{"client-a", "client-b"}).
-    WithTrustedServers([]string{"server-1", "server-2"}).
     Build(ctx)
 ```
 

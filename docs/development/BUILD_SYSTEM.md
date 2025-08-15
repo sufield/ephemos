@@ -269,7 +269,7 @@ ephemos/
 └── .gitignore              # Enhanced binary exclusion (UPDATED)
 ```
 
-### Key File Changes
+### File Changes
 
 **Makefile.core**: Complete rewrite with:
 - PHONY target declarations
@@ -287,18 +287,9 @@ ephemos/
 - Explicit sudo usage
 - Maintains backward compatibility for users who want full automation
 
-## 🔄 Migration Guide
-
 ### For Contributors
 
-**Old Workflow** (⚠️ Deprecated):
-```bash
-make install-tools      # No longer exists
-make deps              # Still works
-make build             # Now includes reproducible builds
-```
-
-**New Workflow** (✅ Recommended):
+**Workflow**
 ```bash
 make setup             # Smart setup
 make build             # Reproducible builds
@@ -307,8 +298,7 @@ make examples          # With version info
 
 ### For CI/CD Systems
 
-**Old**: Direct dependency on make targets that could fail
-**New**: Environment-aware behavior with graceful fallbacks
+Environment-aware behavior with graceful fallbacks
 
 **GitHub Actions**: No changes required - existing workflows continue to work
 **Local CI**: Use `CI=true` environment variable for CI-appropriate behavior
@@ -417,5 +407,3 @@ new-target: check-deps show-build-info
 - [Development Workflow](WORKFLOW_IMPROVEMENTS.md)
 
 ---
-
-*This build system represents a significant security and reliability improvement for Ephemos. All changes are backward compatible while providing enhanced security guarantees and developer experience.*

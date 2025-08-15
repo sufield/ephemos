@@ -14,7 +14,6 @@ func TestConfigBuilder_PureCodeConfiguration(t *testing.T) {
 		WithServiceDomain("test.example.com").
 		WithSPIFFESocket("/custom/spiffe/socket").
 		WithTransport("http", ":8080").
-		WithAuthorizedClients([]string{"spiffe://test.com/client1", "spiffe://test.com/client2"}).
 		WithTrustedServers([]string{"spiffe://test.com/server1", "spiffe://test.com/server2"}).
 		Build(ctx)
 	if err != nil {
@@ -36,9 +35,6 @@ func TestConfigBuilder_PureCodeConfiguration(t *testing.T) {
 	}
 	if config.Transport.Address != ":8080" {
 		t.Errorf("Expected transport address ':8080', got '%s'", config.Transport.Address)
-	}
-	if len(config.AuthorizedClients) != 2 {
-		t.Errorf("Expected 2 authorized clients, got %d", len(config.AuthorizedClients))
 	}
 	if len(config.TrustedServers) != 2 {
 		t.Errorf("Expected 2 trusted servers, got %d", len(config.TrustedServers))
@@ -67,29 +63,16 @@ func verifyTransportConfig(t *testing.T, config *Configuration, expectedType, ex
 	}
 }
 
-// verifyListConfig checks list configuration fields.
-func verifyListConfig(t *testing.T, config *Configuration, expectedClients, expectedServers int) {
-	t.Helper()
-	if len(config.AuthorizedClients) != expectedClients {
-		t.Errorf("Expected %d authorized clients, got %d", expectedClients, len(config.AuthorizedClients))
-	}
-	if len(config.TrustedServers) != expectedServers {
-		t.Errorf("Expected %d trusted servers, got %d", expectedServers, len(config.TrustedServers))
-	}
-}
-
 func TestConfigBuilder_EnvironmentOverrides(t *testing.T) {
 	ctx := t.Context()
 
 	// Set up environment variables
 	envVars := map[string]string{
-		"EPHEMOS_SERVICE_NAME":       "env-service",
-		"EPHEMOS_SERVICE_DOMAIN":     "env.example.com",
-		"EPHEMOS_SPIFFE_SOCKET":      "/env/spiffe/socket",
-		"EPHEMOS_TRANSPORT_TYPE":     "http",
-		"EPHEMOS_TRANSPORT_ADDRESS":  ":9090",
-		"EPHEMOS_AUTHORIZED_CLIENTS": "spiffe://env.com/client1, spiffe://env.com/client2, spiffe://env.com/client3",
-		"EPHEMOS_TRUSTED_SERVERS":    "spiffe://env.com/server1, spiffe://env.com/server2",
+		"EPHEMOS_SERVICE_NAME":      "env-service",
+		"EPHEMOS_SERVICE_DOMAIN":    "env.example.com",
+		"EPHEMOS_SPIFFE_SOCKET":     "/env/spiffe/socket",
+		"EPHEMOS_TRANSPORT_TYPE":    "http",
+		"EPHEMOS_TRANSPORT_ADDRESS": ":9090",
 	}
 
 	// Set environment variables
@@ -108,17 +91,12 @@ func TestConfigBuilder_EnvironmentOverrides(t *testing.T) {
 	// Verify configuration using helper functions
 	verifyServiceConfig(t, config, "env-service", "env.example.com")
 	verifyTransportConfig(t, config, "http", ":9090")
-	verifyListConfig(t, config, 3, 2)
 
 	// Verify SPIFFE socket
 	if config.SPIFFE.SocketPath != "/env/spiffe/socket" {
 		t.Errorf("Expected SPIFFE socket '/env/spiffe/socket', got '%s'", config.SPIFFE.SocketPath)
 	}
 
-	// Verify first client
-	if config.AuthorizedClients[0] != "spiffe://env.com/client1" {
-		t.Errorf("Expected first client 'spiffe://env.com/client1', got '%s'", config.AuthorizedClients[0])
-	}
 }
 
 func TestLoadConfigFlexible_PureCode(t *testing.T) {
