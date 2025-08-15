@@ -4,6 +4,7 @@ package transport
 import (
 	"crypto/tls"
 	"fmt"
+	"log"
 	"net"
 
 	"google.golang.org/grpc"
@@ -67,11 +68,16 @@ func (p *GRPCProvider) CreateServer(cert *domain.Certificate, bundle *domain.Tru
 
 // createClientTLSConfig creates TLS configuration for gRPC client with SPIFFE certs.
 func (p *GRPCProvider) createClientTLSConfig(cert *domain.Certificate, bundle *domain.TrustBundle) (*tls.Config, error) {
-	// Certificate validation is disabled ONLY in development environments
-	// Production, staging, and all other environments always validate certificates
+	// Follow industry best practices: explicit opt-in for insecure mode
+	// Similar to Docker, Argo Workflows, Consul, and Kubernetes patterns
 	insecureSkipVerify := false
 	if p.config != nil {
 		insecureSkipVerify = p.config.ShouldSkipCertificateValidation()
+		
+		// Log security warning when validation is disabled (industry standard practice)
+		if insecureSkipVerify {
+			log.Printf("⚠️  [EPHEMOS] Certificate validation disabled (EPHEMOS_INSECURE_SKIP_VERIFY=true) - development only!")
+		}
 	}
 
 	// For now, create a basic TLS config
@@ -83,11 +89,16 @@ func (p *GRPCProvider) createClientTLSConfig(cert *domain.Certificate, bundle *d
 
 // createServerTLSConfig creates TLS configuration for gRPC server with SPIFFE certs.
 func (p *GRPCProvider) createServerTLSConfig(cert *domain.Certificate, bundle *domain.TrustBundle) (*tls.Config, error) {
-	// Certificate validation is disabled ONLY in development environments
-	// Production, staging, and all other environments always validate certificates
+	// Follow industry best practices: explicit opt-in for insecure mode
+	// Similar to Docker, Argo Workflows, Consul, and Kubernetes patterns
 	insecureSkipVerify := false
 	if p.config != nil {
 		insecureSkipVerify = p.config.ShouldSkipCertificateValidation()
+		
+		// Log security warning when validation is disabled (industry standard practice)
+		if insecureSkipVerify {
+			log.Printf("⚠️  [EPHEMOS] Certificate validation disabled (EPHEMOS_INSECURE_SKIP_VERIFY=true) - development only!")
+		}
 	}
 
 	// For now, create a basic TLS config

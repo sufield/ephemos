@@ -177,14 +177,15 @@ type ConfigurationProvider interface {
 
 // Environment variable names for configuration.
 const (
-	EnvServiceName   = "EPHEMOS_SERVICE_NAME"
-	EnvTrustDomain   = "EPHEMOS_TRUST_DOMAIN"
-	EnvAgentSocket   = "EPHEMOS_AGENT_SOCKET"
-	EnvRequireAuth   = "EPHEMOS_REQUIRE_AUTHENTICATION"
-	EnvLogLevel      = "EPHEMOS_LOG_LEVEL"
-	EnvBindAddress   = "EPHEMOS_BIND_ADDRESS"
-	EnvTLSMinVersion = "EPHEMOS_TLS_MIN_VERSION"
-	EnvDebugEnabled  = "EPHEMOS_DEBUG_ENABLED"
+	EnvServiceName         = "EPHEMOS_SERVICE_NAME"
+	EnvTrustDomain         = "EPHEMOS_TRUST_DOMAIN"
+	EnvAgentSocket         = "EPHEMOS_AGENT_SOCKET"
+	EnvInsecureSkipVerify  = "EPHEMOS_INSECURE_SKIP_VERIFY"
+	EnvRequireAuth         = "EPHEMOS_REQUIRE_AUTHENTICATION"
+	EnvLogLevel            = "EPHEMOS_LOG_LEVEL"
+	EnvBindAddress         = "EPHEMOS_BIND_ADDRESS"
+	EnvTLSMinVersion       = "EPHEMOS_TLS_MIN_VERSION"
+	EnvDebugEnabled        = "EPHEMOS_DEBUG_ENABLED"
 )
 
 // LoadFromEnvironment creates a configuration from environment variables.
@@ -292,6 +293,11 @@ func validateProductionSecurity(config *Configuration) error {
 	}
 
 
+	// Check for insecure certificate validation setting
+	if strings.ToLower(os.Getenv(EnvInsecureSkipVerify)) == "true" {
+		errors = append(errors, "EPHEMOS_INSECURE_SKIP_VERIFY=true - certificate validation is disabled (development only)")
+	}
+
 	// Check for debug environment variables that shouldn't be enabled in production
 	if debugEnabled := os.Getenv(EnvDebugEnabled); debugEnabled == "true" {
 		errors = append(errors, "debug mode is enabled via EPHEMOS_DEBUG_ENABLED - should be disabled in production")
@@ -334,46 +340,19 @@ func validateSocketPath(socketPath string) error {
 	return fmt.Errorf("agent socket should be in a secure directory (/run, /var/run, or /tmp)")
 }
 
-// IsDevEnvironment detects if we're running in a development environment.
-// Development environments are the ONLY ones where certificate validation is disabled.
-func (c *Configuration) IsDevEnvironment() bool {
-	// Development indicators in domain
-	if c.Service.Domain != "" {
-		domain := strings.ToLower(c.Service.Domain)
-		if strings.Contains(domain, "dev") || 
-		   strings.Contains(domain, "test") || 
-		   strings.Contains(domain, "local") ||
-		   strings.Contains(domain, "example") {
-			return true
-		}
-	}
-	
-	// Development socket paths
-	if c.Agent != nil {
-		socketPath := strings.ToLower(c.Agent.SocketPath)
-		if strings.HasPrefix(socketPath, "/tmp/") {
-			return true
-		}
-	}
-	
-	// Development environment variable indicators
-	nodeEnv := strings.ToLower(os.Getenv("NODE_ENV"))
-	environment := strings.ToLower(os.Getenv("ENVIRONMENT"))
-	stage := strings.ToLower(os.Getenv("STAGE"))
-	
-	if nodeEnv == "development" || nodeEnv == "dev" ||
-	   environment == "development" || environment == "dev" ||
-	   stage == "development" || stage == "dev" {
-		return true
-	}
-	
-	return false
+// ShouldSkipCertificateValidation follows industry best practices for explicit opt-in.
+// Returns true ONLY when EPHEMOS_INSECURE_SKIP_VERIFY=true is explicitly set.
+// This matches patterns used by Docker, Argo Workflows, Consul, and other successful Go projects.
+func (c *Configuration) ShouldSkipCertificateValidation() bool {
+	// Explicit opt-in following industry standard pattern
+	// Similar to DOCKER_TLS_VERIFY, ARGO_INSECURE_SKIP_VERIFY, CONSUL_TLS_SKIP_VERIFY
+	return strings.ToLower(os.Getenv(EnvInsecureSkipVerify)) == "true"
 }
 
-// ShouldSkipCertificateValidation returns true ONLY in development environments.
-// All other environments (production, staging, etc.) always validate certificates.
-func (c *Configuration) ShouldSkipCertificateValidation() bool {
-	return c.IsDevEnvironment()
+// IsInsecureModeExplicitlyEnabled checks if insecure mode was explicitly requested.
+// Used for logging warnings when security is disabled.
+func (c *Configuration) IsInsecureModeExplicitlyEnabled() bool {
+	return c.ShouldSkipCertificateValidation()
 }
 
 // IsProductionReady checks if the configuration is suitable for production use.

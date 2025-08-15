@@ -852,48 +852,58 @@ The performance impact is negligible compared to the security benefits provided.
 
 ### How does certificate validation work?
 
-**Certificate validation is automatic and environment-based - no configuration required.**
+**Ephemos follows industry best practices with explicit opt-in for insecure mode.**
 
-Ephemos automatically determines when to skip certificate validation based on the environment:
+Like Docker, Argo Workflows, Consul, and Kubernetes, certificate validation is controlled via environment variables:
 
-#### **Development Configuration**
-```yaml
-service:
-  name: "dev-service"
-  domain: "dev.example.org"     # Contains "dev" - detected as development
-
-agent:
-  socketPath: "/tmp/agent.sock"  # /tmp path - detected as development
-```
-**Result**: Certificate validation disabled for easy local testing
-
-#### **Production Configuration**  
+#### **Secure by Default (Production)**
 ```yaml
 service:
   name: "payment-service"
-  domain: "company.com"          # Production domain
+  domain: "company.com"
 
 agent:
-  socketPath: "/run/sockets/agent.sock"  # /run path - detected as production
+  socketPath: "/run/sockets/agent.sock"
 ```
-**Result**: Certificate validation always enabled
+```bash
+# No environment variable set = secure certificate validation
+./your-service
+```
+**Result**: Certificates always validated ✅
 
-#### **Environment Detection**
+#### **Development with Disabled Validation**
+```yaml
+service:
+  name: "dev-service"
+  domain: "dev.company.com"
 
-**Development environments** (certificate validation disabled):
-- Domains containing: `dev`, `test`, `local`, `example`
-- Socket paths starting with: `/tmp/`
-- Environment variables: `NODE_ENV=development`, `ENVIRONMENT=dev`, `STAGE=dev`
+agent:
+  socketPath: "/tmp/agent.sock"
+```
+```bash
+# Explicit opt-in for insecure mode (development only)
+export EPHEMOS_INSECURE_SKIP_VERIFY=true
+./your-service
+# ⚠️ [EPHEMOS] Certificate validation disabled (EPHEMOS_INSECURE_SKIP_VERIFY=true) - development only!
+```
+**Result**: Certificate validation disabled for development testing
 
-**All other environments** (certificate validation enabled):
-- Production, staging, and any other environment
-- Standard paths: `/run/`, `/var/run/`
-- Environment variables: `NODE_ENV=production`, `ENVIRONMENT=production`, etc.
+#### **Industry Standard Pattern**
 
-#### **Why This Approach?**
+This follows the same pattern as successful Go projects:
 
-✅ **Zero Configuration** - No security flags or settings to configure  
-✅ **Foolproof** - Impossible to accidentally disable validation in production  
-✅ **Development Friendly** - Automatic detection for easy local testing  
-✅ **Environment Aware** - Works correctly across all deployment environments  
-✅ **Secure by Default** - Production always validates certificates
+| Project | Environment Variable | Default |
+|---------|---------------------|---------|
+| **Docker** | `DOCKER_TLS_VERIFY` | Varies |
+| **Argo Workflows** | `ARGO_INSECURE_SKIP_VERIFY=true` | Secure |
+| **Consul** | `CONSUL_TLS_SKIP_VERIFY=true` | Secure |
+| **Kubernetes** | `insecure-skip-tls-verify: true` | Secure |
+| **Ephemos** | `EPHEMOS_INSECURE_SKIP_VERIFY=true` | **Secure** |
+
+#### **Security Features**
+
+✅ **Explicit Opt-in** - Must set `EPHEMOS_INSECURE_SKIP_VERIFY=true`  
+✅ **Secure by Default** - Certificate validation enabled unless explicitly disabled  
+✅ **Security Warnings** - Logs warning when validation is disabled  
+✅ **Production Validation** - `IsProductionReady()` fails if insecure mode detected  
+✅ **Industry Standard** - Matches patterns from successful Go projects
