@@ -12,6 +12,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
+	"time"
 
 	"github.com/sufield/ephemos/internal/adapters/primary/api"
 )
@@ -46,6 +48,7 @@ type Client interface {
 	// The serviceName is used for identity verification and must be non-empty.
 	// The address should be in the format "host:port" and must be non-empty.
 	Connect(ctx context.Context, serviceName, address string) (*ClientConnection, error)
+	
 	// Close releases any resources held by the client.
 	Close() error
 }
@@ -54,6 +57,39 @@ type Client interface {
 type ClientConnection struct {
 	// Implementation details hidden - only used for resource management
 	internalConn *api.ClientConnection
+}
+
+// HTTPClient returns an HTTP client configured with SPIFFE certificate authentication.
+// The returned client can be used to make authenticated HTTP requests to the connected service.
+//
+// Example:
+//   conn, err := client.Connect(ctx, "payment-service", "https://payment.example.com")
+//   if err != nil { ... }
+//   defer conn.Close()
+//   
+//   httpClient := conn.HTTPClient()
+//   resp, err := httpClient.Get("https://payment.example.com/api/balance")
+func (c *ClientConnection) HTTPClient() *http.Client {
+	if c.internalConn != nil {
+		return c.internalConn.HTTPClient()
+	}
+	
+	// Return a basic secure HTTP client if internal connection is not available
+	return &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("stopped after 10 redirects")
+			}
+			return nil
+		},
+	}
 }
 
 // Close closes the connection and releases resources.
