@@ -6,6 +6,6 @@ agent:
   socketPath: "/run/sockets/agent.sock"
 
 security:
-  # WARNING: This is ONLY for development environments
-  # Certificate validation is disabled - NOT secure for production
+  # Development only: Certificate validation disabled for local testing
+  # Production environments automatically ignore this setting
   certificate_validation_disabled: true

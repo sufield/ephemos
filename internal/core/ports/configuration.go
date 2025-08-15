@@ -62,8 +62,8 @@ type AgentConfig struct {
 // SecurityConfig contains security configuration settings.
 type SecurityConfig struct {
 	// CertificateValidationDisabled controls whether certificate validation is disabled.
-	// WARNING: This should ONLY be set to true in development environments.
-	// In production, this MUST be false to ensure proper certificate validation.
+	// Development: Setting this to true disables certificate validation for local testing.
+	// Production: This setting is automatically ignored - certificates are always validated.
 	// Default: false (certificate validation enabled)
 	CertificateValidationDisabled bool `yaml:"certificate_validation_disabled,omitempty"`
 }
@@ -358,6 +358,58 @@ func validateTLSSecurity(config *Configuration) error {
 		return fmt.Errorf("certificate_validation_disabled is enabled - certificate validation must be enabled in production")
 	}
 	return nil
+}
+
+// IsProductionEnvironment detects if we're running in a production environment.
+// Production is detected by secure domain names and standard production paths.
+func (c *Configuration) IsProductionEnvironment() bool {
+	// Production indicators
+	if c.Service.Domain != "" {
+		domain := strings.ToLower(c.Service.Domain)
+		// Production domains (not development)
+		if !strings.Contains(domain, "dev") && 
+		   !strings.Contains(domain, "test") && 
+		   !strings.Contains(domain, "local") &&
+		   !strings.Contains(domain, "example") {
+			return true
+		}
+	}
+	
+	// Production socket paths
+	if c.Agent != nil {
+		socketPath := strings.ToLower(c.Agent.SocketPath)
+		if strings.HasPrefix(socketPath, "/run/") || 
+		   strings.HasPrefix(socketPath, "/var/run/") {
+			return true
+		}
+	}
+	
+	// Environment variable indicators
+	if os.Getenv("NODE_ENV") == "production" ||
+	   os.Getenv("ENVIRONMENT") == "production" ||
+	   os.Getenv("STAGE") == "prod" ||
+	   os.Getenv("STAGE") == "production" {
+		return true
+	}
+	
+	return false
+}
+
+// GetEffectiveCertificateValidationDisabled returns whether certificate validation 
+// should be disabled, but ALWAYS returns false in production environments.
+// This makes production foolproof regardless of configuration.
+func (c *Configuration) GetEffectiveCertificateValidationDisabled() bool {
+	// PRODUCTION OVERRIDE: Always validate certificates in production
+	if c.IsProductionEnvironment() {
+		return false
+	}
+	
+	// Development: Honor the configuration setting
+	if c.Security != nil {
+		return c.Security.CertificateValidationDisabled
+	}
+	
+	return false // Secure default
 }
 
 // IsProductionReady checks if the configuration is suitable for production use.

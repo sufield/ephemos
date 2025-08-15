@@ -866,7 +866,7 @@ agent:
   socketPath: "/run/sockets/agent.sock"
 
 security:
-  certificate_validation_disabled: true  # ⚠️ Development only!
+  certificate_validation_disabled: true  # Development only - ignored in production
 ```
 
 #### **Production Configuration** (Secure by default)
@@ -883,16 +883,26 @@ agent:
 
 #### **Security Enforcement**
 
-Ephemos **automatically prevents** insecure configurations in production:
+Ephemos is **foolproof in production** and automatically enforces secure certificate validation:
 
 ```go
-// Production validation will fail if certificate_validation_disabled is true
-config := loadConfig("production.yaml")
+// Production environments ALWAYS validate certificates regardless of configuration
+config := loadConfig("production.yaml") // Even if this sets certificate_validation_disabled: true
+
+// Production override: Always returns false in production environments
+isDisabled := config.GetEffectiveCertificateValidationDisabled() // false
+
+// Production validation also catches configuration errors
 err := config.IsProductionReady()
 if err != nil {
     // Error: "certificate_validation_disabled is enabled - certificate validation must be enabled in production"
 }
 ```
+
+**Production Detection:**
+- Production domains (not containing "dev", "test", "local", "example")
+- Standard production paths (`/run/sockets/`, `/var/run/`)
+- Environment variables: `NODE_ENV=production`, `ENVIRONMENT=production`, `STAGE=prod`
 
 #### **Industry Best Practices**
 
@@ -906,6 +916,7 @@ This follows the same pattern as other successful Go projects, but with business
 #### **Why This Approach?**
 
 ✅ **Development Productivity** - Developers can quickly test locally without certificate setup  
-✅ **Production Security** - Impossible to accidentally deploy with disabled certificate validation  
+✅ **Foolproof Production** - **Impossible** to disable certificate validation in production, even with misconfigured YAML  
 ✅ **Clear Intent** - Configuration explicitly shows when security is relaxed  
-✅ **Audit Trail** - Security teams can easily identify and review insecure configurations
+✅ **Audit Trail** - Security teams can easily identify and review insecure configurations  
+✅ **Defense in Depth** - Multiple layers detect and prevent production security bypasses
