@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/grpc"
-
 	"github.com/sufield/ephemos/internal/adapters/secondary/config"
 	"github.com/sufield/ephemos/internal/adapters/secondary/memidentity"
 	"github.com/sufield/ephemos/internal/core/domain"
@@ -104,7 +102,7 @@ func TestAuthenticationPolicyFlow(t *testing.T) {
 		serverIdentity := domain.NewServiceIdentity("api-server", "company.com")
 		clientIdentity := domain.NewServiceIdentity("web-client", "company.com")
 
-		// Step 2: Create authentication policy (now without authorization)
+		// Step 2: Create authentication policy
 		policy := domain.NewAuthenticationPolicy(serverIdentity)
 		if policy.ServiceIdentity != serverIdentity {
 			t.Error("Policy does not reference correct service identity")
@@ -265,8 +263,6 @@ func testCreateIdentityService(t *testing.T, provider ports.IdentityProvider) *s
 		SPIFFE: &ports.SPIFFEConfig{
 			SocketPath: "/tmp/test-spire-agent/public/api.sock",
 		},
-		AuthorizedClients: []string{"spiffe://test.example.org/test-client"},
-		TrustedServers:    []string{"spiffe://test.example.org/test-server"},
 	}
 
 	mockTransportProvider := &mockTransportProvider{}
@@ -309,9 +305,6 @@ func TestPublicAPIIntegration(t *testing.T) {
 		testInterceptorConfigurations(t)
 	})
 
-	t.Run("ServiceRegistrarCreation", func(t *testing.T) {
-		testServiceRegistrarCreation(t)
-	})
 }
 
 func testInterceptorConfigurations(t *testing.T) {
@@ -361,27 +354,6 @@ func testDevelopmentInterceptorConfig(t *testing.T) {
 		t.Error("Expected identity propagation to be enabled in development config")
 	}
 	t.Logf("✅ Development interceptor configuration validated")
-}
-
-func testServiceRegistrarCreation(t *testing.T) {
-	t.Helper()
-	var registrationCalled bool
-	registrar := ephemos.NewServiceRegistrar(func(_ *grpc.Server) {
-		registrationCalled = true
-	})
-
-	if registrar == nil {
-		t.Fatal("Service registrar is nil")
-	}
-
-	grpcServer := grpc.NewServer()
-	defer grpcServer.Stop()
-	registrar.Register(grpcServer)
-
-	if !registrationCalled {
-		t.Error("Registration function was not called")
-	}
-	t.Logf("✅ Service registrar created and tested successfully")
 }
 
 // TestErrorHandlingFlow tests error handling throughout the identity stack.
@@ -615,12 +587,4 @@ func BenchmarkIdentityOperations(b *testing.B) {
 		}
 	})
 
-	b.Run("PolicyAuthorization", func(b *testing.B) {
-		policy := domain.NewAuthenticationPolicy(identity)
-		policy.AddAuthorizedClient("test-client")
-
-		for i := 0; i < b.N; i++ {
-			_ = policy.IsClientAuthorized("test-client")
-		}
-	})
 }
