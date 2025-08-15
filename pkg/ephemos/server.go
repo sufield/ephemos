@@ -120,6 +120,7 @@ func (s *TransportServer) serveOnListener(ctx context.Context, listener net.List
 	}
 }
 
+// TODO: Refactor
 func (s *TransportServer) resolveAddress() string {
 	addr := s.config.Transport.Address
 	if addr == "" {

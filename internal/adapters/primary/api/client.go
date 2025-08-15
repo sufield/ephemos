@@ -22,6 +22,7 @@ type IdentityClient struct {
 	mu              sync.Mutex
 }
 
+// TODO: Deprecation is not needed. Remove this
 // NewIdentityClient creates a new IdentityClient with the given configuration file path.
 // Deprecated: Use NewIdentityClientWithDependencies for proper dependency injection.
 func NewIdentityClient(ctx context.Context, configPath string) (*IdentityClient, error) {
@@ -34,6 +35,7 @@ func NewIdentityClient(ctx context.Context, configPath string) (*IdentityClient,
 	}
 }
 
+// TODO: Rename this to NewIdentityClient
 // NewIdentityClientWithDependencies creates a new identity client with injected dependencies.
 // This constructor follows proper dependency injection and hexagonal architecture principles.
 func NewIdentityClientWithDependencies(
