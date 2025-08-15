@@ -1,5 +1,11 @@
 // Package ephemos provides identity-based authentication for backend services.
 // It provides simple, business-focused APIs that hide all implementation complexity.
+//
+// The public API focuses on two core operations:
+//   - IdentityServer(): Create a server that can verify client identities
+//   - IdentityClient(): Create a client that can authenticate to servers
+//
+// Service registration and management are handled by CLI tools, not the public API.
 package ephemos
 
 import (
@@ -63,19 +69,12 @@ func (c *ClientConnection) Close() error {
 
 // Server provides identity-based server functionality for hosting services.
 type Server interface {
-	// RegisterService registers a service implementation with the server.
-	RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error
 	// ListenAndServe starts the server and serves requests.
 	ListenAndServe(ctx context.Context) error
 	// Close gracefully shuts down the server.
 	Close() error
 }
 
-// ServiceRegistrar handles service registration (used by admin/CLI tools).
-type ServiceRegistrar interface {
-	// Register registers the service with the transport
-	Register(transport interface{})
-}
 
 // IdentityClient creates a new identity client for connecting to services.
 func IdentityClient(ctx context.Context, configPath string) (Client, error) {
@@ -159,12 +158,6 @@ type serverWrapper struct {
 	server *api.Server
 }
 
-// RegisterService registers a service implementation with the server.
-func (s *serverWrapper) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
-	// The internal server expects a different registrar interface
-	// We need to adapt the public ServiceRegistrar to the internal requirements
-	return fmt.Errorf("service registration not yet implemented - requires adapter between public and internal registrar interfaces")
-}
 
 // ListenAndServe starts the server and serves requests.
 func (s *serverWrapper) ListenAndServe(ctx context.Context) error {
@@ -181,23 +174,4 @@ func (s *serverWrapper) ListenAndServe(ctx context.Context) error {
 // Close gracefully shuts down the server.
 func (s *serverWrapper) Close() error {
 	return s.server.Close()
-}
-
-// NewServiceRegistrar creates a service registrar for admin/CLI use.
-func NewServiceRegistrar(registerFunc func(interface{})) ServiceRegistrar {
-	return &serviceRegistrarWrapper{
-		registerFunc: registerFunc,
-	}
-}
-
-// serviceRegistrarWrapper adapts the public ServiceRegistrar interface.
-type serviceRegistrarWrapper struct {
-	registerFunc func(interface{})
-}
-
-// Register registers the service with the transport.
-func (r *serviceRegistrarWrapper) Register(transport interface{}) {
-	if r.registerFunc != nil {
-		r.registerFunc(transport)
-	}
 }

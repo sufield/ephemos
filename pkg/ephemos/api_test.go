@@ -21,13 +21,7 @@ func TestPublicAPI(t *testing.T) {
 		t.Logf("IdentityServer returned error (expected): %v", err)
 	}
 	
-	// Test ServiceRegistrar creation
-	registrar := NewServiceRegistrar(func(transport interface{}) {
-		// Mock registration function
-	})
-	if registrar == nil {
-		t.Log("NewServiceRegistrar returned nil (expected - implementation delegated to internal packages)")
-	}
+	// Note: Service registration is now CLI-only, not part of public API
 	
 	// Test Configuration struct
 	config := Configuration{
