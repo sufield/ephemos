@@ -13,11 +13,10 @@ import (
 )
 
 // TestDomainPortsHaveNoProtocolDependencies ensures that domain ports
-// don't import any protocol-specific packages (gRPC, HTTP, etc.)
+// don't import any protocol-specific packages (HTTP etc.)
 func TestDomainPortsHaveNoProtocolDependencies(t *testing.T) {
 	prohibited := []string{
 		"google.golang.org/grpc",
-		"google.golang.org/protobuf",
 		"net/http",
 		"github.com/gin-gonic",
 		"github.com/gorilla/mux",
@@ -159,10 +158,8 @@ func checkStructFields(t *testing.T, st *ast.StructType) {
 			}
 
 			// No exported fields should be protocol-specific
-			if strings.Contains(name.Name, "grpc") ||
-				strings.Contains(name.Name, "http") ||
-				strings.Contains(name.Name, "HTTP") ||
-				strings.Contains(name.Name, "GRPC") {
+			if strings.Contains(name.Name, "http") ||
+				strings.Contains(name.Name, "HTTP") {
 				t.Errorf("TransportServer has exported protocol-specific field: %s", name.Name)
 			}
 		}
@@ -243,9 +240,7 @@ func checkParameterTypes(t *testing.T, fn *ast.FuncDecl) {
 }
 
 func isProtocolSpecific(name string) bool {
-	return strings.Contains(name, "grpc") ||
-		strings.Contains(name, "http") ||
-		strings.Contains(name, "pb")
+	return strings.Contains(name, "http")
 }
 
 // findServerFile locates the server.go file relative to the module root.

@@ -137,7 +137,6 @@ All shell scripts have been converted to Bazel targets for better dependency man
 
 ### Demo Scripts (`scripts/demo/BUILD.bazel`)
 - `run-demo.sh` → `//scripts/demo:full_demo`
-- `setup-demo.sh` → `//scripts/demo:setup_demo`
 - `cleanup.sh` → `//scripts/demo:cleanup`
 - `install-spire.sh` → `//scripts/demo:install_spire`
 
@@ -204,10 +203,7 @@ Provides Make-like interface for common operations:
 ./bazel.sh lint
 ./bazel.sh security
 
-# 3. Build examples
-./bazel.sh examples
-
-# 4. Run full test suite
+# s3. Run full test suite
 ./bazel.sh test
 ```
 

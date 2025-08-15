@@ -12,8 +12,6 @@ echo "Starting SPIRE services..."
 echo "Cleaning up any existing SPIRE processes..."
 sudo pkill -f spire-server 2>/dev/null || true
 sudo pkill -f spire-agent 2>/dev/null || true
-sudo pkill -f echo-server 2>/dev/null || true
-pkill -f echo-server 2>/dev/null || true
 sleep 2
 
 # Generate upstream CA if it doesn't exist

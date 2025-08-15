@@ -72,7 +72,7 @@ examples/interceptors/interceptors                    # ❌ ELF executable
 graph TD
     A[Developer] --> B{Security Level Choice}
     B -->|Highest Security| C[make setup - No sudo, Go tools only]
-    B -->|Explicit Escalation| D[./scripts/install-deps-sudo.sh]
+    B -->|Explicit Escalation| D[./scripts/install-deps.sh --system]
     C --> E[✅ Secure: Go dependencies installed]
     D --> F[⚠️ Elevated: System packages + Go tools]
     E --> G[Reproducible Build with Provenance]
@@ -86,7 +86,7 @@ graph TD
 $ make setup
 🔧 Installing Go tools (no sudo required)...
 🔧 Setup partially complete. System packages still needed.
-For system packages, run: ./scripts/install-deps-sudo.sh
+For system packages, run: ./scripts/install-deps.sh --system
 
 # CI Environment (Hardened)  
 $ CI=true make setup
@@ -171,7 +171,7 @@ make setup  # Automatically detects and installs missing dependencies
 # Option 2: Go Tools Only (No Sudo Required)  
 
 # Option 3: Complete Installation (Requires Sudo)
-./scripts/install-deps-sudo.sh  # Installs system packages + Go tools
+./scripts/install-deps.sh --system  # Installs system packages + Go tools
 ```
 
 ## 🧪 Security Testing & Verification

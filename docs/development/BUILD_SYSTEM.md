@@ -103,8 +103,8 @@ Go Flags:    -trimpath -ldflags "-X main.Version=v1.2.3-5-gb513744-dirty ..."
 **Implementation**:
 - `make setup` - Smart setup that installs Go tools without sudo
 - `make install-deps` - Go tools only (no system packages)
-- `make install-deps-sudo` - Complete installation with sudo
-- `./scripts/install-deps-sudo.sh` - Direct sudo script
+- `make install-deps-system` - Complete installation with sudo
+- `./scripts/install-deps.sh --system` - Direct sudo script
 
 ### Setup Process Flow
 
@@ -117,7 +117,7 @@ graph TD
     E --> F{System Packages Needed?}
     F -->|Yes| G[Guide User to Sudo Options]
     F -->|No| H[✅ Partial Success - Go Tools Ready]
-    G --> I[User Choice: Manual or ./scripts/install-deps-sudo.sh]
+    G --> I[User Choice: Manual or ./scripts/install-deps.sh --system]
 ```
 
 ### Environment-Aware Behavior
@@ -152,7 +152,7 @@ $ CI=true make setup
 |--------|-------------|---------------|---------------|
 | `make setup` | Smart setup (recommended) | No | ✅ |
 | `make install-deps` | Go tools only | No | ✅ |
-| `make install-deps-sudo` | Complete installation | Yes | ❌ |
+| `make install-deps-system` | Complete installation | Yes | ❌ |
 | `make check-deps` | Check dependencies | No | ✅ |
 
 ### Information Targets
@@ -185,7 +185,7 @@ if [[ "${CI:-}" == "true" ]] || [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
     echo "CI environment detected. Protoc should be installed by GitHub Actions."
 else
     echo "  make setup          # Smart setup (Go tools only)"
-    echo "  ./scripts/install-deps-sudo.sh  # Full setup (requires sudo)"
+    echo "  ./scripts/install-deps.sh --system  # Full setup (requires sudo)"
 fi
 ```
 
@@ -263,7 +263,7 @@ ephemos/
 ├── Makefile.security       # Security scanning targets
 ├── scripts/
 │   ├── install-deps.sh     # No-sudo setup script (UPDATED)
-│   ├── install-deps-sudo.sh # Full sudo setup script (NEW)
+│   ├── install-deps.sh --system # Full sudo setup script (NEW)
 │   ├── check-deps.sh       # Dependency checker (UPDATED)
 │   └── build/
 └── .gitignore              # Enhanced binary exclusion (UPDATED)
@@ -282,7 +282,7 @@ ephemos/
 - Exit 0 instead of exit 1 for automation compatibility
 - Clear guidance for system packages
 
-**scripts/install-deps-sudo.sh**: New file:
+**scripts/install-deps.sh --system**: New file:
 - Complete installation including system packages
 - Explicit sudo usage
 - Maintains backward compatibility for users who want full automation
@@ -328,7 +328,7 @@ make examples          # With version info
 ```bash
 # The setup intentionally doesn't install system packages without sudo
 # Solutions:
-./scripts/install-deps-sudo.sh  # Automatic with sudo
+./scripts/install-deps.sh --system  # Automatic with sudo
 # or
 make setup  # Try again
 ```

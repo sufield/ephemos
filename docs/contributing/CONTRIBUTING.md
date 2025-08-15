@@ -31,9 +31,9 @@ make install-deps  # Installs Go protobuf tools only
 
 **Option B: Complete Installation (Requires Sudo)**
 ```bash
-./scripts/install-deps-sudo.sh  # Installs system packages + Go tools
+./scripts/install-deps.sh --system  # Installs system packages + Go tools
 # or
-make install-deps-sudo
+make install-deps-system
 ```
 
 ### 3. Build and Test
@@ -189,7 +189,7 @@ make build
 ```bash
 # Use our automated setup:
 make setup                           # Smart setup (recommended)
-./scripts/install-deps-sudo.sh      # Full installation with sudo
+./scripts/install-deps.sh --system      # Full installation with sudo
 # Or install manually:
 sudo apt install protobuf-compiler
 ```
@@ -255,7 +255,7 @@ Before submitting changes:
 
 ### New Security-First Setup
 - `make setup` handles Go dependencies automatically (no sudo required)
-- System packages require manual approval or `./scripts/install-deps-sudo.sh`
+- System packages require manual approval or `./scripts/install-deps.sh --system`
 - All binaries built from source with reproducible build flags
 - No pre-compiled executables in repository for security
 

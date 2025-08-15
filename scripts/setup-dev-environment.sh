@@ -64,7 +64,7 @@ if ./scripts/install-deps.sh; then
 else
     echo -e "${RED}✗ Dependency installation encountered issues${NC}"
     echo "Please check the output above and resolve any issues"
-    echo "You may need to run: ./scripts/install-deps-sudo.sh"
+    echo "You may need to run: ./scripts/install-deps.sh --system"
     exit 1
 fi
 
@@ -298,7 +298,7 @@ else
     printf '  %s\n' "${MISSING_TOOLS[@]}"
     echo ""
     echo "To install missing system packages, run:"
-    echo "  ./scripts/install-deps-sudo.sh"
+    echo "  ./scripts/install-deps.sh --system"
     echo ""
     echo "You can still develop with the available tools."
 fi
