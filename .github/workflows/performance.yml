@@ -277,7 +277,7 @@ jobs:
               go func(worker int) {
                 defer wg.Done()
                 ctx := context.Background()
-                client, err := ephemos.NewIdentityClient(ctx, "config/echo-client.yaml")
+                client, err := ephemos.IdentityClient(ctx, "config/echo-client.yaml")
                 if err != nil {
                   log.Printf("Worker %d: Failed to create client: %v", worker, err)
                   return

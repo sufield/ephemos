@@ -87,7 +87,7 @@ spire-server entry create \
 // 3. Issues certificate ONLY if all selectors match
 
 // Your code doesn't change:
-server := ephemos.NewIdentityServer(ctx, configPath)
+server := ephemos.IdentityServer(ctx, configPath)
 // Ephemos handles getting the cert from SPIRE
 ```
 
@@ -275,7 +275,7 @@ agent {
 
 func main() {
     // Create identity-aware server
-    server, err := ephemos.NewIdentityServer(ctx, configPath)
+    server, err := ephemos.IdentityServer(ctx, configPath)
     if err != nil {
         log.Fatal(err)
     }
@@ -349,5 +349,5 @@ The beauty of Ephemos is that **your application code doesn't change** between d
 
 But the core API remains the same:
 ```go
-server := ephemos.NewIdentityServer(ctx, configPath)  // Same in demo and prod!
+server := ephemos.IdentityServer(ctx, configPath)  // Same in demo and prod!
 ```

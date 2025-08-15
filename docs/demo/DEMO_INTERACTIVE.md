@@ -160,12 +160,12 @@ time=2025-08-08T23:46:00.123-04:00 level=ERROR msg="Failed to create identity cl
    - SPIRE automatically issues and rotates X.509 certificates
    - Certificates are used for mTLS authentication
 
-2. **Server Side** (`ephemos.NewIdentityServer`):
+2. **Server Side** (`ephemos.IdentityServer`):
    - Fetches its SVID from SPIRE
    - Creates a gRPC server with TLS using the SVID
    - Validates client certificates against authorized list
 
-3. **Client Side** (`ephemos.NewIdentityClient`):
+3. **Client Side** (`ephemos.IdentityClient`):
    - Fetches its SVID from SPIRE  
    - Creates a gRPC client with TLS using the SVID
    - Presents certificate when connecting to servers
@@ -259,7 +259,7 @@ sudo spire-server entry delete -socketPath /tmp/spire-server/private/api.sock -s
 
 ## Key Takeaways
 
-1. **Simple API**: Developers only need to call `ephemos.NewIdentityServer()` and `ephemos.NewIdentityClient()`
+1. **Simple API**: Developers only need to call `ephemos.IdentityServer()` and `ephemos.IdentityClient()`
 2. **Automatic Security**: mTLS, certificate rotation, and identity verification handled transparently
 3. **Zero Configuration**: No need to manage certificates, keys, or credentials manually
 4. **Production Ready**: Based on SPIFFE/SPIRE, used by major companies for workload identity

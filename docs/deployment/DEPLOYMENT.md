@@ -492,7 +492,7 @@ ss -x | grep agent.sock
 ```go
 // Support both mTLS and API keys during migration
 if ephemosEnabled {
-    server = ephemos.NewIdentityServer(ctx, config)
+    server = ephemos.IdentityServer(ctx, config)
 } else {
     server = traditional.NewAPIKeyServer(config)
 }
@@ -510,7 +510,7 @@ features:
 ### Phase 3: Complete Migration
 ```go
 // Remove legacy auth code
-server = ephemos.NewIdentityServer(ctx, config)
+server = ephemos.IdentityServer(ctx, config)
 ```
 
 ## Cost Optimization

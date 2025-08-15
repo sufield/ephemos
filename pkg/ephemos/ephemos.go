@@ -343,4 +343,3 @@ func Mount[T any](server *TransportServer, impl T) error {
 	return mount[T](server, impl)
 }
 
-}

@@ -1,33 +1,88 @@
 package api_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/sufield/ephemos/internal/adapters/primary/api"
+	"github.com/sufield/ephemos/internal/core/ports"
 )
+
+// Mock implementations for testing
+type mockIdentityProvider struct{}
+
+func (m *mockIdentityProvider) GetIdentity(ctx context.Context) (ports.Identity, error) {
+	return &mockIdentity{}, nil
+}
+
+func (m *mockIdentityProvider) Close() error {
+	return nil
+}
+
+type mockTransportProvider struct{}
+
+func (m *mockTransportProvider) CreateServer(identity ports.Identity, config *ports.Configuration) (ports.Server, error) {
+	return nil, nil
+}
+
+func (m *mockTransportProvider) CreateClient(identity ports.Identity, config *ports.Configuration) (ports.Client, error) {
+	return &mockClient{}, nil
+}
+
+type mockIdentity struct{}
+
+func (m *mockIdentity) GetSPIFFEID() string {
+	return "spiffe://example.org/test"
+}
+
+func (m *mockIdentity) GetCertificate() interface{} {
+	return nil
+}
+
+type mockClient struct{}
+
+func (m *mockClient) Connect(serviceName, address string) (ports.Connection, error) {
+	return nil, nil
+}
+
+func (m *mockClient) Close() error {
+	return nil
+}
 
 func TestIdentityClient_NewIdentityClient(t *testing.T) {
 	tests := []struct {
-		name       string
-		configPath string
-		wantErr    bool
+		name              string
+		identityProvider  ports.IdentityProvider
+		transportProvider ports.TransportProvider
+		config            *ports.Configuration
+		wantErr           bool
 	}{
 		{
-			name:       "empty config path",
-			configPath: "",
-			wantErr:    true, // Default config may not be valid without proper SPIFFE setup
+			name:              "nil config",
+			identityProvider:  &mockIdentityProvider{},
+			transportProvider: &mockTransportProvider{},
+			config:            nil,
+			wantErr:           true,
 		},
 		{
-			name:       "invalid config path",
-			configPath: "/nonexistent/path",
-			wantErr:    true,
+			name:              "nil identity provider",
+			identityProvider:  nil,
+			transportProvider: &mockTransportProvider{},
+			config:            &ports.Configuration{},
+			wantErr:           true,
+		},
+		{
+			name:              "nil transport provider",
+			identityProvider:  &mockIdentityProvider{},
+			transportProvider: nil,
+			config:            &ports.Configuration{},
+			wantErr:           true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := t.Context()
-			client, err := api.NewIdentityClient(ctx, tt.configPath)
+			client, err := api.NewIdentityClient(tt.identityProvider, tt.transportProvider, tt.config)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewIdentityClient() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -75,9 +130,8 @@ func TestIdentityClient_Connect(t *testing.T) {
 		},
 	}
 
-	// Create a client for testing (this may fail without proper SPIFFE setup)
-	ctx := t.Context()
-	client, err := api.NewIdentityClient(ctx, "")
+	// Create a client for testing with mock dependencies
+	client, err := api.NewIdentityClient(&mockIdentityProvider{}, &mockTransportProvider{}, &ports.Configuration{})
 	if err != nil {
 		t.Skip("Skipping Connect tests - could not create client:", err)
 	}
@@ -98,8 +152,7 @@ func TestIdentityClient_Connect(t *testing.T) {
 }
 
 func TestIdentityClient_Close(t *testing.T) {
-	ctx := t.Context()
-	client, err := api.NewIdentityClient(ctx, "")
+	client, err := api.NewIdentityClient(&mockIdentityProvider{}, &mockTransportProvider{}, &ports.Configuration{})
 	if err != nil {
 		t.Skip("Skipping Close test - could not create client:", err)
 	}

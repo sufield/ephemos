@@ -75,7 +75,7 @@ func createBaseServer(ctx context.Context, opts *ServerOptions) (Server, error) 
 		}
 		return server, nil
 	}
-	server, err := NewIdentityServer(ctx, opts.ConfigPath)
+	server, err := IdentityServer(ctx, opts.ConfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create server from path: %w", err)
 	}
