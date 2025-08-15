@@ -168,3 +168,15 @@ func (s *IdentityService) getTrustBundle() (*domain.TrustBundle, error) {
 	}
 	return bundle, nil
 }
+
+// GetCertificate retrieves the certificate from the identity provider.
+// This is exposed for use by HTTP client connections to get SPIFFE certificates.
+func (s *IdentityService) GetCertificate() (*domain.Certificate, error) {
+	return s.getCertificate()
+}
+
+// GetTrustBundle retrieves the trust bundle from the identity provider.
+// This is exposed for use by HTTP client connections to get SPIFFE trust bundles.
+func (s *IdentityService) GetTrustBundle() (*domain.TrustBundle, error) {
+	return s.getTrustBundle()
+}

@@ -18,6 +18,7 @@ import (
 	"github.com/sufield/ephemos/internal/adapters/secondary/config"
 	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
 	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/sufield/ephemos/internal/core/services"
@@ -168,7 +169,11 @@ func (c *Client) Connect(ctx context.Context, serviceName, address string) (*Cli
 		return nil, fmt.Errorf("unexpected connection type from domain client")
 	}
 
-	return &ClientConnection{conn: grpcConn, domainConn: domainConn}, nil
+	return &ClientConnection{
+		conn:            grpcConn,
+		domainConn:      domainConn,
+		identityService: c.identityService,
+	}, nil
 }
 
 // Close cleans up the client resources and closes any connections.
@@ -186,10 +191,17 @@ func (c *Client) Close() error {
 	return nil
 }
 
+// CertificateProvider provides access to certificates and trust bundles for HTTP clients
+type CertificateProvider interface {
+	GetCertificate() (*domain.Certificate, error)
+	GetTrustBundle() (*domain.TrustBundle, error)
+}
+
 // ClientConnection represents a secure client connection to a remote service.
 type ClientConnection struct {
-	conn       *grpc.ClientConn
-	domainConn ports.ConnectionPort
+	conn            *grpc.ClientConn
+	domainConn      ports.ConnectionPort
+	identityService CertificateProvider
 }
 
 // Close terminates the client connection and cleans up resources.
@@ -316,14 +328,131 @@ type SPIFFEConfig struct {
 
 // extractSPIFFEConfig extracts SPIFFE configuration from the connection
 func (c *ClientConnection) extractSPIFFEConfig() (*SPIFFEConfig, error) {
-	// This is a placeholder for extracting actual SPIFFE certificates
-	// In a full implementation, this would:
-	// 1. Access the identity service that created the gRPC connection
-	// 2. Get the current SPIFFE certificates and trust bundle
-	// 3. Configure automatic certificate rotation
-	
-	// For now, return an error to trigger fallback to secure TLS
-	return nil, fmt.Errorf("SPIFFE certificate extraction not yet implemented")
+	if c.identityService == nil {
+		return nil, fmt.Errorf("no identity service available")
+	}
+
+	// Extract SPIFFE certificate from identity service
+	cert, err := c.identityService.GetCertificate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get SPIFFE certificate: %w", err)
+	}
+
+	// Extract trust bundle from identity service
+	trustBundle, err := c.identityService.GetTrustBundle()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get SPIFFE trust bundle: %w", err)
+	}
+
+	// Convert domain certificate to TLS certificate
+	tlsCerts, err := c.convertToTLSCertificates(cert)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert certificate to TLS format: %w", err)
+	}
+
+	// Convert trust bundle to certificate pool
+	rootCAs, err := c.convertToX509CertPool(trustBundle)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert trust bundle to certificate pool: %w", err)
+	}
+
+	return &SPIFFEConfig{
+		ClientCertificates:    tlsCerts,
+		RootCAs:              rootCAs,
+		VerifyPeerCertificate: c.createPeerCertificateVerifier(trustBundle),
+		VerifyConnection:     c.createConnectionVerifier(),
+	}, nil
+}
+
+// convertToTLSCertificates converts a domain.Certificate to []tls.Certificate
+func (c *ClientConnection) convertToTLSCertificates(cert *domain.Certificate) ([]tls.Certificate, error) {
+	if cert == nil || cert.Cert == nil {
+		return nil, fmt.Errorf("certificate is nil")
+	}
+
+	if cert.PrivateKey == nil {
+		return nil, fmt.Errorf("private key is nil")
+	}
+
+	// Build certificate chain
+	certChain := [][]byte{cert.Cert.Raw}
+	for _, chainCert := range cert.Chain {
+		certChain = append(certChain, chainCert.Raw)
+	}
+
+	tlsCert := tls.Certificate{
+		Certificate: certChain,
+		PrivateKey:  cert.PrivateKey,
+		Leaf:        cert.Cert,
+	}
+
+	return []tls.Certificate{tlsCert}, nil
+}
+
+// convertToX509CertPool converts a domain.TrustBundle to *x509.CertPool
+func (c *ClientConnection) convertToX509CertPool(bundle *domain.TrustBundle) (*x509.CertPool, error) {
+	if bundle == nil || len(bundle.Certificates) == 0 {
+		return nil, fmt.Errorf("trust bundle is empty")
+	}
+
+	certPool := x509.NewCertPool()
+	for _, cert := range bundle.Certificates {
+		certPool.AddCert(cert)
+	}
+
+	return certPool, nil
+}
+
+// createPeerCertificateVerifier creates a function to verify peer certificates using SPIFFE trust bundle
+func (c *ClientConnection) createPeerCertificateVerifier(trustBundle *domain.TrustBundle) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		// Basic SPIFFE certificate verification
+		// In a full implementation, this would validate SPIFFE IDs and other SPIFFE-specific properties
+		if len(rawCerts) == 0 {
+			return fmt.Errorf("no peer certificates provided")
+		}
+
+		// Parse the peer certificate
+		peerCert, err := x509.ParseCertificate(rawCerts[0])
+		if err != nil {
+			return fmt.Errorf("failed to parse peer certificate: %w", err)
+		}
+
+		// Verify against trust bundle
+		certPool, err := c.convertToX509CertPool(trustBundle)
+		if err != nil {
+			return fmt.Errorf("failed to create certificate pool: %w", err)
+		}
+
+		opts := x509.VerifyOptions{
+			Roots: certPool,
+		}
+
+		_, err = peerCert.Verify(opts)
+		if err != nil {
+			return fmt.Errorf("peer certificate verification failed: %w", err)
+		}
+
+		return nil
+	}
+}
+
+// createConnectionVerifier creates a function to verify TLS connection state
+func (c *ClientConnection) createConnectionVerifier() func(tls.ConnectionState) error {
+	return func(state tls.ConnectionState) error {
+		// Verify basic TLS connection properties
+		if len(state.PeerCertificates) == 0 {
+			return fmt.Errorf("no peer certificates in connection")
+		}
+
+		// Ensure TLS version is secure
+		if state.Version < tls.VersionTLS12 {
+			return fmt.Errorf("insecure TLS version: %d", state.Version)
+		}
+
+		// Additional SPIFFE-specific connection verification can be added here
+		return nil
+	}
 }
 
 // createSecureTLSConfig creates a secure TLS configuration as fallback
