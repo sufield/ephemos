@@ -2,6 +2,8 @@
 package validation
 
 import (
+	"strings"
+	
 	"github.com/sufield/ephemos/internal/core/domain"
 )
 
@@ -54,5 +56,11 @@ func GetErrors(err error) []Error {
 
 // IsValidationError checks if an error is a validation-related error.
 func IsValidationError(err error) bool {
-	return domain.IsValidationError(err)
+	// Check if the error is a validation error by checking the error message or type
+	if err == nil {
+		return false
+	}
+	// For now, just check if it contains validation-related keywords
+	errStr := err.Error()
+	return strings.Contains(errStr, "validation") || strings.Contains(errStr, "invalid")
 }

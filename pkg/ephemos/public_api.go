@@ -4,6 +4,13 @@ package ephemos
 
 import (
 	"context"
+	"fmt"
+	"net"
+
+	"github.com/sufield/ephemos/internal/adapters/primary/api"
+	"github.com/sufield/ephemos/internal/adapters/secondary/config"
+	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
+	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
 )
 
 // ServiceIdentity represents a service's identity in business terms.
@@ -43,11 +50,14 @@ type Client interface {
 // ClientConnection represents an established connection to a service.
 type ClientConnection struct {
 	// Implementation details hidden - only used for resource management
+	internalConn *api.ClientConnection
 }
 
 // Close closes the connection and releases resources.
 func (c *ClientConnection) Close() error {
-	// Implementation will be handled internally
+	if c.internalConn != nil {
+		return c.internalConn.Close()
+	}
 	return nil
 }
 
@@ -69,66 +79,125 @@ type ServiceRegistrar interface {
 
 // IdentityClient creates a new identity client for connecting to services.
 func IdentityClient(ctx context.Context, configPath string) (Client, error) {
-	// Implementation will use internal packages
-	return createInternalClient(ctx, configPath)
+	// Load configuration
+	configProvider := config.NewFileProvider()
+	cfg, err := configProvider.LoadConfiguration(ctx, configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Create identity provider
+	identityProvider, err := spiffe.NewProvider(cfg.SPIFFE)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create identity provider: %w", err)
+	}
+
+	// Create transport provider
+	transportProvider := transport.NewGRPCProvider()
+
+	// Create client using internal API
+	internalClient, err := api.IdentityClient(identityProvider, transportProvider, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	return &clientWrapper{client: internalClient}, nil
+}
+
+// clientWrapper adapts internal client to public Client interface.
+type clientWrapper struct {
+	client *api.Client
+}
+
+// Connect establishes an authenticated connection to the specified service.
+func (c *clientWrapper) Connect(ctx context.Context, serviceName, address string) (*ClientConnection, error) {
+	internalConn, err := c.client.Connect(ctx, serviceName, address)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Wrap the internal connection in the public API type
+	return &ClientConnection{
+		internalConn: internalConn,
+	}, nil
+}
+
+// Close releases any resources held by the client.
+func (c *clientWrapper) Close() error {
+	return c.client.Close()
 }
 
 // IdentityServer creates a new identity server for hosting services.  
 func IdentityServer(ctx context.Context, configPath string) (Server, error) {
-	// Implementation will use internal packages
-	return createInternalServer(ctx, configPath)
+	// Load configuration
+	configProvider := config.NewFileProvider()
+	cfg, err := configProvider.LoadConfiguration(ctx, configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Create identity provider
+	identityProvider, err := spiffe.NewProvider(cfg.SPIFFE)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create identity provider: %w", err)
+	}
+
+	// Create transport provider
+	transportProvider := transport.NewGRPCProvider()
+
+	// Create server using internal API
+	internalServer, err := api.WorkloadServer(identityProvider, transportProvider, configProvider, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create server: %w", err)
+	}
+
+	return &serverWrapper{server: internalServer}, nil
+}
+
+// serverWrapper adapts internal server to public Server interface.
+type serverWrapper struct {
+	server *api.Server
+}
+
+// RegisterService registers a service implementation with the server.
+func (s *serverWrapper) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
+	// The internal server expects a different registrar interface
+	// We need to adapt the public ServiceRegistrar to the internal requirements
+	return fmt.Errorf("service registration not yet implemented - requires adapter between public and internal registrar interfaces")
+}
+
+// ListenAndServe starts the server and serves requests.
+func (s *serverWrapper) ListenAndServe(ctx context.Context) error {
+	// For now, use a default listener - in production this should be configurable
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return fmt.Errorf("failed to create listener: %w", err)
+	}
+	defer listener.Close()
+	
+	return s.server.Serve(ctx, listener)
+}
+
+// Close gracefully shuts down the server.
+func (s *serverWrapper) Close() error {
+	return s.server.Close()
 }
 
 // NewServiceRegistrar creates a service registrar for admin/CLI use.
 func NewServiceRegistrar(registerFunc func(interface{})) ServiceRegistrar {
-	return &serviceRegistrar{registerFunc: registerFunc}
-}
-
-// Internal implementations - these will be moved to use internal packages
-
-type serviceRegistrar struct {
-	registerFunc func(interface{})
-}
-
-func (r *serviceRegistrar) Register(transport interface{}) {
-	if r.registerFunc != nil {
-		r.registerFunc(transport)
+	return &serviceRegistrarWrapper{
+		registerFunc: registerFunc,
 	}
 }
 
-// Internal client implementation - will use internal packages
-type internalClient struct{}
-
-func (c *internalClient) Connect(ctx context.Context, serviceName, address string) (*ClientConnection, error) {
-	// Will be implemented using internal transport/config packages
-	return &ClientConnection{}, nil
+// serviceRegistrarWrapper adapts the public ServiceRegistrar interface.
+type serviceRegistrarWrapper struct {
+	registerFunc func(interface{})
 }
 
-func (c *internalClient) Close() error {
-	return nil
-}
-
-func createInternalClient(ctx context.Context, configPath string) (Client, error) {
-	return &internalClient{}, nil
-}
-
-// Internal server implementation - will use internal packages  
-type internalServer struct{}
-
-func (s *internalServer) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
-	// Will be implemented using internal transport packages
-	return nil
-}
-
-func (s *internalServer) ListenAndServe(ctx context.Context) error {
-	// Will be implemented using internal transport/shutdown packages
-	return nil
-}
-
-func (s *internalServer) Close() error {
-	return nil
-}
-
-func createInternalServer(ctx context.Context, configPath string) (Server, error) {
-	return &internalServer{}, nil
+// Register registers the service with the transport.
+func (r *serviceRegistrarWrapper) Register(transport interface{}) {
+	if r.registerFunc != nil {
+		r.registerFunc(transport)
+	}
 }

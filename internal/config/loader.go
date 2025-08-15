@@ -3,7 +3,6 @@ package config
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strconv"
 )
