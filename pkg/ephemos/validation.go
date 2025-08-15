@@ -782,8 +782,6 @@ func (ve *ValidationEngine) validateSPIFFEID(val reflect.Value, _ string) error 
 		return nil // Empty SPIFFE IDs are allowed unless required
 	}
 
-	// Use official go-spiffe/v2 SDK for proper SPIFFE ID validation
-	// This provides full SPIFFE specification compliance
 	_, err := spiffeid.FromString(id)
 	if err != nil {
 		return fmt.Errorf("invalid SPIFFE ID: %w", err)
