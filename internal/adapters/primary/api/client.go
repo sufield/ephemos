@@ -22,23 +22,9 @@ type IdentityClient struct {
 	mu              sync.Mutex
 }
 
-// TODO: Deprecation is not needed. Remove this
-// NewIdentityClient creates a new IdentityClient with the given configuration file path.
-// Deprecated: Use NewIdentityClientWithDependencies for proper dependency injection.
-func NewIdentityClient(ctx context.Context, configPath string) (*IdentityClient, error) {
-	// This is a legacy method maintained for backward compatibility.
-	// For new code, use NewIdentityClientWithDependencies instead.
-	return nil, &errors.ValidationError{
-		Field:   "constructor",
-		Value:   "NewIdentityClient",
-		Message: "deprecated constructor - use NewIdentityClientWithDependencies instead",
-	}
-}
-
-// TODO: Rename this to NewIdentityClient
-// NewIdentityClientWithDependencies creates a new identity client with injected dependencies.
+// IdentityClient creates a new identity client with injected dependencies.
 // This constructor follows proper dependency injection and hexagonal architecture principles.
-func NewIdentityClientWithDependencies(
+func IdentityClient(
 	identityProvider ports.IdentityProvider,
 	transportProvider ports.TransportProvider,
 	cfg *ports.Configuration,

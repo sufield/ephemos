@@ -287,8 +287,6 @@ func (p *fileProviderCompat) GetDefaultConfiguration(_ context.Context) *Configu
 			Type:    "http",
 			Address: ":8080",
 		},
-		AuthorizedClients: []string{},
-		TrustedServers:    []string{},
 	}
 }
 
