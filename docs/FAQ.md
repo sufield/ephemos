@@ -849,3 +849,61 @@ For production use, consider:
 - **Optimized libraries**: Uses efficient go-spiffe implementation
 
 The performance impact is negligible compared to the security benefits provided.
+
+### How does certificate validation work?
+
+**Ephemos follows industry best practices with explicit opt-in for insecure mode.**
+
+Like Docker, Argo Workflows, Consul, and Kubernetes, certificate validation is controlled via environment variables:
+
+#### **Secure by Default (Production)**
+```yaml
+service:
+  name: "payment-service"
+  domain: "company.com"
+
+agent:
+  socketPath: "/run/sockets/agent.sock"
+```
+```bash
+# No environment variable set = secure certificate validation
+./your-service
+```
+**Result**: Certificates always validated ✅
+
+#### **Development with Disabled Validation**
+```yaml
+service:
+  name: "dev-service"
+  domain: "dev.company.com"
+
+agent:
+  socketPath: "/tmp/agent.sock"
+```
+```bash
+# Explicit opt-in for insecure mode (development only)
+export EPHEMOS_INSECURE_SKIP_VERIFY=true
+./your-service
+# ⚠️ [EPHEMOS] Certificate validation disabled (EPHEMOS_INSECURE_SKIP_VERIFY=true) - development only!
+```
+**Result**: Certificate validation disabled for development testing
+
+#### **Industry Standard Pattern**
+
+This follows the same pattern as successful Go projects:
+
+| Project | Environment Variable | Default |
+|---------|---------------------|---------|
+| **Docker** | `DOCKER_TLS_VERIFY` | Varies |
+| **Argo Workflows** | `ARGO_INSECURE_SKIP_VERIFY=true` | Secure |
+| **Consul** | `CONSUL_TLS_SKIP_VERIFY=true` | Secure |
+| **Kubernetes** | `insecure-skip-tls-verify: true` | Secure |
+| **Ephemos** | `EPHEMOS_INSECURE_SKIP_VERIFY=true` | **Secure** |
+
+#### **Security Features**
+
+✅ **Explicit Opt-in** - Must set `EPHEMOS_INSECURE_SKIP_VERIFY=true`  
+✅ **Secure by Default** - Certificate validation enabled unless explicitly disabled  
+✅ **Security Warnings** - Logs warning when validation is disabled  
+✅ **Production Validation** - `IsProductionReady()` fails if insecure mode detected  
+✅ **Industry Standard** - Matches patterns from successful Go projects

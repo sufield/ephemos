@@ -14,9 +14,6 @@ import (
 	"net"
 
 	"github.com/sufield/ephemos/internal/adapters/primary/api"
-	"github.com/sufield/ephemos/internal/adapters/secondary/config"
-	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
-	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
 )
 
 // ServiceIdentity represents a service's identity in business terms.
@@ -78,24 +75,8 @@ type Server interface {
 
 // IdentityClient creates a new identity client for connecting to services.
 func IdentityClient(ctx context.Context, configPath string) (Client, error) {
-	// Load configuration
-	configProvider := config.NewFileProvider()
-	cfg, err := configProvider.LoadConfiguration(ctx, configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
-	}
-
-	// Create identity provider
-	identityProvider, err := spiffe.NewProvider(cfg.SPIFFE)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create identity provider: %w", err)
-	}
-
-	// Create transport provider
-	transportProvider := transport.NewGRPCProvider()
-
-	// Create client using internal API
-	internalClient, err := api.IdentityClient(identityProvider, transportProvider, cfg)
+	// Create client using internal API (all provider creation handled internally)
+	internalClient, err := api.NewClientFromConfig(ctx, configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
@@ -128,24 +109,8 @@ func (c *clientWrapper) Close() error {
 
 // IdentityServer creates a new identity server for hosting services.  
 func IdentityServer(ctx context.Context, configPath string) (Server, error) {
-	// Load configuration
-	configProvider := config.NewFileProvider()
-	cfg, err := configProvider.LoadConfiguration(ctx, configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
-	}
-
-	// Create identity provider
-	identityProvider, err := spiffe.NewProvider(cfg.SPIFFE)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create identity provider: %w", err)
-	}
-
-	// Create transport provider
-	transportProvider := transport.NewGRPCProvider()
-
-	// Create server using internal API
-	internalServer, err := api.WorkloadServer(identityProvider, transportProvider, configProvider, cfg)
+	// Create server using internal API (all provider creation handled internally)
+	internalServer, err := api.NewServerFromConfig(ctx, configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create server: %w", err)
 	}

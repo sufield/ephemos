@@ -9,6 +9,9 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/sufield/ephemos/internal/adapters/secondary/config"
+	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
+	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/sufield/ephemos/internal/core/services"
@@ -21,6 +24,41 @@ type Server struct {
 	serviceName     string
 	domainServer    ports.ServerPort
 	mu              sync.Mutex
+}
+
+// NewServerFromConfig creates a new workload server from configuration path.
+// Handles all provider creation internally to hide implementation details from public API.
+func NewServerFromConfig(ctx context.Context, configPath string) (*Server, error) {
+	// Load configuration
+	configProvider := config.NewFileProvider()
+	cfg, err := configProvider.LoadConfiguration(ctx, configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Create identity provider
+	identityProvider, err := spiffe.NewProvider(cfg.Agent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create identity provider: %w", err)
+	}
+
+	// Create default transport provider
+	transportProvider := transport.NewGRPCProvider(cfg)
+	
+	return WorkloadServer(identityProvider, transportProvider, configProvider, cfg)
+}
+
+// NewServer creates a new workload server with minimal dependencies.
+// Uses default transport provider internally to hide implementation details from public API.
+func NewServer(
+	identityProvider ports.IdentityProvider,
+	configProvider ports.ConfigurationProvider,
+	cfg *ports.Configuration,
+) (*Server, error) {
+	// Create default transport provider internally
+	transportProvider := transport.NewGRPCProvider(cfg)
+	
+	return WorkloadServer(identityProvider, transportProvider, configProvider, cfg)
 }
 
 // WorkloadServer creates a new workload server with injected dependencies.

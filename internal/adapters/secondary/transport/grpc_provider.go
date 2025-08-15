@@ -4,6 +4,7 @@ package transport
 import (
 	"crypto/tls"
 	"fmt"
+	"log"
 	"net"
 
 	"google.golang.org/grpc"
@@ -14,11 +15,13 @@ import (
 )
 
 // GRPCProvider provides gRPC-based transport with SPIFFE mTLS authentication.
-type GRPCProvider struct{}
+type GRPCProvider struct {
+	config *ports.Configuration
+}
 
-// NewGRPCProvider creates a new gRPC transport provider.
-func NewGRPCProvider() *GRPCProvider {
-	return &GRPCProvider{}
+// NewGRPCProvider creates a new gRPC transport provider with configuration.
+func NewGRPCProvider(config *ports.Configuration) *GRPCProvider {
+	return &GRPCProvider{config: config}
 }
 
 // CreateClient creates a gRPC client with SPIFFE-based mTLS authentication.
@@ -65,19 +68,43 @@ func (p *GRPCProvider) CreateServer(cert *domain.Certificate, bundle *domain.Tru
 
 // createClientTLSConfig creates TLS configuration for gRPC client with SPIFFE certs.
 func (p *GRPCProvider) createClientTLSConfig(cert *domain.Certificate, bundle *domain.TrustBundle) (*tls.Config, error) {
+	// Follow industry best practices: explicit opt-in for insecure mode
+	// Similar to Docker, Argo Workflows, Consul, and Kubernetes patterns
+	insecureSkipVerify := false
+	if p.config != nil {
+		insecureSkipVerify = p.config.ShouldSkipCertificateValidation()
+		
+		// Log security warning when validation is disabled (industry standard practice)
+		if insecureSkipVerify {
+			log.Printf("⚠️  [EPHEMOS] Certificate validation disabled (EPHEMOS_INSECURE_SKIP_VERIFY=true) - development only!")
+		}
+	}
+
 	// For now, create a basic TLS config
 	// In a real implementation, this would use the SPIFFE certificates properly
 	return &tls.Config{
-		InsecureSkipVerify: true, // TODO: Use proper certificate validation with SPIFFE certs
+		InsecureSkipVerify: insecureSkipVerify,
 	}, nil
 }
 
 // createServerTLSConfig creates TLS configuration for gRPC server with SPIFFE certs.
 func (p *GRPCProvider) createServerTLSConfig(cert *domain.Certificate, bundle *domain.TrustBundle) (*tls.Config, error) {
+	// Follow industry best practices: explicit opt-in for insecure mode
+	// Similar to Docker, Argo Workflows, Consul, and Kubernetes patterns
+	insecureSkipVerify := false
+	if p.config != nil {
+		insecureSkipVerify = p.config.ShouldSkipCertificateValidation()
+		
+		// Log security warning when validation is disabled (industry standard practice)
+		if insecureSkipVerify {
+			log.Printf("⚠️  [EPHEMOS] Certificate validation disabled (EPHEMOS_INSECURE_SKIP_VERIFY=true) - development only!")
+		}
+	}
+
 	// For now, create a basic TLS config
 	// In a real implementation, this would use the SPIFFE certificates properly
 	return &tls.Config{
-		InsecureSkipVerify: true, // TODO: Use proper certificate validation with SPIFFE certs
+		InsecureSkipVerify: insecureSkipVerify,
 	}, nil
 }
 

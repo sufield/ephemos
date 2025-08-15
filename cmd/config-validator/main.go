@@ -62,8 +62,8 @@ func displayConfiguration(cfg *ports.Configuration) {
 	fmt.Printf("   Service Name: %s\n", cfg.Service.Name)
 	fmt.Printf("   Trust Domain: %s\n", cfg.Service.Domain)
 
-	if cfg.SPIFFE != nil {
-		fmt.Printf("   SPIFFE Socket: %s\n", cfg.SPIFFE.SocketPath)
+	if cfg.Agent != nil {
+		fmt.Printf("   Agent Socket: %s\n", cfg.Agent.SocketPath)
 	}
 }
 
@@ -106,7 +106,7 @@ func printSecurityRecommendations(envOnly bool) {
 	fmt.Printf("     export %s=\"your.production.domain\"\n", ports.EnvTrustDomain)
 
 	fmt.Println("  🛡️ Optional security environment variables:")
-	fmt.Printf("     export %s=\"/run/spire/sockets/api.sock\"\n", ports.EnvSPIFFESocket)
+	fmt.Printf("     export %s=\"/run/sockets/agent.sock\"\n", ports.EnvAgentSocket)
 	fmt.Printf("     export %s=\"false\"\n", ports.EnvDebugEnabled)
 
 	fmt.Println("  📚 For more details, see:")

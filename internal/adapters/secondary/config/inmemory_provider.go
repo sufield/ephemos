@@ -25,8 +25,8 @@ func NewInMemoryProvider() *InMemoryProvider {
 				Name:   "default-service",
 				Domain: "default.org",
 			},
-			SPIFFE: &ports.SPIFFEConfig{
-				SocketPath: "/tmp/spire-agent/public/api.sock",
+			Agent: &ports.AgentConfig{
+				SocketPath: "/run/sockets/agent.sock",
 			},
 		},
 	}
@@ -99,9 +99,9 @@ func copyConfiguration(config *ports.Configuration) *ports.Configuration {
 		Service: config.Service,
 	}
 
-	if config.SPIFFE != nil {
-		cfgCopy.SPIFFE = &ports.SPIFFEConfig{
-			SocketPath: config.SPIFFE.SocketPath,
+	if config.Agent != nil {
+		cfgCopy.Agent = &ports.AgentConfig{
+			SocketPath: config.Agent.SocketPath,
 		}
 	}
 
