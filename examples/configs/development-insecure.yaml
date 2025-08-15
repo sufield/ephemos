@@ -2,8 +2,8 @@ service:
   name: "development-service"
   domain: "dev.example.org"
 
-spiffe:
-  socketPath: "/tmp/spire-agent/public/api.sock"
+agent:
+  socketPath: "/run/sockets/agent.sock"
 
 security:
   # WARNING: This is ONLY for development environments

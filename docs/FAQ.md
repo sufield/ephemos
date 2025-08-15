@@ -862,8 +862,8 @@ service:
   name: "dev-service"
   domain: "dev.example.org"
 
-spiffe:
-  socketPath: "/tmp/spire-agent/public/api.sock"
+agent:
+  socketPath: "/run/sockets/agent.sock"
 
 security:
   certificate_validation_disabled: true  # ⚠️ Development only!
@@ -875,8 +875,8 @@ service:
   name: "payment-service"  
   domain: "prod.company.com"
 
-spiffe:
-  socketPath: "/run/spire/sockets/agent.sock"
+agent:
+  socketPath: "/run/sockets/agent.sock"
 
 # Certificate validation is enabled by default - no security section needed
 ```

@@ -82,8 +82,8 @@ func (p *FileProvider) GetDefaultConfiguration(_ context.Context) *ports.Configu
 			Name:   "ephemos-service", // Default service name
 			Domain: "",                // Empty domain uses SPIRE trust domain
 		},
-		SPIFFE: &ports.SPIFFEConfig{
-			SocketPath: "/tmp/spire-agent/public/api.sock", // Standard SPIRE agent socket path
+		Agent: &ports.AgentConfig{
+			SocketPath: "/run/sockets/agent.sock", // Standard agent socket path
 		},
 	}
 }

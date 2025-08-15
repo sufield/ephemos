@@ -21,16 +21,16 @@ const (
 )
 
 // Configuration represents the complete configuration for Ephemos services.
-// It contains all necessary settings for service identity, SPIFFE integration,
+// It contains all necessary settings for service identity, agent connection,
 // and security policies.
 type Configuration struct {
 	// Service contains the core service identification settings.
 	// This is required and must include at least a service name.
 	Service ServiceConfig `yaml:"service"`
 
-	// SPIFFE contains optional SPIFFE/SPIRE integration settings.
-	// If nil, default SPIFFE settings will be used.
-	SPIFFE *SPIFFEConfig `yaml:"spiffe,omitempty"`
+	// Agent contains the connection settings for the identity agent.
+	// If nil, default agent settings will be used.
+	Agent *AgentConfig `yaml:"agent,omitempty"`
 
 	// Security contains security configuration settings.
 	// If nil, secure defaults will be used.
@@ -50,11 +50,11 @@ type ServiceConfig struct {
 	Domain string `yaml:"domain,omitempty"`
 }
 
-// SPIFFEConfig contains SPIFFE/SPIRE integration settings.
-type SPIFFEConfig struct {
-	// SocketPath is the path to the SPIRE agent's Unix domain socket.
+// AgentConfig contains identity agent connection settings.
+type AgentConfig struct {
+	// SocketPath is the path to the identity agent's Unix domain socket.
 	// Must be an absolute path to a valid Unix socket file.
-	// Common default: "/tmp/spire-agent/public/api.sock"
+	// Common default: "/run/sockets/agent.sock"
 	SocketPath string `yaml:"socketPath"`
 }
 
@@ -84,10 +84,10 @@ func (c *Configuration) Validate() error {
 		return fmt.Errorf("invalid service configuration: %w", err)
 	}
 
-	// Validate SPIFFE configuration if present
-	if c.SPIFFE != nil {
-		if err := c.validateSPIFFE(); err != nil {
-			return fmt.Errorf("invalid SPIFFE configuration: %w", err)
+	// Validate agent configuration if present
+	if c.Agent != nil {
+		if err := c.validateAgent(); err != nil {
+			return fmt.Errorf("invalid agent configuration: %w", err)
 		}
 	}
 
@@ -156,22 +156,22 @@ func (c *Configuration) validateServiceDomain() error {
 	return nil
 }
 
-func (c *Configuration) validateSPIFFE() error {
-	if strings.TrimSpace(c.SPIFFE.SocketPath) == "" {
+func (c *Configuration) validateAgent() error {
+	if strings.TrimSpace(c.Agent.SocketPath) == "" {
 		return &errors.ValidationError{
-			Field:   "spiffe.socket_path",
-			Value:   c.SPIFFE.SocketPath,
-			Message: "SPIFFE socket path is required when SPIFFE config is provided",
+			Field:   "agent.socketPath",
+			Value:   c.Agent.SocketPath,
+			Message: "agent socket path is required when agent config is provided",
 		}
 	}
 
 	// Validate that socket path is absolute
-	socketPath := strings.TrimSpace(c.SPIFFE.SocketPath)
+	socketPath := strings.TrimSpace(c.Agent.SocketPath)
 	if !strings.HasPrefix(socketPath, "/") {
 		return &errors.ValidationError{
-			Field:   "spiffe.socket_path",
-			Value:   c.SPIFFE.SocketPath,
-			Message: "SPIFFE socket path must be an absolute path",
+			Field:   "agent.socketPath",
+			Value:   c.Agent.SocketPath,
+			Message: "agent socket path must be an absolute path",
 		}
 	}
 
@@ -193,7 +193,7 @@ type ConfigurationProvider interface {
 const (
 	EnvServiceName   = "EPHEMOS_SERVICE_NAME"
 	EnvTrustDomain   = "EPHEMOS_TRUST_DOMAIN"
-	EnvSPIFFESocket  = "EPHEMOS_SPIFFE_SOCKET"
+	EnvAgentSocket   = "EPHEMOS_AGENT_SOCKET"
 	EnvRequireAuth   = "EPHEMOS_REQUIRE_AUTHENTICATION"
 	EnvLogLevel      = "EPHEMOS_LOG_LEVEL"
 	EnvBindAddress   = "EPHEMOS_BIND_ADDRESS"
@@ -227,14 +227,14 @@ func LoadFromEnvironment() (*Configuration, error) {
 		Domain: trustDomain,
 	}
 
-	// SPIFFE Configuration
-	spiffeSocket := os.Getenv(EnvSPIFFESocket)
-	if spiffeSocket == "" {
-		spiffeSocket = "/tmp/spire-agent/public/api.sock" // Default socket path
+	// Agent Configuration
+	agentSocket := os.Getenv(EnvAgentSocket)
+	if agentSocket == "" {
+		agentSocket = "/run/sockets/agent.sock" // Default socket path
 	}
 
-	config.SPIFFE = &SPIFFEConfig{
-		SocketPath: spiffeSocket,
+	config.Agent = &AgentConfig{
+		SocketPath: agentSocket,
 	}
 
 	// Validate the configuration
@@ -263,12 +263,12 @@ func (c *Configuration) MergeWithEnvironment() error {
 		c.Service.Domain = trustDomain
 	}
 
-	// Override SPIFFE socket path if set via environment
-	if spiffeSocket := os.Getenv(EnvSPIFFESocket); spiffeSocket != "" {
-		if c.SPIFFE == nil {
-			c.SPIFFE = &SPIFFEConfig{}
+	// Override agent socket path if set via environment
+	if agentSocket := os.Getenv(EnvAgentSocket); agentSocket != "" {
+		if c.Agent == nil {
+			c.Agent = &AgentConfig{}
 		}
-		c.SPIFFE.SocketPath = spiffeSocket
+		c.Agent.SocketPath = agentSocket
 	}
 
 	return c.Validate()
@@ -300,8 +300,8 @@ func validateProductionSecurity(config *Configuration) error {
 		errors = append(errors, err.Error())
 	}
 
-	// Check SPIFFE socket path security
-	if err := validateSocketPath(config.SPIFFE.SocketPath); err != nil {
+	// Check agent socket path security
+	if err := validateSocketPath(config.Agent.SocketPath); err != nil {
 		errors = append(errors, err.Error())
 	}
 
@@ -341,7 +341,7 @@ func validateProductionServiceName(name string) error {
 	return nil
 }
 
-// validateSocketPath checks if the SPIFFE socket path is in a secure location.
+// validateSocketPath checks if the agent socket path is in a secure location.
 func validateSocketPath(socketPath string) error {
 	secureDirectories := []string{"/run/", "/var/run/", "/tmp/"}
 	for _, dir := range secureDirectories {
@@ -349,7 +349,7 @@ func validateSocketPath(socketPath string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("SPIFFE socket should be in a secure directory (/run, /var/run, or /tmp)")
+	return fmt.Errorf("agent socket should be in a secure directory (/run, /var/run, or /tmp)")
 }
 
 // validateTLSSecurity checks security configuration for production security issues.

@@ -86,7 +86,7 @@ func IdentityClient(ctx context.Context, configPath string) (Client, error) {
 	}
 
 	// Create identity provider
-	identityProvider, err := spiffe.NewProvider(cfg.SPIFFE)
+	identityProvider, err := spiffe.NewProvider(cfg.Agent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity provider: %w", err)
 	}
@@ -136,7 +136,7 @@ func IdentityServer(ctx context.Context, configPath string) (Server, error) {
 	}
 
 	// Create identity provider
-	identityProvider, err := spiffe.NewProvider(cfg.SPIFFE)
+	identityProvider, err := spiffe.NewProvider(cfg.Agent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity provider: %w", err)
 	}

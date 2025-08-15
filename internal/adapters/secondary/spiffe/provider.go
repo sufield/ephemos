@@ -21,11 +21,11 @@ type Provider struct {
 }
 
 // NewProvider creates a provider.
-func NewProvider(config *ports.SPIFFEConfig) (*Provider, error) {
+func NewProvider(config *ports.AgentConfig) (*Provider, error) {
 	if config == nil {
 		// Use default socket path when no config is provided
 		return &Provider{
-			socketPath: "/tmp/spire-agent/public/api.sock",
+			socketPath: "/run/sockets/agent.sock",
 		}, nil
 	}
 
