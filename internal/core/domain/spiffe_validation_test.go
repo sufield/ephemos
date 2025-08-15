@@ -39,7 +39,7 @@ func TestSPIFFEValidator_ValidateSPIFFEID(t *testing.T) {
 		{
 			name:      "empty SPIFFE ID",
 			spiffeID:  "",
-			wantError: true,
+			wantError: true, // Empty SPIFFE IDs are invalid
 		},
 		{
 			name:      "invalid format - spaces",
@@ -188,7 +188,7 @@ func TestSPIFFEValidationIntegration(t *testing.T) {
 		{"invalid scheme", "https://example.org/service", false},
 		{"invalid empty trust domain", "spiffe:///service", false},
 		{"invalid characters", "spiffe://example.org/service with spaces", false},
-		{"empty string", "", false},
+		{"empty string", "", false}, // Empty is invalid
 	}
 
 	validator := NewSPIFFEValidator(nil)

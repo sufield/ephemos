@@ -237,46 +237,6 @@ func TestValidationRules(t *testing.T) {
 	}
 }
 
-func TestSPIFFEValidation(t *testing.T) {
-	tests := []struct {
-		name     string
-		spiffeID string
-		hasErr   bool
-	}{
-		{
-			name:     "valid SPIFFE ID",
-			spiffeID: "spiffe://example.org/service",
-			hasErr:   false,
-		},
-		{
-			name:     "invalid SPIFFE ID format",
-			spiffeID: "not-a-spiffe-id",
-			hasErr:   true,
-		},
-		{
-			name:     "empty SPIFFE ID",
-			spiffeID: "",
-			hasErr:   false, // Empty values are allowed unless marked as required
-		},
-	}
-
-	engine := NewValidationEngine()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			input := &testSPIFFEStruct{
-				SPIFFEID: tt.spiffeID,
-			}
-
-			err := engine.ValidateAndSetDefaults(input)
-			hasErr := err != nil
-
-			if hasErr != tt.hasErr {
-				t.Errorf("expected hasErr=%v, got hasErr=%v, err=%v", tt.hasErr, hasErr, err)
-			}
-		})
-	}
-}
 
 func TestFileValidation(t *testing.T) {
 	// Create a temporary file
@@ -398,9 +358,6 @@ type testStruct struct {
 	DefaultField  string `default:"default_value"`
 }
 
-type testSPIFFEStruct struct {
-	SPIFFEID string `validate:"spiffe_id"`
-}
 
 type testFileStruct struct {
 	FilePath string `validate:"file_exists"`

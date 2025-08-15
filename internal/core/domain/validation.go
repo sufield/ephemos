@@ -12,8 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/spiffe/go-spiffe/v2/spiffeid"
 )
 
 // Validation rule constants.
@@ -791,15 +789,12 @@ func (ve *ValidationEngine) validateSPIFFEID(val reflect.Value, _ string) error 
 
 	id := strings.TrimSpace(val.String())
 	if id == "" {
-		return nil // Empty SPIFFE IDs are allowed unless required
+		return nil // Empty values handled by 'required' rule
 	}
 
-	_, err := spiffeid.FromString(id)
-	if err != nil {
-		return fmt.Errorf("invalid SPIFFE ID: %w", err)
-	}
-
-	return nil
+	// Delegate to the dedicated SPIFFEValidator for consistency
+	validator := NewSPIFFEValidator(nil)
+	return validator.ValidateSPIFFEID(id)
 }
 
 func (ve *ValidationEngine) validateDomain(val reflect.Value, _ string) error {

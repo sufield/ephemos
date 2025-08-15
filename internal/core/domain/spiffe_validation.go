@@ -24,16 +24,12 @@ func NewSPIFFEValidator(bundleSource x509bundle.Source) *SPIFFEValidator {
 }
 
 // ValidateSPIFFEID validates a SPIFFE ID string using the official SDK.
+// This is an internal method - external users should use spiffeid.FromString() directly.
 func (v *SPIFFEValidator) ValidateSPIFFEID(spiffeIDStr string) error {
-	if spiffeIDStr == "" {
-		return fmt.Errorf("SPIFFE ID cannot be empty")
-	}
-
 	_, err := spiffeid.FromString(spiffeIDStr)
 	if err != nil {
 		return fmt.Errorf("invalid SPIFFE ID format: %w", err)
 	}
-
 	return nil
 }
 
