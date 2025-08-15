@@ -136,15 +136,15 @@ func assertValidIdentity(t *testing.T, identity *domain.ServiceIdentity) {
 		t.Fatal("GetServiceIdentity returned nil identity without error")
 	}
 
-	if identity.Name == "" {
+	if identity.Name() == "" {
 		t.Error("ServiceIdentity.Name should not be empty")
 	}
 
-	if identity.Domain == "" {
+	if identity.Domain() == "" {
 		t.Error("ServiceIdentity.Domain should not be empty")
 	}
 
-	if identity.URI == "" {
+	if identity.URI() == "" {
 		t.Error("ServiceIdentity.URI should not be empty")
 	}
 
@@ -199,13 +199,13 @@ func assertValidTrustBundle(t *testing.T, bundle *domain.TrustBundle) {
 // assertIdentitiesConsistent asserts that two identities are consistent.
 func assertIdentitiesConsistent(t *testing.T, identity1, identity2 *domain.ServiceIdentity) {
 	t.Helper()
-	if identity1.Name != identity2.Name {
+	if identity1.Name() != identity2.Name() {
 		t.Error("GetServiceIdentity returned inconsistent Name")
 	}
-	if identity1.Domain != identity2.Domain {
+	if identity1.Domain() != identity2.Domain() {
 		t.Error("GetServiceIdentity returned inconsistent Domain")
 	}
-	if identity1.URI != identity2.URI {
+	if identity1.URI() != identity2.URI() {
 		t.Error("GetServiceIdentity returned inconsistent URI")
 	}
 }
