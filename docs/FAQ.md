@@ -16,19 +16,23 @@ Ephemos is a Go library that provides identity-based authentication for backend 
 
 ### How simple is it to use?
 
-Extremely simple - just two lines of code:
+Extremely simple - just two lines of code for developers:
 
 **Server:**
 ```go
-server := ephemos.IdentityServer()
-server.RegisterService(serviceRegistrar)
-server.Serve(listener)
+server := ephemos.IdentityServer(ctx, configPath)
+server.ListenAndServe(ctx)
 ```
 
 **Client:**
 ```go
-client := ephemos.IdentityClient()
-conn, _ := client.Connect("service-name", "localhost:50051")
+client := ephemos.IdentityClient(ctx, configPath)
+conn, _ := client.Connect(ctx, "service-name", "localhost:50051")
+```
+
+**Service Registration** (CLI-only, for administrators):
+```bash
+ephemos-cli register --name my-service --domain company.com
 ```
 
 ## Technical Questions
@@ -109,6 +113,119 @@ This demonstrates that:
 - Both services can identify themselves in communication
 
 ## Architecture Questions
+
+### Why is service registration CLI-only and not part of the public API?
+
+This addresses a fundamental **chicken and egg security problem** in authentication systems.
+
+#### **The Security Paradox**
+
+```
+Client needs SPIFFE identity → to authenticate to registration service
+    ↓
+But client gets SPIFFE identity → by registering with SPIRE
+    ↓  
+How does client authenticate → to register itself? 🤔
+```
+
+#### **Bad Solutions (Security Anti-Patterns)**
+
+❌ **API Keys in Configuration Files**
+```yaml
+# This defeats the entire purpose of identity-based authentication!
+registration:
+  api_key: "sk_live_51H..."  # Plaintext secret - exactly what we're trying to avoid
+```
+
+❌ **Pre-shared Secrets**
+```go
+// Doesn't scale, creates key management nightmare
+client.RegisterSelf("shared-secret-123")
+```
+
+❌ **Open Registration Endpoint**
+```go
+// Anyone can register malicious services!
+http.POST("/register", serviceInfo)  // No authentication required
+```
+
+❌ **Self-Registration with Trust-on-First-Use**
+```go
+// How do we verify this is a legitimate service?
+service.RegisterSelf("payment-service")  // Could be malicious impersonator
+```
+
+#### **The Correct Solution: Administrative Registration**
+
+**Service registration is an infrastructure operation, not an application operation.**
+
+```bash
+# 🔐 SECURE: Admin registers service out-of-band
+ephemos-cli register \
+    --name payment-service \
+    --domain company.com \
+    --selector k8s:ns:production \
+    --selector k8s:sa:payment-service
+
+# ✅ SIMPLE: Service uses pre-registered identity
+server := ephemos.IdentityServer(ctx, configPath)  // Gets registered identity
+client := ephemos.IdentityClient(ctx, configPath)  // Gets registered identity
+```
+
+#### **Who Can Register Services?**
+
+✅ **Platform Administrators** - Direct SPIRE server access  
+✅ **Infrastructure as Code** - Terraform, Helm charts with proper credentials  
+✅ **CI/CD Pipelines** - Authenticated deployment systems  
+✅ **Kubernetes Operators** - Service account permissions  
+✅ **Bastion Hosts** - Secure admin workstations with VPN
+
+#### **From Where?**
+
+✅ **Secure Networks** - Admin VPN, private networks  
+✅ **Control Plane** - Kubernetes API server, management clusters  
+✅ **Deployment Systems** - Authenticated CI/CD environments  
+✅ **Operations Centers** - SOC workstations with proper access controls
+
+#### **Benefits of This Architecture**
+
+🛡️ **Zero Trust** - No service can self-register or register others  
+📋 **Audit Trail** - All registrations logged and auditable  
+🔒 **Principle of Least Privilege** - Only authenticated admins can register services  
+⚖️ **Separation of Concerns** - Infrastructure operations separate from application logic  
+🏗️ **Scalable** - Works in containerized and orchestrated environments
+
+#### **Example: Production Workflow**
+
+```bash
+# 1. 👨‍💼 Admin registers service (one-time, secure)
+ephemos-cli register --config payment-service.yaml
+
+# 2. 🏗️ Service deploys and automatically gets identity
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+spec:
+  template:
+    spec:
+      serviceAccountName: payment-service  # Maps to SPIRE registration
+      containers:
+      - name: payment-service
+        image: company/payment-service:v1.2.3
+        # Service automatically gets spiffe://company.com/payment-service identity
+```
+
+```go
+// 3. 👩‍💻 Developer code is simple and secure
+func main() {
+    // Automatically uses pre-registered identity
+    server := ephemos.IdentityServer(ctx, "config.yaml")
+    server.ListenAndServe(ctx)  // Only authorized clients can connect
+}
+```
+
+This solves the bootstrapping problem by separating **identity provisioning** (admin/CLI) from **identity usage** (developer/API).
 
 ### What architecture does Ephemos use?
 
@@ -437,15 +554,9 @@ func main() {
     }
     defer server.Close()
     
-    // Register your gRPC service
-    registrar := ephemos.NewServiceRegistrar(func(s *grpc.Server) {
-        pb.RegisterPaymentServiceServer(s, &paymentService{})
-    })
-    server.RegisterService(ctx, registrar)
-    
-    // Start with automatic mTLS authentication
-    lis, _ := net.Listen("tcp", ":50051")
-    server.Serve(ctx, lis) // Only authorized clients can connect
+    // Service registration is handled by CLI, not code
+    // Simply start the server with automatic mTLS authentication
+    server.ListenAndServe(ctx) // Only authorized clients can connect
 }
 ```
 
