@@ -317,7 +317,7 @@ echo "✅ Local CI checks passed"
 
 ```bash
 # Run with specific matrix configurations
-./act --matrix os:ubuntu-latest --matrix go-version:1.21
+./act --matrix os:ubuntu-latest --matrix go-version:1.23
 
 # Override job conditions
 ./act --job build --env FORCE_BUILD=true
