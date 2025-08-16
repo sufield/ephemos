@@ -15,7 +15,6 @@ go_library(
     importpath = "github.com/sufield/ephemos/pkg/ephemos",
     visibility = ["//visibility:public"],
     deps = [
-        "//internal/adapters/http",
         "//internal/adapters/interceptors",
         "//internal/adapters/primary/api",
         "//internal/adapters/secondary/config",
