@@ -106,14 +106,14 @@ func TestAuthenticationPolicyFlow(t *testing.T) {
 		if policy.ServiceIdentity != serverIdentity {
 			t.Error("Policy does not reference correct service identity")
 		}
-		t.Logf("✅ Created authentication policy for %s", serverIdentity.Name)
+		t.Logf("✅ Created authentication policy for %s", serverIdentity.Name())
 
 		// Step 3: Create client-side policy
 		clientPolicy := domain.NewAuthenticationPolicy(clientIdentity)
 		if clientPolicy.ServiceIdentity != clientIdentity {
 			t.Error("Client policy does not reference correct service identity")
 		}
-		t.Logf("✅ Created client authentication policy for %s", clientIdentity.Name)
+		t.Logf("✅ Created client authentication policy for %s", clientIdentity.Name())
 	})
 }
 
