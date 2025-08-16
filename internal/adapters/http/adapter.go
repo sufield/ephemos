@@ -5,7 +5,6 @@ package http
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -56,10 +55,6 @@ func (a *Adapter) createHTTPHandlers(serviceName string, impl interface{}) error
 	switch service := impl.(type) {
 	case ports.EchoService:
 		return a.mountEchoService(serviceName, service)
-	case ports.FileService:
-		return a.mountFileService(serviceName, service)
-	case ports.HealthService:
-		return a.mountHealthService(serviceName, service)
 	default:
 		return a.mountGenericService(serviceName, impl)
 	}
@@ -121,153 +116,9 @@ func (a *Adapter) mountEchoService(serviceName string, service ports.EchoService
 	return nil
 }
 
-// mountFileService creates HTTP handlers for FileService.
-func (a *Adapter) mountFileService(serviceName string, service ports.FileService) error {
-	basePath := fmt.Sprintf("/%s", serviceName)
-
-	a.setupUploadHandler(basePath, service)
-	a.setupDownloadHandler(basePath, service)
-	a.setupListHandler(basePath, service)
-
-	return nil
-}
-
-func (a *Adapter) setupUploadHandler(basePath string, service ports.FileService) {
-	// POST /{service}/upload/{filename}
-	a.mux.HandleFunc(fmt.Sprintf("%s/upload/", basePath), func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		filename := strings.TrimPrefix(r.URL.Path, fmt.Sprintf("%s/upload/", basePath))
-		if filename == "" {
-			http.Error(w, "Filename required", http.StatusBadRequest)
-			return
-		}
-
-		if err := service.Upload(r.Context(), filename, r.Body); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusCreated)
-	})
-}
-
-func (a *Adapter) setupDownloadHandler(basePath string, service ports.FileService) {
-	// GET /{service}/download/{filename}
-	a.mux.HandleFunc(fmt.Sprintf("%s/download/", basePath), func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		filename := strings.TrimPrefix(r.URL.Path, fmt.Sprintf("%s/download/", basePath))
-		if filename == "" {
-			http.Error(w, "Filename required", http.StatusBadRequest)
-			return
-		}
-
-		reader, err := service.Download(r.Context(), filename)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/octet-stream")
-		if _, err := io.Copy(w, reader); err != nil {
-			http.Error(w, "Failed to transfer file", http.StatusInternalServerError)
-		}
-	})
-}
-
-func (a *Adapter) setupListHandler(basePath string, service ports.FileService) {
-	// GET /{service}/list?prefix={prefix}
-	a.mux.HandleFunc(fmt.Sprintf("%s/list", basePath), func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		prefix := r.URL.Query().Get("prefix")
-
-		files, err := service.List(r.Context(), prefix)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		resp := struct {
-			Files []string `json:"files"`
-		}{
-			Files: files,
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		}
-	})
-}
-
-// mountHealthService creates HTTP handlers for HealthService.
-func (a *Adapter) mountHealthService(_ string, service ports.HealthService) error {
-	// GET /health/{service}
-	a.mux.HandleFunc("/health/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		serviceName := strings.TrimPrefix(r.URL.Path, "/health/")
-		if serviceName == "" {
-			serviceName = "default"
-		}
-
-		status, err := service.Check(r.Context(), serviceName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		resp := struct {
-			Service string `json:"service"`
-			Status  string `json:"status"`
-			Message string `json:"message"`
-		}{
-			Service: status.Service,
-			Status:  healthStatusToString(status.Status),
-			Message: status.Message,
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		}
-	})
-
-	return nil
-}
-
 // mountGenericService creates HTTP handlers for unknown service types.
 func (a *Adapter) mountGenericService(serviceName string, _ interface{}) error {
 	// Use reflection to create handlers based on method signatures
 	return fmt.Errorf("generic service mounting not yet implemented for %s", serviceName)
 }
 
-// healthStatusToString converts HealthStatusType to string.
-func healthStatusToString(status ports.HealthStatusType) string {
-	switch status {
-	case ports.HealthStatusUnknown:
-		return "unknown"
-	case ports.HealthStatusServing:
-		return "serving"
-	case ports.HealthStatusNotServing:
-		return "not_serving"
-	case ports.HealthStatusServiceUnknown:
-		return "service_unknown"
-	default:
-		return "unknown"
-	}
-}
