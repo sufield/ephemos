@@ -5,13 +5,10 @@ go_library(
     srcs = [
         "auth.go",
         "identity_propagation.go",
-        "logging.go",
-        "metrics.go",
     ],
     importpath = "github.com/sufield/ephemos/internal/adapters/interceptors",
     visibility = ["//:__subpackages__"],
     deps = [
-        "//internal/adapters/logging",
         "//internal/core/ports",
         "@org_golang_google_grpc//:grpc",
         "@org_golang_google_grpc//codes",
@@ -29,8 +26,6 @@ go_test(
         "direct_test.go",
         "identity_propagation_test.go",
         "integration_test.go",
-        "logging_test.go",
-        "metrics_test.go",
     ],
     embed = [":interceptors"],
     deps = [
