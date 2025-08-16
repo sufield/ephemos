@@ -1,25 +1,37 @@
 // Package main provides a configuration validation tool for Ephemos.
 // This tool helps validate configuration settings before deployment to production.
-//
-//nolint:forbidigo // CLI tool requires direct output to stdout
 package main
 
 import (
 	"context"
-	"flag"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/spf13/cobra"
 
 	"github.com/sufield/ephemos/internal/adapters/secondary/config"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
-// Version information
+// Version information - set by build
 var (
 	version   = "dev"
 	commit    = "unknown"
 	buildDate = "unknown"
+)
+
+// Global flags
+var (
+	configFile  string
+	envOnly     bool
+	production  bool
+	verbose     bool
+	noEmoji     bool
+	format      string
+	quiet       bool
+	timeout     time.Duration
 )
 
 // Exit codes
@@ -31,46 +43,92 @@ const (
 	ExitLoadError          = 5
 )
 
-func main() {
-	var (
-		configFile = flag.String("config", "", "Path to configuration file")
-		envOnly    = flag.Bool("env-only", false, "Validate environment variables only (most secure)")
-		production = flag.Bool("production", false, "Perform production readiness validation")
-		verbose    = flag.Bool("verbose", false, "Verbose output")
-		showVersion = flag.Bool("version", false, "Show version information")
-		noEmoji    = flag.Bool("no-emoji", false, "Disable emoji in output")
-		format     = flag.String("format", "text", "Output format (text|json)")
-		quiet      = flag.Bool("quiet", false, "Suppress success messages")
-		timeout    = flag.Duration("timeout", 30*time.Second, "Timeout for operations")
-	)
+var rootCmd = &cobra.Command{
+	Use:   "config-validator",
+	Short: "Validates Ephemos configuration for security and production readiness",
+	Long: `Validates Ephemos configuration for security and production readiness.
 
-	setupUsage()
-	flag.Parse()
+This tool helps ensure your Ephemos configuration is secure and ready for production deployment.
+It validates service names, trust domains, socket paths, and other security settings.`,
+	Example: `  # Validate environment variables (most secure):
+  config-validator --env-only --production
 
+  # Validate config file with environment override:
+  config-validator --config config/production.yaml --production
+
+  # JSON output for CI:
+  config-validator --env-only --format json --production
+
+  # Verbose validation:
+  config-validator --env-only --verbose`,
+	RunE: runValidator,
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Show version information",
+	Run: func(cmd *cobra.Command, args []string) {
+		if format == "json" {
+			versionInfo := map[string]string{
+				"version":    version,
+				"commit":     commit,
+				"build_date": buildDate,
+			}
+			encoder := json.NewEncoder(os.Stdout)
+			encoder.SetIndent("", "  ")
+			encoder.Encode(versionInfo)
+		} else {
+			fmt.Printf("ephemos-config-validator version %s\n", version)
+			fmt.Printf("  Commit: %s\n", commit)
+			fmt.Printf("  Built:  %s\n", buildDate)
+		}
+	},
+}
+
+func init() {
+	// Add version subcommand
+	rootCmd.AddCommand(versionCmd)
+
+	// Persistent flags (available to all commands)
+	rootCmd.PersistentFlags().StringVar(&format, "format", "text", "Output format (text|json)")
+	rootCmd.PersistentFlags().BoolVar(&noEmoji, "no-emoji", false, "Disable emoji in output")
+	rootCmd.PersistentFlags().BoolVar(&quiet, "quiet", false, "Suppress success messages")
+	rootCmd.PersistentFlags().DurationVar(&timeout, "timeout", 30*time.Second, "Timeout for operations")
+
+	// Root command flags
+	rootCmd.Flags().StringVar(&configFile, "config", "", "Path to configuration file")
+	rootCmd.Flags().BoolVar(&envOnly, "env-only", false, "Validate environment variables only (most secure)")
+	rootCmd.Flags().BoolVar(&production, "production", false, "Perform production readiness validation")
+	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "Verbose output")
+
+	// Make flags mutually exclusive where appropriate
+	rootCmd.MarkFlagsMutuallyExclusive("config", "env-only")
+}
+
+func runValidator(cmd *cobra.Command, args []string) error {
 	// Create printer with proper writer injection
-	printer := NewPrinter(os.Stdout, os.Stderr, !*noEmoji, *quiet)
-
-	// Handle version flag
-	if *showVersion {
-		printVersion(printer, *format)
-		os.Exit(ExitSuccess)
-	}
+	printer := NewPrinter(os.Stdout, os.Stderr, !noEmoji, quiet)
 
 	// Create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	// Header for text mode
-	if *format == "text" && !*quiet {
+	if format == "text" && !quiet {
 		printer.Plain("Ephemos Configuration Validator")
 		printer.Plain("==============================")
 		printer.Newline()
 	}
 
+	// Validate flag combination
+	if configFile == "" && !envOnly {
+		return fmt.Errorf("either --config or --env-only must be specified")
+	}
+
 	// Load configuration with proper precedence
-	cfg, err := loadConfiguration(ctx, printer, *configFile, *envOnly)
+	cfg, err := loadConfigurationCobra(ctx, printer, configFile, envOnly)
 	if err != nil {
-		handleLoadError(printer, *format, err)
+		handleLoadErrorCobra(printer, format, err)
 		os.Exit(ExitLoadError)
 	}
 
@@ -89,13 +147,13 @@ func main() {
 	}
 
 	// Display configuration if verbose
-	if *verbose && *format == "text" {
-		displayConfiguration(printer, cfg)
+	if verbose && format == "text" {
+		displayConfigurationCobra(printer, cfg)
 		printer.Newline()
 	}
 
 	// Perform basic validation
-	if *format == "text" {
+	if format == "text" {
 		printer.Info("Performing basic validation...")
 	}
 
@@ -103,22 +161,22 @@ func main() {
 		result.BasicValid = false
 		result.Errors = append(result.Errors, err.Error())
 
-		if *format == "json" {
-			printer.PrintJSON(result)
+		if format == "json" {
+			return printer.PrintJSON(result)
 		} else {
 			printer.Errorf("Basic validation failed: %v", err)
+			os.Exit(ExitBasicValidation)
 		}
-		os.Exit(ExitBasicValidation)
 	}
 
-	if *format == "text" {
+	if format == "text" {
 		printer.Success("Basic validation passed")
 		result.Messages = append(result.Messages, "Basic validation passed")
 	}
 
 	// Perform production validation if requested
-	if *production {
-		if *format == "text" {
+	if production {
+		if format == "text" {
 			printer.Newline()
 			printer.Production("Performing production readiness validation...")
 		}
@@ -128,9 +186,9 @@ func main() {
 			tips := getProductionTips(err)
 			result.Tips = tips
 
-			if *format == "json" {
+			if format == "json" {
 				result.Errors = append(result.Errors, err.Error())
-				printer.PrintJSON(result)
+				return printer.PrintJSON(result)
 			} else {
 				printer.Errorf("Production validation failed: %v", err)
 				printer.Newline()
@@ -138,23 +196,23 @@ func main() {
 				for _, tip := range tips {
 					printer.Bullet(tip)
 				}
+				os.Exit(ExitProductionReadiness)
 			}
-			os.Exit(ExitProductionReadiness)
 		}
 
-		if *format == "text" {
+		if format == "text" {
 			printer.Success("Production validation passed")
 			result.Messages = append(result.Messages, "Production validation passed")
 		}
 	}
 
 	// Show security recommendations
-	if *format == "text" && !*quiet {
+	if format == "text" && !quiet {
 		printer.Newline()
 		printer.Tip("Security recommendations:")
-		recommendations := getSecurityRecommendations(*envOnly)
+		recommendations := getSecurityRecommendations(envOnly)
 		for _, rec := range recommendations {
-			if rec[0] == ' ' {
+			if len(rec) > 0 && rec[0] == ' ' {
 				printer.Plain(rec)
 			} else {
 				printer.Bullet(rec)
@@ -162,43 +220,23 @@ func main() {
 		}
 	}
 
-	// Final success message
-	if *format == "text" && !*quiet {
+	// Final success message or JSON output
+	if format == "text" && !quiet {
 		printer.Newline()
 		printer.Banner("Configuration validation completed successfully!")
 
-		if *production {
+		if production {
 			printer.Success("Configuration is ready for production deployment")
 		}
-	} else if *format == "json" {
-		printer.PrintJSON(result)
+	} else if format == "json" {
+		return printer.PrintJSON(result)
 	}
 
-	os.Exit(ExitSuccess)
+	return nil
 }
 
-// setupUsage configures the custom usage function
-func setupUsage() {
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [options]\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Validates Ephemos configuration for security and production readiness.\n\n")
-		fmt.Fprintf(os.Stderr, "Options:\n")
-		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  # Validate environment variables (most secure):\n")
-		fmt.Fprintf(os.Stderr, "  %s --env-only --production\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  # Validate config file with environment override:\n")
-		fmt.Fprintf(os.Stderr, "  %s --config config/production.yaml --production\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  # JSON output for CI:\n")
-		fmt.Fprintf(os.Stderr, "  %s --env-only --format json --production\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  # Verbose validation:\n")
-		fmt.Fprintf(os.Stderr, "  %s --env-only --verbose\n\n", os.Args[0])
-	}
-}
-
-// loadConfiguration loads configuration with proper precedence
-func loadConfiguration(ctx context.Context, printer *Printer, configFile string, envOnly bool) (*ports.Configuration, error) {
-	// Precedence: config file (if specified) with env override, or env-only
+// loadConfigurationCobra loads configuration with proper precedence
+func loadConfigurationCobra(ctx context.Context, printer *Printer, configFile string, envOnly bool) (*ports.Configuration, error) {
 	switch {
 	case configFile != "":
 		printer.File(fmt.Sprintf("Loading configuration from file: %s", configFile))
@@ -230,8 +268,8 @@ func loadConfiguration(ctx context.Context, printer *Printer, configFile string,
 	}
 }
 
-// displayConfiguration displays configuration details
-func displayConfiguration(printer *Printer, cfg *ports.Configuration) {
+// displayConfigurationCobra displays configuration details
+func displayConfigurationCobra(printer *Printer, cfg *ports.Configuration) {
 	printer.Section("Configuration Details:")
 	printer.Infof("   Service Name: %s", cfg.Service.Name)
 	printer.Infof("   Trust Domain: %s", cfg.Service.Domain)
@@ -241,8 +279,8 @@ func displayConfiguration(printer *Printer, cfg *ports.Configuration) {
 	}
 }
 
-// handleLoadError handles configuration load errors
-func handleLoadError(printer *Printer, format string, err error) {
+// handleLoadErrorCobra handles configuration load errors
+func handleLoadErrorCobra(printer *Printer, format string, err error) {
 	if format == "json" {
 		result := &Result{
 			BasicValid: false,
@@ -254,18 +292,13 @@ func handleLoadError(printer *Printer, format string, err error) {
 	}
 }
 
-// printVersion prints version information
-func printVersion(printer *Printer, format string) {
-	if format == "json" {
-		versionInfo := map[string]string{
-			"version":    version,
-			"commit":     commit,
-			"build_date": buildDate,
-		}
-		printer.PrintJSON(versionInfo)
-	} else {
-		printer.Plain(fmt.Sprintf("ephemos-config-validator version %s", version))
-		printer.Plain(fmt.Sprintf("  Commit: %s", commit))
-		printer.Plain(fmt.Sprintf("  Built:  %s", buildDate))
+// Execute runs the CLI application
+func Execute() error {
+	return rootCmd.Execute()
+}
+
+func main() {
+	if err := Execute(); err != nil {
+		os.Exit(1)
 	}
 }
