@@ -39,15 +39,6 @@ import (
 	"github.com/sufield/ephemos/internal/cli"
 )
 
-// Build information - injected at compile time via ldflags/x_defs
-var (
-	version   = "dev"
-	commit    = "unknown"
-	buildDate = "unknown"
-	buildUser = "unknown"
-	buildHost = "unknown"
-)
-
 // Exit codes for different types of failures
 const (
 	exitOK       = 0
@@ -60,12 +51,8 @@ const (
 // main is the entry point for the Ephemos CLI tool.
 // It sets up signal handling, executes the CLI with context, and handles errors with appropriate exit codes.
 func main() {
-	// Inject build information into the CLI package
-	cli.Version = version
-	cli.Commit = commit
-	cli.BuildDate = buildDate
-	cli.BuildUser = buildUser
-	cli.BuildHost = buildHost
+	// Build information is now injected directly into the buildinfo package via x_defs
+	// No need to manually inject - the CLI package imports buildinfo directly
 
 	// Create a context that cancels on SIGINT or SIGTERM
 	ctx, stop := signal.NotifyContext(context.Background(),

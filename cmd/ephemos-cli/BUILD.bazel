@@ -1,31 +1,27 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
-
-go_library(
-    name = "ephemos-cli_lib",
-    srcs = ["main.go"],
-    importpath = "github.com/sufield/ephemos/cmd/ephemos-cli",
-    visibility = ["//visibility:private"],
-    deps = ["//internal/cli"],
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_test")
 
 go_binary(
     name = "ephemos-cli",
-    embed = [":ephemos-cli_lib"],
+    srcs = ["main.go"],  # package main
+    embed = ["//internal/cli"],  # embed real library
     visibility = ["//visibility:public"],
-    stamp = 1,
-    gc_linkopts = ["-s", "-w"],
+    stamp = 1,  # REQUIRED for {STABLE_*} to populate
     x_defs = {
-        "main.version": "{STABLE_VERSION}",
-        "main.commit": "{STABLE_COMMIT}",
-        "main.buildDate": "{STABLE_BUILD_DATE}",
-        "main.buildUser": "{STABLE_BUILD_USER}",
-        "main.buildHost": "{STABLE_BUILD_HOST}",
+        "github.com/sufield/ephemos/internal/buildinfo.Version": "{STABLE_VERSION}",
+        "github.com/sufield/ephemos/internal/buildinfo.CommitHash": "{STABLE_COMMIT}",
+        "github.com/sufield/ephemos/internal/buildinfo.BuildTime": "{STABLE_BUILD_DATE}",
+        "github.com/sufield/ephemos/internal/buildinfo.BuildUser": "{STABLE_BUILD_USER}",
+        "github.com/sufield/ephemos/internal/buildinfo.BuildHost": "{STABLE_BUILD_HOST}",
     },
+    # Strip symbols for smaller release binaries
+    gc_linkopts = ["-s", "-w"],
 )
 
 go_test(
     name = "ephemos-cli_test",
     srcs = ["main_test.go"],
-    embed = [":ephemos-cli_lib"],
-    deps = ["//internal/cli"],
+    deps = [
+        "//internal/buildinfo",
+        "//internal/cli",
+    ],
 )

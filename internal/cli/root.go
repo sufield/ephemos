@@ -7,15 +7,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-)
-
-// Build information - injected at compile time via ldflags/x_defs
-var (
-	Version   = "dev"
-	Commit    = "unknown"
-	BuildDate = "unknown"
-	BuildUser = "unknown"
-	BuildHost = "unknown"
+	"github.com/sufield/ephemos/internal/buildinfo"
 )
 
 var rootCmd = &cobra.Command{ //nolint:gochecknoglobals // Cobra command pattern
@@ -33,8 +25,9 @@ identity verification, and SPIRE infrastructure management.`,
 
 // getVersionString returns formatted version information for Cobra's built-in version support
 func getVersionString() string {
+	info := buildinfo.Get()
 	return fmt.Sprintf("%s\nCommit: %s\nBuild Date: %s\nBuild User: %s\nBuild Host: %s\nGo Version: %s\nOS/Arch: %s/%s",
-		Version, Commit, BuildDate, BuildUser, BuildHost, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+		info.Version, info.CommitHash, info.BuildTime, info.BuildUser, info.BuildHost, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 }
 
 // Execute runs the CLI without context (for backward compatibility).
