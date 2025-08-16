@@ -2,26 +2,33 @@ package api
 
 import "google.golang.org/grpc"
 
-// ServiceRegistrar is a generic interface for registering gRPC services.
+// ServiceRegistrar aligns with gRPC's own registration interface.
+// This allows working with real servers, wrapped servers, and test doubles.
 type ServiceRegistrar interface {
-	Register(grpcServer *grpc.Server)
+	Register(s grpc.ServiceRegistrar)
 }
 
-// GRPCServiceRegistrar is a concrete implementation of ServiceRegistrar for gRPC services.
-type GRPCServiceRegistrar struct {
-	registerFunc func(*grpc.Server)
-}
+// GRPCRegisterFunc is a function adapter implementing ServiceRegistrar.
+// This provides a clean, idiomatic way to register services without extra structs.
+type GRPCRegisterFunc func(grpc.ServiceRegistrar)
 
-// NewGRPCServiceRegistrar creates a new gRPC service registrar with the provided registration function.
-func NewGRPCServiceRegistrar(registerFunc func(*grpc.Server)) *GRPCServiceRegistrar {
-	return &GRPCServiceRegistrar{
-		registerFunc: registerFunc,
+// Register calls the underlying function if both function and server are non-nil.
+// This prevents silent no-ops and panics from nil servers.
+func (f GRPCRegisterFunc) Register(s grpc.ServiceRegistrar) {
+	if f == nil || s == nil {
+		return
 	}
+	f(s)
 }
 
-// Register implements ServiceRegistrar by calling the stored registration function.
-func (r *GRPCServiceRegistrar) Register(grpcServer *grpc.Server) {
-	if r.registerFunc != nil {
-		r.registerFunc(grpcServer)
+// NewGRPCServiceRegistrar creates a ServiceRegistrar that enforces non-nil behavior.
+// If fn is nil, returns a no-op registrar instead of allowing silent failures.
+func NewGRPCServiceRegistrar(fn func(grpc.ServiceRegistrar)) ServiceRegistrar {
+	if fn == nil {
+		return GRPCRegisterFunc(func(grpc.ServiceRegistrar) {})
 	}
+	return GRPCRegisterFunc(fn)
 }
+
+// Compile-time check: *grpc.Server satisfies grpc.ServiceRegistrar.
+var _ grpc.ServiceRegistrar = (*grpc.Server)(nil)
