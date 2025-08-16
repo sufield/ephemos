@@ -103,29 +103,6 @@ func (i *IdentityPropagationInterceptor) UnaryClientInterceptor() grpc.UnaryClie
 	}
 }
 
-// StreamClientInterceptor returns a gRPC stream client interceptor for identity propagation.
-func (i *IdentityPropagationInterceptor) StreamClientInterceptor() grpc.StreamClientInterceptor {
-	return func(
-		ctx context.Context,
-		desc *grpc.StreamDesc,
-		cc *grpc.ClientConn,
-		method string,
-		streamer grpc.Streamer,
-		opts ...grpc.CallOption,
-	) (grpc.ClientStream, error) {
-		// Create context with propagated identity metadata
-		propagatedCtx, err := i.propagateIdentity(ctx, method)
-		if err != nil {
-			i.logger.Error("Failed to propagate identity for stream",
-				"method", method,
-				"error", err)
-			return nil, err
-		}
-
-		// Create the stream with propagated context
-		return streamer(propagatedCtx, desc, cc, method, opts...)
-	}
-}
 
 // propagateIdentity adds identity metadata to the outgoing context.
 func (i *IdentityPropagationInterceptor) propagateIdentity(ctx context.Context, method string) (context.Context, error) {
@@ -312,37 +289,6 @@ func (i *IdentityPropagationServerInterceptor) UnaryServerInterceptor() grpc.Una
 	}
 }
 
-// StreamServerInterceptor returns a gRPC stream server interceptor for identity extraction.
-func (i *IdentityPropagationServerInterceptor) StreamServerInterceptor() grpc.StreamServerInterceptor {
-	return func(
-		srv interface{},
-		ss grpc.ServerStream,
-		info *grpc.StreamServerInfo,
-		handler grpc.StreamHandler,
-	) error {
-		// Extract and add identity information to context
-		enrichedCtx := i.extractIdentityMetadata(ss.Context(), info.FullMethod)
-
-		// Wrap stream with enriched context
-		wrappedStream := &enrichedServerStream{
-			ServerStream: ss,
-			ctx:          enrichedCtx,
-		}
-
-		return handler(srv, wrappedStream)
-	}
-}
-
-// enrichedServerStream wraps a grpc.ServerStream with an enriched context.
-type enrichedServerStream struct {
-	grpc.ServerStream
-	ctx context.Context //nolint:containedctx // Required for gRPC ServerStream interface
-}
-
-// Context returns the enriched context.
-func (s *enrichedServerStream) Context() context.Context {
-	return s.ctx
-}
 
 // extractIdentityMetadata extracts identity metadata from incoming context and enriches it.
 func (i *IdentityPropagationServerInterceptor) extractIdentityMetadata(ctx context.Context, method string) context.Context {

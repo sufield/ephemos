@@ -35,22 +35,6 @@ func (s *testServiceImpl) TestMethod(ctx context.Context, _ *TestRequest) (*Test
 	return &TestResponse{Message: "Hello anonymous"}, nil
 }
 
-func (s *testServiceImpl) TestStream(stream TestServiceTestStreamServer) error {
-	for {
-		req, err := stream.Recv()
-		if err != nil {
-			return fmt.Errorf("failed to receive stream message: %w", err)
-		}
-
-		// Echo back the request
-		err = stream.Send(&TestResponse{
-			Message: fmt.Sprintf("Echo: %s", req.Message),
-		})
-		if err != nil {
-			return fmt.Errorf("failed to send stream response: %w", err)
-		}
-	}
-}
 
 // Mock message definitions for testing.
 type TestRequest struct {
@@ -69,27 +53,15 @@ func (r *TestResponse) Reset()         { *r = TestResponse{} }
 func (r *TestResponse) String() string { return r.Message }
 func (r *TestResponse) ProtoMessage()  {}
 
-type TestServiceTestStreamServer interface {
-	grpc.ServerStream
-	Send(*TestResponse) error
-	Recv() (*TestRequest, error)
-}
 
 type TestServiceServer interface {
 	TestMethod(context.Context, *TestRequest) (*TestResponse, error)
-	TestStream(TestServiceTestStreamServer) error
 }
 
 type TestServiceClient interface {
 	TestMethod(ctx context.Context, req *TestRequest, opts ...grpc.CallOption) (*TestResponse, error)
-	TestStream(ctx context.Context, opts ...grpc.CallOption) (TestServiceTestStreamClient, error)
 }
 
-type TestServiceTestStreamClient interface {
-	grpc.ClientStream
-	Send(*TestRequest) error
-	Recv() (*TestResponse, error)
-}
 
 // Mock service registration.
 func RegisterTestServiceServer(_ *grpc.Server, _ TestServiceServer) {
@@ -114,37 +86,7 @@ func (c *testServiceClient) TestMethod(ctx context.Context, req *TestRequest, op
 	return out, nil
 }
 
-func (c *testServiceClient) TestStream(ctx context.Context, opts ...grpc.CallOption) (TestServiceTestStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &grpc.StreamDesc{
-		StreamName:    "TestStream",
-		ServerStreams: true,
-		ClientStreams: true,
-	}, "/test.TestService/TestStream", opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stream: %w", err)
-	}
-	return &testStreamClient{stream}, nil
-}
 
-type testStreamClient struct {
-	grpc.ClientStream
-}
-
-func (c *testStreamClient) Send(req *TestRequest) error {
-	if err := c.ClientStream.SendMsg(req); err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
-	}
-	return nil
-}
-
-func (c *testStreamClient) Recv() (*TestResponse, error) {
-	resp := new(TestResponse)
-	err := c.ClientStream.RecvMsg(resp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to receive message: %w", err)
-	}
-	return resp, nil
-}
 
 func bufDialer(lis *bufconn.Listener) func(context.Context, string) (net.Conn, error) {
 	return func(_ context.Context, _ string) (net.Conn, error) {

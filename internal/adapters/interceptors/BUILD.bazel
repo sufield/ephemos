@@ -31,7 +31,6 @@ go_test(
         "integration_test.go",
         "logging_test.go",
         "metrics_test.go",
-        "stream_test.go",
     ],
     embed = [":interceptors"],
     deps = [

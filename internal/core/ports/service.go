@@ -22,12 +22,9 @@ type ServiceDescriptor struct {
 
 // MethodDescriptor describes a service method for transport mapping.
 type MethodDescriptor struct {
-	Name           string
-	InputType      string
-	OutputType     string
-	IsStreaming    bool
-	IsClientStream bool
-	IsServerStream bool
+	Name       string
+	InputType  string
+	OutputType string
 }
 
 // NewServiceRegistry creates a new service registry.
