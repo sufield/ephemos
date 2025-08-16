@@ -3,5 +3,5 @@ service:
   domain: "example.org"
   
 # Optional - sensible defaults if not specified
-spiffe:
+agent:
   socketPath: "/tmp/spire-agent/public/api.sock"

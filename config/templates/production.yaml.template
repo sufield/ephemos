@@ -13,18 +13,20 @@ service:
   # Required: Service identity
   name: "${EPHEMOS_SERVICE_NAME}"           # Set via environment variable
   domain: "${EPHEMOS_TRUST_DOMAIN}"        # Set via environment variable (e.g., "prod.company.com")
+  
+  # Authorization: Comma-separated SPIFFE IDs via environment variables
+  # Example: EPHEMOS_AUTHORIZED_CLIENTS="spiffe://prod.company.com/api-gateway,spiffe://prod.company.com/billing"
+  authorized_clients:
+    - "${EPHEMOS_AUTHORIZED_CLIENTS:-}"
+  
+  # Trusted servers: Comma-separated SPIFFE IDs via environment variables  
+  # Example: EPHEMOS_TRUSTED_SERVERS="spiffe://prod.company.com/database,spiffe://prod.company.com/cache"
+  trusted_servers:
+    - "${EPHEMOS_TRUSTED_SERVERS:-}"
 
-spiffe:
+agent:
   # SPIFFE/SPIRE agent configuration
-  socketPath: "${EPHEMOS_SPIFFE_SOCKET:-/run/spire/sockets/api.sock}"
-
-# Authorization: Comma-separated SPIFFE IDs via environment variables
-# Example: EPHEMOS_AUTHORIZED_CLIENTS="spiffe://prod.company.com/api-gateway,spiffe://prod.company.com/billing"
-authorized_clients: "${EPHEMOS_AUTHORIZED_CLIENTS:-}"
-
-# Trusted servers: Comma-separated SPIFFE IDs via environment variables  
-# Example: EPHEMOS_TRUSTED_SERVERS="spiffe://prod.company.com/database,spiffe://prod.company.com/cache"
-trusted_servers: "${EPHEMOS_TRUSTED_SERVERS:-}"
+  socketPath: "${EPHEMOS_AGENT_SOCKET:-/run/sockets/agent.sock}"
 
 # Production Security Settings (via environment variables):
 # EPHEMOS_REQUIRE_AUTHENTICATION=true
