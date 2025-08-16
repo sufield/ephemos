@@ -9,9 +9,6 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/sufield/ephemos/internal/adapters/secondary/config"
-	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
-	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/sufield/ephemos/internal/core/services"
@@ -26,40 +23,8 @@ type Server struct {
 	mu              sync.Mutex
 }
 
-// NewServerFromConfig creates a new workload server from configuration path.
-// Handles all provider creation internally to hide implementation details from public API.
-func NewServerFromConfig(ctx context.Context, configPath string) (*Server, error) {
-	// Load configuration
-	configProvider := config.NewFileProvider()
-	cfg, err := configProvider.LoadConfiguration(ctx, configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
-	}
-
-	// Create identity provider
-	identityProvider, err := spiffe.NewProvider(cfg.Agent)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create identity provider: %w", err)
-	}
-
-	// Create default transport provider
-	transportProvider := transport.NewGRPCProvider(cfg)
-	
-	return WorkloadServer(identityProvider, transportProvider, configProvider, cfg)
-}
-
-// NewServer creates a new workload server with minimal dependencies.
-// Uses default transport provider internally to hide implementation details from public API.
-func NewServer(
-	identityProvider ports.IdentityProvider,
-	configProvider ports.ConfigurationProvider,
-	cfg *ports.Configuration,
-) (*Server, error) {
-	// Create default transport provider internally
-	transportProvider := transport.NewGRPCProvider(cfg)
-	
-	return WorkloadServer(identityProvider, transportProvider, configProvider, cfg)
-}
+// Note: Factory functions that create secondary adapters have been moved to avoid cross-adapter imports.
+// Use WorkloadServer with dependency injection instead.
 
 // WorkloadServer creates a new workload server with injected dependencies.
 // This constructor follows proper dependency injection and hexagonal architecture principles.
@@ -119,11 +84,16 @@ func WorkloadServer(
 
 // RegisterService registers a gRPC service with the identity server.
 func (s *Server) RegisterService(ctx context.Context, serviceRegistrar ServiceRegistrar) error {
-	// Input validation
+	if ctx == nil {
+		return &errors.ValidationError{
+			Field:   "context",
+			Message: "context cannot be nil",
+		}
+	}
+	
 	if serviceRegistrar == nil {
 		return &errors.ValidationError{
 			Field:   "serviceRegistrar",
-			Value:   serviceRegistrar,
 			Message: "service registrar cannot be nil",
 		}
 	}
@@ -149,15 +119,12 @@ func (s *Server) RegisterService(ctx context.Context, serviceRegistrar ServiceRe
 
 // Serve starts the identity server on the provided listener.
 func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
-	// Input validation
 	if listener == nil {
 		return &errors.ValidationError{
 			Field:   "listener",
-			Value:   listener,
 			Message: "listener cannot be nil",
 		}
 	}
-
 	s.mu.Lock()
 	if s.domainServer == nil {
 		if err := s.initializeServer(ctx); err != nil {
@@ -169,26 +136,31 @@ func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
 
 	slog.Info("Server ready", "service", s.serviceName, "address", listener.Addr().String())
 
-	// Adapt net.Listener to ports.ListenerPort
 	portListener := &netListenerAdapter{listener: listener}
-	if err := s.domainServer.Start(portListener); err != nil {
-		return fmt.Errorf("failed to serve domain server: %w", err)
+	errCh := make(chan error, 1)
+
+	go func() { errCh <- s.domainServer.Start(portListener) }()
+
+	select {
+	case <-ctx.Done():
+		_ = s.domainServer.Stop() // best-effort
+		return ctx.Err()
+	case err := <-errCh:
+		return err
 	}
-	return nil
 }
 
 // Close gracefully shuts down the identity server.
 func (s *Server) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	if s.domainServer != nil {
 		if err := s.domainServer.Stop(); err != nil {
 			return fmt.Errorf("failed to stop server: %w", err)
 		}
+		s.domainServer = nil
 		slog.Info("Server stopped gracefully", "service", s.serviceName)
 	}
-
 	return nil
 }
 

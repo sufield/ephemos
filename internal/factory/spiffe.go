@@ -12,6 +12,7 @@ import (
 	"github.com/sufield/ephemos/internal/adapters/primary/api"
 	"github.com/sufield/ephemos/internal/adapters/secondary/config"
 	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
+	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
@@ -62,9 +63,12 @@ func SPIFFEServer(ctx context.Context, cfg *ports.Configuration) (ports.Authenti
 	// Create configuration provider
 	configProvider := config.NewFileProvider()
 	
-	// Create the internal server adapter using the proper constructor
-	// Note: This is the only place where we directly depend on the adapter
-	internalServer, err := api.NewServer(identityProvider, configProvider, cfg)
+	// Create transport provider
+	transportProvider := transport.NewGRPCProvider(cfg)
+	
+	// Create the internal server adapter using proper dependency injection
+	// This factory is the appropriate place for this wiring, keeping the API package clean
+	internalServer, err := api.WorkloadServer(identityProvider, transportProvider, configProvider, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SPIFFE server: %w", err)
 	}
