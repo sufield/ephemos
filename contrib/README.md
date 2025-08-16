@@ -52,8 +52,10 @@ func MTLSClientConfig(source, bundle, authorizer) *tls.Config
 import "github.com/sufield/ephemos/contrib/middleware/chi"
 
 r := chi.NewRouter()
-r.Use(chimiddleware.SPIFFEAuth(authConfig))
-r.Get("/api/data", dataHandler) // Handler receives authenticated SPIFFE identity
+r.Use(chimiddleware.IdentityAuthentication(ephemos.IdentitySetting{
+    AllowedServices: []string{"spiffe://prod.company.com/service-b"},
+}))
+r.Get("/api/data", dataHandler) // Handler receives verified identity document
 ```
 
 - **Location**: [`middleware/chi/`](middleware/chi/)
@@ -65,8 +67,10 @@ r.Get("/api/data", dataHandler) // Handler receives authenticated SPIFFE identit
 import "github.com/sufield/ephemos/contrib/middleware/gin"
 
 r := gin.Default()
-r.Use(ginmiddleware.SPIFFEAuth(authConfig))
-r.GET("/api/data", dataHandler) // Handler receives authenticated SPIFFE identity
+r.Use(ginmiddleware.IdentityAuthentication(ephemos.IdentitySetting{
+    AllowedServices: []string{"spiffe://prod.company.com/service-b"},
+}))
+r.GET("/api/data", dataHandler) // Handler receives verified identity document
 ```
 
 - **Location**: [`middleware/gin/`](middleware/gin/)  

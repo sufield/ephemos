@@ -139,28 +139,30 @@ For the MVP release, we are focusing **exclusively** on:
 - **SPIRE integration**: Agent socket communication
 
 #### ✅ **Contrib Middleware**  
-- **Chi middleware**: `chimiddleware.SPIFFEAuth(config)`
-- **Gin middleware**: `ginmiddleware.SPIFFEAuth(config)`
-- **Identity extraction**: Access to peer SPIFFE ID in handlers
-- **Authorization policies**: Allow/deny based on SPIFFE ID patterns
+- **Chi middleware**: `chimiddleware.IdentityAuthentication(settings)`
+- **Gin middleware**: `ginmiddleware.IdentityAuthentication(settings)`
+- **Identity extraction**: Access to identity document in handlers via `GetIdentityDocument()`
+- **Authorization policies**: Allow/deny based on identity document validation
 
 #### ✅ **End-to-End Example**
 ```go
 // Service A (Chi)
 r := chi.NewRouter()
-r.Use(chimiddleware.SPIFFEAuth(ephemos.AuthConfig{
+r.Use(chimiddleware.IdentityAuthentication(ephemos.IdentitySetting{
     AllowedServices: []string{"spiffe://prod.company.com/service-b/*"},
 }))
 r.Get("/api/data", func(w http.ResponseWriter, r *http.Request) {
-    // Access authenticated peer identity
-    identity := chimiddleware.GetSPIFFEIdentity(r.Context())
-    log.Printf("Request from: %s", identity.SPIFFEID)
+    // Access identity document from authenticated request
+    identityDoc := chimiddleware.GetIdentityDocument(r.Context())
+    log.Printf("Request from: %s", identityDoc.ServiceName())
     json.NewEncoder(w).Encode(map[string]string{"data": "secret"})
 })
 
 // Service B (Gin) - calling Service A
 r := gin.Default()
-r.Use(ginmiddleware.SPIFFEAuth(authConfig))
+r.Use(ginmiddleware.IdentityAuthentication(ephemos.IdentitySetting{
+    AllowedServices: []string{"spiffe://prod.company.com/service-a/*"},
+}))
 r.GET("/proxy", func(c *gin.Context) {
     // Use Ephemos HTTP client with automatic mTLS
     client := ephemos.HTTPClient(config)
@@ -185,7 +187,7 @@ r.GET("/proxy", func(c *gin.Context) {
 
 ### Success Criteria for MVP:
 
-1. **Drop-in replacement**: Replace API key middleware with SPIFFE middleware in < 10 lines
+1. **Drop-in replacement**: Replace API key middleware with identity authentication in < 10 lines
 2. **Zero config complexity**: Works with default SPIRE setup
 3. **Framework parity**: Chi and Gin have equivalent functionality  
 4. **Production ready**: Handles certificate rotation, connection pooling, error cases
@@ -198,7 +200,7 @@ r.GET("/proxy", func(c *gin.Context) {
 - Chi and Gin middleware implementations
 - Client-to-service HTTP calls with mTLS
 - Certificate rotation and trust bundle management
-- Basic authorization policies (allow/deny by SPIFFE ID)
+- Basic authorization policies (allow/deny by identity document validation)
 
 #### ❌ **Out of Scope**  
 - gRPC transport layer
