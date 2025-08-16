@@ -35,7 +35,7 @@ func Test_NoInternalImports_InPublicPkgs(t *testing.T) {
 			}
 			return nil
 		}
-		
+
 		// Only check Go files, skip test files
 		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
@@ -242,7 +242,7 @@ func main() {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			// Compile test to verify the public API is sufficient
 			if err := compileTestCode(t, tt.code); err != nil {
 				t.Errorf("%s failed: %v\nDescription: %s", tt.name, err, tt.desc)
@@ -270,7 +270,7 @@ func Test_PublicAPI_Types(t *testing.T) {
 	_ = ephemos.IdentityServer
 	_ = ephemos.IdentityClientFromFile
 	_ = ephemos.IdentityServerFromFile
-	
+
 	// Verify option functions exist
 	_ = ephemos.WithConfig
 	_ = ephemos.WithServerConfig
@@ -305,7 +305,7 @@ func Test_PackageDocumentation(t *testing.T) {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			continue // File may not exist, that's ok
 		}
-		
+
 		// These files don't need package docs if public_api.go has it
 		// But they should have type/function docs
 		if err := checkFileHasTypeOrFunctionDocs(path); err != nil {
@@ -317,15 +317,15 @@ func Test_PackageDocumentation(t *testing.T) {
 // compileTestCode actually compiles the code to verify it works
 func compileTestCode(t *testing.T, code string) error {
 	t.Helper()
-	
+
 	dir := t.TempDir()
-	
+
 	// Get the absolute path to the ephemos module root
 	ephemosRoot, err := filepath.Abs("../..")
 	if err != nil {
 		return fmt.Errorf("get ephemos root: %w", err)
 	}
-	
+
 	// Create a temporary module
 	modContent := fmt.Sprintf(`module testmod
 
@@ -358,12 +358,12 @@ replace github.com/sufield/ephemos => %s
 	cmd := exec.Command("go", "build", "-o", filepath.Join(dir, "bin"), srcPath)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GO111MODULE=on")
-	
+
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("go build failed: %w\nOutput:\n%s", err, out)
 	}
-	
+
 	return nil
 }
 
@@ -388,8 +388,8 @@ func isGeneratedFile(path string) bool {
 	buf := make([]byte, 512)
 	n, _ := file.Read(buf)
 	firstLines := string(buf[:n])
-	
-	return strings.Contains(firstLines, "Code generated") && 
+
+	return strings.Contains(firstLines, "Code generated") &&
 		strings.Contains(firstLines, "DO NOT EDIT")
 }
 
@@ -400,11 +400,11 @@ func hasPackageDoc(path string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	
+
 	if f.Doc == nil {
 		return false, nil
 	}
-	
+
 	for _, c := range f.Doc.List {
 		if strings.HasPrefix(c.Text, "// Package ephemos") {
 			return true, nil
@@ -422,7 +422,7 @@ func checkFileHasTypeOrFunctionDocs(path string) error {
 	}
 
 	hasAnyDocs := false
-	
+
 	// Check for any exported type or function with documentation
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch node := n.(type) {
@@ -443,6 +443,6 @@ func checkFileHasTypeOrFunctionDocs(path string) error {
 	if !hasAnyDocs {
 		return fmt.Errorf("no documentation found for exported types or functions")
 	}
-	
+
 	return nil
 }

@@ -12,12 +12,12 @@ import (
 
 // Compile-time interface conformance checks
 var (
-	_ Client            = (*clientWrapper)(nil)
-	_ Server            = (*serverWrapper)(nil)
-	_ ports.Dialer      = (*mockDialer)(nil)
-	_ ports.Conn        = (*mockConn)(nil)
+	_ Client                    = (*clientWrapper)(nil)
+	_ Server                    = (*serverWrapper)(nil)
+	_ ports.Dialer              = (*mockDialer)(nil)
+	_ ports.Conn                = (*mockConn)(nil)
 	_ ports.AuthenticatedServer = (*mockServerPort)(nil)
-	_ ConfigLoader      = (*mockConfigLoader)(nil)
+	_ ConfigLoader              = (*mockConfigLoader)(nil)
 )
 
 // Mock implementations for testing
@@ -107,7 +107,7 @@ func (m *mockConfigLoader) LoadConfiguration(source string) (*ports.Configuratio
 
 func TestClientConformance(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Test with mock dialer
 	mockDialer := &mockDialer{}
 	client, err := IdentityClient(ctx, WithDialer(mockDialer))
@@ -115,14 +115,14 @@ func TestClientConformance(t *testing.T) {
 		t.Fatalf("failed to create client: %v", err)
 	}
 	defer client.Close()
-	
+
 	// Test Connect
 	conn, err := client.Connect(ctx, "localhost:8080")
 	if err != nil {
 		t.Fatalf("failed to connect: %v", err)
 	}
 	defer conn.Close()
-	
+
 	// Test HTTPClient
 	httpClient, err := conn.HTTPClient()
 	if err != nil {
@@ -135,14 +135,14 @@ func TestClientConformance(t *testing.T) {
 
 func TestServerConformance(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Create a test listener
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatalf("failed to create listener: %v", err)
 	}
 	defer listener.Close()
-	
+
 	// Test with mock server implementation
 	mockServerPort := &mockServerPort{}
 	server, err := IdentityServer(ctx, WithServerImpl(mockServerPort), WithListener(listener))
@@ -150,7 +150,7 @@ func TestServerConformance(t *testing.T) {
 		t.Fatalf("failed to create server: %v", err)
 	}
 	defer server.Close()
-	
+
 	// Test Addr
 	addr := server.Addr()
 	if addr != nil {
@@ -160,18 +160,18 @@ func TestServerConformance(t *testing.T) {
 
 func TestClientClosureIdempotency(t *testing.T) {
 	ctx := context.Background()
-	
+
 	mockDialer := &mockDialer{}
 	client, err := IdentityClient(ctx, WithDialer(mockDialer))
 	if err != nil {
 		t.Fatalf("failed to create client: %v", err)
 	}
-	
+
 	// Test multiple Close calls
 	if err := client.Close(); err != nil {
 		t.Fatalf("first close failed: %v", err)
 	}
-	
+
 	if err := client.Close(); err != nil {
 		t.Fatalf("second close failed: %v", err)
 	}
@@ -179,24 +179,24 @@ func TestClientClosureIdempotency(t *testing.T) {
 
 func TestConnectionClosureIdempotency(t *testing.T) {
 	ctx := context.Background()
-	
+
 	mockDialer := &mockDialer{}
 	client, err := IdentityClient(ctx, WithDialer(mockDialer))
 	if err != nil {
 		t.Fatalf("failed to create client: %v", err)
 	}
 	defer client.Close()
-	
+
 	conn, err := client.Connect(ctx, "localhost:8080")
 	if err != nil {
 		t.Fatalf("failed to connect: %v", err)
 	}
-	
+
 	// Test multiple Close calls
 	if err := conn.Close(); err != nil {
 		t.Fatalf("first close failed: %v", err)
 	}
-	
+
 	if err := conn.Close(); err != nil {
 		t.Fatalf("second close failed: %v", err)
 	}
@@ -204,18 +204,18 @@ func TestConnectionClosureIdempotency(t *testing.T) {
 
 func TestServerClosureIdempotency(t *testing.T) {
 	ctx := context.Background()
-	
+
 	mockServerPort := &mockServerPort{}
 	server, err := IdentityServer(ctx, WithServerImpl(mockServerPort), WithAddress("localhost:0"))
 	if err != nil {
 		t.Fatalf("failed to create server: %v", err)
 	}
-	
+
 	// Test multiple Close calls
 	if err := server.Close(); err != nil {
 		t.Fatalf("first close failed: %v", err)
 	}
-	
+
 	if err := server.Close(); err != nil {
 		t.Fatalf("second close failed: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestServerClosureIdempotency(t *testing.T) {
 
 func TestTimeoutConfiguration(t *testing.T) {
 	ctx := context.Background()
-	
+
 	timeout := 5 * time.Second
 	mockDialer := &mockDialer{}
 	client, err := IdentityClient(ctx, WithDialer(mockDialer), WithClientTimeout(timeout))
@@ -231,7 +231,7 @@ func TestTimeoutConfiguration(t *testing.T) {
 		t.Fatalf("failed to create client: %v", err)
 	}
 	defer client.Close()
-	
+
 	// The timeout is applied during Connect
 	conn, err := client.Connect(ctx, "localhost:8080", WithDialTimeout(2*time.Second))
 	if err != nil {
@@ -244,6 +244,7 @@ func TestErrorSentinels(t *testing.T) {
 	// Test that sentinel errors are defined
 	sentinelErrors := []error{
 		ErrNoAuth,
+		ErrNoSPIFFEAuth,
 		ErrInvalidIdentity,
 		ErrConfigInvalid,
 		ErrConnectionFailed,
@@ -251,7 +252,7 @@ func TestErrorSentinels(t *testing.T) {
 		ErrInvalidAddress,
 		ErrTimeout,
 	}
-	
+
 	for _, err := range sentinelErrors {
 		if err == nil {
 			t.Error("sentinel error should not be nil")

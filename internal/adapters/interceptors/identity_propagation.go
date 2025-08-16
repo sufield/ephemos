@@ -8,13 +8,24 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
 // Default configuration constants.
 const defaultMaxCallChainDepth = 10
+
+// Typed errors for identity propagation.
+var (
+	ErrDepthLimitExceeded = status.Error(codes.PermissionDenied, "call chain depth limit exceeded")
+	ErrCircularCall       = status.Error(codes.PermissionDenied, "circular call detected")
+)
+
+// Clock provides time.Now functionality for dependency injection.
+type Clock func() time.Time
 
 // RequestIDContextKey is the context key for storing request ID information.
 type RequestIDContextKey struct{}
@@ -53,6 +64,9 @@ type IdentityPropagationConfig struct {
 
 	// Logger for propagation events
 	Logger *slog.Logger
+
+	// Clock for time generation (nil => time.Now)
+	Clock Clock
 }
 
 // IdentityPropagationInterceptor handles identity propagation for outgoing gRPC calls.
@@ -193,7 +207,7 @@ func (i *IdentityPropagationInterceptor) buildCallChain(ctx context.Context, cur
 
 	// Validate chain depth limit
 	if len(callChain) >= i.config.MaxCallChainDepth {
-		return "", fmt.Errorf("call chain depth limit exceeded (%d)", i.config.MaxCallChainDepth)
+		return "", ErrDepthLimitExceeded
 	}
 
 	// Check for circular calls
@@ -211,7 +225,7 @@ func (i *IdentityPropagationInterceptor) buildCallChain(ctx context.Context, cur
 func (i *IdentityPropagationInterceptor) validateNoCycle(callChain []string, currentIdentity string) error {
 	for _, service := range callChain {
 		if service == currentIdentity {
-			return fmt.Errorf("circular call detected: %s already in chain", currentIdentity)
+			return ErrCircularCall
 		}
 	}
 	return nil
@@ -249,8 +263,12 @@ func (i *IdentityPropagationInterceptor) getOrGenerateRequestID(ctx context.Cont
 		return requestID
 	}
 
-	// Generate new request ID
-	return generateRequestID()
+	// Generate new request ID using injected clock
+	now := time.Now
+	if i.config.Clock != nil {
+		now = i.config.Clock
+	}
+	return fmt.Sprintf("req-%d", now().UnixNano())
 }
 
 // generateRequestID creates a new unique request ID.
@@ -392,5 +410,6 @@ func DefaultIdentityPropagationConfig(identityProvider ports.IdentityProvider) *
 		MaxCallChainDepth:       defaultMaxCallChainDepth,
 		CustomHeaders:           []string{},
 		Logger:                  slog.Default(),
+		Clock:                   time.Now,
 	}
 }
