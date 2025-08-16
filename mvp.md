@@ -2,12 +2,82 @@
 
 ## The 4 SPIFFE Authentication Methods
 
-SPIFFE/SPIRE supports 4 authentication patterns:
+SPIFFE/SPIRE supports 4 authentication patterns based on 2 protocols × 2 SVID types:
 
-1. **SPIFFE to SPIFFE authentication using X.509 SVIDs**
-2. **SPIFFE to SPIFFE authentication using JWT SVIDs**  
-3. **HTTP over mTLS using X.509 SVIDs**
-4. **gRPC over mTLS using X.509 SVIDs**
+| **Protocol** | **X.509 SVIDs** | **JWT SVIDs** |
+|--------------|-----------------|---------------|
+| **HTTP** | ✅ **Option 3**: HTTP over mTLS using X.509 SVIDs | ⚡ **Option 1**: HTTP with JWT SVID in headers |
+| **gRPC** | 🚀 **Option 4**: gRPC over mTLS using X.509 SVIDs | 🔐 **Option 2**: gRPC with JWT SVID in metadata |
+
+### Authentication Method Breakdown:
+
+1. **HTTP + JWT SVIDs**: SPIFFE to SPIFFE authentication using JWT SVIDs (HTTP transport)
+2. **gRPC + JWT SVIDs**: SPIFFE to SPIFFE authentication using JWT SVIDs (gRPC transport)  
+3. **HTTP + X.509 SVIDs**: HTTP over mTLS using X.509 SVIDs
+4. **gRPC + X.509 SVIDs**: gRPC over mTLS using X.509 SVIDs
+
+## Framework Capabilities Matrix
+
+| **Framework/Tool** | **HTTP + X.509** | **HTTP + JWT** | **gRPC + X.509** | **gRPC + JWT** | **Best For** |
+|-------------------|-------------------|-----------------|-------------------|-----------------|--------------|
+| **Ephemos Core** | 🎯 **MVP Focus** | ⏳ Future | ⏳ Future | ⏳ Future | Production HTTP services |
+| **Chi Middleware** | ✅ Full Support | ⏳ v2.0 | ❌ N/A | ❌ N/A | REST APIs, web services |
+| **Gin Middleware** | ✅ Full Support | ⏳ v2.0 | ❌ N/A | ❌ N/A | REST APIs, JSON APIs |
+| **gRPC Interceptors** | ⏳ v2.0 | ⏳ v3.0 | ⏳ v2.0 | ⏳ v3.0 | High-performance RPC |
+| **go-spiffe SDK** | ✅ Native | ✅ Native | ✅ Native | ✅ Native | Direct SPIFFE integration |
+| **SPIRE Agent** | ✅ Supported | ✅ Supported | ✅ Supported | ✅ Supported | Certificate/token issuance |
+
+## Use Case Recommendation Matrix
+
+| **Scenario** | **Recommended Option** | **Why** | **Ephemos Support** |
+|--------------|------------------------|---------|-------------------|
+| **Microservices with REST APIs** | HTTP + X.509 SVIDs | Mature mTLS, works with load balancers | ✅ **MVP** |
+| **High-throughput service mesh** | gRPC + X.509 SVIDs | Best performance, native K8s support | ⏳ v2.0 |
+| **Legacy systems integration** | HTTP + JWT SVIDs | No TLS changes needed, header-based auth | ⏳ v2.0 |
+| **Multi-language environments** | HTTP + JWT SVIDs | Language-agnostic JWT validation | ⏳ v2.0 |
+| **Serverless/FaaS** | HTTP + JWT SVIDs | Stateless, no persistent connections | ⏳ v2.0 |
+| **Edge/IoT devices** | gRPC + JWT SVIDs | Lightweight tokens, efficient serialization | ⏳ v3.0 |
+| **Browser-to-service** | HTTP + JWT SVIDs | CORS-friendly, no client certificates | ⏳ v2.0 |
+| **Service-to-service (secure)** | HTTP/gRPC + X.509 SVIDs | Strongest security, automatic rotation | ✅ **MVP** (HTTP) |
+
+## Security & Performance Comparison
+
+| **Aspect** | **X.509 SVIDs** | **JWT SVIDs** |
+|------------|-----------------|---------------|
+| **Security** | 🔒 **Highest** - Private key never leaves workload | 🔐 Medium - Token can be intercepted/replayed |
+| **Performance** | ⚡ Fast - TLS handshake caching | 🐌 Slower - Signature verification per request |
+| **Network** | 📡 Efficient - Connection reuse | 📦 Overhead - Token in every request |
+| **Debugging** | 🔍 Standard TLS tools (Wireshark, openssl) | 📋 JWT tools (jwt.io, debuggers) |
+| **Rotation** | 🔄 Transparent - Background certificate renewal | 🕐 Visible - New token per request |
+| **Firewall** | 🛡️ Standard HTTPS/443 ports | 🛡️ Standard HTTPS/443 ports |
+| **Load Balancers** | ✅ Full support - Standard TLS termination | ⚠️ Limited - May need JWT passthrough |
+| **Caching** | ✅ Connection-level caching | ❌ Token validation per request |
+
+## Framework Suitability
+
+### **HTTP + X.509 SVIDs** (MVP Choice)
+- **Best for**: Production microservices, REST APIs, existing HTTP infrastructure
+- **Frameworks**: Chi, Gin, Echo, Fiber, net/http
+- **Pros**: Mature tooling, connection reuse, familiar TLS patterns
+- **Cons**: Requires TLS configuration, client certificate management
+
+### **HTTP + JWT SVIDs** 
+- **Best for**: Legacy integration, multi-language environments, serverless
+- **Frameworks**: Any HTTP framework with middleware support
+- **Pros**: Language-agnostic, no TLS changes, stateless
+- **Cons**: Performance overhead, token management, replay attacks
+
+### **gRPC + X.509 SVIDs**
+- **Best for**: High-performance service mesh, Kubernetes-native services
+- **Frameworks**: gRPC-Go, gRPC interceptors, service mesh (Istio/Linkerd)
+- **Pros**: Best performance, native K8s support, efficient serialization
+- **Cons**: gRPC adoption required, protobuf complexity
+
+### **gRPC + JWT SVIDs**
+- **Best for**: Edge devices, constrained environments, token-based workflows  
+- **Frameworks**: gRPC with custom auth, IoT platforms
+- **Pros**: Lightweight, stateless, works with limited TLS
+- **Cons**: Performance overhead, limited ecosystem support
 
 ## MVP Decision: HTTP over mTLS using X.509 SVIDs
 
