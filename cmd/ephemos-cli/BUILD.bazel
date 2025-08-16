@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 
 go_library(
     name = "ephemos-cli_lib",
@@ -12,11 +12,20 @@ go_binary(
     name = "ephemos-cli",
     embed = [":ephemos-cli_lib"],
     visibility = ["//visibility:public"],
+    stamp = 1,
+    gc_linkopts = ["-s", "-w"],
     x_defs = {
-        "main.Version": "{STABLE_VERSION}",
-        "main.CommitHash": "{STABLE_COMMIT_HASH}",
-        "main.BuildTime": "{STABLE_BUILD_TIME}",
-        "main.BuildUser": "{STABLE_BUILD_USER}",
-        "main.BuildHost": "{STABLE_BUILD_HOST}",
+        "main.version": "{STABLE_VERSION}",
+        "main.commit": "{STABLE_COMMIT}",
+        "main.buildDate": "{STABLE_BUILD_DATE}",
+        "main.buildUser": "{STABLE_BUILD_USER}",
+        "main.buildHost": "{STABLE_BUILD_HOST}",
     },
+)
+
+go_test(
+    name = "ephemos-cli_test",
+    srcs = ["main_test.go"],
+    embed = [":ephemos-cli_lib"],
+    deps = ["//internal/cli"],
 )

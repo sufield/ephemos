@@ -29,17 +29,81 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/sufield/ephemos/internal/cli"
 )
 
+// Build information - injected at compile time via ldflags/x_defs
+var (
+	version   = "dev"
+	commit    = "unknown"
+	buildDate = "unknown"
+	buildUser = "unknown"
+	buildHost = "unknown"
+)
+
+// Exit codes for different types of failures
+const (
+	exitOK       = 0
+	exitUsage    = 2
+	exitConfig   = 3
+	exitRuntime  = 4
+	exitInternal = 10
+)
+
 // main is the entry point for the Ephemos CLI tool.
-// It executes the root command and handles any errors that occur.
+// It sets up signal handling, executes the CLI with context, and handles errors with appropriate exit codes.
 func main() {
-	if err := cli.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+	// Inject build information into the CLI package
+	cli.Version = version
+	cli.Commit = commit
+	cli.BuildDate = buildDate
+	cli.BuildUser = buildUser
+	cli.BuildHost = buildHost
+
+	// Create a context that cancels on SIGINT or SIGTERM
+	ctx, stop := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// Execute the CLI with context
+	if err := cli.ExecuteContext(ctx); err != nil {
+		// Redact sensitive information from error messages
+		redactedError := cli.RedactError(err)
+		code := classifyExitCode(err)
+		
+		fmt.Fprintf(os.Stderr, "Error: %s\n", redactedError)
+		os.Exit(code)
+	}
+}
+
+// classifyExitCode maps error types to appropriate exit codes for CI/automation
+func classifyExitCode(err error) int {
+	switch {
+	case errors.Is(err, cli.ErrUsage):
+		return exitUsage
+	case errors.Is(err, cli.ErrConfig):
+		return exitConfig
+	case errors.Is(err, cli.ErrAuth):
+		return exitRuntime // Auth failures are runtime issues
+	case errors.Is(err, cli.ErrRuntime):
+		return exitRuntime
+	case errors.Is(err, cli.ErrInternal):
+		return exitInternal
+	case errors.Is(err, context.Canceled):
+		// Graceful shutdown via signal
+		return exitOK
+	case errors.Is(err, context.DeadlineExceeded):
+		// Timeout
+		return exitRuntime
+	default:
+		// Unknown error type
+		return exitRuntime
 	}
 }

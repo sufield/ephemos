@@ -3,8 +3,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "cli",
     srcs = [
+        "completion.go",
+        "errors.go",
+        "redaction.go",
         "register.go",
         "root.go",
+        "version.go",
     ],
     importpath = "github.com/sufield/ephemos/internal/cli",
     visibility = ["//:__subpackages__"],
@@ -13,6 +17,7 @@ go_library(
         "//internal/adapters/secondary/config",
         "//internal/core/ports",
         "@com_github_spf13_cobra//:cobra",
+        "@com_github_spf13_cobra//doc",
     ],
 )
 

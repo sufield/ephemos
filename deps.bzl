@@ -17,3 +17,5 @@ def go_dependencies():
         sum = "h1:iy+VFUOCP1a+8yFto/drg2CJ5u0yRoB7fZw3DKv/JXA=",
         version = "v1.0.5",
     )
+    
+    # Note: cobra/doc is included as part of the main cobra module
