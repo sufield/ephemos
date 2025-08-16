@@ -180,7 +180,7 @@ type serviceRegistrarAdapter struct {
 }
 
 func (a *serviceRegistrarAdapter) Register(server interface{}) {
-	if grpcServer, ok := server.(*grpc.Server); ok {
+	if grpcServer, ok := server.(grpc.ServiceRegistrar); ok {
 		a.registrar.Register(grpcServer)
 	}
 }
