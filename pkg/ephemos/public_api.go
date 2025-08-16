@@ -10,36 +10,38 @@
 // # Basic Usage
 //
 // Client example:
-//   config := &ports.Configuration{
-//       Service: ports.ServiceConfig{
-//           Name: "my-service",
-//           Domain: "prod.company.com",
-//       },
-//   }
-//   client, err := IdentityClient(ctx, WithConfig(config))
-//   if err != nil { return err }
-//   defer client.Close()
-//   
-//   conn, err := client.Connect(ctx, "payment-service", "payment.company.com:443")
-//   if err != nil { return err }
-//   defer conn.Close()
-//   
-//   httpClient, err := conn.HTTPClient()
-//   if err != nil { return err }
-//   resp, err := httpClient.Get("https://payment.company.com/api/balance")
+//
+//	config := &ports.Configuration{
+//	    Service: ports.ServiceConfig{
+//	        Name: "my-service",
+//	        Domain: "prod.company.com",
+//	    },
+//	}
+//	client, err := IdentityClient(ctx, WithConfig(config))
+//	if err != nil { return err }
+//	defer client.Close()
+//
+//	conn, err := client.Connect(ctx, "payment-service", "payment.company.com:443")
+//	if err != nil { return err }
+//	defer conn.Close()
+//
+//	httpClient, err := conn.HTTPClient()
+//	if err != nil { return err }
+//	resp, err := httpClient.Get("https://payment.company.com/api/balance")
 //
 // Server example:
-//   config := &ports.Configuration{
-//       Service: ports.ServiceConfig{
-//           Name: "payment-service", 
-//           Domain: "prod.company.com",
-//       },
-//   }
-//   server, err := IdentityServer(ctx, WithServerConfig(config), WithAddress(":8080"))
-//   if err != nil { return err }
-//   defer server.Close()
-//   
-//   if err := server.ListenAndServe(ctx); err != nil { return err }
+//
+//	config := &ports.Configuration{
+//	    Service: ports.ServiceConfig{
+//	        Name: "payment-service",
+//	        Domain: "prod.company.com",
+//	    },
+//	}
+//	server, err := IdentityServer(ctx, WithServerConfig(config), WithAddress(":8080"))
+//	if err != nil { return err }
+//	defer server.Close()
+//
+//	if err := server.ListenAndServe(ctx); err != nil { return err }
 //
 // Service registration and management are handled by CLI tools, not the public API.
 package ephemos
@@ -71,16 +73,22 @@ type Client interface {
 	// The target should be in "host:port" format.
 	// Options can be used to configure connection-specific behavior.
 	Connect(ctx context.Context, target string, opts ...DialOption) (*ClientConnection, error)
-	
+
 	// Close releases any resources held by the client.
 	// It is safe to call Close multiple times.
+	Close() error
+}
+
+// clientConn is the minimal behavior we need from the internal connection.
+type clientConn interface {
+	HTTPClient() (*http.Client, error)
 	Close() error
 }
 
 // ClientConnection represents an established authenticated connection to a service.
 // Methods are safe for concurrent use by multiple goroutines.
 type ClientConnection struct {
-	conn   ports.Conn
+	conn   clientConn
 	mu     sync.RWMutex
 	closed bool
 }
@@ -91,15 +99,15 @@ type ClientConnection struct {
 func (c *ClientConnection) HTTPClient() (*http.Client, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	if c.closed {
 		return nil, ErrServerClosed
 	}
-	
+
 	if c.conn == nil {
-		return nil, ErrNoAuth
+		return nil, ErrNoSPIFFEAuth
 	}
-	
+
 	return c.conn.HTTPClient()
 }
 
@@ -108,11 +116,11 @@ func (c *ClientConnection) HTTPClient() (*http.Client, error) {
 func (c *ClientConnection) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if c.closed {
 		return nil // idempotent
 	}
-	
+
 	c.closed = true
 	if c.conn != nil {
 		return c.conn.Close()
@@ -126,11 +134,11 @@ type Server interface {
 	// ListenAndServe starts the server and serves requests.
 	// Blocks until the context is cancelled or an error occurs.
 	ListenAndServe(ctx context.Context) error
-	
+
 	// Close gracefully shuts down the server.
 	// It is safe to call Close multiple times.
 	Close() error
-	
+
 	// Addr returns the network address the server is listening on.
 	// Returns nil if the server is not currently listening.
 	Addr() net.Addr
@@ -146,7 +154,7 @@ func IdentityClient(ctx context.Context, opts ...ClientOption) (Client, error) {
 	for _, opt := range opts {
 		opt(options)
 	}
-	
+
 	// If a direct implementation is provided (for testing), use it
 	if options.Impl != nil {
 		return &clientWrapper{
@@ -154,19 +162,19 @@ func IdentityClient(ctx context.Context, opts ...ClientOption) (Client, error) {
 			timeout: options.Timeout,
 		}, nil
 	}
-	
+
 	// Load configuration from options
 	config, err := loadClientConfig(options)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrConfigInvalid, err)
 	}
-	
+
 	// Create SPIFFE/SPIRE-backed dialer via factory
 	dialer, err := factory.SPIFFEDialer(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
-	
+
 	return &clientWrapper{
 		dialer:  dialer,
 		timeout: options.Timeout,
@@ -183,7 +191,7 @@ func IdentityServer(ctx context.Context, opts ...ServerOption) (Server, error) {
 	for _, opt := range opts {
 		opt(options)
 	}
-	
+
 	// If a direct implementation is provided (for testing), use it
 	if options.Impl != nil {
 		return &serverWrapper{
@@ -193,24 +201,24 @@ func IdentityServer(ctx context.Context, opts ...ServerOption) (Server, error) {
 			timeout:  options.Timeout,
 		}, nil
 	}
-	
+
 	// Validate networking configuration
 	if options.Listener == nil && options.Address == "" {
 		return nil, fmt.Errorf("%w: either WithListener or WithAddress must be specified", ErrConfigInvalid)
 	}
-	
+
 	// Load configuration from options
 	config, err := loadServerConfig(options)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrConfigInvalid, err)
 	}
-	
+
 	// Create SPIFFE/SPIRE-backed server via factory
 	impl, err := factory.SPIFFEServer(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create server: %w", err)
 	}
-	
+
 	return &serverWrapper{
 		impl:     impl,
 		listener: options.Listener,
@@ -227,7 +235,7 @@ func IdentityClientFromFile(ctx context.Context, path string, opts ...ClientOpti
 	if err != nil {
 		return nil, fmt.Errorf("failed to load configuration from %s: %w", path, err)
 	}
-	
+
 	// Prepend the file-based config option
 	allOpts := append([]ClientOption{WithConfig(cfg)}, opts...)
 	return IdentityClient(ctx, allOpts...)
@@ -241,7 +249,7 @@ func IdentityServerFromFile(ctx context.Context, path string, opts ...ServerOpti
 	if err != nil {
 		return nil, fmt.Errorf("failed to load configuration from %s: %w", path, err)
 	}
-	
+
 	// Prepend the file-based config option
 	allOpts := append([]ServerOption{WithServerConfig(cfg)}, opts...)
 	return IdentityServer(ctx, allOpts...)
@@ -258,11 +266,11 @@ type clientWrapper struct {
 func (c *clientWrapper) Connect(ctx context.Context, target string, opts ...DialOption) (*ClientConnection, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	if c.closed {
 		return nil, ErrServerClosed
 	}
-	
+
 	// Apply dial options
 	dialOpts := &dialOpts{
 		Timeout: c.timeout,
@@ -270,7 +278,7 @@ func (c *clientWrapper) Connect(ctx context.Context, target string, opts ...Dial
 	for _, opt := range opts {
 		opt(dialOpts)
 	}
-	
+
 	// Apply timeout to context
 	dialCtx := ctx
 	if dialOpts.Timeout > 0 {
@@ -278,25 +286,25 @@ func (c *clientWrapper) Connect(ctx context.Context, target string, opts ...Dial
 		dialCtx, cancel = context.WithTimeout(ctx, dialOpts.Timeout)
 		defer cancel()
 	}
-	
+
 	// Establish connection using the dialer
 	// For now, use a default service name - this could be enhanced with service discovery
 	conn, err := c.dialer.Connect(dialCtx, "default", target)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, err)
 	}
-	
+
 	return &ClientConnection{conn: conn}, nil
 }
 
 func (c *clientWrapper) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if c.closed {
 		return nil // idempotent
 	}
-	
+
 	c.closed = true
 	return c.dialer.Close()
 }
@@ -314,11 +322,11 @@ type serverWrapper struct {
 func (s *serverWrapper) ListenAndServe(ctx context.Context) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	if s.closed {
 		return ErrServerClosed
 	}
-	
+
 	// Create listener if not provided
 	listener := s.listener
 	if listener == nil {
@@ -329,7 +337,7 @@ func (s *serverWrapper) ListenAndServe(ctx context.Context) error {
 		}
 		defer listener.Close()
 	}
-	
+
 	// Apply timeout to context if configured
 	serverCtx := ctx
 	if s.timeout > 0 {
@@ -337,18 +345,18 @@ func (s *serverWrapper) ListenAndServe(ctx context.Context) error {
 		serverCtx, cancel = context.WithTimeout(ctx, s.timeout)
 		defer cancel()
 	}
-	
+
 	return s.impl.Serve(serverCtx, listener)
 }
 
 func (s *serverWrapper) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if s.closed {
 		return nil // idempotent
 	}
-	
+
 	s.closed = true
 	return s.impl.Close()
 }
@@ -356,11 +364,11 @@ func (s *serverWrapper) Close() error {
 func (s *serverWrapper) Addr() net.Addr {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	if s.closed || s.impl == nil {
 		return nil
 	}
-	
+
 	return s.impl.Addr()
 }
 
@@ -369,12 +377,12 @@ func loadClientConfig(opts *clientOpts) (*ports.Configuration, error) {
 	if opts.Config != nil {
 		return opts.Config, nil
 	}
-	
+
 	if opts.Loader != nil {
 		// Custom loader would need a source - this is a placeholder
 		return nil, fmt.Errorf("custom loader specified but no source provided")
 	}
-	
+
 	return nil, fmt.Errorf("no configuration provided")
 }
 
@@ -383,11 +391,11 @@ func loadServerConfig(opts *serverOpts) (*ports.Configuration, error) {
 	if opts.Config != nil {
 		return opts.Config, nil
 	}
-	
+
 	if opts.Loader != nil {
 		// Custom loader would need a source - this is a placeholder
 		return nil, fmt.Errorf("custom loader specified but no source provided")
 	}
-	
+
 	return nil, fmt.Errorf("no configuration provided")
 }
