@@ -83,3 +83,7 @@ spiffe://env\.com/.*
 # Chi middleware test SPIFFE URIs (contrib/middleware/chi/identity_test.go)
 spiffe://untrusted\.com/.*
 spiffe://any-domain\.com/.*
+
+# Gin middleware test SPIFFE URIs (contrib/middleware/gin/identity_test.go)
+spiffe://forbidden\.org/.*
+spiffe://test\.org/.*
