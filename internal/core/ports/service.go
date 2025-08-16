@@ -2,9 +2,6 @@
 // These interfaces are transport-agnostic and contain no protocol buffer dependencies.
 package ports
 
-import (
-	"context"
-)
 
 // ServiceRegistry maps service interface types to their transport implementations.
 // This allows the Mount[T] function to dynamically register services without compile-time coupling.
@@ -65,11 +62,6 @@ func (r *ServiceRegistry) ListServices() []ServiceDescriptor {
 // Common domain service interfaces that users can implement.
 // These use plain Go types and are completely transport-agnostic.
 
-// EchoService demonstrates a simple request-response service.
-type EchoService interface {
-	Echo(ctx context.Context, message string) (string, error)
-	Ping(ctx context.Context) error
-}
 
 // HealthStatus represents the health status of a service.
 type HealthStatus struct {
