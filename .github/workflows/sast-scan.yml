@@ -33,10 +33,13 @@ jobs:
         uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
           go-version: '1.21'
-          check-latest: true
+          check-latest: false  # Disable to avoid toolchain download timeouts
 
       - name: Download dependencies
         run: go mod download
+
+      - name: Create reports directory
+        run: mkdir -p reports/
 
       - name: Perform ShiftLeft Security Scan
         uses: ShiftLeftSecurity/scan-action@master
@@ -60,5 +63,5 @@ jobs:
         if: always()
         uses: github/codeql-action/upload-sarif@e2b3eafc8d227b0241d48be5f425d47c2d750a13 # v3.26.10
         with:
-          sarif_file: reports/
+          sarif_file: reports/result.sarif
         continue-on-error: true
