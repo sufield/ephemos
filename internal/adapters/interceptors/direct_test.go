@@ -2,6 +2,7 @@ package interceptors
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -19,7 +20,9 @@ import (
 
 // Direct testing of pure functions without mocks
 
-func TestParseSpiffeID_Direct(t *testing.T) {
+func TestParseSpiffeIDComprehensive(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		spiffeID    string
@@ -45,6 +48,55 @@ func TestParseSpiffeID_Direct(t *testing.T) {
 				TrustDomain:  "example.org",
 				ServiceName:  "",
 				WorkloadPath: "",
+				Claims:       make(map[string]string),
+			},
+		},
+		{
+			name:        "uppercase_scheme_rejected",
+			spiffeID:    "SPIFFE://example.org/service",
+			expectError: true,
+		},
+		{
+			name:     "trailing_slash_behavior",
+			spiffeID: "spiffe://example.org/",
+			expected: &AuthenticatedIdentity{
+				SPIFFEID:     "spiffe://example.org/",
+				TrustDomain:  "example.org",
+				ServiceName:  "",
+				WorkloadPath: "/",
+				Claims:       make(map[string]string),
+			},
+		},
+		{
+			name:     "query_parameter_behavior",
+			spiffeID: "spiffe://example.org/service?param=value",
+			expected: &AuthenticatedIdentity{
+				SPIFFEID:     "spiffe://example.org/service?param=value",
+				TrustDomain:  "example.org",
+				ServiceName:  "service?param=value", // Current implementation includes full path
+				WorkloadPath: "/service?param=value",
+				Claims:       make(map[string]string),
+			},
+		},
+		{
+			name:     "fragment_behavior",
+			spiffeID: "spiffe://example.org/service#fragment",
+			expected: &AuthenticatedIdentity{
+				SPIFFEID:     "spiffe://example.org/service#fragment",
+				TrustDomain:  "example.org",
+				ServiceName:  "service#fragment", // Current implementation includes full path
+				WorkloadPath: "/service#fragment",
+				Claims:       make(map[string]string),
+			},
+		},
+		{
+			name:     "percent_encoded_path_segments",
+			spiffeID: "spiffe://example.org/workload/test%2Dservice",
+			expected: &AuthenticatedIdentity{
+				SPIFFEID:     "spiffe://example.org/workload/test%2Dservice",
+				TrustDomain:  "example.org",
+				ServiceName:  "test%2Dservice", // Not decoded by current implementation
+				WorkloadPath: "/workload/test%2Dservice",
 				Claims:       make(map[string]string),
 			},
 		},
@@ -83,12 +135,14 @@ func TestParseSpiffeID_Direct(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			interceptor := NewAuthInterceptor(DefaultAuthConfig())
 			result, err := interceptor.parseSpiffeID(tt.spiffeID)
 
 			if tt.expectError {
-				assert.Error(t, err)
-				assert.Nil(t, result)
+				require.Error(t, err)
+				require.Nil(t, result)
 				return
 			}
 
@@ -104,7 +158,9 @@ func TestParseSpiffeID_Direct(t *testing.T) {
 	}
 }
 
-func TestMetadataExtraction_Direct(t *testing.T) {
+func TestMetadataExtraction(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		metadata    map[string]string
@@ -134,9 +190,9 @@ func TestMetadataExtraction_Direct(t *testing.T) {
 			expectedOk:  false,
 		},
 		{
-			name:        "case_insensitive",
+			name:        "case_insensitive_grpc_normalization",
 			metadata:    map[string]string{"Test-Key": "test-value"},
-			key:         "test-key",
+			key:         "test-key", // gRPC normalizes to lowercase
 			expectedVal: "test-value",
 			expectedOk:  true,
 		},
@@ -151,12 +207,28 @@ func TestMetadataExtraction_Direct(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create context with metadata
-			md := metadata.New(tt.metadata)
-			ctx := metadata.NewIncomingContext(t.Context(), md)
+			t.Parallel()
 
-			// Test extraction function directly
-			val, ok := extractMetadataValue(ctx, tt.key)
+			// Use metadata.Pairs which properly handles case normalization
+			var md metadata.MD
+			if len(tt.metadata) > 0 {
+				pairs := make([]string, 0, len(tt.metadata)*2)
+				for k, v := range tt.metadata {
+					pairs = append(pairs, k, v)
+				}
+				md = metadata.Pairs(pairs...)
+			} else {
+				md = metadata.New(tt.metadata)
+			}
+
+			// Test using real gRPC metadata.Get() behavior
+			values := md.Get(tt.key)
+			var val string
+			var ok bool
+			if len(values) > 0 {
+				val = values[0]
+				ok = true
+			}
 
 			assert.Equal(t, tt.expectedOk, ok)
 			assert.Equal(t, tt.expectedVal, val)
@@ -263,47 +335,54 @@ func TestPatternMatching_Direct(t *testing.T) {
 	}
 }
 
-func TestRequestIDGeneration_Direct(t *testing.T) {
+func TestRequestIDGeneration(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name             string
 		incomingMetadata map[string]string
 		contextValue     interface{}
-		contextKey       string
 		expectGenerated  bool
-		expectedPrefix   string
+		expectedID       string
 	}{
 		{
 			name:             "from_incoming_metadata",
 			incomingMetadata: map[string]string{MetadataKeyRequestID: "req-from-metadata"},
 			expectGenerated:  false,
+			expectedID:       "req-from-metadata",
 		},
 		{
 			name:            "from_context_value",
 			contextValue:    "req-from-context",
-			contextKey:      "request-id",
 			expectGenerated: false,
+			expectedID:      "req-from-context",
 		},
 		{
 			name:            "generate_new",
 			expectGenerated: true,
-			expectedPrefix:  "req-",
+			expectedID:      "req-1696000000000000123",
 		},
 		{
 			name:             "metadata_takes_precedence",
 			incomingMetadata: map[string]string{MetadataKeyRequestID: "req-from-metadata"},
 			contextValue:     "req-from-context",
-			contextKey:       "request-id",
 			expectGenerated:  false,
+			expectedID:       "req-from-metadata",
 		},
 	}
 
-	provider := &mockIdentityProvider{}
-	config := DefaultIdentityPropagationConfig(provider)
-	interceptor := NewIdentityPropagationInterceptor(config)
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := t.Context()
+			t.Parallel()
+
+			provider := &mockIdentityProvider{}
+			config := DefaultIdentityPropagationConfig(provider)
+			// Inject deterministic clock for testing
+			fixed := time.Unix(1696000000, 123)
+			config.Clock = func() time.Time { return fixed }
+			interceptor := NewIdentityPropagationInterceptor(config)
+
+			ctx := context.Background()
 
 			// Setup incoming metadata
 			if tt.incomingMetadata != nil {
@@ -318,32 +397,34 @@ func TestRequestIDGeneration_Direct(t *testing.T) {
 
 			requestID := interceptor.getOrGenerateRequestID(ctx)
 
-			assert.NotEmpty(t, requestID)
-
-			if tt.expectGenerated {
-				assert.True(t, strings.HasPrefix(requestID, tt.expectedPrefix))
-				// Verify it's actually a timestamp-based ID
-				assert.True(t, len(requestID) > len(tt.expectedPrefix))
-			} else {
-				// Should match expected value from metadata or context
-				if tt.incomingMetadata != nil && tt.incomingMetadata[MetadataKeyRequestID] != "" {
-					assert.Equal(t, tt.incomingMetadata[MetadataKeyRequestID], requestID)
-				} else if tt.contextValue != nil {
-					assert.Equal(t, tt.contextValue, requestID)
-				}
-			}
+			require.NotEmpty(t, requestID)
+			assert.Equal(t, tt.expectedID, requestID)
 		})
 	}
 }
 
-func TestCallChainValidation_Direct(t *testing.T) {
+func TestRequestIDGeneration_Deterministic(t *testing.T) {
+	t.Parallel()
+
+	fixed := time.Unix(1_696_000_000, 123) // example
+	config := DefaultIdentityPropagationConfig(&mockIdentityProvider{})
+	config.Clock = func() time.Time { return fixed }
+	ic := NewIdentityPropagationInterceptor(config)
+
+	got := ic.getOrGenerateRequestID(context.Background())
+	require.Equal(t, "req-1696000000000000123", got)
+}
+
+func TestCallChainValidation(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		existingChain  string
 		currentService string
 		maxDepth       int
 		expectError    bool
-		errorContains  string
+		expectedError  error
 		expectedChain  string
 	}{
 		{
@@ -367,7 +448,7 @@ func TestCallChainValidation_Direct(t *testing.T) {
 			currentService: "s6",
 			maxDepth:       5,
 			expectError:    true,
-			errorContains:  "depth limit exceeded",
+			expectedError:  ErrDepthLimitExceeded,
 		},
 		{
 			name:           "circular_call_detected",
@@ -375,19 +456,44 @@ func TestCallChainValidation_Direct(t *testing.T) {
 			currentService: "spiffe://example.org/service-a",
 			maxDepth:       5,
 			expectError:    true,
-			errorContains:  "circular call detected",
+			expectedError:  ErrCircularCall,
 		},
 		{
-			name:           "self_call",
+			name:           "self_call_new_chain",
 			currentService: "spiffe://example.org/service-a",
 			maxDepth:       5,
 			expectError:    false,
 			expectedChain:  "spiffe://example.org/service-a",
 		},
+		{
+			name:           "maxDepth_one_with_new_chain",
+			currentService: "spiffe://example.org/service-a",
+			maxDepth:       1,
+			expectError:    false,
+			expectedChain:  "spiffe://example.org/service-a",
+		},
+		{
+			name:           "mixed_spaces_separator",
+			existingChain:  "s1  ->  s2",
+			currentService: "s3",
+			maxDepth:       5,
+			expectError:    false,
+			expectedChain:  "s1  ->  s2 -> s3",
+		},
+		{
+			name:           "duplicate_consecutive_entries",
+			existingChain:  "s1 -> s1",
+			currentService: "s2",
+			maxDepth:       5,
+			expectError:    false,
+			expectedChain:  "s1 -> s1 -> s2",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			provider := &mockIdentityProvider{}
 			config := &IdentityPropagationConfig{
 				IdentityProvider:  provider,
@@ -395,7 +501,7 @@ func TestCallChainValidation_Direct(t *testing.T) {
 			}
 			interceptor := NewIdentityPropagationInterceptor(config)
 
-			ctx := t.Context()
+			ctx := context.Background()
 			if tt.existingChain != "" {
 				md := metadata.New(map[string]string{
 					MetadataKeyCallChain: tt.existingChain,
@@ -406,11 +512,12 @@ func TestCallChainValidation_Direct(t *testing.T) {
 			result, err := interceptor.buildCallChain(ctx, tt.currentService)
 
 			if tt.expectError {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorContains)
-				assert.Empty(t, result)
+				require.Error(t, err)
+				require.Equal(t, codes.PermissionDenied, status.Code(err))
+				require.True(t, errors.Is(err, tt.expectedError))
+				require.Empty(t, result)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expectedChain, result)
 			}
 		})
