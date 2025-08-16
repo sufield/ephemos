@@ -34,7 +34,7 @@ func testCreateServiceIdentity(t *testing.T) *domain.ServiceIdentity {
 	if err := identity.Validate(); err != nil {
 		t.Fatalf("Identity validation failed: %v", err)
 	}
-	t.Logf("✅ Created identity: %s", identity.URI)
+	t.Logf("✅ Created identity: %s", identity.URI())
 	return identity
 }
 
@@ -50,16 +50,16 @@ func testValidateRetrievedIdentity(t *testing.T, provider ports.IdentityProvider
 		t.Fatalf("Failed to get service identity: %v", err)
 	}
 
-	if retrievedIdentity.Name != identity.Name {
-		t.Errorf("Expected identity name %s, got %s", identity.Name, retrievedIdentity.Name)
+	if retrievedIdentity.Name() != identity.Name() {
+		t.Errorf("Expected identity name %s, got %s", identity.Name(), retrievedIdentity.Name())
 	}
-	if retrievedIdentity.Domain != identity.Domain {
-		t.Errorf("Expected identity domain %s, got %s", identity.Domain, retrievedIdentity.Domain)
+	if retrievedIdentity.Domain() != identity.Domain() {
+		t.Errorf("Expected identity domain %s, got %s", identity.Domain(), retrievedIdentity.Domain())
 	}
-	if retrievedIdentity.URI != identity.URI {
-		t.Errorf("Expected identity URI %s, got %s", identity.URI, retrievedIdentity.URI)
+	if retrievedIdentity.URI() != identity.URI() {
+		t.Errorf("Expected identity URI %s, got %s", identity.URI(), retrievedIdentity.URI())
 	}
-	t.Logf("✅ Retrieved identity matches: %s", retrievedIdentity.URI)
+	t.Logf("✅ Retrieved identity matches: %s", retrievedIdentity.URI())
 }
 
 func testValidateCertificate(t *testing.T, provider ports.IdentityProvider) {
@@ -139,7 +139,7 @@ func testSetupConfigProvider(t *testing.T) (*config.InMemoryProvider, *ports.Con
 			Name:   "test-service",
 			Domain: "test.example.org",
 		},
-		SPIFFE: &ports.SPIFFEConfig{
+		Agent: &ports.AgentConfig{
 			SocketPath: "/tmp/test-spire-agent/public/api.sock",
 		},
 	}
@@ -217,10 +217,10 @@ func testValidateProviderDirectly(t *testing.T, provider ports.IdentityProvider,
 		t.Fatalf("Failed to get service identity: %v", err)
 	}
 
-	if serviceIdentity.URI != identity.URI {
-		t.Errorf("Expected URI %s, got %s", identity.URI, serviceIdentity.URI)
+	if serviceIdentity.URI() != identity.URI() {
+		t.Errorf("Expected URI %s, got %s", identity.URI(), serviceIdentity.URI())
 	}
-	t.Logf("✅ Identity provider returned correct identity: %s", serviceIdentity.URI)
+	t.Logf("✅ Identity provider returned correct identity: %s", serviceIdentity.URI())
 
 	testValidateProviderCertificate(t, provider)
 	testValidateProviderTrustBundle(t, provider)
@@ -259,7 +259,7 @@ func testCreateIdentityService(t *testing.T, provider ports.IdentityProvider) *s
 			Name:   "integration-service",
 			Domain: "test.example.org",
 		},
-		SPIFFE: &ports.SPIFFEConfig{
+		Agent: &ports.AgentConfig{
 			SocketPath: "/tmp/test-spire-agent/public/api.sock",
 		},
 	}
@@ -336,17 +336,17 @@ func TestErrorHandlingFlow(t *testing.T) {
 			},
 			{
 				name:     "EmptyServiceName",
-				identity: &domain.ServiceIdentity{Name: "", Domain: "example.org"},
+				identity: domain.NewServiceIdentity("", "example.org"),
 				hasError: true,
 			},
 			{
 				name:     "EmptyDomain",
-				identity: &domain.ServiceIdentity{Name: "service", Domain: ""},
+				identity: domain.NewServiceIdentity("service", ""),
 				hasError: true,
 			},
 			{
 				name:     "BothEmpty",
-				identity: &domain.ServiceIdentity{Name: "", Domain: ""},
+				identity: domain.NewServiceIdentity("", ""),
 				hasError: true,
 			},
 		}
@@ -420,7 +420,7 @@ func TestIdentityLifecycle(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Iteration %d: Failed to get service identity: %v", i, err)
 			}
-			if serviceIdentity.URI != identity.URI {
+			if serviceIdentity.URI() != identity.URI() {
 				t.Errorf("Iteration %d: URI mismatch", i)
 			}
 		}

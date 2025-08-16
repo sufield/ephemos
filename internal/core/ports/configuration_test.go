@@ -21,7 +21,7 @@ func TestConfiguration_Validate(t *testing.T) {
 					Name:   "test-service",
 					Domain: "example.com",
 				},
-				SPIFFE: &ports.SPIFFEConfig{
+				Agent: &ports.AgentConfig{
 					SocketPath: "/tmp/spire-agent/public/api.sock",
 				},
 			},
@@ -31,7 +31,7 @@ func TestConfiguration_Validate(t *testing.T) {
 			name: "empty service config",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{}, // Empty service config to test validation
-				SPIFFE: &ports.SPIFFEConfig{
+				Agent: &ports.AgentConfig{
 					SocketPath: "/tmp/spire-agent/public/api.sock",
 				},
 			},
@@ -45,7 +45,7 @@ func TestConfiguration_Validate(t *testing.T) {
 					Name:   "test-service",
 					Domain: "example.com",
 				},
-				SPIFFE: nil,
+				Agent: nil,
 			},
 			wantErr:       false, // SPIFFE config is optional
 			errorContains: "",
@@ -57,7 +57,7 @@ func TestConfiguration_Validate(t *testing.T) {
 					Name:   "",
 					Domain: "example.com",
 				},
-				SPIFFE: &ports.SPIFFEConfig{
+				Agent: &ports.AgentConfig{
 					SocketPath: "/tmp/spire-agent/public/api.sock",
 				},
 			},
@@ -71,7 +71,7 @@ func TestConfiguration_Validate(t *testing.T) {
 					Name:   "test-service",
 					Domain: "",
 				},
-				SPIFFE: &ports.SPIFFEConfig{
+				Agent: &ports.AgentConfig{
 					SocketPath: "/tmp/spire-agent/public/api.sock",
 				},
 			},
@@ -85,7 +85,7 @@ func TestConfiguration_Validate(t *testing.T) {
 					Name:   "   ",
 					Domain: "example.com",
 				},
-				SPIFFE: &ports.SPIFFEConfig{
+				Agent: &ports.AgentConfig{
 					SocketPath: "/tmp/spire-agent/public/api.sock",
 				},
 			},
@@ -99,7 +99,7 @@ func TestConfiguration_Validate(t *testing.T) {
 					Name:   "test-service",
 					Domain: "example.com",
 				},
-				SPIFFE: &ports.SPIFFEConfig{
+				Agent: &ports.AgentConfig{
 					SocketPath: "",
 				},
 			},
@@ -187,29 +187,29 @@ func TestServiceConfig_Validate(t *testing.T) {
 	}
 }
 
-func TestSPIFFEConfig_Validate(t *testing.T) {
+func TestAgentConfig_Validate(t *testing.T) {
 	tests := []struct {
 		name    string
-		config  *ports.SPIFFEConfig
+		config  *ports.AgentConfig
 		wantErr bool
 	}{
 		{
 			name: "valid config",
-			config: &ports.SPIFFEConfig{
+			config: &ports.AgentConfig{
 				SocketPath: "/tmp/spire-agent/public/api.sock",
 			},
 			wantErr: false,
 		},
 		{
 			name: "empty socket path",
-			config: &ports.SPIFFEConfig{
+			config: &ports.AgentConfig{
 				SocketPath: "",
 			},
 			wantErr: true,
 		},
 		{
 			name: "whitespace socket path",
-			config: &ports.SPIFFEConfig{
+			config: &ports.AgentConfig{
 				SocketPath: "  /tmp/spire-agent/public/api.sock  ",
 			},
 			wantErr: false, // Should be trimmed and valid
@@ -218,12 +218,12 @@ func TestSPIFFEConfig_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Test SPIFFE config validation by creating a Configuration with it
+			// Test Agent config validation by creating a Configuration with it
 			config := &ports.Configuration{
 				Service: ports.ServiceConfig{
 					Name: "test-service",
 				},
-				SPIFFE: tt.config,
+				Agent: tt.config,
 			}
 			err := config.Validate()
 			if (err != nil) != tt.wantErr {
@@ -240,7 +240,7 @@ func TestConfiguration_DefaultValues(t *testing.T) {
 			Name:   "test-service",
 			Domain: "example.com",
 		},
-		SPIFFE: &ports.SPIFFEConfig{
+		Agent: &ports.AgentConfig{
 			SocketPath: "/tmp/spire-agent/public/api.sock",
 		},
 	}
@@ -265,7 +265,7 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 					Name:   strings.Repeat("a", 1000),
 					Domain: "example.com",
 				},
-				SPIFFE: &ports.SPIFFEConfig{
+				Agent: &ports.AgentConfig{
 					SocketPath: "/tmp/spire-agent/public/api.sock",
 				},
 			},
@@ -278,7 +278,7 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 					Name:   "测试服务",
 					Domain: "example.com",
 				},
-				SPIFFE: &ports.SPIFFEConfig{
+				Agent: &ports.AgentConfig{
 					SocketPath: "/tmp/spire-agent/public/api.sock",
 				},
 			},
@@ -291,7 +291,7 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 					Name:   "test-service",
 					Domain: "example.com",
 				},
-				SPIFFE: &ports.SPIFFEConfig{
+				Agent: &ports.AgentConfig{
 					SocketPath: "/tmp/spire-agent/public/api.sock?query=1",
 				},
 			},
@@ -315,7 +315,7 @@ func BenchmarkConfiguration_Validate(b *testing.B) {
 			Name:   "test-service",
 			Domain: "example.com",
 		},
-		SPIFFE: &ports.SPIFFEConfig{
+		Agent: &ports.AgentConfig{
 			SocketPath: "/tmp/spire-agent/public/api.sock",
 		},
 	}
@@ -351,7 +351,7 @@ func BenchmarkSPIFFEConfig_Validate(b *testing.B) {
 		Service: ports.ServiceConfig{
 			Name: "test-service",
 		},
-		SPIFFE: &ports.SPIFFEConfig{
+		Agent: &ports.AgentConfig{
 			SocketPath: "/tmp/spire-agent/public/api.sock",
 		},
 	}

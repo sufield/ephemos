@@ -174,8 +174,8 @@ func TestFileProvider_GetDefaultConfiguration(t *testing.T) {
 			}
 
 			// Verify default values
-			if config.SPIFFE == nil {
-				t.Error("Default configuration missing SPIFFE section")
+			if config.Agent == nil {
+				t.Error("Default configuration missing Agent section")
 			}
 		})
 	}

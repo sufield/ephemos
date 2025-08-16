@@ -8,9 +8,9 @@ import (
 
 func TestClientConnection_HTTPClient(t *testing.T) {
 	t.Run("HTTPClient requires SPIFFE authentication", func(t *testing.T) {
-		// Create a client connection with nil internal connection (should fail)
+		// Create a client connection with nil conn (should fail)
 		conn := &ClientConnection{
-			internalConn: nil,
+			conn: nil,
 		}
 
 		httpClient, err := conn.HTTPClient()
@@ -25,7 +25,7 @@ func TestClientConnection_HTTPClient(t *testing.T) {
 		// Test that HTTPClient consistently requires SPIFFE authentication
 		// and does not fall back to insecure configurations
 		conn := &ClientConnection{
-			internalConn: nil,
+			conn: nil,
 		}
 
 		httpClient, err := conn.HTTPClient()

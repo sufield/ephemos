@@ -69,7 +69,7 @@ func createValidTestConfig() *ports.Configuration {
 			Name:   "test-service",
 			Domain: "example.org",
 		},
-		SPIFFE: &ports.SPIFFEConfig{
+		Agent: &ports.AgentConfig{
 			SocketPath: "/tmp/spire-agent/public/api.sock",
 		},
 	}
