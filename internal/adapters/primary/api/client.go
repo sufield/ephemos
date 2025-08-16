@@ -14,11 +14,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
 
-	"github.com/sufield/ephemos/internal/adapters/secondary/config"
-	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
-	"github.com/sufield/ephemos/internal/adapters/secondary/transport"
 	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
@@ -30,42 +26,56 @@ import (
 	"github.com/sufield/ephemos/internal/core/services"
 )
 
+// ClientOption configures client creation.
+type ClientOption func(*clientOpts)
+
+type clientOpts struct {
+	transportProvider ports.TransportProvider
+	authorizer        tlsconfig.Authorizer
+	trustDomain       spiffeid.TrustDomain
+}
+
+// WithTransportProvider sets the transport provider for the client.
+func WithTransportProvider(p ports.TransportProvider) ClientOption {
+	return func(o *clientOpts) { o.transportProvider = p }
+}
+
+// WithAuthorizer sets the authorizer for peer verification.
+func WithAuthorizer(a tlsconfig.Authorizer) ClientOption {
+	return func(o *clientOpts) { o.authorizer = a }
+}
+
+// WithTrustDomain sets the trust domain for authorization.
+func WithTrustDomain(td spiffeid.TrustDomain) ClientOption {
+	return func(o *clientOpts) { o.trustDomain = td }
+}
+
 // Client provides a high-level API for connecting to SPIFFE-secured services.
 type Client struct {
 	identityService *services.IdentityService
 	domainClient    ports.ClientPort
+	trustDomain     spiffeid.TrustDomain
+	authorizer      tlsconfig.Authorizer
 	mu              sync.Mutex
 }
 
-// NewClientFromConfig creates a new identity client from configuration path.
-// Handles all provider creation internally to hide implementation details from public API.
-func NewClientFromConfig(ctx context.Context, configPath string) (*Client, error) {
-	// Load configuration
-	configProvider := config.NewFileProvider()
-	cfg, err := configProvider.LoadConfiguration(ctx, configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
+// NewClient creates a new identity client with dependency injection.
+// The caller must provide all dependencies through options to avoid internal adapter imports.
+func NewClient(identityProvider ports.IdentityProvider, cfg *ports.Configuration, opts ...ClientOption) (*Client, error) {
+	var o clientOpts
+	for _, f := range opts {
+		f(&o)
 	}
 
-	// Create identity provider
-	identityProvider, err := spiffe.NewProvider(cfg.Agent)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create identity provider: %w", err)
+	if o.transportProvider == nil {
+		return nil, &errors.ValidationError{
+			Field:   "transportProvider",
+			Message: "transport provider cannot be nil",
+		}
 	}
 
-	// Create default transport provider
-	transportProvider := transport.NewGRPCProvider(cfg)
-	
-	return IdentityClient(identityProvider, transportProvider, cfg)
-}
-
-// NewClient creates a new identity client with minimal dependencies.
-// Uses default transport provider internally to hide implementation details from public API.
-func NewClient(identityProvider ports.IdentityProvider, cfg *ports.Configuration) (*Client, error) {
-	// Create default transport provider internally
-	transportProvider := transport.NewGRPCProvider(cfg)
-	
-	return IdentityClient(identityProvider, transportProvider, cfg)
+	// Use provided authorizer and trust domain from options
+	return IdentityClient(identityProvider, o.transportProvider, cfg, o.authorizer, o.trustDomain)
 }
 
 // IdentityClient creates a new identity client with injected dependencies.
@@ -74,6 +84,8 @@ func IdentityClient(
 	identityProvider ports.IdentityProvider,
 	transportProvider ports.TransportProvider,
 	cfg *ports.Configuration,
+	authorizer tlsconfig.Authorizer,
+	trustDomain spiffeid.TrustDomain,
 ) (*Client, error) {
 	if cfg == nil {
 		return nil, &errors.ValidationError{
@@ -110,6 +122,8 @@ func IdentityClient(
 
 	return &Client{
 		identityService: identityService,
+		trustDomain:     trustDomain,
+		authorizer:      authorizer,
 	}, nil
 }
 
@@ -175,30 +189,13 @@ func (c *Client) Connect(ctx context.Context, serviceName, address string) (*Cli
 		return nil, fmt.Errorf("unexpected connection type from domain client")
 	}
 
-	// Create a secure default authorizer based on the service name
-	// In production, this should be configurable through the configuration system
-	var authorizer tlsconfig.Authorizer
-	
-	// Try to create a strict authorizer based on service name if it looks like a SPIFFE ID
-	if strings.Contains(serviceName, "/") {
-		// Assume serviceName might be a full SPIFFE ID path component
-		expectedID := fmt.Sprintf("spiffe://example.org/%s", strings.TrimPrefix(serviceName, "/"))
-		if id, err := spiffeid.FromString(expectedID); err == nil {
-			authorizer = tlsconfig.AuthorizeID(id)
-		} else {
-			// Fall back to trust domain authorization
-			if td, err := spiffeid.TrustDomainFromString("example.org"); err == nil {
-				authorizer = tlsconfig.AuthorizeMemberOf(td)
-			} else {
-				authorizer = tlsconfig.AuthorizeAny()
-			}
-		}
-	} else {
-		// For simple service names, use trust domain authorization
-		if td, err := spiffeid.TrustDomainFromString("example.org"); err == nil {
-			authorizer = tlsconfig.AuthorizeMemberOf(td)
-		} else {
-			authorizer = tlsconfig.AuthorizeAny()
+	// Use deterministic, config-driven authorizer
+	authorizer := buildAuthorizer(serviceName, c.trustDomain)
+	if authorizer == nil {
+		// Fall back to client's configured authorizer if available
+		authorizer = c.authorizer
+		if authorizer == nil {
+			return nil, fmt.Errorf("no authorizer configured for service %s", serviceName)
 		}
 	}
 
@@ -207,6 +204,7 @@ func (c *Client) Connect(ctx context.Context, serviceName, address string) (*Cli
 		domainConn:      domainConn,
 		identityService: c.identityService,
 		authorizer:      authorizer,
+		trustDomain:     c.trustDomain,
 	}, nil
 }
 
@@ -237,6 +235,11 @@ type ClientConnection struct {
 	domainConn      ports.ConnectionPort
 	identityService CertificateProvider
 	authorizer      tlsconfig.Authorizer
+	trustDomain     spiffeid.TrustDomain
+	
+	tlsOnce sync.Once
+	tlsCfg  *tls.Config
+	tlsErr  error
 }
 
 // Close terminates the client connection and cleans up resources.
@@ -259,31 +262,26 @@ func (c *ClientConnection) GetClientConnection() *grpc.ClientConn {
 // as the gRPC connection for secure HTTP communication.
 func (c *ClientConnection) HTTPClient() (*http.Client, error) {
 	if c.domainConn == nil {
-		return nil, fmt.Errorf("no domain connection available for SPIFFE authentication")
+		return nil, fmt.Errorf("no domain connection available")
 	}
 
-	// Extract SPIFFE certificates and trust configuration from the domain connection
-	// This uses the same security context as the gRPC connection
-	tlsConfig, err := c.extractTLSConfig()
+	tlsCfg, err := c.extractTLSConfig(c.trustDomain)
 	if err != nil {
-		return nil, fmt.Errorf("failed to configure SPIFFE authentication for HTTP client: %w", err)
+		return nil, fmt.Errorf("tls config: %w", err)
 	}
 
-	// Create HTTP transport with SPIFFE certificate authentication
-	transport := &http.Transport{
-		TLSClientConfig: tlsConfig,
-		// Configure connection pooling and timeouts
+	tr := &http.Transport{
+		TLSClientConfig:       tlsCfg,
+		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
-
 	return &http.Client{
-		Transport: transport,
+		Transport: tr,
 		Timeout:   30 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			// Limit redirects for security
+		CheckRedirect: func(_ *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
 				return fmt.Errorf("stopped after 10 redirects")
 			}
@@ -292,38 +290,53 @@ func (c *ClientConnection) HTTPClient() (*http.Client, error) {
 	}, nil
 }
 
+// buildAuthorizer creates a deterministic, config-driven authorizer.
+// If caller passes a full SPIFFE ID, enforce exact match.
+// Otherwise, require membership in the configured trust domain.
+func buildAuthorizer(serviceName string, td spiffeid.TrustDomain) tlsconfig.Authorizer {
+	// If caller passes a full SPIFFE ID, enforce exact match.
+	if strings.HasPrefix(serviceName, "spiffe://") {
+		if id, err := spiffeid.FromString(serviceName); err == nil {
+			return tlsconfig.AuthorizeID(id)
+		}
+	}
+	// Otherwise, require membership in the configured trust domain.
+	return tlsconfig.AuthorizeMemberOf(td)
+}
+
 // extractTLSConfig extracts TLS configuration using official go-spiffe tlsconfig
 // This provides the same SPIFFE certificate authentication for HTTP as gRPC uses
-func (c *ClientConnection) extractTLSConfig() (*tls.Config, error) {
-	if c.conn == nil {
-		return nil, fmt.Errorf("no gRPC connection available")
+// Results are cached using sync.Once for performance.
+func (c *ClientConnection) extractTLSConfig(trustDomain spiffeid.TrustDomain) (*tls.Config, error) {
+	c.tlsOnce.Do(func() {
+		// Create adapters for go-spiffe interfaces
+		svidSource, err := c.createSVIDSource()
+		if err != nil {
+			c.tlsErr = fmt.Errorf("failed to create SVID source for SPIFFE authentication: %w", err)
+			return
+		}
+
+		bundleSource, err := c.createBundleSourceForTrustDomain(trustDomain)
+		if err != nil {
+			c.tlsErr = fmt.Errorf("failed to create bundle source for SPIFFE authentication: %w", err)
+			return
+		}
+
+		// Use official go-spiffe tlsconfig for mutual TLS with SPIFFE authentication
+		// This provides the standard SPIFFE peer verification with proper authorizers
+		tlsConfig := tlsconfig.MTLSClientConfig(svidSource, bundleSource, c.authorizer)
+
+		// Ensure TLS 1.3 minimum version (go-spiffe uses 1.2 by default)
+		tlsConfig.MinVersion = tls.VersionTLS13
+
+		c.tlsCfg = tlsConfig
+	})
+
+	if c.tlsErr != nil {
+		return nil, c.tlsErr
 	}
 
-	// Get the connection state from the gRPC connection
-	state := c.conn.GetState()
-	if state == connectivity.Shutdown {
-		return nil, fmt.Errorf("gRPC connection is shut down")
-	}
-
-	// Create adapters for go-spiffe interfaces
-	svidSource, err := c.createSVIDSource()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create SVID source for SPIFFE authentication: %w", err)
-	}
-
-	bundleSource, err := c.createBundleSource()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create bundle source for SPIFFE authentication: %w", err)
-	}
-
-	// Use official go-spiffe tlsconfig for mutual TLS with SPIFFE authentication
-	// This provides the standard SPIFFE peer verification with proper authorizers
-	tlsConfig := tlsconfig.MTLSClientConfig(svidSource, bundleSource, c.authorizer)
-
-	// Ensure TLS 1.3 minimum version (go-spiffe uses 1.2 by default)
-	tlsConfig.MinVersion = tls.VersionTLS13
-
-	return tlsConfig, nil
+	return c.tlsCfg, nil
 }
 
 // svidSourceAdapter adapts the domain certificate to go-spiffe x509svid.Source
@@ -371,11 +384,18 @@ func (s *svidSourceAdapter) GetX509SVID() (*x509svid.SVID, error) {
 
 // bundleSourceAdapter adapts the domain trust bundle to go-spiffe x509bundle.Source  
 type bundleSourceAdapter struct {
-	identityService CertificateProvider
+	identityService     CertificateProvider
+	restrictedTrustDomain spiffeid.TrustDomain
 }
 
 // GetX509BundleForTrustDomain implements x509bundle.Source interface
+// This enforces trust domain isolation by only serving bundles for the configured domain
 func (b *bundleSourceAdapter) GetX509BundleForTrustDomain(td spiffeid.TrustDomain) (*x509bundle.Bundle, error) {
+	// Enforce trust domain isolation - only serve bundles for our configured domain
+	if !b.restrictedTrustDomain.IsZero() && td != b.restrictedTrustDomain {
+		return nil, fmt.Errorf("trust domain %s not allowed, restricted to %s", td, b.restrictedTrustDomain)
+	}
+
 	trustBundle, err := b.identityService.GetTrustBundle()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get trust bundle: %w", err)
@@ -386,7 +406,6 @@ func (b *bundleSourceAdapter) GetX509BundleForTrustDomain(td spiffeid.TrustDomai
 	}
 
 	// Create bundle for the requested trust domain
-	// Note: In production, the trust bundle should be domain-aware
 	bundle := x509bundle.FromX509Authorities(td, trustBundle.Certificates)
 	return bundle, nil
 }
@@ -402,7 +421,7 @@ func (c *ClientConnection) createSVIDSource() (x509svid.Source, error) {
 	}, nil
 }
 
-// createBundleSource creates an x509bundle.Source adapter
+// createBundleSource creates an x509bundle.Source adapter without trust domain restrictions
 func (c *ClientConnection) createBundleSource() (x509bundle.Source, error) {
 	if c.identityService == nil {
 		return nil, fmt.Errorf("no identity service available")
@@ -410,6 +429,18 @@ func (c *ClientConnection) createBundleSource() (x509bundle.Source, error) {
 
 	return &bundleSourceAdapter{
 		identityService: c.identityService,
+	}, nil
+}
+
+// createBundleSourceForTrustDomain creates an x509bundle.Source adapter with trust domain enforcement
+func (c *ClientConnection) createBundleSourceForTrustDomain(td spiffeid.TrustDomain) (x509bundle.Source, error) {
+	if c.identityService == nil {
+		return nil, fmt.Errorf("no identity service available")
+	}
+
+	return &bundleSourceAdapter{
+		identityService:       c.identityService,
+		restrictedTrustDomain: td,
 	}, nil
 }
 

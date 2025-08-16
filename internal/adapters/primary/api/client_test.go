@@ -2,10 +2,16 @@ package api_test
 
 import (
 	"context"
+	"errors"
 	"testing"
+
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
+	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+	"google.golang.org/grpc"
 
 	"github.com/sufield/ephemos/internal/adapters/primary/api"
 	"github.com/sufield/ephemos/internal/core/domain"
+	epherrors "github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
@@ -41,51 +47,99 @@ func (m *mockTransportProvider) CreateClient(cert *domain.Certificate, bundle *d
 type mockClient struct{}
 
 func (m *mockClient) Connect(serviceName, address string) (ports.ConnectionPort, error) {
-	return nil, nil
+	return &mockConnection{}, nil
 }
 
 func (m *mockClient) Close() error {
 	return nil
 }
 
+type mockConnection struct{}
+
+func (m *mockConnection) GetClientConnection() interface{} {
+	// Return a mock gRPC connection
+	return &grpc.ClientConn{}
+}
+
+func (m *mockConnection) Close() error {
+	return nil
+}
+
 func TestClient_IdentityClient(t *testing.T) {
+	trustDomain := spiffeid.RequireTrustDomainFromString("test.local")
+	authorizer := tlsconfig.AuthorizeMemberOf(trustDomain)
+
 	tests := []struct {
 		name              string
 		identityProvider  ports.IdentityProvider
 		transportProvider ports.TransportProvider
 		config            *ports.Configuration
+		authorizer        tlsconfig.Authorizer
+		trustDomain       spiffeid.TrustDomain
 		wantErr           bool
+		wantErrType       string
 	}{
 		{
 			name:              "nil config",
 			identityProvider:  &mockIdentityProvider{},
 			transportProvider: &mockTransportProvider{},
 			config:            nil,
+			authorizer:        authorizer,
+			trustDomain:       trustDomain,
 			wantErr:           true,
+			wantErrType:       "ValidationError",
 		},
 		{
 			name:              "nil identity provider",
 			identityProvider:  nil,
 			transportProvider: &mockTransportProvider{},
 			config:            &ports.Configuration{},
+			authorizer:        authorizer,
+			trustDomain:       trustDomain,
 			wantErr:           true,
+			wantErrType:       "ValidationError",
 		},
 		{
 			name:              "nil transport provider",
 			identityProvider:  &mockIdentityProvider{},
 			transportProvider: nil,
 			config:            &ports.Configuration{},
+			authorizer:        authorizer,
+			trustDomain:       trustDomain,
 			wantErr:           true,
+			wantErrType:       "ValidationError",
+		},
+		{
+			name:              "valid parameters",
+			identityProvider:  &mockIdentityProvider{},
+			transportProvider: &mockTransportProvider{},
+			config: &ports.Configuration{
+				Service: ports.ServiceConfig{
+					Name:   "test-service",
+					Domain: "test.local",
+				},
+			},
+			authorizer:        authorizer,
+			trustDomain:       trustDomain,
+			wantErr:           false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, err := api.IdentityClient(tt.identityProvider, tt.transportProvider, tt.config)
+			client, err := api.IdentityClient(tt.identityProvider, tt.transportProvider, tt.config, tt.authorizer, tt.trustDomain)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("IdentityClient() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			
+			if tt.wantErr && tt.wantErrType != "" {
+				var validationErr *epherrors.ValidationError
+				if !errors.As(err, &validationErr) {
+					t.Errorf("IdentityClient() error type = %T, want %s", err, tt.wantErrType)
+				}
+			}
+			
 			if !tt.wantErr && client == nil {
 				t.Error("IdentityClient() returned nil client")
 			}
@@ -130,7 +184,15 @@ func TestClient_Connect(t *testing.T) {
 	}
 
 	// Create a client for testing with mock dependencies
-	client, err := api.IdentityClient(&mockIdentityProvider{}, &mockTransportProvider{}, &ports.Configuration{})
+	trustDomain := spiffeid.RequireTrustDomainFromString("test.local")
+	authorizer := tlsconfig.AuthorizeMemberOf(trustDomain)
+	config := &ports.Configuration{
+		Service: ports.ServiceConfig{
+			Name:   "test-service",
+			Domain: "test.local",
+		},
+	}
+	client, err := api.IdentityClient(&mockIdentityProvider{}, &mockTransportProvider{}, config, authorizer, trustDomain)
 	if err != nil {
 		t.Skip("Skipping Connect tests - could not create client:", err)
 	}
@@ -151,7 +213,15 @@ func TestClient_Connect(t *testing.T) {
 }
 
 func TestClient_Close(t *testing.T) {
-	client, err := api.IdentityClient(&mockIdentityProvider{}, &mockTransportProvider{}, &ports.Configuration{})
+	trustDomain := spiffeid.RequireTrustDomainFromString("test.local")
+	authorizer := tlsconfig.AuthorizeMemberOf(trustDomain)
+	config := &ports.Configuration{
+		Service: ports.ServiceConfig{
+			Name:   "test-service",
+			Domain: "test.local",
+		},
+	}
+	client, err := api.IdentityClient(&mockIdentityProvider{}, &mockTransportProvider{}, config, authorizer, trustDomain)
 	if err != nil {
 		t.Skip("Skipping Close test - could not create client:", err)
 	}
