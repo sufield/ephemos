@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// ArchConfig holds configuration for architecture tests
+// ArchConfig holds configuration for architecture tests.
 type ArchConfig struct {
 	ProhibitedImports     []string `json:"prohibited_imports"`
 	AllowedHTTPFiles      []string `json:"allowed_http_files"`
@@ -29,6 +29,9 @@ type ArchConfig struct {
 	AllowedExternalDeps   []string `json:"allowed_external_deps"`
 	SkipPatterns          []string `json:"skip_patterns"`
 	IncludeTestFiles      bool     `json:"include_test_files"`
+	
+	// Compiled regexes for performance (populated during config load)
+	compiledFrameworkRegexes map[string]*regexp.Regexp `json:"-"`
 }
 
 // getDefaultConfig returns the default configuration for architecture tests
@@ -87,28 +90,42 @@ func getDefaultConfig() *ArchConfig {
 	}
 }
 
-// loadConfig loads configuration from file or returns default
+// loadConfig loads configuration from file or returns default.
 func loadConfig(t *testing.T, repoRoot string) *ArchConfig {
 	t.Helper()
 	
 	configPath := filepath.Join(repoRoot, ".arch-test-config.json")
+	var config *ArchConfig
+	
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return getDefaultConfig()
+		config = getDefaultConfig()
+	} else {
+		data, err := os.ReadFile(configPath)
+		if err != nil {
+			t.Logf("Failed to read config file %s, using defaults: %v", configPath, err)
+			config = getDefaultConfig()
+		} else {
+			var loadedConfig ArchConfig
+			if err := json.Unmarshal(data, &loadedConfig); err != nil {
+				t.Logf("Failed to parse config file %s, using defaults: %v", configPath, err)
+				config = getDefaultConfig()
+			} else {
+				config = &loadedConfig
+			}
+		}
 	}
 	
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		t.Logf("Failed to read config file %s, using defaults: %v", configPath, err)
-		return getDefaultConfig()
+	// Precompile framework regexes for performance
+	config.compiledFrameworkRegexes = make(map[string]*regexp.Regexp)
+	for _, framework := range config.HTTPFrameworks {
+		if regex, err := compileFrameworkRegex(framework); err == nil {
+			config.compiledFrameworkRegexes[framework] = regex
+		} else {
+			t.Logf("Failed to compile regex for framework %s: %v", framework, err)
+		}
 	}
 	
-	var config ArchConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		t.Logf("Failed to parse config file %s, using defaults: %v", configPath, err)
-		return getDefaultConfig()
-	}
-	
-	return &config
+	return config
 }
 
 // getRepoRoot returns the absolute path to the repository root
@@ -215,16 +232,37 @@ func compileFrameworkRegex(framework string) (*regexp.Regexp, error) {
 	return regexp.Compile(pattern)
 }
 
-// walkDirectoryParallel walks a directory in parallel for improved performance
-func walkDirectoryParallel(t *testing.T, rootDir string, processFn func(path string, info os.FileInfo) error) error {
+// FileError represents an error from processing a specific file.
+type FileError struct {
+	Path string
+	Err  error
+}
+
+// Error implements the error interface.
+func (fe *FileError) Error() string {
+	return fmt.Sprintf("%s: %v", fe.Path, fe.Err)
+}
+
+// walkDirectoryParallel walks a directory in parallel for improved performance.
+// It collects all errors and is safe for concurrent use with testing.T.
+func walkDirectoryParallel(t *testing.T, rootDir string, processFn func(path string, info os.FileInfo) error) []FileError {
 	t.Helper()
 	
 	var wg sync.WaitGroup
-	errCh := make(chan error, 100) // Buffer to prevent blocking
+	var mu sync.Mutex
+	var errors []FileError
+	
+	// Function to safely add errors
+	addError := func(path string, err error) {
+		mu.Lock()
+		errors = append(errors, FileError{Path: path, Err: err})
+		mu.Unlock()
+	}
 	
 	err := filepath.WalkDir(rootDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return fmt.Errorf("walking directory %s: %w", path, err)
+			addError(path, fmt.Errorf("walking directory: %w", err))
+			return nil // Continue walking
 		}
 		
 		if d.IsDir() {
@@ -232,39 +270,34 @@ func walkDirectoryParallel(t *testing.T, rootDir string, processFn func(path str
 		}
 		
 		wg.Add(1)
-		go func(p string) {
+		go func(p string, dirEntry os.DirEntry) {
 			defer wg.Done()
 			
-			info, err := d.Info()
+			info, err := dirEntry.Info()
 			if err != nil {
-				errCh <- fmt.Errorf("getting file info for %s: %w", p, err)
+				addError(p, fmt.Errorf("getting file info: %w", err))
 				return
 			}
 			
 			if err := processFn(p, info); err != nil {
-				errCh <- err
+				addError(p, err)
 			}
-		}(path)
+		}(path, d)
 		
 		return nil
 	})
 	
 	// Wait for all goroutines to complete
 	wg.Wait()
-	close(errCh)
 	
-	// Check for any errors
+	// Add walk error if any
 	if err != nil {
-		return err
+		mu.Lock()
+		errors = append(errors, FileError{Path: rootDir, Err: fmt.Errorf("directory walk failed: %w", err)})
+		mu.Unlock()
 	}
 	
-	for err := range errCh {
-		if err != nil {
-			return err
-		}
-	}
-	
-	return nil
+	return errors
 }
 
 // TestNoHTTPInCore verifies that core packages (internal/ and pkg/) don't import HTTP framework dependencies.
@@ -277,7 +310,7 @@ func TestNoHTTPInCore(t *testing.T) {
 		t.Run(coreDir, func(t *testing.T) {
 			fullPath := filepath.Join(repoRoot, coreDir)
 			
-			err := walkDirectoryParallel(t, fullPath, func(path string, info os.FileInfo) error {
+			errorList := walkDirectoryParallel(t, fullPath, func(path string, _ os.FileInfo) error {
 				// Skip files based on configuration
 				if shouldSkipFile(path, config) {
 					return nil
@@ -297,22 +330,24 @@ func TestNoHTTPInCore(t *testing.T) {
 
 				// Check imports against prohibited list
 				for _, importPath := range imports {
-					if err := checkProhibitedImport(t, importPath, relPath, config); err != nil {
-						t.Errorf("Core file %s: %v", relPath, err)
+					if err := checkProhibitedImport(importPath, relPath, config); err != nil {
+						return fmt.Errorf("core file %s: %v", relPath, err)
 					}
 				}
 
 				return nil
 			})
-			require.NoError(t, err)
+			
+			// Report all errors found during parallel processing
+			for _, fileErr := range errorList {
+				t.Error(fileErr.Error())
+			}
 		})
 	}
 }
 
-// checkProhibitedImport validates that an import is not prohibited for core packages
-func checkProhibitedImport(t *testing.T, importPath, relPath string, config *ArchConfig) error {
-	t.Helper()
-	
+// checkProhibitedImport validates that an import is not prohibited for core packages.
+func checkProhibitedImport(importPath, relPath string, config *ArchConfig) error {
 	// Check against prohibited imports with regex support for frameworks
 	for _, prohibited := range config.ProhibitedImports {
 		// Handle net/http specially (exact match)
@@ -323,15 +358,11 @@ func checkProhibitedImport(t *testing.T, importPath, relPath string, config *Arc
 			return fmt.Errorf("imports prohibited HTTP package: %s", importPath)
 		}
 		
-		// Handle framework imports with regex for versioned imports
-		frameworkRegex, err := compileFrameworkRegex(prohibited)
-		if err != nil {
-			t.Logf("Failed to compile regex for framework %s: %v", prohibited, err)
-			continue
-		}
-		
-		if frameworkRegex.MatchString(importPath) {
-			return fmt.Errorf("imports prohibited framework: %s (matches %s)", importPath, prohibited)
+		// Handle framework imports with cached regex for versioned imports
+		if frameworkRegex, exists := config.compiledFrameworkRegexes[prohibited]; exists {
+			if frameworkRegex.MatchString(importPath) {
+				return fmt.Errorf("imports prohibited framework: %s (matches %s)", importPath, prohibited)
+			}
 		}
 	}
 	
@@ -357,9 +388,10 @@ func isAllowedHTTPUsage(relPath string, config *ArchConfig) bool {
 	return false
 }
 
-// TestContribHasHTTPFrameworks verifies that contrib examples use framework imports (positive test)
+// TestContribHasHTTPFrameworks verifies that contrib examples use framework imports (positive test).
 func TestContribHasHTTPFrameworks(t *testing.T) {
 	repoRoot := getRepoRoot(t)
+	config := loadConfig(t, repoRoot)
 	
 	testCases := []struct {
 		dir      string
@@ -377,9 +409,9 @@ func TestContribHasHTTPFrameworks(t *testing.T) {
 			imports, err := parseImports(t, filePath)
 			require.NoError(t, err)
 
-			// Check that it imports the expected framework using regex for precision
-			frameworkRegex, err := compileFrameworkRegex(tc.expected)
-			require.NoError(t, err, "Failed to compile regex for framework %s", tc.expected)
+			// Check that it imports the expected framework using cached regex
+			frameworkRegex, exists := config.compiledFrameworkRegexes[tc.expected]
+			require.True(t, exists, "Framework %s not found in compiled regexes", tc.expected)
 			
 			found := false
 			for _, importPath := range imports {
@@ -399,7 +431,7 @@ func TestHTTPFrameworkIsolation(t *testing.T) {
 	repoRoot := getRepoRoot(t)
 	config := loadConfig(t, repoRoot)
 
-	err := walkDirectoryParallel(t, repoRoot, func(path string, info os.FileInfo) error {
+	errorList := walkDirectoryParallel(t, repoRoot, func(path string, _ os.FileInfo) error {
 		// Skip files based on configuration
 		if shouldSkipFile(path, config) {
 			return nil
@@ -426,29 +458,28 @@ func TestHTTPFrameworkIsolation(t *testing.T) {
 		// Parse imports and check for framework usage
 		imports, err := parseImports(t, path)
 		if err != nil {
-			// Log but don't fail for unparseable files (might be generated code)
-			t.Logf("Skipping unparseable file %s: %v", relPath, err)
+			// Don't fail for unparseable files (might be generated code)
 			return nil
 		}
 
 		for _, importPath := range imports {
 			for _, framework := range config.HTTPFrameworks {
-				// Use regex matching for precise version support
-				frameworkRegex, err := compileFrameworkRegex(framework)
-				if err != nil {
-					t.Logf("Failed to compile regex for framework %s: %v", framework, err)
-					continue
-				}
-				
-				if frameworkRegex.MatchString(importPath) {
-					t.Errorf("HTTP framework %s found in non-contrib file: %s", importPath, relPath)
+				// Use cached regex matching for precise version support
+				if frameworkRegex, exists := config.compiledFrameworkRegexes[framework]; exists {
+					if frameworkRegex.MatchString(importPath) {
+						return fmt.Errorf("HTTP framework %s found in non-contrib file: %s", importPath, relPath)
+					}
 				}
 			}
 		}
 
 		return nil
 	})
-	require.NoError(t, err)
+	
+	// Report all errors found during parallel processing
+	for _, fileErr := range errorList {
+		t.Error(fileErr.Error())
+	}
 }
 
 // TestCoreArchitectureBoundaries tests broader architectural boundaries
@@ -460,16 +491,16 @@ func TestCoreArchitectureBoundaries(t *testing.T) {
 		// internal/core should only import other internal/core packages and stdlib
 		coreDir := filepath.Join(repoRoot, "internal/core")
 		
-		err := walkDirectoryParallel(t, coreDir, func(path string, info os.FileInfo) error {
-			// Skip test files and generated files
-			if shouldSkipFile(path, config) || strings.HasSuffix(path, "_test.go") {
+		errorList := walkDirectoryParallel(t, coreDir, func(path string, _ os.FileInfo) error {
+			// Skip files based on configuration (includes test files if configured)
+			if shouldSkipFile(path, config) {
 				return nil
 			}
 
 			// Parse imports
 			imports, err := parseImports(t, path)
 			if err != nil {
-				t.Logf("Skipping unparseable core file %s: %v", path, err)
+				// Don't fail for unparseable files
 				return nil
 			}
 
@@ -499,17 +530,22 @@ func TestCoreArchitectureBoundaries(t *testing.T) {
 				}
 
 				// Prohibited: adapters, contrib, other internal packages
-				if strings.HasPrefix(importPath, "github.com/sufield/ephemos/internal/adapters") {
-					t.Errorf("Core package %s imports adapter: %s (violates dependency inversion)", relPath, importPath)
-				} else if strings.HasPrefix(importPath, "github.com/sufield/ephemos/contrib") {
-					t.Errorf("Core package %s imports contrib: %s (core should not depend on contrib)", relPath, importPath)
-				} else if strings.HasPrefix(importPath, "github.com/sufield/ephemos/internal/") {
-					t.Errorf("Core package %s imports non-core internal package: %s", relPath, importPath)
+				switch {
+				case strings.HasPrefix(importPath, "github.com/sufield/ephemos/internal/adapters"):
+					return fmt.Errorf("core package %s imports adapter: %s (violates dependency inversion)", relPath, importPath)
+				case strings.HasPrefix(importPath, "github.com/sufield/ephemos/contrib"):
+					return fmt.Errorf("core package %s imports contrib: %s (core should not depend on contrib)", relPath, importPath)
+				case strings.HasPrefix(importPath, "github.com/sufield/ephemos/internal/"):
+					return fmt.Errorf("core package %s imports non-core internal package: %s", relPath, importPath)
 				}
 			}
 
 			return nil
 		})
-		require.NoError(t, err)
+		
+		// Report all errors found during parallel processing
+		for _, fileErr := range errorList {
+			t.Error(fileErr.Error())
+		}
 	})
 }
