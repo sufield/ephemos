@@ -130,19 +130,13 @@ func testServiceInterfacesAvailable(t *testing.T) {
 package main
 import (
 	"context"
-	"io"
 	"github.com/sufield/ephemos/pkg/ephemos"
 )
 type MyEchoService struct{}
 func (m *MyEchoService) Echo(ctx context.Context, message string) (string, error) { return message, nil }
 func (m *MyEchoService) Ping(ctx context.Context) error { return nil }
-type MyFileService struct{}
-func (m *MyFileService) Upload(ctx context.Context, filename string, data io.Reader) error { return nil }
-func (m *MyFileService) Download(ctx context.Context, filename string) (io.Reader, error) { return nil, nil }
-func (m *MyFileService) List(ctx context.Context, prefix string) ([]string, error) { return nil, nil }
 func main() {
 	var _ ephemos.EchoService = &MyEchoService{}
-	var _ ephemos.FileService = &MyFileService{}
 }
 `
 	if err := compileTestCode(code); err != nil {
