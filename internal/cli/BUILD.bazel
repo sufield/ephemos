@@ -14,6 +14,7 @@ go_library(
     deps = [
         "//internal/adapters/primary/cli",
         "//internal/adapters/secondary/config",
+        "//internal/buildinfo",
         "//internal/core/ports",
         "@com_github_spf13_cobra//:cobra",
         "@com_github_spf13_cobra//doc",

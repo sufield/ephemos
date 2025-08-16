@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
+	"github.com/sufield/ephemos/internal/buildinfo"
 )
 
 // manCmd generates manual pages (keeping this as it's not built into Cobra)
@@ -32,7 +33,7 @@ func runMan(cmd *cobra.Command, args []string) error {
 	header := &doc.GenManHeader{
 		Title:   "EPHEMOS",
 		Section: "1",
-		Source:  "Ephemos CLI " + Version,
+		Source:  "Ephemos CLI " + buildinfo.Version,
 		Manual:  "Ephemos Manual",
 	}
 
