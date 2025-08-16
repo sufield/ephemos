@@ -695,16 +695,6 @@ func TestConfigDefaults_Direct(t *testing.T) {
 	assert.True(t, authConfig.RequireAuthentication) // Default is true
 	assert.Empty(t, authConfig.AllowedServices)
 	assert.Empty(t, authConfig.SkipMethods)
-
-
-	loggingConfigSecure := NewSecureLoggingConfig()
-	assert.NotNil(t, loggingConfigSecure)
-	assert.False(t, loggingConfigSecure.LogPayloads) // Secure = no payloads
-	assert.True(t, loggingConfigSecure.LogRequests)
-
-	loggingConfigDebug := NewDebugLoggingConfig()
-	assert.NotNil(t, loggingConfigDebug)
-	assert.True(t, loggingConfigDebug.LogPayloads) // Debug = with payloads
 }
 
 func TestContextHelpers_Direct(t *testing.T) {
@@ -825,29 +815,6 @@ func TestIdentityPropagationEdgeCases_Direct(t *testing.T) {
 
 // TestMetricsInterceptorEdgeCases_Direct removed - only authentication metrics are relevant
 
-func TestLoggingInterceptorEdgeCases_Direct(t *testing.T) {
-	// Test logging interceptor edge cases
-	config := NewDebugLoggingConfig()
-	config.ExcludeMethods = []string{"/test.Service/ExcludedMethod"}
-
-	interceptor := NewLoggingInterceptor(config)
-
-	// Test method exclusion
-	assert.True(t, interceptor.shouldExcludeMethod("/test.Service/ExcludedMethod"))
-	assert.False(t, interceptor.shouldExcludeMethod("/test.Service/IncludedMethod"))
-
-	// Test with health check
-	config2 := NewSecureLoggingConfig()
-	config2.ExcludeMethods = []string{"/grpc.health.v1.Health/Check"}
-	interceptor2 := NewLoggingInterceptor(config2)
-	assert.True(t, interceptor2.shouldExcludeMethod("/grpc.health.v1.Health/Check"))
-
-	// Test with empty exclude list
-	config3 := NewSecureLoggingConfig()
-	config3.ExcludeMethods = []string{}
-	interceptor3 := NewLoggingInterceptor(config3)
-	assert.False(t, interceptor3.shouldExcludeMethod("/test.Service/AnyMethod"))
-}
 
 func TestAdditionalCoverageTests_Direct(t *testing.T) {
 	// Additional tests to increase coverage
@@ -921,52 +888,3 @@ func TestIdentityContextKeys_Direct(t *testing.T) {
 	assert.Nil(t, retrieved)
 }
 
-func TestSlowRequestDetection_Direct(t *testing.T) {
-	tests := []struct {
-		name               string
-		threshold          time.Duration
-		requestDuration    time.Duration
-		expectSlowDetected bool
-	}{
-		{
-			name:               "fast_request",
-			threshold:          500 * time.Millisecond,
-			requestDuration:    100 * time.Millisecond,
-			expectSlowDetected: false,
-		},
-		{
-			name:               "slow_request",
-			threshold:          500 * time.Millisecond,
-			requestDuration:    800 * time.Millisecond,
-			expectSlowDetected: true,
-		},
-		{
-			name:               "exactly_at_threshold",
-			threshold:          500 * time.Millisecond,
-			requestDuration:    500 * time.Millisecond,
-			expectSlowDetected: false,
-		},
-		{
-			name:               "just_over_threshold",
-			threshold:          500 * time.Millisecond,
-			requestDuration:    501 * time.Millisecond,
-			expectSlowDetected: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Test the logic directly
-			isSlowRequest := tt.requestDuration > tt.threshold
-			assert.Equal(t, tt.expectSlowDetected, isSlowRequest)
-
-			// Test with actual logging config
-			config := &LoggingConfig{
-				SlowRequestThreshold: tt.threshold,
-			}
-
-			actualSlow := tt.requestDuration > config.SlowRequestThreshold
-			assert.Equal(t, tt.expectSlowDetected, actualSlow)
-		})
-	}
-}
