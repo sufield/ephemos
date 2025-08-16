@@ -17,6 +17,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const defaultResultCode = "success"
+
 func TestNewAuthInterceptor(t *testing.T) {
 	config := DefaultAuthConfig()
 	interceptor := NewAuthInterceptor(config)

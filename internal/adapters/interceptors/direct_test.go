@@ -696,10 +696,6 @@ func TestConfigDefaults_Direct(t *testing.T) {
 	assert.Empty(t, authConfig.AllowedServices)
 	assert.Empty(t, authConfig.SkipMethods)
 
-	metricsConfig := DefaultAuthMetricsConfig("test-service")
-	assert.NotNil(t, metricsConfig)
-	assert.Equal(t, "test-service", metricsConfig.ServiceName)
-	assert.NotNil(t, metricsConfig.AuthMetricsCollector)
 
 	loggingConfigSecure := NewSecureLoggingConfig()
 	assert.NotNil(t, loggingConfigSecure)
@@ -882,13 +878,6 @@ func TestAdditionalCoverageTests_Direct(t *testing.T) {
 	assert.True(t, identityConfig.PropagateCallChain)
 	assert.Equal(t, 10, identityConfig.MaxCallChainDepth)
 
-	// Test auth metrics config with nil collector
-	metricsConfig := &AuthMetricsConfig{
-		AuthMetricsCollector: nil,
-		ServiceName:          "test",
-	}
-	metricsInterceptor := NewAuthMetricsInterceptor(metricsConfig)
-	assert.NotNil(t, metricsInterceptor)
 }
 
 func TestRequireIdentityHelper_Direct(t *testing.T) {

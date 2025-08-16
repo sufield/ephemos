@@ -3,25 +3,16 @@ package middleware
 
 import "log/slog"
 
-// MetricsConfig configures metrics collection.
-type MetricsConfig struct {
-	AuthMetricsCollector interface{}
-}
-
 // InterceptorConfig configures server interceptors.
 type InterceptorConfig struct {
 	// EnableAuth enables authentication interceptor
 	EnableAuth bool
 	// EnableLogging enables audit logging interceptor
 	EnableLogging bool
-	// EnableMetrics enables metrics collection interceptor
-	EnableMetrics bool
 	// EnableIdentityPropagation enables identity propagation between services
 	EnableIdentityPropagation bool
 	// Logger for interceptor logging
 	Logger *slog.Logger
-	// MetricsConfig for metrics configuration
-	MetricsConfig *MetricsConfig
 	// CustomInterceptors allows adding custom interceptors
 	CustomInterceptors []interface{}
 }
@@ -31,10 +22,8 @@ func NewDefaultConfig() *InterceptorConfig {
 	return &InterceptorConfig{
 		EnableAuth:                true,
 		EnableLogging:             true,
-		EnableMetrics:             true,
 		EnableIdentityPropagation: false,
 		Logger:                    slog.Default(),
-		MetricsConfig:             &MetricsConfig{},
 	}
 }
 
@@ -44,10 +33,8 @@ func NewProductionConfig(serviceName string) *InterceptorConfig {
 	return &InterceptorConfig{
 		EnableAuth:                true,
 		EnableLogging:             true,
-		EnableMetrics:             true,
 		EnableIdentityPropagation: true,
 		Logger:                    logger,
-		MetricsConfig:             &MetricsConfig{},
 	}
 }
 
@@ -57,9 +44,7 @@ func NewDevelopmentConfig(serviceName string) *InterceptorConfig {
 	return &InterceptorConfig{
 		EnableAuth:                false, // Disabled for easier development
 		EnableLogging:             true,
-		EnableMetrics:             true,
 		EnableIdentityPropagation: true, // Enabled for development testing
 		Logger:                    logger,
-		MetricsConfig:             &MetricsConfig{},
 	}
 }
