@@ -11,16 +11,18 @@ service:
   # Required: Service identity for staging
   name: "${EPHEMOS_SERVICE_NAME}"           # Set via environment variable
   domain: "${EPHEMOS_TRUST_DOMAIN}"        # Set via environment variable (e.g., "staging.company.com")
+  
+  # Authorization: Use environment variables for staging client lists
+  authorized_clients:
+    - "${EPHEMOS_AUTHORIZED_CLIENTS:-}"
+  
+  # Trusted servers: Use environment variables for staging server lists
+  trusted_servers:
+    - "${EPHEMOS_TRUSTED_SERVERS:-}"
 
-spiffe:
+agent:
   # SPIFFE/SPIRE agent configuration for staging
-  socketPath: "${EPHEMOS_SPIFFE_SOCKET:-/tmp/spire-agent/public/api.sock}"
-
-# Authorization: Use environment variables for staging client lists
-authorized_clients: "${EPHEMOS_AUTHORIZED_CLIENTS:-}"
-
-# Trusted servers: Use environment variables for staging server lists
-trusted_servers: "${EPHEMOS_TRUSTED_SERVERS:-}"
+  socketPath: "${EPHEMOS_AGENT_SOCKET:-/tmp/spire-agent/public/api.sock}"
 
 # Staging Settings (via environment variables):
 # EPHEMOS_REQUIRE_AUTHENTICATION=true
