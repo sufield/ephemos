@@ -1,4 +1,6 @@
-// Package arch provides runtime architectural boundary validation.
+//go:build !prod_arch_off
+
+// Package arch provides thread-safe runtime architectural boundary validation.
 // This complements the compile-time tests with runtime checks.
 package arch
 
@@ -6,33 +8,59 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 )
 
-// Validator provides runtime validation of architectural boundaries.
+// Validator provides thread-safe runtime validation of architectural boundaries.
 type Validator struct {
+	mu         sync.Mutex
 	violations []string
-	enabled    bool
+	enabled    atomic.Bool
+
+	// allowlist: map[fromAdapter]set[toAdapter] for legitimate crossings
+	allow map[string]map[string]struct{}
 }
 
-// NewValidator creates a new architectural validator.
-// In production builds, validation can be disabled for performance.
+// NewValidator creates a new validator with the specified enabled state.
 func NewValidator(enabled bool) *Validator {
-	return &Validator{
-		enabled: enabled,
-	}
+	v := &Validator{allow: make(map[string]map[string]struct{})}
+	v.enabled.Store(enabled)
+	return v
 }
 
-// ValidateCall checks if the current call stack violates architectural boundaries.
-// This is meant to be called at critical boundary points.
+// SetEnabled atomically sets the validation enabled state.
+func (v *Validator) SetEnabled(b bool) {
+	v.enabled.Store(b)
+}
+
+// IsEnabled atomically checks if validation is enabled.
+func (v *Validator) IsEnabled() bool {
+	return v.enabled.Load()
+}
+
+// addViolation safely adds a violation to the list.
+func (v *Validator) addViolation(s string) {
+	v.mu.Lock()
+	v.violations = append(v.violations, s)
+	v.mu.Unlock()
+}
+
+// ValidateCall checks the current call stack for architectural boundary violations.
 func (v *Validator) ValidateCall(operation string) error {
-	if !v.enabled {
+	if !v.enabled.Load() {
 		return nil
 	}
 
+	// Growable buffer to capture complete stack
 	pc := make([]uintptr, 32)
 	n := runtime.Callers(2, pc)
-	frames := runtime.CallersFrames(pc[:n])
+	for n == len(pc) {
+		pc = make([]uintptr, len(pc)*2)
+		n = runtime.Callers(2, pc)
+	}
 
+	frames := runtime.CallersFrames(pc[:n])
 	var callStack []string
 	for {
 		frame, more := frames.Next()
@@ -40,114 +68,138 @@ func (v *Validator) ValidateCall(operation string) error {
 			break
 		}
 
-		// Filter out runtime and testing frames
-		if !strings.Contains(frame.File, "runtime/") &&
-			!strings.Contains(frame.File, "testing/") {
-			callStack = append(callStack, frame.Function)
+		fn := frame.Function // import path + function
+		// Filter noisy frames by package path rather than file path
+		if strings.HasPrefix(fn, "runtime.") || 
+		   strings.HasPrefix(fn, "testing.") ||
+		   strings.Contains(fn, "/internal/arch") { // Skip our own frames
+			continue
 		}
+		callStack = append(callStack, fn)
 	}
 
-	// Check for architectural violations in the call stack
-	violation := v.checkCallStackViolation(callStack, operation)
-	if violation != "" {
-		v.violations = append(v.violations, violation)
+	if violation := v.checkCallStackViolation(callStack, operation); violation != "" {
+		v.addViolation(violation)
 		return fmt.Errorf("architectural boundary violation: %s", violation)
 	}
-
 	return nil
 }
 
-// checkCallStackViolation analyzes the call stack for boundary violations.
-func (v *Validator) checkCallStackViolation(callStack []string, operation string) string {
-	// Check for direct adapter-to-adapter calls
-	for i, caller := range callStack {
-		if strings.Contains(caller, "/internal/adapters/") {
-			for j := i + 1; j < len(callStack); j++ {
-				callee := callStack[j]
-				if strings.Contains(callee, "/internal/adapters/") {
-					if v.isDifferentAdapterType(caller, callee) {
-						return fmt.Sprintf("adapter %s directly calls adapter %s during %s",
-							v.extractAdapterType(caller), v.extractAdapterType(callee), operation)
-					}
-				}
+// isAdapterFunc checks if a function is from an adapter package.
+func isAdapterFunc(fn string) bool {
+	return strings.Contains(fn, "/internal/adapters")
+}
+
+// isDomainFunc checks if a function is from a domain package.
+func isDomainFunc(fn string) bool {
+	return strings.Contains(fn, "/internal/core/domain")
+}
+
+// extractAdapterType correctly extracts the adapter type from a function name.
+func (v *Validator) extractAdapterType(fn string) string {
+	const key = "/internal/adapters/"
+	i := strings.Index(fn, key)
+	if i < 0 {
+		return ""
+	}
+	rest := fn[i+len(key):] // e.g. "grpc/client.(*X).Meth" or "grpc.(*S).Serve"
+
+	// First path segment after adapters
+	if j := strings.IndexByte(rest, '/'); j >= 0 {
+		rest = rest[:j] // "grpc"
+	}
+	// Drop anything after the first dot: ".(*Type)..." → "grpc"
+	if k := strings.IndexByte(rest, '.'); k >= 0 {
+		rest = rest[:k]
+	}
+	return rest
+}
+
+// checkCallStackViolation examines adjacent frames for direct boundary violations.
+func (v *Validator) checkCallStackViolation(stack []string, op string) string {
+	// Scan adjacent pairs: stack[0] (most recent) -> stack[1] (its caller) ...
+	for i := 0; i+1 < len(stack); i++ {
+		caller, callee := stack[i], stack[i+1]
+
+		// Domain -> adapter direct call
+		if isDomainFunc(caller) && isAdapterFunc(callee) {
+			return fmt.Sprintf("domain %s directly calls adapter %s during %s",
+				caller, v.extractAdapterType(callee), op)
+		}
+
+		// Adapter -> adapter direct call across types (unless allowed)
+		if isAdapterFunc(caller) && isAdapterFunc(callee) {
+			a := v.extractAdapterType(caller)
+			b := v.extractAdapterType(callee)
+			if a != "" && b != "" && a != b && !v.allowed(a, b) {
+				return fmt.Sprintf("adapter %s directly calls adapter %s during %s", a, b, op)
 			}
 		}
 	}
-
-	// Check for domain calling adapters directly
-	for i, caller := range callStack {
-		if strings.Contains(caller, "/internal/core/domain/") {
-			for j := i + 1; j < len(callStack); j++ {
-				callee := callStack[j]
-				if strings.Contains(callee, "/internal/adapters/") {
-					return fmt.Sprintf("domain %s directly calls adapter %s during %s",
-						caller, v.extractAdapterType(callee), operation)
-				}
-			}
-		}
-	}
-
 	return ""
 }
 
-// isDifferentAdapterType checks if two function names are from different adapter types.
-func (v *Validator) isDifferentAdapterType(caller, callee string) bool {
-	callerType := v.extractAdapterType(caller)
-	calleeType := v.extractAdapterType(callee)
-	return callerType != calleeType && callerType != "" && calleeType != ""
+// allowed checks if a cross-adapter call is explicitly permitted.
+func (v *Validator) allowed(from, to string) bool {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if m, ok := v.allow[from]; ok {
+		_, ok = m[to]
+		return ok
+	}
+	return false
 }
 
-// extractAdapterType extracts the adapter type from a function name.
-func (v *Validator) extractAdapterType(funcName string) string {
-	if !strings.Contains(funcName, "/internal/adapters/") {
-		return ""
+// Allow explicitly permits calls from one adapter type to another.
+// Useful for shared/base adapters or legitimate crossings.
+func (v *Validator) Allow(from, to string) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.allow[from] == nil {
+		v.allow[from] = make(map[string]struct{})
 	}
-
-	// Extract path component after /internal/adapters/
-	parts := strings.Split(funcName, "/internal/adapters/")
-	if len(parts) < 2 {
-		return ""
-	}
-
-	adapterPath := parts[1]
-	pathParts := strings.Split(adapterPath, "/")
-	if len(pathParts) > 0 {
-		return pathParts[0] // primary, secondary, grpc, http, etc.
-	}
-
-	return ""
+	v.allow[from][to] = struct{}{}
 }
 
-// GetViolations returns all recorded violations.
+// GetViolations returns a copy of all recorded violations.
 func (v *Validator) GetViolations() []string {
-	return append([]string(nil), v.violations...) // Return copy
+	v.mu.Lock()
+	cp := append([]string(nil), v.violations...)
+	v.mu.Unlock()
+	return cp
 }
 
-// ClearViolations clears all recorded violations.
+// ClearViolations removes all recorded violations.
 func (v *Validator) ClearViolations() {
+	v.mu.Lock()
 	v.violations = nil
+	v.mu.Unlock()
 }
 
-// Global validator instance (can be disabled in production).
-var globalValidator = NewValidator(true) //nolint:gochecknoglobals // Global state needed for runtime validation
+// Global validator instance
+var globalValidator = NewValidator(true) //nolint:gochecknoglobals
 
-// SetGlobalValidationEnabled enables or disables global validation.
+// Global API functions for convenience
 func SetGlobalValidationEnabled(enabled bool) {
-	globalValidator.enabled = enabled
+	globalValidator.SetEnabled(enabled)
 }
 
-// ValidateBoundary is a convenience function for validating architectural boundaries.
-// Call this at critical points where adapters interact with core or each other.
+func IsGlobalValidationEnabled() bool {
+	return globalValidator.IsEnabled()
+}
+
 func ValidateBoundary(operation string) error {
 	return globalValidator.ValidateCall(operation)
 }
 
-// GetGlobalViolations returns violations from the global validator.
 func GetGlobalViolations() []string {
 	return globalValidator.GetViolations()
 }
 
-// ClearGlobalViolations clears violations from the global validator.
 func ClearGlobalViolations() {
 	globalValidator.ClearViolations()
+}
+
+func AllowGlobalCrossing(from, to string) {
+	globalValidator.Allow(from, to)
 }
