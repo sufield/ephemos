@@ -81,26 +81,33 @@ r.GET("/api/data", dataHandler) // Handler receives verified identity document
 
 #### Using Core Primitives with net/http
 ```go
-// Get certificates and trust bundle from core
-cert, _ := identityService.GetCertificate()
-bundle, _ := identityService.GetTrustBundle()
-authorizer := ephemos.AuthorizeMemberOf("prod.company.com")
+// Get certificates and trust bundle from core using SPIRE Workload API
+source, _ := workloadapi.NewX509Source(ctx)
+defer source.Close()
+
+svid, _ := source.GetX509SVID()
+trustDomain := svid.ID.TrustDomain()
+
+bundleSource := x509bundle.NewSet()
+bundle, _ := source.GetX509BundleForTrustDomain(trustDomain)
+bundleSource.Add(bundle)
+
+// Create authorizer and TLS config
+authorizer := tlsconfig.AuthorizeMemberOf(trustDomain)
+tlsConfig := tlsconfig.MTLSClientConfig(source, bundleSource, authorizer)
 
 // Build HTTP client with mTLS
-tlsConfig := tlsconfig.MTLSClientConfig(cert, bundle, authorizer)
 httpClient := &http.Client{
-    Transport: &http.Transport{
-        TLSClientConfig: tlsConfig,
-    },
+    Transport: &http.Transport{TLSClientConfig: tlsConfig},
 }
 
 // Make authenticated requests
 resp, _ := httpClient.Get("https://api-server.prod.company.com/data")
 ```
 
-- **Location**: [`examples/`](examples/)
-- **Purpose**: Show HTTP client patterns using core certificates/bundles  
-- **Patterns**: Client creation, connection pooling, error handling
+- **Location**: [`examples/http_client.go`](examples/http_client.go)
+- **Purpose**: Complete working example building HTTP clients with core SPIFFE primitives
+- **Patterns**: SPIRE integration, mTLS configuration, authorization patterns, transport optimization
 
 ### Documentation
 
@@ -135,6 +142,8 @@ Detailed instructions for integrating Ephemos with HTTP services.
 
 ## Getting Started
 
+**Core Philosophy**: Core provides certificates and trust bundles; contrib provides framework integration.
+
 ### 1. Set Up Core
 First, set up Ephemos core for your service:
 ```go
@@ -162,7 +171,7 @@ go get github.com/sufield/ephemos/contrib/middleware/gin
 ```
 
 **For Custom HTTP:**
-See [`examples/http_client.go`](examples/http_client.go)
+See [`examples/http_client.go`](examples/http_client.go) - Complete working example with SPIRE integration
 
 ### 3. Add Middleware
 Integrate with your HTTP framework using contrib middleware.
