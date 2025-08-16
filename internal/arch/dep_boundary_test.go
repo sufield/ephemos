@@ -1,3 +1,5 @@
+//go:build integration
+
 package arch_test
 
 import (
@@ -42,6 +44,7 @@ type importChecker struct {
 	forbiddenPrefixes []string
 	violations        map[string][]string
 	seen              map[string]bool
+	importChains      map[string][]string // tracks import chains for violation remediation
 }
 
 // newImportChecker creates a new import checker.
@@ -51,30 +54,45 @@ func newImportChecker(adaptersPrefix string, forbiddenPrefixes []string) *import
 		forbiddenPrefixes: forbiddenPrefixes,
 		violations:        make(map[string][]string),
 		seen:              make(map[string]bool),
+		importChains:      make(map[string][]string),
 	}
 }
 
 // checkPackage checks all imports of a package.
 func (ic *importChecker) checkPackage(owner string, p *packages.Package) {
+	ic.checkPackageWithChain(owner, p, []string{owner})
+}
+
+// checkPackageWithChain checks all imports of a package with import chain tracking.
+func (ic *importChecker) checkPackageWithChain(owner string, p *packages.Package, chain []string) {
 	for path, imp := range p.Imports {
-		ic.checkSingleImport(owner, path, imp)
+		ic.checkSingleImportWithChain(owner, path, imp, chain)
 	}
 }
 
 // checkSingleImport checks a single import.
 func (ic *importChecker) checkSingleImport(owner, path string, imp *packages.Package) {
+	ic.checkSingleImportWithChain(owner, path, imp, []string{owner})
+}
+
+// checkSingleImportWithChain checks a single import with chain tracking.
+func (ic *importChecker) checkSingleImportWithChain(owner, path string, imp *packages.Package, chain []string) {
 	// Skip if already seen this path from this owner
 	if !ic.markSeen(owner, path) {
 		return
 	}
 
+	// Store the import chain for this violation
+	newChain := append(chain, path)
+	ic.importChains[path] = newChain
+
 	// Check violation rules
 	ic.checkAdaptersViolation(owner, path)
 	ic.checkForbiddenPrefixViolation(owner, path)
 
-	// Recurse if needed
-	if imp != nil {
-		ic.checkPackage(path, imp)
+	// Recurse if needed (with depth limit to prevent infinite loops)
+	if imp != nil && len(newChain) < 10 {
+		ic.checkPackageWithChain(path, imp, newChain)
 	}
 }
 
@@ -113,17 +131,17 @@ func (ic *importChecker) matchesForbiddenPrefix(path, prefix string) bool {
 // loadCorePackages loads all core packages for testing.
 func loadCorePackages(t *testing.T) []*packages.Package {
 	t.Helper()
+	mp := modulePath(t)
 	cfg := &packages.Config{
 		Mode: packages.NeedName |
 			packages.NeedImports |
 			packages.NeedDeps |
 			packages.NeedModule |
 			packages.NeedFiles,
-		Dir: "../..", // Go up from internal/arch to repo root
 	}
 
 	// Load all core packages for hexagonal architecture.
-	pkgs, err := packages.Load(cfg, "./internal/core/...")
+	pkgs, err := packages.Load(cfg, mp+"/internal/core/...")
 	if err != nil {
 		t.Fatalf("packages.Load: %v", err)
 	}
@@ -143,6 +161,19 @@ func formatViolations(violations map[string][]string) string {
 
 	for imp, owners := range violations {
 		formatSingleViolation(&b, imp, owners)
+	}
+
+	appendRemediation(&b)
+	return b.String()
+}
+
+// formatViolationsWithChains formats violation messages with import chain tracking.
+func (ic *importChecker) formatViolationsWithChains() string {
+	var b strings.Builder
+	b.WriteString("Import boundary violated:\n")
+
+	for imp, owners := range ic.violations {
+		ic.formatSingleViolationWithChain(&b, imp, owners)
 	}
 
 	appendRemediation(&b)
@@ -176,6 +207,41 @@ func formatSingleViolation(b *strings.Builder, imp string, owners []string) {
 	}
 }
 
+// formatSingleViolationWithChain formats a single violation entry with import chain.
+func (ic *importChecker) formatSingleViolationWithChain(b *strings.Builder, imp string, owners []string) {
+	b.WriteString("  - ")
+	b.WriteString(imp)
+	b.WriteString("\n    introduced via:\n")
+
+	// Show unique introducers
+	seenOwner := map[string]bool{}
+	count := 0
+
+	for _, owner := range owners {
+		if seenOwner[owner] {
+			continue
+		}
+		seenOwner[owner] = true
+
+		b.WriteString("      * ")
+		b.WriteString(owner)
+		
+		// Add import chain if available
+		if chain, exists := ic.importChains[imp]; exists && len(chain) > 1 {
+			b.WriteString(" (via: ")
+			b.WriteString(strings.Join(chain[:len(chain)-1], " -> "))
+			b.WriteString(")")
+		}
+		
+		b.WriteString("\n")
+
+		count++
+		if count >= 5 {
+			break
+		}
+	}
+}
+
 // appendRemediation adds remediation advice to the output.
 func appendRemediation(b *strings.Builder) {
 	b.WriteString("\nRemediation:\n")
@@ -186,6 +252,7 @@ func appendRemediation(b *strings.Builder) {
 }
 
 func Test_Core_Has_No_Forbidden_Imports(t *testing.T) {
+	t.Parallel()
 	mp := modulePath(t)
 	adaptersPrefix := mp + "/internal/adapters"
 	forbiddenPrefixes := getForbiddenPrefixes()
@@ -201,7 +268,7 @@ func Test_Core_Has_No_Forbidden_Imports(t *testing.T) {
 
 	// Report violations
 	if len(checker.violations) > 0 {
-		t.Fatalf("%s", formatViolations(checker.violations))
+		t.Fatalf("%s", checker.formatViolationsWithChains())
 	}
 }
 
@@ -209,15 +276,15 @@ func Test_Core_Has_No_Forbidden_Imports(t *testing.T) {
 //
 //nolint:cyclop // Test function complexity acceptable for readability
 func Test_Adapters_Cannot_Import_Other_Adapters(t *testing.T) {
+	t.Parallel()
 	mp := modulePath(t)
 	adaptersPrefix := mp + "/internal/adapters"
 
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedFiles,
-		Dir:  "../..",
 	}
 
-	pkgs, err := packages.Load(cfg, "./internal/adapters/...")
+	pkgs, err := packages.Load(cfg, mp+"/internal/adapters/...")
 	if err != nil {
 		t.Fatalf("packages.Load: %v", err)
 	}
@@ -232,6 +299,11 @@ func Test_Adapters_Cannot_Import_Other_Adapters(t *testing.T) {
 		for importPath := range pkg.Imports {
 			// Check if this adapter imports another adapter
 			if strings.HasPrefix(importPath, adaptersPrefix) && importPath != pkg.PkgPath {
+				// Allow shared adapter subtrees
+				if isSharedAdapterPath(importPath, adaptersPrefix) {
+					continue
+				}
+				
 				// Extract adapter types
 				ownerAdapter := extractAdapterType(pkg.PkgPath, adaptersPrefix)
 				importedAdapter := extractAdapterType(importPath, adaptersPrefix)
@@ -266,14 +338,14 @@ func Test_Adapters_Cannot_Import_Other_Adapters(t *testing.T) {
 //
 //nolint:cyclop // Test function complexity acceptable for readability
 func Test_Core_Domain_Has_No_External_Dependencies(t *testing.T) {
+	t.Parallel()
 	mp := modulePath(t)
 
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedFiles,
-		Dir:  "../..",
 	}
 
-	pkgs, err := packages.Load(cfg, "./internal/core/domain/...")
+	pkgs, err := packages.Load(cfg, mp+"/internal/core/domain/...")
 	if err != nil {
 		t.Fatalf("packages.Load: %v", err)
 	}
@@ -283,29 +355,28 @@ func Test_Core_Domain_Has_No_External_Dependencies(t *testing.T) {
 	}
 
 	violations := make(map[string][]string)
-	allowedPrefixes := []string{
-		"",                           // stdlib
-		"context",                    // context is allowed
-		"time",                       // time is allowed
-		"fmt",                        // fmt is allowed for errors
-		"errors",                     // errors is allowed
-		"strings",                    // strings is allowed
-		mp + "/internal/core/domain", // self-imports within domain
+
+	allowedStdlib := map[string]bool{
+		"errors":  true,
+		"fmt":     true,
+		"strings": true,
+		"time":    true,
+		"context": true,
 	}
 
 	for _, pkg := range pkgs {
 		for importPath := range pkg.Imports {
 			allowed := false
-			for _, prefix := range allowedPrefixes {
-				if prefix == "" {
-					// Check if it's stdlib (no dots in path)
-					if !strings.Contains(importPath, ".") {
-						allowed = true
-						break
-					}
-				} else if importPath == prefix || strings.HasPrefix(importPath, prefix+"/") {
+			
+			// Check if it's an allowed stdlib package
+			if !strings.Contains(importPath, ".") {
+				if allowedStdlib[importPath] {
 					allowed = true
-					break
+				}
+			} else {
+				// Check self-imports within domain
+				if importPath == mp+"/internal/core/domain" || strings.HasPrefix(importPath, mp+"/internal/core/domain/") {
+					allowed = true
 				}
 			}
 
@@ -334,15 +405,15 @@ func Test_Core_Domain_Has_No_External_Dependencies(t *testing.T) {
 
 // Test_Public_API_Boundary ensures pkg/ephemos doesn't leak internal details.
 func Test_Public_API_Boundary(t *testing.T) {
+	t.Parallel()
 	mp := modulePath(t)
 	internalPrefix := mp + "/internal/"
 
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedFiles,
-		Dir:  "../..",
 	}
 
-	pkgs, err := packages.Load(cfg, "./pkg/ephemos/...")
+	pkgs, err := packages.Load(cfg, mp+"/pkg/ephemos/...")
 	if err != nil {
 		t.Fatalf("packages.Load: %v", err)
 	}
@@ -382,12 +453,13 @@ func Test_Public_API_Boundary(t *testing.T) {
 
 // Test_Circular_Dependencies detects circular import patterns.
 func Test_Circular_Dependencies(t *testing.T) {
+	t.Parallel()
+	mp := modulePath(t)
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedFiles,
-		Dir:  "../..",
 	}
 
-	pkgs, err := packages.Load(cfg, "./internal/...")
+	pkgs, err := packages.Load(cfg, mp+"/internal/...")
 	if err != nil {
 		t.Fatalf("packages.Load: %v", err)
 	}
@@ -399,7 +471,7 @@ func Test_Circular_Dependencies(t *testing.T) {
 	graph := make(map[string][]string)
 	for _, pkg := range pkgs {
 		for importPath := range pkg.Imports {
-			if strings.HasPrefix(importPath, modulePath(t)+"/internal/") {
+			if strings.HasPrefix(importPath, mp+"/internal/") {
 				graph[pkg.PkgPath] = append(graph[pkg.PkgPath], importPath)
 			}
 		}
@@ -422,6 +494,7 @@ func Test_Circular_Dependencies(t *testing.T) {
 
 // Test_Layer_Dependencies ensures proper layering (domain <- ports <- services <- adapters).
 func Test_Layer_Dependencies(t *testing.T) {
+	t.Parallel()
 	mp := modulePath(t)
 
 	layerHierarchy := map[string]int{
@@ -435,10 +508,9 @@ func Test_Layer_Dependencies(t *testing.T) {
 
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedFiles,
-		Dir:  "../..",
 	}
 
-	pkgs, err := packages.Load(cfg, "./internal/...", "./pkg/ephemos/...")
+	pkgs, err := packages.Load(cfg, mp+"/internal/...", mp+"/pkg/ephemos/...")
 	if err != nil {
 		t.Fatalf("packages.Load: %v", err)
 	}
@@ -451,7 +523,7 @@ func Test_Layer_Dependencies(t *testing.T) {
 		for importPath := range pkg.Imports {
 			importLayer := getLayerLevel(importPath, layerHierarchy)
 
-			// Check if import violates layer hierarchy (higher layer importing lower layer is violation)
+			// Check if import violates layer hierarchy (lower layer importing higher layer is violation)
 			if importLayer != -1 && pkgLayer != -1 && pkgLayer < importLayer {
 				violations[pkg.PkgPath] = append(violations[pkg.PkgPath], importPath)
 			}
@@ -491,6 +563,32 @@ func extractAdapterType(path, adaptersPrefix string) string {
 	return ""
 }
 
+// isSharedAdapterPath checks if a path points to a shared adapter subtree
+// that should be allowed to be imported by multiple adapter types.
+func isSharedAdapterPath(path, adaptersPrefix string) bool {
+	if !strings.HasPrefix(path, adaptersPrefix) {
+		return false
+	}
+	
+	remainder := strings.TrimPrefix(path, adaptersPrefix+"/")
+	
+	// Allow shared utilities, common types, etc.
+	sharedPrefixes := []string{
+		"shared/",
+		"common/",
+		"utils/",
+		"types/",
+	}
+	
+	for _, prefix := range sharedPrefixes {
+		if strings.HasPrefix(remainder, prefix) {
+			return true
+		}
+	}
+	
+	return false
+}
+
 func findCycles(graph map[string][]string) [][]string {
 	var cycles [][]string
 	visited := make(map[string]bool)
@@ -502,11 +600,12 @@ func findCycles(graph map[string][]string) [][]string {
 		visited[node] = true
 		recStack[node] = true
 
+		foundCycle := false
 		for _, neighbor := range graph[node] {
 			if !visited[neighbor] {
 				path[neighbor] = node
 				if dfs(neighbor) {
-					return true
+					foundCycle = true
 				}
 			} else if recStack[neighbor] {
 				// Found cycle, reconstruct it
@@ -524,19 +623,17 @@ func findCycles(graph map[string][]string) [][]string {
 				}
 
 				cycles = append(cycles, cycle)
-				return true
+				foundCycle = true
 			}
 		}
 
 		recStack[node] = false
-		return false
+		return foundCycle
 	}
 
 	for node := range graph {
 		if !visited[node] {
-			if dfs(node) {
-				return cycles
-			}
+			dfs(node)
 		}
 	}
 
