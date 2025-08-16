@@ -67,7 +67,7 @@ Ephemos focuses on authentication - use your existing service discovery solution
 
 ```go
 // Use your existing service discovery (Kubernetes, Consul, etc.)
-address, err := myServiceRegistry.Lookup("payment-service")
+address, err := kubernetesClient.GetServiceEndpoint("payment-service")
 if err != nil {
     log.Fatalf("Service lookup failed: %v", err)
 }
@@ -151,9 +151,9 @@ client := &http.Client{
 ### Multiple Service Connections
 
 ```go
-// Look up service addresses using your service registry
-paymentAddr, _ := serviceRegistry.Lookup("payment-service") 
-orderAddr, _ := serviceRegistry.Lookup("order-service")
+// Look up service addresses using your service discovery
+paymentAddr, _ := kubernetesClient.GetServiceEndpoint("payment-service") 
+orderAddr, _ := kubernetesClient.GetServiceEndpoint("order-service")
 
 // Connect to multiple services with authentication
 paymentConn, err := client.Connect(ctx, "payment-service", paymentAddr)
@@ -181,7 +181,7 @@ orderResp, _ := orderClient.Get("https://" + orderAddr + "/api/orders")
 
 ```go
 // Service discovery is handled by your infrastructure
-address, err := serviceRegistry.Lookup("payment-service")
+address, err := consulClient.DiscoverService("payment-service")
 if err != nil {
     log.Printf("Service discovery failed: %v", err)
     return
@@ -241,7 +241,7 @@ resp, err := httpClient.Get("https://payment.example.com/api/balance")
 **After:**
 ```go
 // Use existing service discovery
-address, _ := serviceRegistry.Lookup("payment-service")
+address, _ := kubernetesClient.GetServiceEndpoint("payment-service")
 
 conn, err := ephemosClient.Connect(ctx, "payment-service", address)
 if err != nil {
