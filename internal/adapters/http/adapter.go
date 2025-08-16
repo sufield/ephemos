@@ -3,7 +3,6 @@
 package http
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -53,67 +52,9 @@ func (a *Adapter) getServiceName(impl interface{}) string {
 func (a *Adapter) createHTTPHandlers(serviceName string, impl interface{}) error {
 	// Check what interfaces the implementation satisfies
 	switch service := impl.(type) {
-	case ports.EchoService:
-		return a.mountEchoService(serviceName, service)
 	default:
-		return a.mountGenericService(serviceName, impl)
+		return a.mountGenericService(serviceName, service)
 	}
-}
-
-// mountEchoService creates HTTP handlers for EchoService.
-func (a *Adapter) mountEchoService(serviceName string, service ports.EchoService) error {
-	basePath := fmt.Sprintf("/%s", serviceName)
-
-	// POST /{service}/echo
-	a.mux.HandleFunc(fmt.Sprintf("%s/echo", basePath), func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		var req struct {
-			Message string `json:"message"`
-		}
-
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid JSON", http.StatusBadRequest)
-			return
-		}
-
-		result, err := service.Echo(r.Context(), req.Message)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		resp := struct {
-			Message string `json:"message"`
-		}{
-			Message: result,
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		}
-	})
-
-	// POST /{service}/ping
-	a.mux.HandleFunc(fmt.Sprintf("%s/ping", basePath), func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		if err := service.Ping(r.Context()); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-	})
-
-	return nil
 }
 
 // mountGenericService creates HTTP handlers for unknown service types.

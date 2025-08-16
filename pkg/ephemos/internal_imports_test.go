@@ -125,22 +125,28 @@ func main() {
 
 func testServiceInterfacesAvailable(t *testing.T) {
 	t.Helper()
-	// Test that service interfaces are available publicly
+	// Test that public API is accessible for identity services
 	code := `
 package main
 import (
 	"context"
 	"github.com/sufield/ephemos/pkg/ephemos"
 )
-type MyEchoService struct{}
-func (m *MyEchoService) Echo(ctx context.Context, message string) (string, error) { return message, nil }
-func (m *MyEchoService) Ping(ctx context.Context) error { return nil }
 func main() {
-	var _ ephemos.EchoService = &MyEchoService{}
+	// Test that identity client and server can be created
+	ctx := context.Background()
+	_, err := ephemos.IdentityClient(ctx, "")
+	if err != nil {
+		// Expected error due to missing config, but function should exist
+	}
+	_, err = ephemos.IdentityServer(ctx, "")
+	if err != nil {
+		// Expected error due to missing config, but function should exist
+	}
 }
 `
 	if err := compileTestCode(code); err != nil {
-		t.Errorf("Public service interfaces not accessible: %v", err)
+		t.Errorf("Public identity services not accessible: %v", err)
 	}
 }
 
