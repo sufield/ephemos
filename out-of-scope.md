@@ -1,30 +1,33 @@
 ## Scope Definition: Core vs Contrib
 
+> 📊 **See [mvp.md](mvp.md) for comprehensive authentication method comparison tables and framework positioning.**
+
 ### ✅ **Core Scope** (this repository)
-- **SPIFFE identity management**: Service certificates and trust bundles
-- **gRPC client/server**: Authenticated connections with automatic mTLS  
-- **Identity interceptors**: Authentication and identity propagation for gRPC
+- **SPIFFE identity management**: X.509 SVID certificates and trust bundles
+- **HTTP over mTLS**: Authenticated HTTP connections using X.509 SVIDs
+- **Core primitives**: Certificate fetching, trust bundle management, TLS configuration
 - **Configuration**: Service identity and trust domain management
-- **Domain logic**: Core business logic for service identity
+- **Domain logic**: Core business logic for service identity and HTTP authentication
 
 ### 🚫 **Out of Core Scope** (moved to contrib)
 - **HTTP middleware implementations**: Chi, Gin, custom HTTP framework integrations
-- **HTTP client helpers**: `net/http` transport configuration and helpers
-- **Framework-specific code**: Any web framework dependencies or patterns
-- **HTTP examples**: REST API examples and HTTP-specific documentation
-- **Non-auth interceptors**: Logging, metrics, and other cross-cutting concerns
+- **Framework-specific code**: Web framework dependencies and routing patterns
+- **gRPC transport**: gRPC client/server and interceptors (future release)
+- **JWT SVIDs**: JWT-based authentication (future release)
+- **Non-auth features**: Logging, metrics, and other cross-cutting concerns
 
 ### 🔌 **Plugin Points** (interfaces for contrib)
 Core exposes these interfaces for contrib extensions:
-- `IdentityService.GetCertificate()` - Access to service certificates
+- `IdentityService.GetCertificate()` - Access to X.509 SVID certificates
 - `IdentityService.GetTrustBundle()` - Access to trust bundles  
-- Authorization policy builders - For peer validation
-- TLS configuration helpers - For mTLS setup
+- `HTTPClient()` - HTTP client with automatic mTLS configuration
+- Authorization policy builders - For peer validation with X.509 SVIDs
+- TLS configuration helpers - For custom mTLS setup
 
-**Note**: HTTP middleware implementations are explicitly contrib-only. Core provides identity primitives; contrib provides framework integrations.
+**Note**: Framework middleware implementations are explicitly contrib-only. Core provides HTTP + mTLS primitives; contrib provides Chi/Gin/framework integrations.
 
-### Review of the Original PR Plan
-Your PR plan is solid overall—it's focused, incremental, and reversible, which minimizes risk in refactoring. It correctly identifies HTTP-specific code (e.g., `HTTPClient()`, TLS extraction helpers) as removable from the core while preserving gRPC and SPIFFE identity primitives. This aligns with best practices for Go libraries: keeping the core lightweight and transport-agnostic (e.g., identity + mTLS logic), with framework-specific extensions (like Chi/Gin middleware) in a separate contrib module or repo. The plan also follows patterns seen in projects like OpenTelemetry-go, where core APIs are framework-agnostic, and integrations (e.g., for Gin/Chi) live in contrib for modularity and independent versioning.
+### Review of the Updated Architecture Plan
+The architecture has been updated to focus on HTTP + X.509 SVIDs for MVP, which is focused, incremental, and reversible, minimizing risk in the initial release. This correctly identifies framework-specific middleware (e.g., Chi/Gin handlers, routing patterns) as removable from the core while preserving HTTP + mTLS and SPIFFE identity primitives. This aligns with best practices for Go libraries: keeping the core lightweight and HTTP-focused (e.g., identity + mTLS logic), with framework-specific extensions (like Chi/Gin middleware) in a separate contrib module or repo. The plan follows patterns seen in projects like OpenTelemetry-go, where core APIs are transport-specific but framework-agnostic, and integrations (e.g., for Gin/Chi) live in contrib for modularity and independent versioning.
 
 **Strengths**:
 - **Granularity**: Small PRs (e.g., docs first, then code removals) make reviews easy and allow quick reverts if issues arise.
@@ -50,32 +53,34 @@ I've refined the plan: Added a PR for exports and Gin stub; enhanced checks (e.g
   - out-of-scope.md: Explicitly list "HTTP middleware implementations" as contrib-only; note plugin points (e.g., exposed interfaces for auth policies).
 - **Accept Criteria**: Docs only; no code changes. Run `git diff --stat` to confirm.
 
-#### PR1: Remove HTTP Client Helpers from Core
-- **Goal**: Eliminate net/http coupling; core exposes only gRPC Connect and identity primitives.
+#### PR1: Remove Framework-Specific Middleware from Core
+- **Goal**: Eliminate framework coupling; core exposes only HTTP + mTLS primitives and identity management.
 - **Changes** (Surgical Edits):
   - internal/adapters/primary/api/client.go:
-    - Delete `HTTPClient()`, `extractTLSConfig()`, `createSVIDSource()`, `createBundleSource()`, and adapters (`svidSourceAdapter`, `bundleSourceAdapter`)—but only if they're HTTP-exclusive. If reusable for gRPC (e.g., building creds), move to a shared internal/spiffe/adapters.go.
-    - Keep `Connect()` (gRPC), `Close()`, identity creation.
-  - Delete internal/adapters/primary/api/spiffe_tlsconfig_test.go.
-  - Delete pkg/ephemos/http_client_test.go (or any HTTP-specific tests).
-- **Follow-ups**: Prune references in other tests/files.
+    - Keep `HTTPClient()`, `extractTLSConfig()`, `createSVIDSource()`, `createBundleSource()` as core HTTP primitives
+    - Remove any Chi/Gin-specific middleware or routing code
+    - Keep HTTP client creation, mTLS configuration, identity management
+  - Move framework middleware to contrib/middleware/chi/ and contrib/middleware/gin/
+  - Remove any framework imports from core (chi, gin, etc.)
+- **Follow-ups**: Prune framework references in core tests/files.
 - **Accept Criteria**:
   ```
-  rg -n 'HTTPClient\(|extractTLSConfig\(|createSVIDSource\(|createBundleSource\(' # No matches in core
-  rg -n '"net/http"' internal pkg # No matches (except possibly contrib)
+  rg -n '"github.com/go-chi/chi|gin-gonic/gin"' internal pkg # No framework imports in core
+  rg -n 'router\.|middleware\.' internal pkg # No framework-specific patterns in core
   go test ./... # All pass
-  go mod graph | grep net/http # Ensure no direct dep on net/http in core module
+  go mod graph | grep -E "chi|gin" # Ensure no framework deps in core module
   ```
 
-#### PR2: Export Primitives for Contrib Middleware
-- **Goal**: Ensure contrib can build middleware without internal access; core remains thin but extensible.
+#### PR2: Export HTTP Primitives for Contrib Middleware
+- **Goal**: Ensure contrib can build HTTP middleware without internal access; core remains thin but extensible.
 - **Changes**:
-  - In pkg/ephemos (public facade): Export necessary types/interfaces if not already (e.g., `IdentityService` with `GetCertificate()`, `GetTrustBundle()`; `AuthenticationPolicy`; authorizer builders like `func NewAuthorizerFromConfig(cfg) tlsconfig.Authorizer`).
-  - Add pkg/ephemos/authorizer.go: Simple funcs for common authorizers (e.g., `AuthorizeMemberOf(domain string) tlsconfig.Authorizer` wrapping go-spiffe).
+  - In pkg/ephemos (public facade): Export necessary HTTP types/interfaces if not already (e.g., `IdentityService` with `GetCertificate()`, `GetTrustBundle()`; `HTTPClient()` with mTLS; `AuthenticationPolicy`; authorizer builders like `func NewAuthorizerFromConfig(cfg) tlsconfig.Authorizer`).
+  - Add pkg/ephemos/authorizer.go: Simple funcs for common HTTP authorizers (e.g., `AuthorizeMemberOf(domain string) tlsconfig.Authorizer` wrapping go-spiffe).
+  - Export HTTP client helpers for contrib frameworks to build middleware.
 - **Accept Criteria**:
   ```
   rg -n '\".*internal/' pkg/ephemos # No internal imports in public pkg
-  go doc pkg/ephemos # Verify exported symbols include cert/bundle access
+  go doc pkg/ephemos # Verify exported symbols include HTTP client, cert/bundle access
   ```
 
 #### PR3: Move HTTP Client Guidance to Contrib
