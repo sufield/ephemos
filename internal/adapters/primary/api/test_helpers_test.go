@@ -1,8 +1,9 @@
+//go:build test
+
 package api
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -49,26 +50,74 @@ func (s *TestService) GetLastInput() string {
 	return s.lastInput
 }
 
-// TestMethod implements a simple test RPC method.
-func (s *TestService) TestMethod(_ context.Context, req *TestRequest) (*TestResponse, error) {
+// Reset clears the service state for fresh test runs.
+func (s *TestService) Reset() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.callCount = 0
+	s.lastInput = ""
+	s.shouldFail = false
+	s.failCode = codes.Internal
+}
+
+// TestMethod implements a simple test RPC method that honors context and preserves gRPC status codes.
+func (s *TestService) TestMethod(ctx context.Context, req *TestRequest) (*TestResponse, error) {
+	// Fast context check
+	if err := ctx.Err(); err != nil {
+		return nil, status.FromContextError(err).Err()
+	}
+
 	s.mu.Lock()
 	s.callCount++
 	s.lastInput = req.GetInput()
-	shouldFail := s.shouldFail
-	failCode := s.failCode
+	shouldFail, code := s.shouldFail, s.failCode
 	s.mu.Unlock()
 
 	if shouldFail {
-		return nil, fmt.Errorf("test service failure: %w", status.Error(failCode, "simulated failure"))
+		return nil, status.Errorf(code, "simulated failure")
 	}
 
-	return &TestResponse{
-		Output: "processed: " + req.GetInput(),
-	}, nil
+	return &TestResponse{Output: "processed: " + req.GetInput()}, nil
+}
+
+// TestServiceServer defines the interface for the test service
+type TestServiceServer interface {
+	TestMethod(context.Context, *TestRequest) (*TestResponse, error)
+}
+
+// Compile-time check: TestService implements TestServiceServer
+var _ TestServiceServer = (*TestService)(nil)
+
+// Service descriptor and handler for TestService.TestMethod.
+var _TestService_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "api.TestService", 
+	HandlerType: (*TestServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "TestMethod",
+			Handler: func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+				in := new(TestRequest)
+				if err := dec(in); err != nil {
+					return nil, err
+				}
+				if interceptor == nil {
+					return srv.(TestServiceServer).TestMethod(ctx, in)
+				}
+				info := &grpc.UnaryServerInfo{
+					Server:     srv,
+					FullMethod: "/api.TestService/TestMethod",
+				}
+				handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+					return srv.(TestServiceServer).TestMethod(ctx, req.(*TestRequest))
+				}
+				return interceptor(ctx, in, info, handler)
+			},
+		},
+	},
 }
 
 // TestServiceRegistrar is a real implementation of ServiceRegistrar for testing.
-// It registers a real gRPC service, not a mock.
+// It registers a real gRPC service using grpc.ServiceRegistrar interface.
 type TestServiceRegistrar struct {
 	service       *TestService
 	registered    bool
@@ -86,18 +135,16 @@ func NewTestServiceRegistrar(service *TestService) *TestServiceRegistrar {
 	}
 }
 
-// Register registers the test service with the gRPC server.
-func (r *TestServiceRegistrar) Register(server *grpc.Server) {
+// Register registers the test service with any grpc.ServiceRegistrar.
+func (r *TestServiceRegistrar) Register(s grpc.ServiceRegistrar) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	if server != nil {
-		// In a real scenario, this would be:
-		// RegisterTestServiceServer(server, r.service)
-		// For now, we just track that it was called
-		r.registered = true
-		r.registerCount++
+	if s == nil {
+		return
 	}
+	s.RegisterService(&_TestService_serviceDesc, r.service)
+	r.registered = true
+	r.registerCount++
 }
 
 // IsRegistered returns whether the service has been registered.
@@ -112,6 +159,14 @@ func (r *TestServiceRegistrar) GetRegisterCount() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.registerCount
+}
+
+// Reset clears the registrar state for fresh test runs.
+func (r *TestServiceRegistrar) Reset() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.registered = false
+	r.registerCount = 0
 }
 
 // GetService returns the underlying test service.
@@ -144,4 +199,3 @@ func (r *TestResponse) GetOutput() string {
 	}
 	return ""
 }
-
