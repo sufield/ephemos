@@ -135,7 +135,6 @@ func (l *LoggingInterceptor) UnaryServerInterceptor() grpc.UnaryServerIntercepto
 	}
 }
 
-
 // createBaseLogEntry creates a base log entry with common fields.
 func (l *LoggingInterceptor) createBaseLogEntry(ctx context.Context, method, requestType string) *slog.Logger {
 	entry := l.logger.With(

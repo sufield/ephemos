@@ -78,7 +78,6 @@ func (m *AuthMetricsInterceptor) UnaryServerInterceptor() grpc.UnaryServerInterc
 	}
 }
 
-
 // UnaryClientInterceptor returns a gRPC unary client interceptor for authentication metrics collection.
 func (m *AuthMetricsInterceptor) UnaryClientInterceptor() grpc.UnaryClientInterceptor {
 	return func(
@@ -105,7 +104,6 @@ func (m *AuthMetricsInterceptor) UnaryClientInterceptor() grpc.UnaryClientInterc
 	}
 }
 
-
 // DefaultAuthMetricsConfig returns a default authentication metrics configuration.
 func DefaultAuthMetricsConfig(serviceName string) *AuthMetricsConfig {
 	return &AuthMetricsConfig{
@@ -113,5 +111,3 @@ func DefaultAuthMetricsConfig(serviceName string) *AuthMetricsConfig {
 		ServiceName:          serviceName,
 	}
 }
-
-

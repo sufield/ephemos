@@ -314,4 +314,3 @@ func TestLoggingInterceptor_UnaryServerInterceptor_WithPropagatedInfo(t *testing
 		t.Errorf("Expected request ID in logs, got: %s", logStr)
 	}
 }
-

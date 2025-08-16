@@ -110,7 +110,6 @@ func (a *AuthInterceptor) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	}
 }
 
-
 // authenticateRequest performs the actual authentication logic.
 func (a *AuthInterceptor) authenticateRequest(ctx context.Context, method string) (context.Context, error) {
 	// Extract peer information

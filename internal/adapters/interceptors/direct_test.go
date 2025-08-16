@@ -377,9 +377,10 @@ func TestRequestIDGeneration(t *testing.T) {
 
 			provider := &mockIdentityProvider{}
 			config := DefaultIdentityPropagationConfig(provider)
-			// Inject deterministic clock for testing
+			// Inject deterministic clock and IDGen for testing
 			fixed := time.Unix(1696000000, 123)
 			config.Clock = func() time.Time { return fixed }
+			config.IDGen = func() string { return "req-1696000000000000123" }
 			interceptor := NewIdentityPropagationInterceptor(config)
 
 			ctx := context.Background()
@@ -409,6 +410,7 @@ func TestRequestIDGeneration_Deterministic(t *testing.T) {
 	fixed := time.Unix(1_696_000_000, 123) // example
 	config := DefaultIdentityPropagationConfig(&mockIdentityProvider{})
 	config.Clock = func() time.Time { return fixed }
+	config.IDGen = func() string { return "req-1696000000000000123" }
 	ic := NewIdentityPropagationInterceptor(config)
 
 	got := ic.getOrGenerateRequestID(context.Background())
@@ -647,7 +649,6 @@ func TestAuthorizationPolicies_Direct(t *testing.T) {
 		})
 	}
 }
-
 
 func TestErrorCodesMapping_Direct(t *testing.T) {
 	tests := []struct {
