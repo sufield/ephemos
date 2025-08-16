@@ -2,6 +2,8 @@ package interceptors
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -16,7 +18,10 @@ import (
 )
 
 // Default configuration constants.
-const defaultMaxCallChainDepth = 10
+const (
+	defaultMaxCallChainDepth = 10
+	chainSep                 = " -> "
+)
 
 // Typed errors for identity propagation.
 var (
@@ -26,6 +31,9 @@ var (
 
 // Clock provides time.Now functionality for dependency injection.
 type Clock func() time.Time
+
+// IDGen provides request ID generation for dependency injection.
+type IDGen func() string
 
 // RequestIDContextKey is the context key for storing request ID information.
 type RequestIDContextKey struct{}
@@ -67,6 +75,9 @@ type IdentityPropagationConfig struct {
 
 	// Clock for time generation (nil => time.Now)
 	Clock Clock
+
+	// IDGen for request ID generation (nil => defaultIDGen)
+	IDGen IDGen
 }
 
 // IdentityPropagationInterceptor handles identity propagation for outgoing gRPC calls.
@@ -84,7 +95,17 @@ func NewIdentityPropagationInterceptor(config *IdentityPropagationConfig) *Ident
 
 	// Set default max call chain depth
 	if config.MaxCallChainDepth == 0 {
-		config.MaxCallChainDepth = 10
+		config.MaxCallChainDepth = defaultMaxCallChainDepth
+	}
+
+	// Set default clock
+	if config.Clock == nil {
+		config.Clock = time.Now
+	}
+
+	// Set default ID generator
+	if config.IDGen == nil {
+		config.IDGen = defaultIDGen
 	}
 
 	return &IdentityPropagationInterceptor{
@@ -117,13 +138,12 @@ func (i *IdentityPropagationInterceptor) UnaryClientInterceptor() grpc.UnaryClie
 	}
 }
 
-
 // propagateIdentity adds identity metadata to the outgoing context.
 func (i *IdentityPropagationInterceptor) propagateIdentity(ctx context.Context, method string) (context.Context, error) {
 	// Get current service identity
 	identity, err := i.config.IdentityProvider.GetServiceIdentity()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get service identity: %w", err)
+		return nil, status.Errorf(codes.Unauthenticated, "get service identity: %v", err)
 	}
 
 	// Create metadata for identity propagation
@@ -132,7 +152,7 @@ func (i *IdentityPropagationInterceptor) propagateIdentity(ctx context.Context, 
 	// Add current service identity
 	md.Set(MetadataKeyServiceName, identity.Name())
 	md.Set(MetadataKeyTrustDomain, identity.Domain())
-	md.Set(MetadataKeyTimestamp, fmt.Sprintf("%d", time.Now().Unix()))
+	md.Set(MetadataKeyTimestamp, fmt.Sprintf("%d", i.config.Clock().UnixMilli()))
 
 	// Generate or extract request ID
 	requestID := i.getOrGenerateRequestID(ctx)
@@ -148,7 +168,7 @@ func (i *IdentityPropagationInterceptor) propagateIdentity(ctx context.Context, 
 	if i.config.PropagateCallChain {
 		callChain, err := i.buildCallChain(ctx, identity.URI())
 		if err != nil {
-			return nil, fmt.Errorf("failed to build call chain: %w", err)
+			return nil, err
 		}
 		if callChain != "" {
 			md.Set(MetadataKeyCallChain, callChain)
@@ -166,7 +186,7 @@ func (i *IdentityPropagationInterceptor) propagateIdentity(ctx context.Context, 
 
 	i.logger.Debug("Identity propagated",
 		"method", method,
-		"service", identity.Name,
+		"service", identity.Name(),
 		"request_id", requestID)
 
 	return metadata.NewOutgoingContext(ctx, md), nil
@@ -202,8 +222,8 @@ func (i *IdentityPropagationInterceptor) buildCallChain(ctx context.Context, cur
 		return currentIdentity, nil
 	}
 
-	// Parse existing chain
-	callChain = strings.Split(existingChain[0], " -> ")
+	// Parse existing chain with delimiter constant
+	callChain = strings.Split(existingChain[0], chainSep)
 
 	// Validate chain depth limit
 	if len(callChain) >= i.config.MaxCallChainDepth {
@@ -218,7 +238,7 @@ func (i *IdentityPropagationInterceptor) buildCallChain(ctx context.Context, cur
 	// Add current service to the chain
 	callChain = append(callChain, currentIdentity)
 
-	return strings.Join(callChain, " -> "), nil
+	return strings.Join(callChain, chainSep), nil
 }
 
 // Helper function to validate no circular calls (reduces complexity).
@@ -243,8 +263,9 @@ func (i *IdentityPropagationInterceptor) propagateCustomHeaders(ctx context.Cont
 	}
 
 	for _, header := range i.config.CustomHeaders {
-		if values := incomingMD.Get(header); len(values) > 0 {
-			outgoingMD.Set(header, values...)
+		normalizedHeader := strings.ToLower(header)
+		if values := incomingMD.Get(normalizedHeader); len(values) > 0 {
+			outgoingMD.Set(normalizedHeader, values...)
 		}
 	}
 }
@@ -263,12 +284,8 @@ func (i *IdentityPropagationInterceptor) getOrGenerateRequestID(ctx context.Cont
 		return requestID
 	}
 
-	// Generate new request ID using injected clock
-	now := time.Now
-	if i.config.Clock != nil {
-		now = i.config.Clock
-	}
-	return fmt.Sprintf("req-%d", now().UnixNano())
+	// Generate new request ID using injected generator
+	return i.config.IDGen()
 }
 
 // generateRequestID creates a new unique request ID.
@@ -307,7 +324,6 @@ func (i *IdentityPropagationServerInterceptor) UnaryServerInterceptor() grpc.Una
 	}
 }
 
-
 // extractIdentityMetadata extracts identity metadata from incoming context and enriches it.
 func (i *IdentityPropagationServerInterceptor) extractIdentityMetadata(ctx context.Context, method string) context.Context {
 	md, ok := metadata.FromIncomingContext(ctx)
@@ -342,8 +358,8 @@ func (i *IdentityPropagationServerInterceptor) extractIdentityMetadata(ctx conte
 		i.logger.Debug("Identity metadata extracted",
 			"method", method,
 			"request_id", requestID[0],
-			"caller_service", getValueFromContext(enrichedCtx, "caller-service"),
-			"call_chain", getValueFromContext(enrichedCtx, "call-chain"))
+			"caller_service", mustGet(GetCallerService(enrichedCtx)),
+			"call_chain", mustGet(GetCallChain(enrichedCtx)))
 	}
 
 	return enrichedCtx
@@ -355,6 +371,28 @@ func getValueFromContext(ctx context.Context, key string) string {
 		return value
 	}
 	return ""
+}
+
+func mustGet(v string, ok bool) string {
+	if ok {
+		return v
+	}
+	return ""
+}
+
+func defaultIDGen() string {
+	// RFC4122 v4 (simple, dependency-free)
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("req-%08x-%04x-%04x-%04x-%012x",
+		binary.BigEndian.Uint32(b[0:4]),
+		binary.BigEndian.Uint16(b[4:6]),
+		binary.BigEndian.Uint16(b[6:8]),
+		binary.BigEndian.Uint16(b[8:10]),
+		b[10:16],
+	)
 }
 
 // Identity propagation helper functions
@@ -411,5 +449,6 @@ func DefaultIdentityPropagationConfig(identityProvider ports.IdentityProvider) *
 		CustomHeaders:           []string{},
 		Logger:                  slog.Default(),
 		Clock:                   time.Now,
+		IDGen:                   defaultIDGen,
 	}
 }

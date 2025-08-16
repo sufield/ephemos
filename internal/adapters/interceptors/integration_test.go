@@ -35,7 +35,6 @@ func (s *testServiceImpl) TestMethod(ctx context.Context, _ *TestRequest) (*Test
 	return &TestResponse{Message: "Hello anonymous"}, nil
 }
 
-
 // Mock message definitions for testing.
 type TestRequest struct {
 	Message string
@@ -53,7 +52,6 @@ func (r *TestResponse) Reset()         { *r = TestResponse{} }
 func (r *TestResponse) String() string { return r.Message }
 func (r *TestResponse) ProtoMessage()  {}
 
-
 type TestServiceServer interface {
 	TestMethod(context.Context, *TestRequest) (*TestResponse, error)
 }
@@ -61,7 +59,6 @@ type TestServiceServer interface {
 type TestServiceClient interface {
 	TestMethod(ctx context.Context, req *TestRequest, opts ...grpc.CallOption) (*TestResponse, error)
 }
-
 
 // Mock service registration.
 func RegisterTestServiceServer(_ *grpc.Server, _ TestServiceServer) {
@@ -85,8 +82,6 @@ func (c *testServiceClient) TestMethod(ctx context.Context, req *TestRequest, op
 	}
 	return out, nil
 }
-
-
 
 func bufDialer(lis *bufconn.Listener) func(context.Context, string) (net.Conn, error) {
 	return func(_ context.Context, _ string) (net.Conn, error) {
