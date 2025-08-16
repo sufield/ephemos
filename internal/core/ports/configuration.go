@@ -239,10 +239,8 @@ func LoadFromEnvironment() (*Configuration, error) {
 		return nil, fmt.Errorf("environment configuration validation failed: %w", err)
 	}
 
-	// Additional production security validation
-	if err := validateProductionSecurity(config); err != nil {
-		return nil, fmt.Errorf("production security validation failed: %w", err)
-	}
+	// NOTE: Production validation is NOT run here - it should only be run when explicitly requested
+	// via IsProductionReady() method
 
 	return config, nil
 }
@@ -285,36 +283,47 @@ func parseCommaSeparatedList(value string) []string {
 
 // validateProductionSecurity performs additional security validation for production environments.
 func validateProductionSecurity(config *Configuration) error {
-	var errors []string
+	var validationErrors []error
 
 	// Check domain security
 	if err := validateProductionDomain(config.Service.Domain); err != nil {
-		errors = append(errors, err.Error())
+		validationErrors = append(validationErrors, err)
 	}
 
 	// Check service name
 	if err := validateProductionServiceName(config.Service.Name); err != nil {
-		errors = append(errors, err.Error())
+		validationErrors = append(validationErrors, err)
 	}
 
 	// Check agent socket path security
 	if err := validateSocketPath(config.Agent.SocketPath); err != nil {
-		errors = append(errors, err.Error())
+		validationErrors = append(validationErrors, err)
 	}
-
 
 	// Check for insecure certificate validation setting
 	if strings.ToLower(os.Getenv(EnvInsecureSkipVerify)) == "true" {
-		errors = append(errors, "EPHEMOS_INSECURE_SKIP_VERIFY=true - certificate validation is disabled (development only)")
+		validationErrors = append(validationErrors, errors.ErrInsecureSkipVerify)
 	}
 
 	// Check for debug environment variables that shouldn't be enabled in production
 	if debugEnabled := os.Getenv(EnvDebugEnabled); debugEnabled == "true" {
-		errors = append(errors, "debug mode is enabled via EPHEMOS_DEBUG_ENABLED - should be disabled in production")
+		validationErrors = append(validationErrors, errors.ErrDebugEnabled)
 	}
 
-	if len(errors) > 0 {
-		return fmt.Errorf("production security issues: %s", strings.Join(errors, "; "))
+	// Check for verbose logging
+	if logLevel := strings.ToLower(os.Getenv(EnvLogLevel)); logLevel == "debug" || logLevel == "trace" {
+		validationErrors = append(validationErrors, errors.ErrVerboseLogging)
+	}
+
+	// Check authorized clients for wildcards
+	for _, client := range config.Service.AuthorizedClients {
+		if strings.Contains(client, "*") {
+			validationErrors = append(validationErrors, fmt.Errorf("%w: %s", errors.ErrWildcardClients, client))
+		}
+	}
+
+	if len(validationErrors) > 0 {
+		return errors.NewProductionValidationError(validationErrors...)
 	}
 
 	return nil
@@ -322,19 +331,25 @@ func validateProductionSecurity(config *Configuration) error {
 
 // validateProductionDomain checks if the domain is suitable for production.
 func validateProductionDomain(domain string) error {
-	demoPatterns := []string{"example.org", "localhost", "example.com"}
-	for _, pattern := range demoPatterns {
-		if strings.Contains(domain, pattern) {
-			return fmt.Errorf("trust domain contains '%s' - not suitable for production", pattern)
-		}
+	if strings.Contains(domain, "example.org") || strings.Contains(domain, "example.com") {
+		return errors.ErrExampleTrustDomain
+	}
+	if strings.Contains(domain, "localhost") {
+		return errors.ErrLocalhostTrustDomain
+	}
+	if strings.Contains(domain, "demo") || strings.Contains(domain, "test") {
+		return errors.ErrDemoTrustDomain
 	}
 	return nil
 }
 
 // validateProductionServiceName checks if the service name is suitable for production.
 func validateProductionServiceName(name string) error {
-	if strings.Contains(name, "example") || strings.Contains(name, "demo") {
-		return fmt.Errorf("service name contains demo/example values - not suitable for production")
+	if strings.Contains(name, "example") {
+		return errors.ErrExampleServiceName
+	}
+	if strings.Contains(name, "demo") {
+		return errors.ErrDemoServiceName
 	}
 	return nil
 }
@@ -347,7 +362,7 @@ func validateSocketPath(socketPath string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("agent socket should be in a secure directory (/run, /var/run, or /tmp)")
+	return errors.ErrInsecureSocketPath
 }
 
 // ShouldSkipCertificateValidation follows industry best practices for explicit opt-in.

@@ -9,10 +9,26 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
+	"time"
 
 	"github.com/sufield/ephemos/internal/adapters/secondary/config"
 	"github.com/sufield/ephemos/internal/core/ports"
+)
+
+// Version information
+var (
+	version   = "dev"
+	commit    = "unknown"
+	buildDate = "unknown"
+)
+
+// Exit codes
+const (
+	ExitSuccess            = 0
+	ExitUsageError         = 2
+	ExitBasicValidation    = 3
+	ExitProductionReadiness = 4
+	ExitLoadError          = 5
 )
 
 func main() {
@@ -21,100 +37,147 @@ func main() {
 		envOnly    = flag.Bool("env-only", false, "Validate environment variables only (most secure)")
 		production = flag.Bool("production", false, "Perform production readiness validation")
 		verbose    = flag.Bool("verbose", false, "Verbose output")
+		showVersion = flag.Bool("version", false, "Show version information")
+		noEmoji    = flag.Bool("no-emoji", false, "Disable emoji in output")
+		format     = flag.String("format", "text", "Output format (text|json)")
+		quiet      = flag.Bool("quiet", false, "Suppress success messages")
+		timeout    = flag.Duration("timeout", 30*time.Second, "Timeout for operations")
 	)
 
 	setupUsage()
 	flag.Parse()
 
-	fmt.Println("Ephemos Configuration Validator")
-	fmt.Println("==============================")
-	fmt.Println()
+	// Create printer with proper writer injection
+	printer := NewPrinter(os.Stdout, os.Stderr, !*noEmoji, *quiet)
 
-	// Load configuration
-	cfg := loadConfiguration(*envOnly, *configFile)
-	fmt.Println("✅ Configuration loaded successfully")
-	fmt.Println()
-
-	// Display configuration details if verbose
-	if *verbose {
-		displayConfiguration(cfg)
-		fmt.Println()
+	// Handle version flag
+	if *showVersion {
+		printVersion(printer, *format)
+		os.Exit(ExitSuccess)
 	}
 
-	// Validate configuration
-	validateConfiguration(cfg, *production)
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+	defer cancel()
 
-	// Environment variable recommendations
-	fmt.Println()
-	fmt.Println("💡 Security recommendations:")
-	printSecurityRecommendations(*envOnly)
-
-	fmt.Println()
-	fmt.Println("🎉 Configuration validation completed successfully!")
-
-	if *production {
-		fmt.Println("✅ Configuration is ready for production deployment")
+	// Header for text mode
+	if *format == "text" && !*quiet {
+		printer.Plain("Ephemos Configuration Validator")
+		printer.Plain("==============================")
+		printer.Newline()
 	}
-}
 
-func displayConfiguration(cfg *ports.Configuration) {
-	fmt.Println("📋 Configuration Details:")
-	fmt.Printf("   Service Name: %s\n", cfg.Service.Name)
-	fmt.Printf("   Trust Domain: %s\n", cfg.Service.Domain)
+	// Load configuration with proper precedence
+	cfg, err := loadConfiguration(ctx, printer, *configFile, *envOnly)
+	if err != nil {
+		handleLoadError(printer, *format, err)
+		os.Exit(ExitLoadError)
+	}
+
+	// Create result object for JSON mode
+	result := &Result{
+		BasicValid:      true,
+		ProductionValid: true,
+		Configuration: &Config{
+			ServiceName: cfg.Service.Name,
+			TrustDomain: cfg.Service.Domain,
+		},
+	}
 
 	if cfg.Agent != nil {
-		fmt.Printf("   Agent Socket: %s\n", cfg.Agent.SocketPath)
+		result.Configuration.AgentSocket = cfg.Agent.SocketPath
 	}
+
+	// Display configuration if verbose
+	if *verbose && *format == "text" {
+		displayConfiguration(printer, cfg)
+		printer.Newline()
+	}
+
+	// Perform basic validation
+	if *format == "text" {
+		printer.Info("Performing basic validation...")
+	}
+
+	if err := cfg.Validate(); err != nil {
+		result.BasicValid = false
+		result.Errors = append(result.Errors, err.Error())
+
+		if *format == "json" {
+			printer.PrintJSON(result)
+		} else {
+			printer.Errorf("Basic validation failed: %v", err)
+		}
+		os.Exit(ExitBasicValidation)
+	}
+
+	if *format == "text" {
+		printer.Success("Basic validation passed")
+		result.Messages = append(result.Messages, "Basic validation passed")
+	}
+
+	// Perform production validation if requested
+	if *production {
+		if *format == "text" {
+			printer.Newline()
+			printer.Production("Performing production readiness validation...")
+		}
+
+		if err := cfg.IsProductionReady(); err != nil {
+			result.ProductionValid = false
+			tips := getProductionTips(err)
+			result.Tips = tips
+
+			if *format == "json" {
+				result.Errors = append(result.Errors, err.Error())
+				printer.PrintJSON(result)
+			} else {
+				printer.Errorf("Production validation failed: %v", err)
+				printer.Newline()
+				printer.Tip("Production readiness tips:")
+				for _, tip := range tips {
+					printer.Bullet(tip)
+				}
+			}
+			os.Exit(ExitProductionReadiness)
+		}
+
+		if *format == "text" {
+			printer.Success("Production validation passed")
+			result.Messages = append(result.Messages, "Production validation passed")
+		}
+	}
+
+	// Show security recommendations
+	if *format == "text" && !*quiet {
+		printer.Newline()
+		printer.Tip("Security recommendations:")
+		recommendations := getSecurityRecommendations(*envOnly)
+		for _, rec := range recommendations {
+			if rec[0] == ' ' {
+				printer.Plain(rec)
+			} else {
+				printer.Bullet(rec)
+			}
+		}
+	}
+
+	// Final success message
+	if *format == "text" && !*quiet {
+		printer.Newline()
+		printer.Banner("Configuration validation completed successfully!")
+
+		if *production {
+			printer.Success("Configuration is ready for production deployment")
+		}
+	} else if *format == "json" {
+		printer.PrintJSON(result)
+	}
+
+	os.Exit(ExitSuccess)
 }
 
-func printProductionTips(err error) {
-	errorMsg := err.Error()
-
-	if strings.Contains(errorMsg, "example.org") {
-		fmt.Println("  • Set EPHEMOS_TRUST_DOMAIN to your production domain (e.g., 'prod.company.com')")
-	}
-
-	if strings.Contains(errorMsg, "localhost") {
-		fmt.Println("  • Set EPHEMOS_TRUST_DOMAIN to a proper domain (not localhost)")
-	}
-
-	if strings.Contains(errorMsg, "example") || strings.Contains(errorMsg, "demo") {
-		fmt.Println("  • Set EPHEMOS_SERVICE_NAME to your production service name (not example/demo)")
-	}
-
-	if strings.Contains(errorMsg, "debug mode") {
-		fmt.Println("  • Set EPHEMOS_DEBUG_ENABLED=false for production")
-	}
-
-	if strings.Contains(errorMsg, "wildcard") {
-		fmt.Println("  • Use specific SPIFFE IDs instead of wildcards in EPHEMOS_AUTHORIZED_CLIENTS")
-	}
-
-	if strings.Contains(errorMsg, "socket should be in a secure directory") {
-		fmt.Println("  • Set EPHEMOS_SPIFFE_SOCKET to a secure path like '/run/spire/sockets/api.sock'")
-	}
-}
-
-func printSecurityRecommendations(envOnly bool) {
-	if !envOnly {
-		fmt.Println("  🔒 Use environment variables for production (--env-only)")
-		fmt.Println("     Environment variables are more secure than config files")
-	}
-
-	fmt.Println("  🔐 Required environment variables for production:")
-	fmt.Printf("     export %s=\"your-service-name\"\n", ports.EnvServiceName)
-	fmt.Printf("     export %s=\"your.production.domain\"\n", ports.EnvTrustDomain)
-
-	fmt.Println("  🛡️ Optional security environment variables:")
-	fmt.Printf("     export %s=\"/run/sockets/agent.sock\"\n", ports.EnvAgentSocket)
-	fmt.Printf("     export %s=\"false\"\n", ports.EnvDebugEnabled)
-
-	fmt.Println("  📚 For more details, see:")
-	fmt.Println("     docs/security/CONFIGURATION_SECURITY.md")
-	fmt.Println("     config/README.md")
-}
-
-// setupUsage configures the custom usage function for flag parsing.
+// setupUsage configures the custom usage function
 func setupUsage() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options]\n\n", os.Args[0])
@@ -126,77 +189,83 @@ func setupUsage() {
 		fmt.Fprintf(os.Stderr, "  %s --env-only --production\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  # Validate config file with environment override:\n")
 		fmt.Fprintf(os.Stderr, "  %s --config config/production.yaml --production\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  # JSON output for CI:\n")
+		fmt.Fprintf(os.Stderr, "  %s --env-only --format json --production\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  # Verbose validation:\n")
 		fmt.Fprintf(os.Stderr, "  %s --env-only --verbose\n\n", os.Args[0])
 	}
 }
 
-// loadConfiguration loads the configuration based on the provided flags.
-func loadConfiguration(envOnly bool, configFile string) *ports.Configuration {
-	var cfg *ports.Configuration
-	var err error
-
+// loadConfiguration loads configuration with proper precedence
+func loadConfiguration(ctx context.Context, printer *Printer, configFile string, envOnly bool) (*ports.Configuration, error) {
+	// Precedence: config file (if specified) with env override, or env-only
 	switch {
-	case envOnly:
-		fmt.Println("🔒 Loading configuration from environment variables (secure mode)")
-		cfg, err = ports.LoadFromEnvironment()
-		if err != nil {
-			fmt.Printf("❌ Failed to load configuration from environment: %v\n", err)
-			os.Exit(1)
-		}
 	case configFile != "":
-		cfg = loadConfigurationFromFile(configFile)
-	default:
-		fmt.Println("❌ Either --config or --env-only must be specified")
-		fmt.Println()
-		flag.Usage()
-		os.Exit(1)
-	}
-
-	return cfg
-}
-
-// loadConfigurationFromFile loads configuration from a file and merges with environment.
-func loadConfigurationFromFile(configFile string) *ports.Configuration {
-	fmt.Printf("📁 Loading configuration from file: %s\n", configFile)
-	provider := config.NewFileProvider()
-	cfg, err := provider.LoadConfiguration(context.Background(), configFile)
-	if err != nil {
-		fmt.Printf("❌ Failed to load configuration file: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Merge with environment variables (environment takes precedence)
-	fmt.Println("🔄 Merging with environment variables (environment overrides file)")
-	if err := cfg.MergeWithEnvironment(); err != nil {
-		fmt.Printf("❌ Failed to merge with environment: %v\n", err)
-		os.Exit(1)
-	}
-
-	return cfg
-}
-
-// validateConfiguration performs basic and optional production validation.
-func validateConfiguration(cfg *ports.Configuration, production bool) {
-	// Perform basic validation
-	fmt.Println("🔍 Performing basic validation...")
-	if err := cfg.Validate(); err != nil {
-		fmt.Printf("❌ Basic validation failed: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Println("✅ Basic validation passed")
-
-	// Perform production readiness validation if requested
-	if production {
-		fmt.Println()
-		fmt.Println("🏭 Performing production readiness validation...")
-		if err := cfg.IsProductionReady(); err != nil {
-			fmt.Printf("❌ Production validation failed: %v\n", err)
-			fmt.Println()
-			fmt.Println("💡 Production readiness tips:")
-			printProductionTips(err)
-			os.Exit(1)
+		printer.File(fmt.Sprintf("Loading configuration from file: %s", configFile))
+		provider := config.NewFileProvider()
+		cfg, err := provider.LoadConfiguration(ctx, configFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load configuration file: %w", err)
 		}
-		fmt.Println("✅ Production validation passed")
+
+		printer.Cycle("Merging with environment variables (environment overrides file)")
+		if err := cfg.MergeWithEnvironment(); err != nil {
+			return nil, fmt.Errorf("failed to merge with environment: %w", err)
+		}
+
+		printer.Success("Configuration loaded successfully")
+		return cfg, nil
+
+	case envOnly:
+		printer.Lock("Loading configuration from environment variables (secure mode)")
+		cfg, err := ports.LoadFromEnvironment()
+		if err != nil {
+			return nil, fmt.Errorf("failed to load configuration from environment: %w", err)
+		}
+		printer.Success("Configuration loaded successfully")
+		return cfg, nil
+
+	default:
+		return nil, fmt.Errorf("either --config or --env-only must be specified")
+	}
+}
+
+// displayConfiguration displays configuration details
+func displayConfiguration(printer *Printer, cfg *ports.Configuration) {
+	printer.Section("Configuration Details:")
+	printer.Infof("   Service Name: %s", cfg.Service.Name)
+	printer.Infof("   Trust Domain: %s", cfg.Service.Domain)
+
+	if cfg.Agent != nil {
+		printer.Infof("   Agent Socket: %s", cfg.Agent.SocketPath)
+	}
+}
+
+// handleLoadError handles configuration load errors
+func handleLoadError(printer *Printer, format string, err error) {
+	if format == "json" {
+		result := &Result{
+			BasicValid: false,
+			Errors:     []string{err.Error()},
+		}
+		printer.PrintJSON(result)
+	} else {
+		printer.Errorf("Failed to load configuration: %v", err)
+	}
+}
+
+// printVersion prints version information
+func printVersion(printer *Printer, format string) {
+	if format == "json" {
+		versionInfo := map[string]string{
+			"version":    version,
+			"commit":     commit,
+			"build_date": buildDate,
+		}
+		printer.PrintJSON(versionInfo)
+	} else {
+		printer.Plain(fmt.Sprintf("ephemos-config-validator version %s", version))
+		printer.Plain(fmt.Sprintf("  Commit: %s", commit))
+		printer.Plain(fmt.Sprintf("  Built:  %s", buildDate))
 	}
 }
