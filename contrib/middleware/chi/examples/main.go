@@ -60,11 +60,10 @@ func main() {
 			r.Post("/config", configHandler)
 		})
 
-		// Service-specific routes
-		r.Route("/payment", func(r chi.Router) {
-			r.Use(chimiddleware.RequireService("payment-service"))
-			r.Post("/charge", paymentHandler)
-			r.Get("/status", paymentStatusHandler)
+		// Service-specific routes example
+		r.Route("/data", func(r chi.Router) {
+			r.Use(chimiddleware.RequireService("data-service"))
+			r.Get("/info", dataHandler)
 		})
 	})
 
@@ -166,22 +165,16 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, `{"message": "Config updated by %s"}`, identity.Name)
 }
 
-// Payment handler (payment service only)
-func paymentHandler(w http.ResponseWriter, r *http.Request) {
+// Data handler (data service only)
+func dataHandler(w http.ResponseWriter, r *http.Request) {
 	identity := chimiddleware.IdentityFromContext(r.Context())
 	
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, `{
-		"message": "Payment processed",
+		"message": "Data access granted",
 		"service": "%s",
-		"transaction_id": "txn_12345"
-	}`, identity.Name)
-}
-
-// Payment status handler
-func paymentStatusHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"status": "completed", "amount": "$100.00"}`)
+		"timestamp": "%s"
+	}`, identity.Name, time.Now().Format(time.RFC3339))
 }
 
 // Sensitive data handler (strict authentication required)
