@@ -1,188 +1,150 @@
-# Out-of-Scope Functionality Analysis
+## Scope Definition: Core vs Contrib
 
-This document identifies functionality in the ephemos codebase that is out of scope for an identity-based authentication library focused on SPIFFE certificates.
+> 📊 **See [mvp.md](mvp.md) for comprehensive authentication method comparison tables and framework positioning.**
 
-## Core Scope Definition
+### ✅ **Core Scope** (this repository)
+- **SPIFFE identity management**: X.509 SVID certificates and trust bundles
+- **HTTP over mTLS**: Authenticated HTTP connections using X.509 SVIDs
+- **Core primitives**: Certificate fetching, trust bundle management, TLS configuration
+- **Configuration**: Service identity and trust domain management
+- **Domain logic**: Core business logic for service identity and HTTP authentication
 
-**Ephemos should focus ONLY on:**
-- SPIFFE identity validation and authentication
-- Certificate-based authentication (mTLS)
-- Identity propagation between services
-- Authentication interceptors and middleware
-- Identity context management
-- Service registration with SPIRE
+### 🚫 **Out of Core Scope** (moved to contrib)
+- **HTTP middleware implementations**: Chi, Gin, custom HTTP framework integrations
+- **Framework-specific code**: Web framework dependencies and routing patterns
+- **gRPC transport**: gRPC client/server and interceptors (future release)
+- **JWT SVIDs**: JWT-based authentication (future release)
+- **Non-auth features**: Logging, metrics, and other cross-cutting concerns
 
-## Out-of-Scope Functionality Found
+### 🔌 **Plugin Points** (interfaces for contrib)
+Core exposes these interfaces for contrib extensions:
+- `IdentityService.GetCertificate()` - Access to X.509 SVID certificates
+- `IdentityService.GetTrustBundle()` - Access to trust bundles  
+- `HTTPClient()` - HTTP client with automatic mTLS configuration
+- Authorization policy builders - For peer validation with X.509 SVIDs
+- TLS configuration helpers - For custom mTLS setup
 
-### 1. File/Data Management Services ❌
+**Note**: Framework middleware implementations are explicitly contrib-only. Core provides HTTP + mTLS primitives; contrib provides Chi/Gin/framework integrations.
 
-**Files:**
-- `internal/adapters/http/adapter.go` (lines 124-212)
-- `internal/core/ports/service.go` (FileService interface)
+### Review of the Updated Architecture Plan
+The architecture has been updated to focus on HTTP + X.509 SVIDs for MVP, which is focused, incremental, and reversible, minimizing risk in the initial release. This correctly identifies framework-specific middleware (e.g., Chi/Gin handlers, routing patterns) as removable from the core while preserving HTTP + mTLS and SPIFFE identity primitives. This aligns with best practices for Go libraries: keeping the core lightweight and HTTP-focused (e.g., identity + mTLS logic), with framework-specific extensions (like Chi/Gin middleware) in a separate contrib module or repo. The plan follows patterns seen in projects like OpenTelemetry-go, where core APIs are transport-specific but framework-agnostic, and integrations (e.g., for Gin/Chi) live in contrib for modularity and independent versioning.
 
-**Description:**
-- Complete file upload/download/listing service
-- HTTP REST endpoints: POST `/upload/{filename}`, GET `/download/{filename}`, GET `/list`
-- File system operations and data storage
+**Strengths**:
+- **Granularity**: Small PRs (e.g., docs first, then code removals) make reviews easy and allow quick reverts if issues arise.
+- **Safety Checks**: Using `rg` (ripgrep) for code searches and `go test` ensures no lingering references or broken builds.
+- **Completeness**: Covers code, tests, docs, and build files. Retains essential core components (domain/ports/services, gRPC interceptors).
+- **Rationale**: Emphasizes contrib for HTTP adoption, which keeps core bloat-free while enabling easy extensions—common in Go ecosystems where stdlib + routers like Chi are preferred for minimalism over full frameworks like Gin.
 
-**Why out of scope:** File management is business logic unrelated to identity authentication. An authentication library should handle certificates and identity validation, not file operations.
+**Potential Issues/Gaps**:
+- **Over-Removal Risk**: The SPIFFE adapters (e.g., `svidSourceAdapter`, `bundleSourceAdapter`) and `extractTLSConfig` might be reusable for gRPC mTLS creds (e.g., via `grpc.WithTransportCredentials(spiffetls.MTLSClientCredentials(...))`). If gRPC transport uses similar go-spiffe configs, removing them could break gRPC indirectly. Verify if they're HTTP-only.
+- **Export Gaps**: Contrib middleware needs access to core primitives (e.g., `IdentityService.GetCertificate()`, `GetTrustBundle()`, authorizers). If not already exported (e.g., via `pkg/ephemos`), add an export PR.
+- **Gin Symmetry**: Plan mentions adding Gin later but doesn't include it—add a PR stub for contrib/middleware/gin to mirror Chi.
+- **Testing Coverage**: Post-removal, ensure gRPC tests cover mTLS fully; add integration tests in contrib for HTTP.
+- **Dependencies**: No checks for import cycles or external deps (e.g., ensure core has no `net/http` imports after removal).
+- **Best Practices Alignment**: Draw from Go community: Favor composable middleware (as in Chi/Gin), keep core interfaces extensible for contrib. Use multi-module setup in monorepo for contrib (as suggested earlier).
 
-**Action:** **REMOVE** - This belongs in application-specific services, not an authentication library.
+### Improved PR Plan
+I've refined the plan: Added a PR for exports and Gin stub; enhanced checks (e.g., `go mod graph` for deps); clarified keepers/removals; added a final verification PR; incorporated best practices (e.g., ensure contrib examples demonstrate zero core bloat). Still assumes .sh ignored; focuses on file-level changes.
 
-### 2. Business Logic Services (Echo Service) ❌
+#### PR0: Scope & Plugin Points (Docs Only)
+- **Changes**:
+  - README.md: Update to "Core = SPIFFE identity + mTLS (gRPC-focused). HTTP support via contrib middleware for Chi/Gin."
+  - Add contrib/README.md: "Extensions for frameworks; consumes core primitives like certs, bundles, and authorizers."
+  - out-of-scope.md: Explicitly list "HTTP middleware implementations" as contrib-only; note plugin points (e.g., exposed interfaces for auth policies).
+- **Accept Criteria**: Docs only; no code changes. Run `git diff --stat` to confirm.
 
-**Files:**
-- `internal/adapters/http/adapter.go` (lines 68-122)
-- `internal/core/ports/service.go` (lines 68-75)
+#### PR1: Remove Framework-Specific Middleware from Core
+- **Goal**: Eliminate framework coupling; core exposes only HTTP + mTLS primitives and identity management.
+- **Changes** (Surgical Edits):
+  - internal/adapters/primary/api/client.go:
+    - Keep `HTTPClient()`, `extractTLSConfig()`, `createSVIDSource()`, `createBundleSource()` as core HTTP primitives
+    - Remove any Chi/Gin-specific middleware or routing code
+    - Keep HTTP client creation, mTLS configuration, identity management
+  - Move framework middleware to contrib/middleware/chi/ and contrib/middleware/gin/
+  - Remove any framework imports from core (chi, gin, etc.)
+- **Follow-ups**: Prune framework references in core tests/files.
+- **Accept Criteria**:
+  ```
+  rg -n '"github.com/go-chi/chi|gin-gonic/gin"' internal pkg # No framework imports in core
+  rg -n 'router\.|middleware\.' internal pkg # No framework-specific patterns in core
+  go test ./... # All pass
+  go mod graph | grep -E "chi|gin" # Ensure no framework deps in core module
+  ```
 
-**Description:**
-- Echo service with `Echo(message)` and `Ping()` methods
-- HTTP endpoints: POST `/echo`, POST `/ping`
-- Example business logic for demonstration
+#### PR2: Export HTTP Primitives for Contrib Middleware
+- **Goal**: Ensure contrib can build HTTP middleware without internal access; core remains thin but extensible.
+- **Changes**:
+  - In pkg/ephemos (public facade): Export necessary HTTP types/interfaces if not already (e.g., `IdentityService` with `GetCertificate()`, `GetTrustBundle()`; `HTTPClient()` with mTLS; `AuthenticationPolicy`; authorizer builders like `func NewAuthorizerFromConfig(cfg) tlsconfig.Authorizer`).
+  - Add pkg/ephemos/authorizer.go: Simple funcs for common HTTP authorizers (e.g., `AuthorizeMemberOf(domain string) tlsconfig.Authorizer` wrapping go-spiffe).
+  - Export HTTP client helpers for contrib frameworks to build middleware.
+- **Accept Criteria**:
+  ```
+  rg -n '\".*internal/' pkg/ephemos # No internal imports in public pkg
+  go doc pkg/ephemos # Verify exported symbols include HTTP client, cert/bundle access
+  ```
 
-**Why out of scope:** Echo services are demo/example functionality. An identity authentication library should not include sample business services.
+#### PR3: Move HTTP Client Guidance to Contrib
+- **Goal**: Guide users on HTTP adoption without core docs pollution.
+- **Changes**:
+  - Move docs/HTTP_CLIENT.md → contrib/docs/HTTP_CLIENT.md.
+  - Add contrib/examples/http_client.go: Minimal example building `http.Client` with core primitives (e.g., fetch cert/bundle, use `tlsconfig.MTLSClientConfig(source, bundle, authorizer)`).
+  - Update contrib/README.md: Link to example; emphasize "Core provides certs/bundles; contrib glues to http.Transport".
+- **Accept Criteria**: No core changes; contrib builds independently (`go build ./contrib/...`).
 
-**Action:** **REMOVE** or move to separate examples repository.
+#### PR4: Remove Non-Auth Interceptors
+- **Goal**: Core interceptors focus on auth/identity only (aligns with zero-trust SPIFFE).
+- **Changes** (If not already clean):
+  - Delete internal/adapters/interceptors/logging.go, logging_test.go, metrics.go, metrics_test.go.
+  - Keep auth.go, identity_propagation.go (gRPC-specific for SPIFFE ID propagation).
+- **Accept Criteria**:
+  ```
+  rg -n 'Logging.*|Metrics.*|AuthMetrics' internal/adapters/interceptors # Only auth/identity files
+  go test ./internal/adapters/interceptors/... # Pass
+  ```
 
-### 3. Generic HTTP REST Framework ❌
+#### PR5: Remove Non-Auth HTTP Scaffolding from Core
+- **Goal**: No HTTP middleware or config in core; frameworks in contrib.
+- **Changes**:
+  - Delete internal/middleware/config.go (assuming it's HTTP-only; verify it's not used for gRPC).
+  - Confirm no Chi/Gin imports in core (already planned).
+- **Accept Criteria**:
+  ```
+  rg -n 'package .*middleware' internal # No matches
+  rg -n '"github.com/go-chi/chi|gin-gonic/gin"' . # No matches outside contrib
+  ```
 
-**Files:**
-- `internal/adapters/http/adapter.go` (entire file)
-- `internal/transport/http_adapter.go` (entire file)
-- `internal/transport/server.go` (entire file)
+#### PR6: Add Gin Middleware Stub in Contrib
+- **Goal**: Symmetry with Chi; prepare for Gin extensions without core changes.
+- **Changes**:
+  - Create contrib/middleware/gin/ (mirror chi/): Add gin.IdentityMiddleware(config) using core cert/bundle/authorizer.
+  - Include basic example/test: e.g., Gin handler with SPIFFE auth.
+- **Accept Criteria**:
+  ```
+  go test ./contrib/middleware/gin/... # Pass
+  # Ensure gin imports only in this subdir
+  ```
 
-**Description:**
-- Generic HTTP service mounting and routing infrastructure
-- Automatic REST endpoint generation from service interfaces
-- Transport-agnostic server framework
+#### PR7: Build and Final Verification
+- **Goal**: Tidy up; confirm core is HTTP-free.
+- **Changes**:
+  - Remove Bazel/Make targets for deleted files.
+  - `go mod tidy` in root and contrib modules.
+  - Add arch test: e.g., internal/arch/no_http_in_core_test.go checking imports.
+- **Accept Criteria**:
+  ```
+  go build ./...
+  go test ./...
+  go vet ./...
+  # Optional: golangci-lint run for style/deadcode
+  ```
 
-**Why out of scope:** While HTTP support is needed for SPIFFE certificate validation, generic service hosting and REST framework capabilities go beyond authentication scope.
+#### What Remains (Core Essentials)
+- **Unchanged**: Domain/ports/services (identity logic); secondary adapters (spiffe, transport/gRPC, config); primary API (gRPC client/server); auth interceptors; factory.
+- **Post-Refactor**: Core is gRPC-first but extensible (e.g., via exported authorizers). Contrib handles HTTP/Chi/Gin, consuming only public APIs—no internals.
 
-**Action:** **SIMPLIFY** - Keep minimal HTTP client support for authentication, remove generic service hosting.
-
-### 4. Generic Service Registry/Discovery ❌
-
-**Files:**
-- `internal/core/ports/service.go` (lines 9-63)
-- `internal/adapters/http/adapter.go` (service mounting logic)
-
-**Description:**
-- `ServiceRegistry` for mapping service types to implementations
-- Generic service descriptor and method introspection
-- Dynamic service registration system
-
-**Why out of scope:** Service discovery is an infrastructure concern separate from identity authentication. An authentication library should validate identities, not manage arbitrary service registration.
-
-**Action:** **REMOVE** - Service discovery should be handled by external systems (Kubernetes, Consul, etc.).
-
-### 5. Generic Health Checking Services ❌
-
-**Files:**
-- `internal/adapters/http/adapter.go` (lines 214-251)
-- `internal/core/ports/service.go` (lines 77-96)
-
-**Description:**
-- `HealthService` interface with `Check(serviceName)` method
-- Health status types (Unknown, Serving, NotServing, ServiceUnknown)
-- HTTP endpoints for arbitrary service health checking
-
-**Why out of scope:** While identity services need health checks, generic health checking for arbitrary services is beyond authentication scope.
-
-**Action:** **REMOVE** generic health service. Keep internal health checks for identity/certificate validation only.
-
-### 6. Demo/Example Business Logic ❌
-
-**Files:**
-- `scripts/demo/` (entire directory)
-- `contrib/middleware/chi/examples/main.go` (payment handlers)
-
-**Description:**
-- Mock payment service handlers and business logic
-- Demo infrastructure with business-specific examples
-- SPIRE installation scripts (these are OK)
-
-**Why out of scope:** Demo infrastructure with mock business services like payment processing is not core authentication functionality.
-
-**Action:** **SIMPLIFY** - Keep SPIRE setup scripts and basic identity examples. Remove business logic examples.
-
-### 7. Generic Transport Framework ❌
-
-**Files:**
-- `internal/transport/server.go` (entire file)
-- `internal/transport/http_adapter.go` (generic mounting)
-
-**Description:**
-- Transport-agnostic server framework
-- Generic service mounting with automatic protocol adaptation
-- Configurable transport types beyond identity needs
-
-**Why out of scope:** Generic transport abstractions go beyond identity authentication needs. The library should provide SPIFFE-authenticated connections, not generic transport frameworks.
-
-**Action:** **SIMPLIFY** - Focus on SPIFFE-specific HTTP client and gRPC connection management only.
-
-### 8. CLI Tools for Non-Identity Purposes ⚠️
-
-**Files:**
-- `cmd/config-validator/main.go` (generic config validation)
-
-**Description:**
-- Generic configuration validation tool
-- Production readiness checking beyond identity scope
-
-**Why partially out of scope:** While SPIFFE service registration CLI is appropriate, generic configuration validation extends beyond authentication.
-
-**Action:** **SIMPLIFY** - Keep identity-specific validation (service names, trust domains, socket paths). Remove generic application configuration support.
-
-## Recommendations
-
-### Remove Entirely:
-1. **FileService** and all file management functionality
-2. **EchoService** and demo business logic  
-3. **Generic service registry** and discovery
-4. **Generic health checking** services
-5. **Generic transport framework** beyond SPIFFE needs
-6. **Business logic examples** (payment handlers, etc.)
-
-### Keep But Simplify:
-1. **HTTP client support** (for SPIFFE certificate authentication)
-2. **Configuration management** (limited to identity settings: service name, trust domain, socket path)
-3. **CLI tools** (limited to SPIFFE service registration and identity validation)
-4. **Contrib middleware examples** (remove business logic, keep identity examples)
-
-### Core Identity Scope to Maintain:
-- ✅ SPIFFE certificate validation and management
-- ✅ mTLS connection establishment with SPIFFE certificates  
-- ✅ Identity context propagation and call chain tracking
-- ✅ Authentication interceptors and middleware (auth, logging, metrics)
-- ✅ Service registration with SPIRE
-- ✅ Trust domain and service name configuration
-- ✅ Identity-based authorization policies
-
-## Impact Assessment
-
-**High Priority Removals (No Dependencies):**
-- FileService (pure business logic)
-- EchoService (demo functionality)
-- Generic health checking
-
-**Medium Priority Simplifications:**
-- HTTP adapter (keep client features, remove server hosting)
-- Service registry (keep identity services only)
-- Transport framework (focus on SPIFFE connections)
-
-**Low Priority (Documentation/Examples):**
-- CLI tools (simplify to identity scope)
-- Demo scripts (keep SPIRE setup, remove business examples)
-
-## Post-Cleanup Benefits
-
-After removing out-of-scope functionality:
-1. **Clearer purpose** - Focus on identity authentication only
-2. **Smaller footprint** - Reduced dependencies and complexity
-3. **Better maintainability** - Single responsibility principle
-4. **Easier adoption** - Clear value proposition for identity authentication
-5. **Security focus** - Concentrate on authentication security rather than generic application features
-
----
-
-**Next Steps:** Prioritize removal of FileService and EchoService as they are purely business logic with no relation to identity authentication.
+#### Why Improved Plan is Safer/Better
+- **Added Exports/PR2**: Ensures contrib viability without hacks; follows "interface-based extension" best practices.
+- **Gin Inclusion**: Balances Chi; common in Go web projects to support multiple routers.
+- **Enhanced Checks**: Dep graphs prevent sneaky imports; arch tests enforce boundaries.
+- **Risk Mitigation**: Verify adapters' reusability before full removal; add contrib tests early.
+- **Alignment**: Matches community patterns—core minimal like stdlib + Chi for services, contrib for frameworks. If breaking changes, semver bump core to v2.

@@ -2,7 +2,9 @@
 
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sufield/ephemos/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sufield/ephemos)
 
-**No more plaintext API keys or secrets between your services.** Ephemos handles service-to-service authentication automatically using certificates that rotate every hour - so you never have to manage, store, or worry about API keys again.
+**Core = SPIFFE identity + mTLS (HTTP-focused). Framework extensions via contrib middleware for Chi/Gin.**
+
+**No more plaintext API keys or secrets between your services.** Ephemos provides a lightweight core for SPIFFE-based service identity and HTTP authentication, with framework-specific extensions available through contrib modules.
 
 ## The Problem with API Keys
 
@@ -59,55 +61,127 @@ func main() {
 - 📋 Managing different keys for each service pair
 - 🚨 Keys can be stolen, logged, or accidentally committed to git
 
-### ✅ After: No API Keys with Ephemos
+### ✅ After: No API Keys with Ephemos (HTTP Core)
 
-**Time Server (no authentication code needed):**
+**Time Server (HTTP with automatic authentication):**
 ```go
-func (s *TimeService) GetTime(ctx context.Context, timezone string) (string, error) {
-    // 🎉 No API key validation - authentication is automatic!
-    // If this function runs, the client is already authenticated
+func timeHandler(w http.ResponseWriter, r *http.Request) {
+    // 🎉 No API key validation - SPIFFE authentication is automatic!
+    // If this function runs, the client is already authenticated via mTLS
+    
+    timezone := r.URL.Query().Get("timezone")
+    if timezone == "" {
+        timezone = "UTC"
+    }
     
     loc, err := time.LoadLocation(timezone)
     if err != nil {
-        return "", err
+        http.Error(w, "Invalid timezone", http.StatusBadRequest)
+        return
     }
     
     currentTime := time.Now().In(loc)
-    return currentTime.Format("2006-01-02 15:04:05 MST"), nil
+    json.NewEncoder(w).Encode(map[string]string{
+        "time": currentTime.Format("2006-01-02 15:04:05 MST"),
+    })
 }
 
 func main() {
-    // Setup happens once - no secrets to manage
-    server, _ := ephemos.NewServer("config/time-server.yaml")
-    ephemos.Mount(server, &TimeService{})
-    server.ListenAndServe() // Authentication handled automatically
+    // Core provides HTTP server with SPIFFE authentication
+    config := &ports.Configuration{
+        Service: ports.ServiceConfig{
+            Name: "time-server",
+            Domain: "prod.company.com",
+        },
+    }
+    
+    server, _ := ephemos.IdentityServer(ctx, 
+        ephemos.WithServerConfig(config), 
+        ephemos.WithAddress(":8080"))
+    
+    // Register your HTTP handlers
+    http.HandleFunc("/time", timeHandler)
+    server.ListenAndServe(ctx) // SPIFFE mTLS handled automatically
 }
 ```
 
-**Time Client (no API keys to manage):**
+**Time Client (HTTP with automatic authentication):**
 ```go
 func main() {
-    // No API keys, no secrets, no environment variables!
-    client, _ := ephemos.NewClient("config/time-client.yaml")
-    
-    // Connect automatically authenticates using certificates
-    conn, err := client.Connect("time-server")
-    if err != nil {
-        log.Fatal("Authentication failed:", err) // But no secrets involved
+    // Core provides HTTP client with SPIFFE authentication
+    config := &ports.Configuration{
+        Service: ports.ServiceConfig{
+            Name: "time-client",
+            Domain: "prod.company.com",
+        },
     }
     
-    timeService := ephemos.NewTimeServiceClient(conn)
-    currentTime, _ := timeService.GetTime(context.Background(), "UTC")
-    fmt.Printf("Current time: %s\n", currentTime)
+    client, _ := ephemos.HTTPClient(ctx, ephemos.WithConfig(config))
+    
+    // Request automatically uses SPIFFE mTLS certificates
+    resp, err := client.Get("https://time-server.prod.company.com:8080/time?timezone=UTC")
+    if err != nil {
+        log.Fatal("SPIFFE authentication failed:", err) // But no secrets involved
+    }
+    
+    var result map[string]string
+    json.NewDecoder(resp.Body).Decode(&result)
+    fmt.Printf("Current time: %s\n", result["time"])
 }
+```
+
+**Framework Middleware via Contrib:**
+For framework integration, use contrib middleware that consumes core primitives:
+```go
+// See contrib/middleware/chi/ or contrib/middleware/gin/
+import "github.com/sufield/ephemos/contrib/middleware/chi"
+
+r := chi.NewRouter()
+r.Use(chimiddleware.IdentityAuthentication(ephemos.IdentitySetting{
+    AllowedServices: []string{"spiffe://prod.company.com/time-client"},
+})) // Uses core cert/bundle/authorizer
+r.Get("/time", timeHandler) // Handler gets authenticated identity document
 ```
 
 **What changed:**
 - ✅ **Zero secrets in code** - no API keys anywhere
 - ✅ **Zero secret management** - no environment variables or secret stores
-- ✅ **Automatic authentication** - happens transparently 
+- ✅ **Automatic authentication** - SPIFFE mTLS happens transparently 
 - ✅ **Automatic rotation** - certificates refresh every hour
 - ✅ **Simple failure mode** - connection either works or doesn't
+- ✅ **HTTP-first architecture** - Core focuses on HTTP + mTLS, gRPC planned for v2.0
+
+## Architecture: Core + Contrib
+
+Ephemos follows a modular architecture:
+
+### 🏗️ **Core** (this repository)
+- **SPIFFE identity management** - X.509 SVID certificates and trust bundles
+- **HTTP over mTLS** - Authenticated HTTP connections using X.509 SVIDs
+- **Core primitives** - Certificate fetching, trust bundle management, TLS configuration
+- **Configuration** - Service identity and trust domain management
+
+**Core provides:** Certificates, trust bundles, authorizers, and HTTP + mTLS primitives.
+
+### 🧩 **Contrib** (extensions for frameworks)  
+- **Framework middleware** - Chi, Gin, and other HTTP framework integrations
+- **Examples and guides** - HTTP client examples using core primitives
+- **Framework adapters** - Consume core certificates/bundles for HTTP authentication
+
+**Contrib consumes:** Core primitives like `IdentityService.GetCertificate()`, `GetTrustBundle()`, and HTTP client builders.
+
+### 📁 **Repository Structure**
+```
+ephemos/                    # Core library
+├── pkg/ephemos/           # Public API (HTTP-focused)
+├── internal/              # Core implementation
+└── contrib/               # Framework extensions
+    ├── middleware/
+    │   ├── chi/          # Chi router middleware  
+    │   └── gin/          # Gin framework middleware
+    ├── examples/         # HTTP client examples
+    └── docs/             # HTTP integration guides
+```
 
 ## Configuration (No Secrets Here Either!)
 
@@ -309,9 +383,16 @@ ephemos register service --name other-service
 
 ## Examples
 
-- [Complete Examples](examples/) - Working client/server code
+### HTTP (Core + Contrib)
+- [Complete HTTP Examples](examples/) - Working client/server code using core
 - [Migration Guide](docs/migration.md) - Step-by-step API key to Ephemos migration
 - [Kubernetes Setup](docs/kubernetes.md) - Deploy without secret management
+
+### Framework Integration (Contrib)
+- [Chi Middleware](contrib/middleware/chi/) - SPIFFE authentication for Chi router
+- [Gin Middleware](contrib/middleware/gin/) - SPIFFE authentication for Gin framework  
+- [HTTP Client Examples](contrib/examples/) - Using core primitives with `net/http`
+- [HTTP Integration Guide](contrib/docs/HTTP_CLIENT.md) - Detailed HTTP setup instructions
 
 ## Requirements
 
