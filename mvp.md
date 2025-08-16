@@ -95,7 +95,7 @@ For the MVP release, we are focusing **exclusively** on:
 - **Familiar patterns**: HTTP middleware is well-understood in Go ecosystem
 
 #### 🚀 **Fastest Time-to-Value**
-- **Drop-in replacement**: Replace `r.Use(auth.APIKeyMiddleware)` with `r.Use(chimiddleware.SPIFFEAuth)`
+- **Drop-in replacement**: Replace `r.Use(auth.APIKeyMiddleware)` with `r.Use(ephemos.IdentityMiddleware)`
 - **Existing infrastructure**: Most teams already have HTTP load balancers, monitoring
 - **No protocol migration**: Teams don't need to migrate from HTTP to gRPC
 
@@ -113,9 +113,9 @@ For the MVP release, we are focusing **exclusively** on:
 
 ```
 ┌─────────────────┐    HTTP/mTLS     ┌─────────────────┐
-│   Chi/Gin App   │ ────────────── │   Chi/Gin App   │
-│                 │   (X.509 SVIDs) │                 │
-│ + SPIFFEAuth    │                  │ + SPIFFEAuth    │
+│   Chi/Gin App   │ ──────────────   │   Chi/Gin App   │
+│                 │   (X.509 SVIDs)  │                 │
+│ + EphemosAuth   │                  │ + EphemosAuth   │
 │   middleware    │                  │   middleware    │
 └─────────────────┘                  └─────────────────┘
          │                                     │
