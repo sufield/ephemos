@@ -1,9 +1,0 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
-
-go_library(
-    name = "http",
-    srcs = ["adapter.go"],
-    importpath = "github.com/sufield/ephemos/internal/adapters/http",
-    visibility = ["//:__subpackages__"],
-    deps = ["//internal/core/ports"],
-)
