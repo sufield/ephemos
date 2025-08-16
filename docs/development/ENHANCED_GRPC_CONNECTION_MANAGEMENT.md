@@ -44,7 +44,7 @@ Configure connection health monitoring:
 KeepaliveParams: keepalive.ClientParameters{
     Time:                10 * time.Second, // Send keepalive ping every 10s
     Timeout:             5 * time.Second,  // Wait 5s for ping response  
-    PermitWithoutStream: true,             // Send pings even without active streams
+    PermitWithoutStream: true,             // Send pings even without active RPCs
 },
 ```
 
@@ -128,7 +128,7 @@ config := transport.HighThroughputConnectionConfig()
 - **Pooling**: Enabled with 10 connections
 - **Optimized for**: High-volume, long-lived connections
 
-**Use Cases:** Data streaming, batch processing, high-volume APIs
+**Use Cases:** High-volume APIs, long-lived connections
 
 ## Connection Pooling
 

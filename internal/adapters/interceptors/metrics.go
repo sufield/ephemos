@@ -78,31 +78,6 @@ func (m *AuthMetricsInterceptor) UnaryServerInterceptor() grpc.UnaryServerInterc
 	}
 }
 
-// StreamServerInterceptor returns a gRPC stream server interceptor for authentication metrics collection.
-func (m *AuthMetricsInterceptor) StreamServerInterceptor() grpc.StreamServerInterceptor {
-	return func(
-		srv interface{},
-		ss grpc.ServerStream,
-		_ *grpc.StreamServerInfo,
-		handler grpc.StreamHandler,
-	) error {
-		ctx := ss.Context()
-
-		// Call the handler
-		err := handler(srv, ss)
-
-		// Track authentication metrics if identity is available
-		if identity, ok := GetIdentityFromContext(ctx); ok {
-			result := defaultResultCode
-			if err != nil {
-				result = failureResultCode
-			}
-			m.config.AuthMetricsCollector.IncAuthenticationTotal(identity.ServiceName, result)
-		}
-
-		return err
-	}
-}
 
 // UnaryClientInterceptor returns a gRPC unary client interceptor for authentication metrics collection.
 func (m *AuthMetricsInterceptor) UnaryClientInterceptor() grpc.UnaryClientInterceptor {
@@ -130,31 +105,6 @@ func (m *AuthMetricsInterceptor) UnaryClientInterceptor() grpc.UnaryClientInterc
 	}
 }
 
-// StreamClientInterceptor returns a gRPC stream client interceptor for authentication metrics collection.
-func (m *AuthMetricsInterceptor) StreamClientInterceptor() grpc.StreamClientInterceptor {
-	return func(
-		ctx context.Context,
-		desc *grpc.StreamDesc,
-		cc *grpc.ClientConn,
-		method string,
-		streamer grpc.Streamer,
-		opts ...grpc.CallOption,
-	) (grpc.ClientStream, error) {
-		// Call the method
-		stream, err := streamer(ctx, desc, cc, method, opts...)
-
-		// Track authentication metrics if identity is available
-		if identity, ok := GetIdentityFromContext(ctx); ok {
-			result := defaultResultCode
-			if err != nil {
-				result = failureResultCode
-			}
-			m.config.AuthMetricsCollector.IncAuthenticationTotal(identity.ServiceName, result)
-		}
-
-		return stream, err
-	}
-}
 
 // DefaultAuthMetricsConfig returns a default authentication metrics configuration.
 func DefaultAuthMetricsConfig(serviceName string) *AuthMetricsConfig {

@@ -541,27 +541,6 @@ func TestAuthorizationPolicies_Direct(t *testing.T) {
 	}
 }
 
-func TestStreamInterceptorCreation_Direct(t *testing.T) {
-	// Test that all stream interceptors can be created
-	authConfig := DefaultAuthConfig()
-	authInterceptor := NewAuthInterceptor(authConfig)
-
-	identityProvider := &mockIdentityProvider{}
-	identityConfig := DefaultIdentityPropagationConfig(identityProvider)
-	identityInterceptor := NewIdentityPropagationInterceptor(identityConfig)
-
-	metricsConfig := DefaultAuthMetricsConfig("test")
-	metricsInterceptor := NewAuthMetricsInterceptor(metricsConfig)
-
-	loggingConfig := NewSecureLoggingConfig()
-	loggingInterceptor := NewLoggingInterceptor(loggingConfig)
-
-	// Verify all stream interceptors exist
-	assert.NotNil(t, authInterceptor.StreamServerInterceptor())
-	assert.NotNil(t, identityInterceptor.StreamClientInterceptor())
-	assert.NotNil(t, metricsInterceptor.StreamServerInterceptor())
-	assert.NotNil(t, loggingInterceptor.StreamServerInterceptor())
-}
 
 func TestErrorCodesMapping_Direct(t *testing.T) {
 	tests := []struct {

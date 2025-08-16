@@ -177,7 +177,7 @@ func (a *Adapter) setupDownloadHandler(basePath string, service ports.FileServic
 
 		w.Header().Set("Content-Type", "application/octet-stream")
 		if _, err := io.Copy(w, reader); err != nil {
-			http.Error(w, "Failed to stream file", http.StatusInternalServerError)
+			http.Error(w, "Failed to transfer file", http.StatusInternalServerError)
 		}
 	})
 }

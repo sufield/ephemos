@@ -110,49 +110,6 @@ func (a *AuthInterceptor) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	}
 }
 
-// StreamServerInterceptor returns a gRPC stream server interceptor for authentication.
-func (a *AuthInterceptor) StreamServerInterceptor() grpc.StreamServerInterceptor {
-	return func(
-		srv interface{},
-		ss grpc.ServerStream,
-		info *grpc.StreamServerInfo,
-		handler grpc.StreamHandler,
-	) error {
-		// Check if method should skip authentication
-		if a.shouldSkipMethod(info.FullMethod) {
-			a.logger.Debug("Skipping authentication for stream method", "method", info.FullMethod)
-			return handler(srv, ss)
-		}
-
-		// Perform authentication
-		authenticatedCtx, err := a.authenticateRequest(ss.Context(), info.FullMethod)
-		if err != nil {
-			a.logger.Warn("Stream authentication failed",
-				"method", info.FullMethod,
-				"error", err)
-			return err
-		}
-
-		// Wrap the server stream with authenticated context
-		wrappedStream := &authenticatedServerStream{
-			ServerStream: ss,
-			ctx:          authenticatedCtx,
-		}
-
-		return handler(srv, wrappedStream)
-	}
-}
-
-// authenticatedServerStream wraps a grpc.ServerStream with an authenticated context.
-type authenticatedServerStream struct {
-	grpc.ServerStream
-	ctx context.Context //nolint:containedctx // Required for gRPC ServerStream interface
-}
-
-// Context returns the authenticated context.
-func (s *authenticatedServerStream) Context() context.Context {
-	return s.ctx
-}
 
 // authenticateRequest performs the actual authentication logic.
 func (a *AuthInterceptor) authenticateRequest(ctx context.Context, method string) (context.Context, error) {

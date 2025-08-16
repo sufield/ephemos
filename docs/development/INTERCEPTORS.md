@@ -99,7 +99,6 @@ Collects observability metrics for monitoring and alerting.
 **Features:**
 - Request rate, latency, and error metrics
 - Active request tracking
-- Stream message counting
 - Payload size observation
 - Custom metrics backend integration
 
@@ -179,8 +178,7 @@ config := &ephemos.InterceptorConfig{
 
 // Apply to server (done automatically with RegisterService)
 // Note: Advanced configuration is handled through ephemos public API methods
-serverInterceptors, streamInterceptors := ephemos.CreateServerInterceptors(
-    config, identityProvider)
+serverInterceptors := ephemos.CreateServerInterceptors(config, identityProvider)
 ```
 
 ## Configuration Options
@@ -666,7 +664,7 @@ config := ephemos.NewProductionInterceptorConfig("high-perf-service")
 config.LoggingConfig.LogPayloads = false           // Reduce logging overhead
 config.MetricsConfig.EnablePayloadSize = false     // Skip payload size calculation
 config.LoggingConfig.ExcludeMethods = []string{     // Skip high-volume endpoints
-    "/api.v1.HighVolume/StreamData",
+    "/api.v1.HighVolume/BulkData",
 }
 ```
 
