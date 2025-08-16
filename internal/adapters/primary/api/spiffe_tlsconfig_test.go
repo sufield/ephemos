@@ -1,11 +1,11 @@
 package api
 
 import (
-	"crypto"
+	"crypto/ed25519"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"errors"
 	"math/big"
 	"net/url"
 	"testing"
@@ -19,7 +19,9 @@ import (
 	"github.com/sufield/ephemos/internal/core/domain"
 )
 
-// MockIdentityService is a mock implementation for testing
+var errMock = errors.New("mock")
+
+// MockIdentityService is a mock implementation for testing (decoupled from testify)
 type MockIdentityService struct {
 	cert        *domain.Certificate
 	trustBundle *domain.TrustBundle
@@ -28,238 +30,219 @@ type MockIdentityService struct {
 
 func (m *MockIdentityService) GetCertificate() (*domain.Certificate, error) {
 	if m.shouldError {
-		return nil, assert.AnError
+		return nil, errMock
 	}
 	return m.cert, nil
 }
 
 func (m *MockIdentityService) GetTrustBundle() (*domain.TrustBundle, error) {
 	if m.shouldError {
-		return nil, assert.AnError
+		return nil, errMock
 	}
 	return m.trustBundle, nil
 }
 
-// createTestCertificate creates a test X.509 certificate with SPIFFE URI SAN for testing
-func createTestCertificate() (*x509.Certificate, crypto.Signer, error) {
-	// Generate a private key
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+// createTestCertificate builds a self-signed leaf with ed25519 for fast, deterministic tests.
+// If spiffeID == "", the cert has no SPIFFE URI SAN.
+func createTestCertificate(t *testing.T, spiffeID string) (*x509.Certificate, ed25519.PrivateKey) {
+	t.Helper()
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		return nil, nil, err
+		t.Fatalf("keygen: %v", err)
 	}
 
-	// Create SPIFFE URI for the certificate
-	spiffeURI, err := url.Parse("spiffe://example.org/test-service")
+	var uris []*url.URL
+	if spiffeID != "" {
+		u, err := url.Parse(spiffeID)
+		if err != nil {
+			t.Fatalf("parse spiffe: %v", err)
+		}
+		uris = []*url.URL{u}
+	}
+
+	tpl := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{Organization: []string{"Test"}},
+		NotBefore:             time.Now().Add(-time.Minute),
+		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		URIs:                  uris,
+		BasicConstraintsValid: true,
+		IsCA:                  false,
+	}
+
+	der, err := x509.CreateCertificate(rand.Reader, tpl, tpl, pub, priv)
 	if err != nil {
-		return nil, nil, err
+		t.Fatalf("create cert: %v", err)
 	}
-
-	// Create certificate template with SPIFFE URI SAN
-	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			Organization:  []string{"Test Org"},
-			Country:       []string{"US"},
-			Province:      []string{""},
-			Locality:      []string{"Test City"},
-			StreetAddress: []string{""},
-			PostalCode:    []string{""},
-		},
-		NotBefore:    time.Now(),
-		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
-		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		IPAddresses:  nil,
-		URIs:         []*url.URL{spiffeURI}, // Add SPIFFE URI SAN
-	}
-
-	// Create certificate
-	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	cert, err := x509.ParseCertificate(der)
 	if err != nil {
-		return nil, nil, err
+		t.Fatalf("parse cert: %v", err)
 	}
 
-	cert, err := x509.ParseCertificate(certDER)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return cert, privateKey, nil
+	return cert, priv
 }
 
 func TestClientConnection_CreateSVIDSource(t *testing.T) {
+	t.Parallel()
+
 	t.Run("successful SVID source creation", func(t *testing.T) {
-		// Create test certificate and private key
-		testCert, privateKey, err := createTestCertificate()
+		t.Parallel()
+		cert, key := createTestCertificate(t, "spiffe://example.org/test-service")
+		domainCert := &domain.Certificate{Cert: cert, PrivateKey: key}
+
+		mockID := &MockIdentityService{cert: domainCert}
+		cc := &ClientConnection{identityService: mockID}
+
+		svidSrc, err := cc.createSVIDSource()
 		require.NoError(t, err)
+		require.NotNil(t, svidSrc)
 
-		// Create test domain certificate
-		domainCert := &domain.Certificate{
-			Cert:       testCert,
-			PrivateKey: privateKey,
-			Chain:      []*x509.Certificate{},
-		}
-
-		// Create mock identity service
-		mockIdentityService := &MockIdentityService{
-			cert:        domainCert,
-			shouldError: false,
-		}
-
-		// Create client connection with mock identity service
-		clientConn := &ClientConnection{
-			identityService: mockIdentityService,
-		}
-
-		// Test SVID source creation
-		svidSource, err := clientConn.createSVIDSource()
-		
-		// Verify successful creation
-		assert.NoError(t, err)
-		assert.NotNil(t, svidSource)
-
-		// Test getting SVID from source
-		svid, err := svidSource.GetX509SVID()
-		assert.NoError(t, err)
-		assert.NotNil(t, svid)
+		svid, err := svidSrc.GetX509SVID()
+		require.NoError(t, err)
 		assert.Equal(t, "spiffe://example.org/test-service", svid.ID.String())
-		assert.Equal(t, testCert, svid.Certificates[0])
-		assert.Equal(t, privateKey, svid.PrivateKey)
+		assert.Same(t, cert, svid.Certificates[0])
+		assert.Equal(t, key, svid.PrivateKey)
 	})
 
-	t.Run("handles missing identity service", func(t *testing.T) {
-		clientConn := &ClientConnection{
-			identityService: nil,
-		}
-
-		svidSource, err := clientConn.createSVIDSource()
-		
-		assert.Error(t, err)
-		assert.Nil(t, svidSource)
-		assert.Contains(t, err.Error(), "no identity service available")
+	t.Run("no identity service", func(t *testing.T) {
+		t.Parallel()
+		cc := &ClientConnection{identityService: nil}
+		svidSrc, err := cc.createSVIDSource()
+		require.Error(t, err)
+		require.Nil(t, svidSrc)
+		assert.Contains(t, err.Error(), "no identity service")
 	})
 
-	t.Run("handles certificate retrieval error", func(t *testing.T) {
-		mockIdentityService := &MockIdentityService{
-			shouldError: true,
-		}
-
-		clientConn := &ClientConnection{
-			identityService: mockIdentityService,
-		}
-
-		svidSource, err := clientConn.createSVIDSource()
+	t.Run("certificate retrieval error", func(t *testing.T) {
+		t.Parallel()
+		cc := &ClientConnection{identityService: &MockIdentityService{shouldError: true}}
+		svidSrc, err := cc.createSVIDSource()
 		require.NoError(t, err)
 
-		_, err = svidSource.GetX509SVID()
-		assert.Error(t, err)
+		_, err = svidSrc.GetX509SVID()
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get certificate")
+	})
+
+	t.Run("missing SPIFFE URI SAN", func(t *testing.T) {
+		t.Parallel()
+		cert, key := createTestCertificate(t, "") // no spiffe SAN
+		cc := &ClientConnection{
+			identityService: &MockIdentityService{cert: &domain.Certificate{Cert: cert, PrivateKey: key}},
+		}
+		svidSrc, err := cc.createSVIDSource()
+		require.NoError(t, err)
+
+		_, err = svidSrc.GetX509SVID()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no valid SPIFFE ID")
+	})
+
+	t.Run("private key not a crypto.Signer", func(t *testing.T) {
+		t.Parallel()
+		// This test case is not practically testable due to Go's type system.
+		// The domain.Certificate.PrivateKey field is typed as crypto.Signer,
+		// so it's impossible to put a non-crypto.Signer value there without unsafe operations.
+		// The code path exists for defensive programming but can't be reached in normal operation.
+		t.Skip("Cannot create invalid domain.Certificate due to type constraints - code path exists for defensive programming")
 	})
 }
 
 func TestClientConnection_CreateBundleSource(t *testing.T) {
-	t.Run("successful bundle source creation", func(t *testing.T) {
-		testCert, _, err := createTestCertificate()
+	t.Parallel()
+
+	t.Run("successful bundle source", func(t *testing.T) {
+		t.Parallel()
+		cert, _ := createTestCertificate(t, "spiffe://example.org/test-service")
+		tb := &domain.TrustBundle{Certificates: []*x509.Certificate{cert}}
+		cc := &ClientConnection{identityService: &MockIdentityService{trustBundle: tb}}
+
+		src, err := cc.createBundleSource()
 		require.NoError(t, err)
+		require.NotNil(t, src)
 
-		trustBundle := &domain.TrustBundle{
-			Certificates: []*x509.Certificate{testCert},
-		}
-
-		mockIdentityService := &MockIdentityService{
-			trustBundle: trustBundle,
-			shouldError: false,
-		}
-
-		clientConn := &ClientConnection{
-			identityService: mockIdentityService,
-		}
-
-		bundleSource, err := clientConn.createBundleSource()
-		
-		assert.NoError(t, err)
-		assert.NotNil(t, bundleSource)
-
-		// Test getting bundle from source
-		trustDomain := mustParseTrustDomain("example.org")
-		bundle, err := bundleSource.GetX509BundleForTrustDomain(trustDomain)
-		assert.NoError(t, err)
-		assert.NotNil(t, bundle)
-		assert.Equal(t, trustDomain, bundle.TrustDomain())
+		td := mustParseTrustDomain("example.org")
+		b, err := src.GetX509BundleForTrustDomain(td)
+		require.NoError(t, err)
+		require.NotNil(t, b)
+		assert.Equal(t, td, b.TrustDomain())
 	})
 
-	t.Run("handles empty trust bundle", func(t *testing.T) {
-		trustBundle := &domain.TrustBundle{
-			Certificates: []*x509.Certificate{},
+	t.Run("empty trust bundle", func(t *testing.T) {
+		t.Parallel()
+		cc := &ClientConnection{
+			identityService: &MockIdentityService{trustBundle: &domain.TrustBundle{}},
 		}
-
-		mockIdentityService := &MockIdentityService{
-			trustBundle: trustBundle,
-			shouldError: false,
-		}
-
-		clientConn := &ClientConnection{
-			identityService: mockIdentityService,
-		}
-
-		bundleSource, err := clientConn.createBundleSource()
+		src, err := cc.createBundleSource()
 		require.NoError(t, err)
 
-		trustDomain := mustParseTrustDomain("example.org")
-		_, err = bundleSource.GetX509BundleForTrustDomain(trustDomain)
-		assert.Error(t, err)
+		_, err = src.GetX509BundleForTrustDomain(mustParseTrustDomain("example.org"))
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "trust bundle is empty")
+	})
+
+	t.Run("trust bundle retrieval error", func(t *testing.T) {
+		t.Parallel()
+		cc := &ClientConnection{identityService: &MockIdentityService{shouldError: true}}
+		src, err := cc.createBundleSource()
+		require.NoError(t, err)
+
+		_, err = src.GetX509BundleForTrustDomain(mustParseTrustDomain("example.org"))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get trust bundle")
 	})
 }
 
-func TestClientConnection_SPIFFEAdapters(t *testing.T) {
-	t.Run("SVID and bundle sources work together", func(t *testing.T) {
-		// Create test certificate and private key
-		testCert, privateKey, err := createTestCertificate()
+func TestClientConnection_SPIFFEAdapters_Together(t *testing.T) {
+	t.Parallel()
+	cert, key := createTestCertificate(t, "spiffe://example.org/test-service")
+	tb := &domain.TrustBundle{Certificates: []*x509.Certificate{cert}}
+	cc := &ClientConnection{
+		identityService: &MockIdentityService{
+			cert:        &domain.Certificate{Cert: cert, PrivateKey: key},
+			trustBundle: tb,
+		},
+	}
+	svidSrc, err := cc.createSVIDSource()
+	require.NoError(t, err)
+	bundleSrc, err := cc.createBundleSource()
+	require.NoError(t, err)
+
+	svid, err := svidSrc.GetX509SVID()
+	require.NoError(t, err)
+	assert.Equal(t, "spiffe://example.org/test-service", svid.ID.String())
+
+	b, err := bundleSrc.GetX509BundleForTrustDomain(mustParseTrustDomain("example.org"))
+	require.NoError(t, err)
+	require.NotNil(t, b)
+}
+
+func TestClientConnection_CreateBundleSourceForTrustDomain(t *testing.T) {
+	t.Parallel()
+
+	t.Run("enforces trust domain isolation", func(t *testing.T) {
+		t.Parallel()
+		cert, _ := createTestCertificate(t, "spiffe://example.org/test-service")
+		tb := &domain.TrustBundle{Certificates: []*x509.Certificate{cert}}
+		cc := &ClientConnection{identityService: &MockIdentityService{trustBundle: tb}}
+
+		restrictedTD := mustParseTrustDomain("example.org")
+		src, err := cc.createBundleSourceForTrustDomain(restrictedTD)
 		require.NoError(t, err)
 
-		// Create test domain certificate
-		domainCert := &domain.Certificate{
-			Cert:       testCert,
-			PrivateKey: privateKey,
-			Chain:      []*x509.Certificate{},
-		}
+		// Should work for the allowed trust domain
+		b, err := src.GetX509BundleForTrustDomain(restrictedTD)
+		require.NoError(t, err)
+		assert.Equal(t, restrictedTD, b.TrustDomain())
 
-		// Create test trust bundle
-		trustBundle := &domain.TrustBundle{
-			Certificates: []*x509.Certificate{testCert},
-		}
-
-		// Create mock identity service
-		mockIdentityService := &MockIdentityService{
-			cert:        domainCert,
-			trustBundle: trustBundle,
-			shouldError: false,
-		}
-
-		// Create client connection with mock identity service
-		clientConn := &ClientConnection{
-			identityService: mockIdentityService,
-		}
-
-		// Test that both adapters can be created successfully
-		svidSource, err := clientConn.createSVIDSource()
-		assert.NoError(t, err)
-		assert.NotNil(t, svidSource)
-
-		bundleSource, err := clientConn.createBundleSource()
-		assert.NoError(t, err)
-		assert.NotNil(t, bundleSource)
-
-		// Verify they work together - get SVID and validate against bundle
-		svid, err := svidSource.GetX509SVID()
-		assert.NoError(t, err)
-		assert.Equal(t, "spiffe://example.org/test-service", svid.ID.String())
-
-		trustDomain := mustParseTrustDomain("example.org")
-		bundle, err := bundleSource.GetX509BundleForTrustDomain(trustDomain)
-		assert.NoError(t, err)
-		assert.NotNil(t, bundle)
+		// Should reject a different trust domain
+		differentTD := mustParseTrustDomain("other.org")
+		_, err = src.GetX509BundleForTrustDomain(differentTD)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "trust domain other.org not allowed")
+		assert.Contains(t, err.Error(), "restricted to example.org")
 	})
 }
 
