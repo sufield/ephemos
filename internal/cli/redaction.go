@@ -2,7 +2,6 @@ package cli
 
 import (
 	"regexp"
-	"strings"
 )
 
 // redactSensitiveInfo removes or masks sensitive information from error messages and output

@@ -8,7 +8,6 @@ go_library(
         "redaction.go",
         "register.go",
         "root.go",
-        "version.go",
     ],
     importpath = "github.com/sufield/ephemos/internal/cli",
     visibility = ["//:__subpackages__"],

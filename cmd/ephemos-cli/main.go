@@ -78,7 +78,10 @@ func main() {
 		redactedError := cli.RedactError(err)
 		code := classifyExitCode(err)
 		
-		fmt.Fprintf(os.Stderr, "Error: %s\n", redactedError)
+		// Cobra already prints usage errors, so only print for non-usage errors
+		if code != exitUsage {
+			fmt.Fprintf(os.Stderr, "Error: %s\n", redactedError)
+		}
 		os.Exit(code)
 	}
 }
