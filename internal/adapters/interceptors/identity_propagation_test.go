@@ -188,8 +188,8 @@ func TestIdentityPropagationInterceptor_PropagateOriginalCaller(t *testing.T) {
 		}
 
 		// Should set original caller to current service
-		if values := md.Get(MetadataKeyOriginalCaller); len(values) == 0 || values[0] != provider.identity.URI {
-			t.Errorf("Expected original caller '%s', got: %v", provider.identity.URI, values)
+		if values := md.Get(MetadataKeyOriginalCaller); len(values) == 0 || values[0] != provider.identity.URI() {
+			t.Errorf("Expected original caller '%s', got: %v", provider.identity.URI(), values)
 		}
 	})
 

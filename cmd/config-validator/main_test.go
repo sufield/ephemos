@@ -253,7 +253,7 @@ func TestLoadConfiguration(t *testing.T) {
 			printer := NewPrinter(&out, &err, false, false)
 			ctx := context.Background()
 
-			cfg, loadErr := loadConfiguration(ctx, printer, tt.configFile, tt.envOnly)
+			cfg, loadErr := loadConfigurationCobra(ctx, printer, tt.configFile, tt.envOnly)
 
 			if tt.expectErr {
 				if loadErr == nil {

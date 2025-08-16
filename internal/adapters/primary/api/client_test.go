@@ -13,11 +13,7 @@ import (
 type mockIdentityProvider struct{}
 
 func (m *mockIdentityProvider) GetServiceIdentity() (*domain.ServiceIdentity, error) {
-	return &domain.ServiceIdentity{
-		Name:   "test-service",
-		Domain: "test.local",
-		URI:    "spiffe://test.local/test-service",
-	}, nil
+	return domain.NewServiceIdentity("test-service", "test.local"), nil
 }
 
 func (m *mockIdentityProvider) GetCertificate() (*domain.Certificate, error) {

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -40,7 +41,7 @@ func (m *MockIdentityService) GetTrustBundle() (*domain.TrustBundle, error) {
 }
 
 // createTestCertificate creates a test X.509 certificate with SPIFFE URI SAN for testing
-func createTestCertificate() (*x509.Certificate, interface{}, error) {
+func createTestCertificate() (*x509.Certificate, crypto.Signer, error) {
 	// Generate a private key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {

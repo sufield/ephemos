@@ -1,8 +1,10 @@
 package transport
 
 import (
+	"crypto"
 	"crypto/tls"
 	"crypto/x509"
+	"io"
 	"net/url"
 	"testing"
 
@@ -12,6 +14,17 @@ import (
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
+
+// mockSigner implements crypto.Signer for testing
+type mockSigner struct{}
+
+func (m *mockSigner) Public() crypto.PublicKey {
+	return nil
+}
+
+func (m *mockSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
+	return []byte("mock-signature"), nil
+}
 
 func TestSPIFFECertificateValidation(t *testing.T) {
 	provider := NewGRPCProvider(&ports.Configuration{})
@@ -102,9 +115,12 @@ func TestTLSConfigCreation(t *testing.T) {
 		caCert := &x509.Certificate{Raw: []byte("ca-cert")}
 		clientCert := &x509.Certificate{Raw: []byte("client-cert")}
 
+		// Create a mock private key
+		mockKey := &mockSigner{}
+
 		cert := &domain.Certificate{
 			Cert:       clientCert,
-			PrivateKey: "test-private-key",
+			PrivateKey: mockKey,
 			Chain:      []*x509.Certificate{},
 		}
 		bundle := &domain.TrustBundle{

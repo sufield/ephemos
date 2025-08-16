@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "factory",
+    srcs = ["spiffe.go"],
+    importpath = "github.com/sufield/ephemos/internal/factory",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/adapters/primary/api",
+        "//internal/adapters/secondary/config",
+        "//internal/adapters/secondary/spiffe",
+        "//internal/core/ports",
+    ],
+)
+
+go_test(
+    name = "factory_test",
+    srcs = ["spiffe_test.go"],
+    embed = [":factory"],
+    deps = [
+        "//internal/core/ports",
+    ],
+)
