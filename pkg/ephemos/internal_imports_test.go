@@ -329,7 +329,7 @@ func compileTestCode(t *testing.T, code string) error {
 	// Create a temporary module
 	modContent := fmt.Sprintf(`module testmod
 
-go 1.22
+go 1.23
 
 require github.com/sufield/ephemos v0.0.0
 
