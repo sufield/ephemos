@@ -275,7 +275,7 @@ func NewCertificateWithValidation(cert *x509.Certificate, key crypto.Signer, cha
 	}
 
 	if validate {
-		if err := c.ValidateBasic(); err != nil {
+		if err := c.Validate(CertValidationOptions{}); err != nil {
 			return nil, fmt.Errorf("certificate validation failed: %w", err)
 		}
 	}
@@ -359,11 +359,6 @@ func (c *Certificate) Validate(opts CertValidationOptions) error {
 	return nil
 }
 
-// ValidateBasic performs basic certificate validation without options.
-// Retained for backward compatibility - new code should use Validate().
-func (c *Certificate) ValidateBasic() error {
-	return c.Validate(CertValidationOptions{})
-}
 
 // validateChainOrder checks that the certificate chain is properly ordered
 // and cryptographically valid with full signature verification.

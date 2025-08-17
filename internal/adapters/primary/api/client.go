@@ -115,6 +115,8 @@ func IdentityClient(
 		identityProvider,
 		transportProvider,
 		cfg,
+		nil, // default validator
+		nil, // no-op metrics
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity service: %w", err)
