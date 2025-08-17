@@ -1,3 +1,5 @@
+version: "2"
+
 run:
   timeout: 5m
   issues-exit-code: 1
@@ -36,12 +38,7 @@ linters-settings:
       - "^func Test"
       - "^func Benchmark"
       
-  gofmt:
-    simplify: true
-    
-  goimports:
-    local-prefixes: github.com/sufield/ephemos
-    
+  
   mnd:
     checks:
       - argument
@@ -124,11 +121,7 @@ linters-settings:
   staticcheck:
     checks: ["all"]
     
-  stylecheck:
-    checks: ["all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022"]
-    dot-import-whitelist:
-      - fmt
-      
+  
   tagliatelle:
     case:
       rules:
@@ -150,15 +143,13 @@ linters-settings:
     multi-func: false
 
 linters:
-  disable-all: true
+  default: none
   enable:
     # enabled by default
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
-    - typecheck
     - unused
     # disabled by default
     - asciicheck
@@ -183,10 +174,7 @@ linters:
     - gocyclo
     - godot
     - godox
-    - gofmt
-    - gofumpt
     - goheader
-    - goimports
     - mnd
     - gomoddirectives
     - gomodguard
@@ -213,7 +201,6 @@ linters:
     - revive
     - rowserrcheck
     - sqlclosecheck
-    - stylecheck
     - tagliatelle
     - testableexamples
     - thelper
@@ -225,6 +212,17 @@ linters:
     - wastedassign
     - whitespace
     - wrapcheck
+
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+    - goimports
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes: github.com/sufield/ephemos
 
 issues:
   exclude-files:
@@ -270,13 +268,3 @@ issues:
   max-same-issues: 3
   new: false
 
-severity:
-  default-severity: error
-  case-sensitive: false
-  rules:
-    - linters:
-        - dupl
-      severity: info
-    - linters:
-        - gocritic
-      severity: info
