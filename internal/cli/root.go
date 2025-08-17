@@ -60,4 +60,5 @@ func init() { //nolint:gochecknoinits // Cobra requires init for command setup
 
 	// Add subcommands
 	rootCmd.AddCommand(registerCmd)
+	rootCmd.AddCommand(healthCmd)
 }
