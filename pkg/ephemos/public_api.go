@@ -271,6 +271,10 @@ func (c *clientWrapper) Connect(ctx context.Context, target string, opts ...Dial
 		return nil, ErrServerClosed
 	}
 
+	if c.dialer == nil {
+		return nil, ErrNoAuth
+	}
+
 	// Apply dial options
 	dialOpts := &dialOpts{
 		Timeout: c.timeout,
@@ -306,7 +310,10 @@ func (c *clientWrapper) Close() error {
 	}
 
 	c.closed = true
-	return c.dialer.Close()
+	if c.dialer != nil {
+		return c.dialer.Close()
+	}
+	return nil
 }
 
 // serverWrapper adapts an AuthenticatedServer to the public Server interface
@@ -332,6 +339,10 @@ func (s *serverWrapper) ListenAndServe(ctx context.Context) error {
 	timeout := s.timeout
 	impl := s.impl
 	s.mu.RUnlock()
+
+	if impl == nil {
+		return fmt.Errorf("%w: server implementation is nil", ErrConfigInvalid)
+	}
 
 	// Create listener if not provided
 	if listener == nil {
@@ -363,7 +374,10 @@ func (s *serverWrapper) Close() error {
 	}
 
 	s.closed = true
-	return s.impl.Close()
+	if s.impl != nil {
+		return s.impl.Close()
+	}
+	return nil
 }
 
 func (s *serverWrapper) Addr() net.Addr {
@@ -379,6 +393,10 @@ func (s *serverWrapper) Addr() net.Addr {
 
 // loadClientConfig loads configuration from client options
 func loadClientConfig(opts *clientOpts) (*ports.Configuration, error) {
+	if opts == nil {
+		return nil, fmt.Errorf("nil client options")
+	}
+
 	if opts.Config != nil {
 		return opts.Config, nil
 	}
@@ -393,6 +411,10 @@ func loadClientConfig(opts *clientOpts) (*ports.Configuration, error) {
 
 // loadServerConfig loads configuration from server options
 func loadServerConfig(opts *serverOpts) (*ports.Configuration, error) {
+	if opts == nil {
+		return nil, fmt.Errorf("nil server options")
+	}
+
 	if opts.Config != nil {
 		return opts.Config, nil
 	}

@@ -22,7 +22,9 @@ type clientOpts struct {
 // This is the preferred method for production use as it avoids file I/O.
 func WithConfig(config *ports.Configuration) ClientOption {
 	return func(opts *clientOpts) {
-		opts.Config = config
+		if config != nil {
+			opts.Config = config
+		}
 	}
 }
 
@@ -30,7 +32,9 @@ func WithConfig(config *ports.Configuration) ClientOption {
 // This allows for loading configuration from non-standard sources.
 func WithConfigLoader(loader ConfigLoader) ClientOption {
 	return func(opts *clientOpts) {
-		opts.Loader = loader
+		if loader != nil {
+			opts.Loader = loader
+		}
 	}
 }
 
@@ -38,7 +42,9 @@ func WithConfigLoader(loader ConfigLoader) ClientOption {
 // This is primarily used for testing with mock implementations.
 func WithDialer(dialer ports.Dialer) ClientOption {
 	return func(opts *clientOpts) {
-		opts.Impl = dialer
+		if dialer != nil {
+			opts.Impl = dialer
+		}
 	}
 }
 
@@ -67,7 +73,9 @@ type serverOpts struct {
 // This is the preferred method for production use as it avoids file I/O.
 func WithServerConfig(config *ports.Configuration) ServerOption {
 	return func(opts *serverOpts) {
-		opts.Config = config
+		if config != nil {
+			opts.Config = config
+		}
 	}
 }
 
@@ -75,7 +83,9 @@ func WithServerConfig(config *ports.Configuration) ServerOption {
 // This allows for loading configuration from non-standard sources.
 func WithServerConfigLoader(loader ConfigLoader) ServerOption {
 	return func(opts *serverOpts) {
-		opts.Loader = loader
+		if loader != nil {
+			opts.Loader = loader
+		}
 	}
 }
 
@@ -83,7 +93,9 @@ func WithServerConfigLoader(loader ConfigLoader) ServerOption {
 // This is useful for tests and when you need precise control over the listening socket.
 func WithListener(listener net.Listener) ServerOption {
 	return func(opts *serverOpts) {
-		opts.Listener = listener
+		if listener != nil {
+			opts.Listener = listener
+		}
 	}
 }
 
@@ -100,7 +112,9 @@ func WithAddress(address string) ServerOption {
 // This is primarily used for testing with mock implementations.
 func WithServerImpl(impl ports.AuthenticatedServer) ServerOption {
 	return func(opts *serverOpts) {
-		opts.Impl = impl
+		if impl != nil {
+			opts.Impl = impl
+		}
 	}
 }
 
@@ -127,4 +141,3 @@ func WithDialTimeout(timeout time.Duration) DialOption {
 		opts.Timeout = timeout
 	}
 }
-

@@ -26,13 +26,19 @@ func (c *configAdapter) IsProductionReady() error {
 // NewConfiguration creates a public Configuration from internal configuration.
 // This is a bridge function for internal use.
 func NewConfiguration(internal *ports.Configuration) Configuration {
+	if internal == nil {
+		return nil
+	}
 	return &configAdapter{internal: internal}
 }
 
 // GetInternalConfig extracts the internal configuration for factory use.
 // This is a bridge function for internal use.
 func GetInternalConfig(config Configuration) (*ports.Configuration, error) {
-	if adapter, ok := config.(*configAdapter); ok {
+	if config == nil {
+		return nil, ErrConfigInvalid
+	}
+	if adapter, ok := config.(*configAdapter); ok && adapter.internal != nil {
 		return adapter.internal, nil
 	}
 	return nil, ErrConfigInvalid
