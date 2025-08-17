@@ -257,9 +257,7 @@ func outputVerificationResultText(result *ports.IdentityVerificationResult, quie
 		if result.SerialNumber != "" {
 			fmt.Printf("Serial Number: %s\n", result.SerialNumber)
 		}
-		if len(result.KeyUsage) > 0 {
-			fmt.Printf("Key Usage: %v\n", result.KeyUsage)
-		}
+		// Key usage details available via 'ephemos inspect svid' command
 	}
 
 	return nil
