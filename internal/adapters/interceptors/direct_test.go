@@ -2,6 +2,7 @@ package interceptors
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"strings"
@@ -20,7 +21,7 @@ import (
 
 // Direct testing of pure functions without mocks
 
-func TestParseSpiffeIDComprehensive(t *testing.T) {
+func TestExtractIdentityFromCertificateComprehensive(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -52,53 +53,35 @@ func TestParseSpiffeIDComprehensive(t *testing.T) {
 			},
 		},
 		{
-			name:        "uppercase_scheme_rejected",
-			spiffeID:    "SPIFFE://example.org/service",
-			expectError: true,
-		},
-		{
-			name:     "trailing_slash_behavior",
-			spiffeID: "spiffe://example.org/",
+			name:     "uppercase_scheme_normalized",
+			spiffeID: "SPIFFE://example.org/service",
 			expected: &AuthenticatedIdentity{
-				SPIFFEID:     "spiffe://example.org/",
+				SPIFFEID:     "spiffe://example.org/service", // go-spiffe/v2 normalizes to lowercase
 				TrustDomain:  "example.org",
-				ServiceName:  "",
-				WorkloadPath: "/",
+				ServiceName:  "service",
+				WorkloadPath: "/service",
 				Claims:       make(map[string]string),
 			},
 		},
 		{
-			name:     "query_parameter_behavior",
-			spiffeID: "spiffe://example.org/service?param=value",
-			expected: &AuthenticatedIdentity{
-				SPIFFEID:     "spiffe://example.org/service?param=value",
-				TrustDomain:  "example.org",
-				ServiceName:  "service?param=value", // Current implementation includes full path
-				WorkloadPath: "/service?param=value",
-				Claims:       make(map[string]string),
-			},
+			name:        "trailing_slash_behavior",
+			spiffeID:    "spiffe://example.org/",
+			expectError: true, // go-spiffe/v2 correctly rejects trailing slashes
 		},
 		{
-			name:     "fragment_behavior",
-			spiffeID: "spiffe://example.org/service#fragment",
-			expected: &AuthenticatedIdentity{
-				SPIFFEID:     "spiffe://example.org/service#fragment",
-				TrustDomain:  "example.org",
-				ServiceName:  "service#fragment", // Current implementation includes full path
-				WorkloadPath: "/service#fragment",
-				Claims:       make(map[string]string),
-			},
+			name:        "query_parameter_behavior", 
+			spiffeID:    "spiffe://example.org/service?param=value",
+			expectError: true, // go-spiffe/v2 correctly rejects query parameters
 		},
 		{
-			name:     "percent_encoded_path_segments",
-			spiffeID: "spiffe://example.org/workload/test%2Dservice",
-			expected: &AuthenticatedIdentity{
-				SPIFFEID:     "spiffe://example.org/workload/test%2Dservice",
-				TrustDomain:  "example.org",
-				ServiceName:  "test%2Dservice", // Not decoded by current implementation
-				WorkloadPath: "/workload/test%2Dservice",
-				Claims:       make(map[string]string),
-			},
+			name:        "fragment_behavior",
+			spiffeID:    "spiffe://example.org/service#fragment",
+			expectError: true, // go-spiffe/v2 correctly rejects fragments
+		},
+		{
+			name:        "percent_encoded_path_segments",
+			spiffeID:    "spiffe://example.org/workload/test%2Dservice", 
+			expectError: true, // go-spiffe/v2 correctly rejects invalid characters
 		},
 		{
 			name:     "nested_path",
@@ -138,7 +121,15 @@ func TestParseSpiffeIDComprehensive(t *testing.T) {
 			t.Parallel()
 
 			interceptor := NewAuthInterceptor(DefaultAuthConfig())
-			result, err := interceptor.parseSpiffeID(tt.spiffeID)
+			
+			var cert *x509.Certificate
+			if tt.spiffeID == "" {
+				cert = createTestCertWithoutSPIFFE(t)
+			} else {
+				cert = createTestSPIFFECert(t, tt.spiffeID)
+			}
+			
+			result, err := interceptor.extractIdentityFromCertificate(cert)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -886,3 +877,4 @@ func TestIdentityContextKeys_Direct(t *testing.T) {
 	assert.False(t, ok)
 	assert.Nil(t, retrieved)
 }
+

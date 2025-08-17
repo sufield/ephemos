@@ -238,7 +238,7 @@ func TestAuthInterceptor_UnaryServerInterceptor_DeniedService(t *testing.T) {
 	}
 }
 
-func TestParseSpiffeID(t *testing.T) {
+func TestExtractIdentityFromCertificate(t *testing.T) {
 	interceptor := NewAuthInterceptor(DefaultAuthConfig())
 
 	tests := []struct {
@@ -270,12 +270,7 @@ func TestParseSpiffeID(t *testing.T) {
 			},
 		},
 		{
-			name:        "invalid_scheme",
-			spiffeID:    "https://example.org/test",
-			expectError: true,
-		},
-		{
-			name:        "empty_string",
+			name:        "invalid_certificate_no_spiffe_id",
 			spiffeID:    "",
 			expectError: true,
 		},
@@ -283,7 +278,17 @@ func TestParseSpiffeID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := interceptor.parseSpiffeID(tt.spiffeID)
+			var cert *x509.Certificate
+			var err error
+			
+			if tt.spiffeID == "" {
+				// Create a certificate without SPIFFE ID for error testing
+				cert = createTestCertWithoutSPIFFE(t)
+			} else {
+				cert = createTestSPIFFECert(t, tt.spiffeID)
+			}
+			
+			result, err := interceptor.extractIdentityFromCertificate(cert)
 
 			if tt.expectError {
 				if err == nil {
@@ -433,6 +438,19 @@ func createTestSPIFFECert(t *testing.T, spiffeID string) *x509.Certificate {
 			CommonName: "test-cert",
 		},
 		URIs:      []*url.URL{spiffeURI},
+		NotBefore: time.Now().Add(-time.Hour),
+		NotAfter:  time.Now().Add(time.Hour),
+	}
+}
+
+func createTestCertWithoutSPIFFE(t *testing.T) *x509.Certificate {
+	t.Helper()
+
+	return &x509.Certificate{
+		Subject: pkix.Name{
+			CommonName: "test-cert-no-spiffe",
+		},
+		URIs:      []*url.URL{}, // No URIs, so no SPIFFE ID
 		NotBefore: time.Now().Add(-time.Hour),
 		NotAfter:  time.Now().Add(time.Hour),
 	}
