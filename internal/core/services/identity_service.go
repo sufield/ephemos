@@ -87,6 +87,7 @@ type IdentityService struct {
 	config            *ports.Configuration
 	cachedIdentity    *domain.ServiceIdentity
 	validator         ports.CertValidatorPort // Certificate validator
+	metrics           MetricsReporter         // Metrics reporter (Prometheus or NoOp)
 	
 	// Certificate caching for rotation support
 	cachedCert       *domain.Certificate
@@ -124,6 +125,20 @@ func NewIdentityServiceWithValidator(
 	config *ports.Configuration,
 	validator ports.CertValidatorPort,
 ) (*IdentityService, error) {
+	return NewIdentityServiceWithOptions(identityProvider, transportProvider, config, validator, nil)
+}
+
+// NewIdentityServiceWithOptions creates a new IdentityService with full customization.
+// If validator is nil, uses the default certificate validator.
+// If metrics is nil, uses NoOp metrics reporter.
+// Returns an error if the configuration is invalid.
+func NewIdentityServiceWithOptions(
+	identityProvider ports.IdentityProvider,
+	transportProvider ports.TransportProvider,
+	config *ports.Configuration,
+	validator ports.CertValidatorPort,
+	metrics MetricsReporter,
+) (*IdentityService, error) {
 	if config == nil {
 		return nil, &errors.ValidationError{
 			Field:   "config",
@@ -146,6 +161,11 @@ func NewIdentityServiceWithValidator(
 	if validator == nil {
 		validator = &domain.DefaultCertValidator{}
 	}
+	
+	// Use NoOp metrics if none provided
+	if metrics == nil {
+		metrics = &NoOpMetrics{}
+	}
 
 	// Determine cache TTL from configuration or use default
 	cacheTTL := 30 * time.Minute // Default: 30 minutes (half of typical 1-hour SPIFFE cert lifetime)
@@ -159,6 +179,7 @@ func NewIdentityServiceWithValidator(
 		config:            config,
 		cachedIdentity:    identity,
 		validator:         validator,
+		metrics:           metrics,
 		cacheTTL:          cacheTTL,
 	}, nil
 }
@@ -287,6 +308,7 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 			} else {
 				// Certificate is valid and not expiring soon - cache hit
 				atomic.AddInt64(&s.certCacheHits, 1)
+				s.metrics.RecordCacheHit("certificate")
 				return s.cachedCert, nil
 			}
 		} else {
@@ -297,9 +319,30 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 	
 	// Cache miss - fetch fresh certificate from provider with retry logic for transient failures
 	atomic.AddInt64(&s.certCacheMisses, 1)
+	s.metrics.RecordCacheMiss("certificate")
+	
+	// Track refresh duration
+	refreshStart := time.Now()
 	cert, err := s.fetchCertificateWithRetry()
 	if err != nil {
 		return nil, fmt.Errorf("identity provider failed for service %s: %w", s.cachedIdentity.Name(), err)
+	}
+	refreshDuration := time.Since(refreshStart).Seconds()
+	
+	// Determine refresh reason
+	refreshReason := "cache_miss"
+	if s.cachedCert == nil {
+		refreshReason = "initial"
+	} else if time.Now().After(s.cachedCert.Cert.NotAfter) {
+		refreshReason = "expired"
+	} else if time.Now().Add(10*time.Minute).After(s.cachedCert.Cert.NotAfter) {
+		refreshReason = "proactive"
+	}
+	s.metrics.RecordRefresh(refreshReason, refreshDuration)
+	
+	// Update certificate expiry metric
+	if cert != nil && cert.Cert != nil {
+		s.metrics.UpdateCertExpiry(s.cachedIdentity.Name(), float64(cert.Cert.NotAfter.Unix()))
 	}
 	
 	// Cache the new certificate
@@ -551,6 +594,7 @@ func (s *IdentityService) fetchCertificateWithRetry() (*domain.Certificate, erro
 		}
 		
 		lastErr = err
+		s.metrics.RecordRetry("certificate", attempt+1)
 		
 		// Log retry attempts with structured logging
 		if attempt < maxRetries-1 {
