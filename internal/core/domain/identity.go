@@ -42,7 +42,7 @@ func NewServiceIdentity(name, domain string) *ServiceIdentity {
 	// Parse trust domain to ensure it's valid
 	trustDomain, err := spiffeid.TrustDomainFromString(domain)
 	if err != nil {
-		// Fallback to simple construction for backward compatibility
+		// Fallback to simple construction
 		return &ServiceIdentity{
 			name:   name,
 			domain: domain,
@@ -53,7 +53,7 @@ func NewServiceIdentity(name, domain string) *ServiceIdentity {
 	// Use official SPIFFE ID construction
 	spiffeID, err := spiffeid.FromPath(trustDomain, "/"+name)
 	if err != nil {
-		// Fallback to simple construction for backward compatibility
+		// Fallback to simple construction
 		return &ServiceIdentity{
 			name:   name,
 			domain: domain,
@@ -645,7 +645,7 @@ func (tb *TrustBundle) ContainsCertificate(cert *x509.Certificate) bool {
 }
 
 // CreateCertPool creates a new x509.CertPool from the trust bundle certificates.
-// Unlike a deprecated static ToCertPool, this creates a fresh pool each time
+// This creates a fresh pool each time
 // to support dynamic reloading scenarios where trust bundles change.
 func (tb *TrustBundle) CreateCertPool() *x509.CertPool {
 	pool := x509.NewCertPool()

@@ -30,7 +30,7 @@ func getVersionString() string {
 		info.Version, info.CommitHash, info.BuildTime, info.BuildUser, info.BuildHost, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 }
 
-// Execute runs the CLI without context (for backward compatibility).
+// Execute runs the CLI.
 func Execute() error {
 	return ExecuteContext(context.Background())
 }

@@ -377,7 +377,7 @@ func TestIdentityPropagationInterceptor_PropagateCustomHeaders(t *testing.T) {
 }
 
 func TestNewIdentityPropagationServerInterceptor(t *testing.T) {
-	interceptor := NewIdentityPropagationServerInterceptor(slog.Default())
+	interceptor := NewIdentityPropagationServerInterceptor(slog.Default(), nil)
 
 	if interceptor == nil {
 		t.Fatal("NewIdentityPropagationServerInterceptor returned nil")
@@ -388,7 +388,7 @@ func TestNewIdentityPropagationServerInterceptor(t *testing.T) {
 }
 
 func TestNewIdentityPropagationServerInterceptor_WithNilLogger(t *testing.T) {
-	interceptor := NewIdentityPropagationServerInterceptor(nil)
+	interceptor := NewIdentityPropagationServerInterceptor(nil, nil)
 
 	if interceptor.logger == nil {
 		t.Error("Logger should be set to default when nil provided")
@@ -449,7 +449,7 @@ func TestIdentityPropagationServerInterceptor_UnaryServerInterceptor(t *testing.
 // Helper function to run individual server interceptor test (reduces main function complexity).
 func runServerInterceptorTest(t *testing.T, tt *serverInterceptorTestCase) {
 	t.Helper()
-	interceptor := NewIdentityPropagationServerInterceptor(slog.Default())
+	interceptor := NewIdentityPropagationServerInterceptor(slog.Default(), nil)
 
 	var enrichedContext context.Context
 	handler := func(ctx context.Context, _ interface{}) (interface{}, error) {
@@ -482,70 +482,39 @@ func runServerInterceptorTest(t *testing.T, tt *serverInterceptorTestCase) {
 	validatePropagatedMetadata(enrichedContext, t, tt)
 }
 
-// contextValidationRule defines a validation rule for context values.
-type contextValidationRule struct {
-	name        string
-	expectedVal string
-	getterFunc  func(context.Context) (string, bool)
-}
 
-// Helper function to validate propagated metadata (reduces complexity).
+// Helper function to validate propagated metadata using unified API.
 func validatePropagatedMetadata(ctx context.Context, t *testing.T, expected *serverInterceptorTestCase) {
 	t.Helper()
 
-	// Define validation rules to reduce cyclomatic complexity
-	rules := []contextValidationRule{
-		{
-			name:        "original caller",
-			expectedVal: expected.expectedOriginalCaller,
-			getterFunc:  GetOriginalCaller,
-		},
-		{
-			name:        "call chain",
-			expectedVal: expected.expectedCallChain,
-			getterFunc:  GetCallChain,
-		},
-		{
-			name:        "request ID",
-			expectedVal: expected.expectedRequestID,
-			getterFunc:  GetRequestID,
-		},
-		{
-			name:        "caller service",
-			expectedVal: expected.expectedCallerService,
-			getterFunc:  GetCallerService,
-		},
-		{
-			name:        "trust domain",
-			expectedVal: expected.expectedTrustDomain,
-			getterFunc:  GetCallerTrustDomain,
-		},
-	}
-
-	// Validate each rule
-	for _, rule := range rules {
-		validateContextRule(ctx, t, rule)
-	}
-}
-
-// Helper function to validate individual context rule (reduces complexity).
-func validateContextRule(ctx context.Context, t *testing.T, rule contextValidationRule) {
-	t.Helper()
-
-	// Skip validation if no expected value
-	if rule.expectedVal == "" {
+	identity, ok := GetPropagatedIdentity(ctx)
+	if !ok {
+		t.Error("Expected propagated identity to be present")
 		return
 	}
 
-	actualVal, ok := rule.getterFunc(ctx)
-	if !ok || actualVal != rule.expectedVal {
-		t.Errorf("Expected %s '%s', got: %s (ok: %v)", rule.name, rule.expectedVal, actualVal, ok)
+	// Validate each field
+	if identity.OriginalCaller != expected.expectedOriginalCaller {
+		t.Errorf("Original caller: got %q, want %q", identity.OriginalCaller, expected.expectedOriginalCaller)
+	}
+	if identity.CallChain != expected.expectedCallChain {
+		t.Errorf("Call chain: got %q, want %q", identity.CallChain, expected.expectedCallChain)
+	}
+	if identity.RequestID != expected.expectedRequestID {
+		t.Errorf("Request ID: got %q, want %q", identity.RequestID, expected.expectedRequestID)
+	}
+	if identity.CallerService != expected.expectedCallerService {
+		t.Errorf("Caller service: got %q, want %q", identity.CallerService, expected.expectedCallerService)
+	}
+	if identity.CallerTrustDomain != expected.expectedTrustDomain {
+		t.Errorf("Trust domain: got %q, want %q", identity.CallerTrustDomain, expected.expectedTrustDomain)
 	}
 }
 
+
 func TestGenerateRequestID(t *testing.T) {
-	id1 := generateRequestID()
-	id2 := generateRequestID()
+	id1 := defaultIDGen()
+	id2 := defaultIDGen()
 
 	if id1 == "" {
 		t.Error("Expected non-empty request ID")
@@ -576,16 +545,6 @@ func TestGetOrGenerateRequestID(t *testing.T) {
 
 		if requestID != "existing-req-id" {
 			t.Errorf("Expected 'existing-req-id', got: %s", requestID)
-		}
-	})
-
-	t.Run("from_context_value", func(t *testing.T) {
-		ctx := context.WithValue(t.Context(), RequestIDContextKey{}, "context-req-id")
-
-		requestID := interceptor.getOrGenerateRequestID(ctx)
-
-		if requestID != "context-req-id" {
-			t.Errorf("Expected 'context-req-id', got: %s", requestID)
 		}
 	})
 
@@ -628,148 +587,83 @@ func TestDefaultIdentityPropagationConfig(t *testing.T) {
 }
 
 func TestContextHelperFunctions(t *testing.T) {
-	type contextTestCase struct {
-		name      string
-		setupCtx  func(ctx context.Context) context.Context
-		expectVal string
-		expectOK  bool
-	}
-
-	testGroups := []struct {
-		helperName string
-		cases      []contextTestCase
-		testFunc   func(ctx context.Context) (string, bool)
-	}{
-		{
-			helperName: "GetOriginalCaller",
-			testFunc:   GetOriginalCaller,
-			cases: []contextTestCase{
-				{
-					name: "present",
-					setupCtx: func(ctx context.Context) context.Context {
-						return context.WithValue(ctx, originalCallerKey, "test-caller")
-					},
-					expectVal: "test-caller",
-					expectOK:  true,
-				},
-				{
-					name:      "absent",
-					setupCtx:  func(ctx context.Context) context.Context { return ctx },
-					expectVal: "",
-					expectOK:  false,
-				},
-			},
-		},
-		{
-			helperName: "GetCallChain",
-			testFunc:   GetCallChain,
-			cases: []contextTestCase{
-				{
-					name: "present",
-					setupCtx: func(ctx context.Context) context.Context {
-						return context.WithValue(ctx, callChainKey, "service1 -> service2")
-					},
-					expectVal: "service1 -> service2",
-					expectOK:  true,
-				},
-				{
-					name:      "absent",
-					setupCtx:  func(ctx context.Context) context.Context { return ctx },
-					expectVal: "",
-					expectOK:  false,
-				},
-			},
-		},
-		{
-			helperName: "GetCallerService",
-			testFunc:   GetCallerService,
-			cases: []contextTestCase{
-				{
-					name: "present",
-					setupCtx: func(ctx context.Context) context.Context {
-						return context.WithValue(ctx, callerServiceKey, "caller-service")
-					},
-					expectVal: "caller-service",
-					expectOK:  true,
-				},
-				{
-					name:      "absent",
-					setupCtx:  func(ctx context.Context) context.Context { return ctx },
-					expectVal: "",
-					expectOK:  false,
-				},
-			},
-		},
-		{
-			helperName: "GetCallerTrustDomain",
-			testFunc:   GetCallerTrustDomain,
-			cases: []contextTestCase{
-				{
-					name: "present",
-					setupCtx: func(ctx context.Context) context.Context {
-						return context.WithValue(ctx, callerTrustDomainKey, testTrustDomain)
-					},
-					expectVal: testTrustDomain,
-					expectOK:  true,
-				},
-				{
-					name:      "absent",
-					setupCtx:  func(ctx context.Context) context.Context { return ctx },
-					expectVal: "",
-					expectOK:  false,
-				},
-			},
-		},
-		{
-			helperName: "GetRequestID",
-			testFunc:   GetRequestID,
-			cases: []contextTestCase{
-				{
-					name:      "present",
-					setupCtx:  func(ctx context.Context) context.Context { return context.WithValue(ctx, requestIDKey, "req-123") },
-					expectVal: "req-123",
-					expectOK:  true,
-				},
-				{
-					name:      "absent",
-					setupCtx:  func(ctx context.Context) context.Context { return ctx },
-					expectVal: "",
-					expectOK:  false,
-				},
-			},
-		},
-	}
-
-	for _, group := range testGroups {
-		t.Run(group.helperName, func(t *testing.T) {
-			for _, tc := range group.cases {
-				t.Run(tc.name, func(t *testing.T) {
-					runContextHelperTest(t, tc, group.testFunc)
-				})
+	// Test the unified GetPropagatedIdentity function
+	t.Run("GetPropagatedIdentity", func(t *testing.T) {
+		t.Run("complete_identity_present", func(t *testing.T) {
+			expectedIdentity := &PropagatedIdentity{
+				OriginalCaller:    "test-caller",
+				CallChain:         "service1 -> service2",
+				CallerTrustDomain: testTrustDomain,
+				CallerService:     "caller-service",
+				RequestID:         "test-req-123",
+				Timestamp:         1640995200000,
+			}
+			ctx := context.WithValue(context.Background(), propagatedIdentityKey, expectedIdentity)
+			
+			actualIdentity, ok := GetPropagatedIdentity(ctx)
+			
+			if !ok {
+				t.Fatal("Expected identity to be present")
+			}
+			
+			if actualIdentity.OriginalCaller != expectedIdentity.OriginalCaller {
+				t.Errorf("OriginalCaller = %q, want %q", actualIdentity.OriginalCaller, expectedIdentity.OriginalCaller)
+			}
+			if actualIdentity.CallChain != expectedIdentity.CallChain {
+				t.Errorf("CallChain = %q, want %q", actualIdentity.CallChain, expectedIdentity.CallChain)
+			}
+			if actualIdentity.CallerService != expectedIdentity.CallerService {
+				t.Errorf("CallerService = %q, want %q", actualIdentity.CallerService, expectedIdentity.CallerService)
+			}
+			if actualIdentity.CallerTrustDomain != expectedIdentity.CallerTrustDomain {
+				t.Errorf("CallerTrustDomain = %q, want %q", actualIdentity.CallerTrustDomain, expectedIdentity.CallerTrustDomain)
+			}
+			if actualIdentity.RequestID != expectedIdentity.RequestID {
+				t.Errorf("RequestID = %q, want %q", actualIdentity.RequestID, expectedIdentity.RequestID)
+			}
+			if actualIdentity.Timestamp != expectedIdentity.Timestamp {
+				t.Errorf("Timestamp = %d, want %d", actualIdentity.Timestamp, expectedIdentity.Timestamp)
 			}
 		})
-	}
+		
+		t.Run("identity_absent", func(t *testing.T) {
+			ctx := context.Background()
+			
+			_, ok := GetPropagatedIdentity(ctx)
+			
+			if ok {
+				t.Error("Expected identity to be absent")
+			}
+		})
+		
+		t.Run("partial_identity", func(t *testing.T) {
+			expectedIdentity := &PropagatedIdentity{
+				RequestID: "partial-req-456",
+				CallerService: "partial-service",
+				// Other fields intentionally empty
+			}
+			ctx := context.WithValue(context.Background(), propagatedIdentityKey, expectedIdentity)
+			
+			actualIdentity, ok := GetPropagatedIdentity(ctx)
+			
+			if !ok {
+				t.Fatal("Expected identity to be present")
+			}
+			
+			if actualIdentity.RequestID != expectedIdentity.RequestID {
+				t.Errorf("RequestID = %q, want %q", actualIdentity.RequestID, expectedIdentity.RequestID)
+			}
+			if actualIdentity.CallerService != expectedIdentity.CallerService {
+				t.Errorf("CallerService = %q, want %q", actualIdentity.CallerService, expectedIdentity.CallerService)
+			}
+			// Verify empty fields are actually empty
+			if actualIdentity.OriginalCaller != "" {
+				t.Errorf("OriginalCaller should be empty, got %q", actualIdentity.OriginalCaller)
+			}
+			if actualIdentity.CallChain != "" {
+				t.Errorf("CallChain should be empty, got %q", actualIdentity.CallChain)
+			}
+		})
+	})
 }
 
-// Helper function to run individual context helper test (reduces main function complexity).
-func runContextHelperTest(t *testing.T, tc struct {
-	name      string
-	setupCtx  func(ctx context.Context) context.Context
-	expectVal string
-	expectOK  bool
-}, testFunc func(ctx context.Context) (string, bool),
-) {
-	t.Helper()
-
-	ctx := tc.setupCtx(t.Context())
-	actualVal, actualOK := testFunc(ctx)
-
-	if actualOK != tc.expectOK {
-		t.Errorf("Expected ok=%v, got ok=%v", tc.expectOK, actualOK)
-		return
-	}
-
-	if actualVal != tc.expectVal {
-		t.Errorf("Expected value='%s', got value='%s'", tc.expectVal, actualVal)
-	}
-}
