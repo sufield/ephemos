@@ -50,6 +50,12 @@ test-*
 /config-validator
 /transport-agnostic
 
+# Example binaries (should never be committed)
+/examples/*/identity_verification
+/examples/*/health_monitoring
+examples/identity_verification/identity_verification
+examples/health_monitoring/health_monitoring
+
 # All ELF executables (Linux binaries)
 **/*.elf
 
