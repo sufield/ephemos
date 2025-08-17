@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	metricsadapter "github.com/sufield/ephemos/internal/adapters/metrics"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/sufield/ephemos/internal/core/services"
@@ -26,7 +27,7 @@ func TestIdentityService_CacheMetrics_EdgeCases(t *testing.T) {
 	mockTransport := &MockTransportProvider{}
 
 	// Create service with Prometheus metrics for testing
-	metrics := services.NewPrometheusMetrics()
+	metrics := metricsadapter.NewPrometheusMetrics()
 	service, err := services.NewIdentityService(mockProvider, mockTransport, config, nil, metrics)
 	if err != nil {
 		t.Fatalf("Failed to create IdentityService: %v", err)
@@ -37,7 +38,7 @@ func TestIdentityService_CacheMetrics_EdgeCases(t *testing.T) {
 		if service == nil {
 			t.Error("Service should not be nil")
 		}
-		// Metrics are now tracked through Prometheus - integration would require 
+		// Metrics are now tracked through Prometheus - integration would require
 		// Prometheus client testing which is beyond the scope of unit tests
 	})
 
@@ -197,7 +198,7 @@ func TestIdentityService_ThreadSafety_EdgeCases(t *testing.T) {
 		for i := 0; i < numGoroutines; i++ {
 			go func() {
 				defer wg.Done()
-				
+
 				// Attempt to create server identity concurrently
 				_, err := service.CreateServerIdentity()
 				if err != nil {
@@ -225,7 +226,7 @@ func TestIdentityService_ThreadSafety_EdgeCases(t *testing.T) {
 
 		select {
 		case <-done:
-			t.Logf("Concurrent operations completed: %d successes, %d errors", 
+			t.Logf("Concurrent operations completed: %d successes, %d errors",
 				atomic.LoadInt64(&successCount), atomic.LoadInt64(&errorCount))
 			// At least some operations should complete without hanging
 		case <-time.After(15 * time.Second):
@@ -258,7 +259,7 @@ func TestIdentityService_ProactiveRefresh_EdgeCases(t *testing.T) {
 	t.Run("negative refresh threshold", func(t *testing.T) {
 		config := &ports.Configuration{
 			Service: ports.ServiceConfig{
-				Name:   "test-service", 
+				Name:   "test-service",
 				Domain: "example.com",
 				Cache: &ports.CacheConfig{
 					TTLMinutes:              10,

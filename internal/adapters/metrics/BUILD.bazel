@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "metrics",
+    srcs = ["prometheus_metrics.go"],
+    importpath = "github.com/sufield/ephemos/internal/adapters/metrics",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/core/services",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_golang//prometheus/promauto",
+    ],
+)
