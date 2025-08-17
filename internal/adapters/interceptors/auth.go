@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -162,75 +163,33 @@ func (a *AuthInterceptor) authenticateRequest(ctx context.Context, method string
 	return authenticatedCtx, nil
 }
 
-// extractIdentityFromCertificate extracts SPIFFE identity from an X.509 certificate.
+// extractIdentityFromCertificate extracts SPIFFE identity from an X.509 certificate using go-spiffe/v2.
 func (a *AuthInterceptor) extractIdentityFromCertificate(cert *x509.Certificate) (*AuthenticatedIdentity, error) {
-	// Look for SPIFFE ID in Subject Alternative Names (URI SAN)
-	var spiffeID string
-	for _, uri := range cert.URIs {
-		if uri.Scheme == "spiffe" {
-			spiffeID = uri.String()
-			break
-		}
-	}
-
-	if spiffeID == "" {
-		return nil, fmt.Errorf("no SPIFFE ID found in certificate")
-	}
-
-	// Parse SPIFFE ID components
-	identity, err := a.parseSpiffeID(spiffeID)
+	// Extract and parse SPIFFE ID using go-spiffe/v2 library
+	id, err := x509svid.IDFromCert(cert)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse SPIFFE ID %s: %w", spiffeID, err)
+		return nil, fmt.Errorf("failed to extract SPIFFE ID: %w", err)
 	}
 
-	// Set certificate and authentication time
-	identity.Certificate = cert
-	identity.AuthTime = cert.NotBefore.Unix()
-
-	return identity, nil
-}
-
-// parseSpiffeID parses a SPIFFE ID into its components.
-func (a *AuthInterceptor) parseSpiffeID(spiffeID string) (*AuthenticatedIdentity, error) {
-	// SPIFFE ID format: spiffe://trust-domain/path/to/workload
-	if !strings.HasPrefix(spiffeID, "spiffe://") {
-		return nil, fmt.Errorf("invalid SPIFFE ID format: %s", spiffeID)
-	}
-
-	// Remove spiffe:// prefix
-	idPath := strings.TrimPrefix(spiffeID, "spiffe://")
-
-	// Split trust domain and path
-	parts := strings.SplitN(idPath, "/", 2)
-	if len(parts) < 1 {
-		return nil, fmt.Errorf("invalid SPIFFE ID structure: %s", spiffeID)
-	}
-
-	trustDomain := parts[0]
-	if trustDomain == "" {
-		return nil, fmt.Errorf("empty trust domain in SPIFFE ID: %s", spiffeID)
-	}
-
-	var workloadPath, serviceName string
-
-	if len(parts) > 1 {
-		workloadPath = "/" + parts[1]
-
-		// Extract service name from path (last component)
-		pathParts := strings.Split(parts[1], "/")
-		if len(pathParts) > 0 {
-			serviceName = pathParts[len(pathParts)-1]
-		}
+	// Extract service name from path (last path component)
+	path := id.Path()
+	pathParts := strings.Split(strings.TrimPrefix(path, "/"), "/")
+	serviceName := ""
+	if len(pathParts) > 0 && pathParts[0] != "" {
+		serviceName = pathParts[len(pathParts)-1]
 	}
 
 	return &AuthenticatedIdentity{
-		SPIFFEID:     spiffeID,
-		TrustDomain:  trustDomain,
+		SPIFFEID:     id.String(),
+		Certificate:  cert,
+		TrustDomain:  id.TrustDomain().Name(),
 		ServiceName:  serviceName,
-		WorkloadPath: workloadPath,
-		Claims:       make(map[string]string),
+		WorkloadPath: path,
+		Claims:       make(map[string]string), // Populate if needed from cert extensions
+		AuthTime:     cert.NotBefore.Unix(),
 	}, nil
 }
+
 
 // authorizeIdentity performs authorization checks on the authenticated identity.
 func (a *AuthInterceptor) authorizeIdentity(identity *AuthenticatedIdentity, _ string) error {
