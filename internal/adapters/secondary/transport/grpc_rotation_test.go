@@ -264,7 +264,7 @@ func TestSourceAdapter(t *testing.T) {
 	svid, err := adapter.GetX509SVID()
 	require.NoError(t, err)
 	assert.NotNil(t, svid)
-	assert.Equal(t, "spiffe://test.example.org/service", svid.ID.String())
+	assert.Equal(t, "spiffe://test.example.org/test-service", svid.ID.String())
 
 	// Test bundle source
 	td, err := spiffeid.TrustDomainFromString("test.example.org")

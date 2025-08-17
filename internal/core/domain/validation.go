@@ -2,6 +2,7 @@
 package domain
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -217,11 +218,12 @@ func (ve *ValidationError) Error() string {
 
 // ConvertValidationErrors converts go-playground validation errors to our custom format.
 func ConvertValidationErrors(err error) []ValidationError {
-	var errors []ValidationError
+	var result []ValidationError
 
-	if validationErrors, ok := err.(validator.ValidationErrors); ok {
+	var validationErrors validator.ValidationErrors
+	if errors.As(err, &validationErrors) {
 		for _, validationErr := range validationErrors {
-			errors = append(errors, ValidationError{
+			result = append(result, ValidationError{
 				Field:   validationErr.Field(),
 				Tag:     validationErr.Tag(),
 				Value:   validationErr.Value(),
@@ -230,7 +232,7 @@ func ConvertValidationErrors(err error) []ValidationError {
 		}
 	}
 
-	return errors
+	return result
 }
 
 // getCustomErrorMessage provides human-readable error messages for validation failures.
