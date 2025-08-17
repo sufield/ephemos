@@ -4,10 +4,10 @@ package ports
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
 	"strings"
 
+	"github.com/go-viper/mapstructure/v2"
+	"github.com/spf13/viper"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/errors"
 )
@@ -169,90 +169,103 @@ const (
 // LoadFromEnvironment creates a configuration from environment variables.
 // This is the most secure way to configure Ephemos in production.
 func LoadFromEnvironment() (*Configuration, error) {
-	config := &Configuration{}
-
+	v := viper.New()
+	
+	// Configure viper for environment variables
+	v.SetEnvPrefix("EPHEMOS")
+	v.AutomaticEnv()
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	
+	// Set defaults
+	v.SetDefault("service.domain", "default.local")
+	v.SetDefault("agent.socketpath", "/run/sockets/agent.sock")
+	v.SetDefault("service.cache.ttl_minutes", 30)
+	v.SetDefault("service.cache.proactive_refresh_minutes", 10)
+	
 	// Required: Service Name
-	serviceName := os.Getenv(EnvServiceName)
-	if serviceName == "" {
+	if !v.IsSet("service_name") {
 		return nil, &errors.ValidationError{
 			Field:   EnvServiceName,
 			Value:   "",
 			Message: "service name is required via environment variable",
 		}
 	}
-
-	// Optional: Trust Domain
-	trustDomain := os.Getenv(EnvTrustDomain)
-	if trustDomain == "" {
-		trustDomain = "default.local" // Secure default, not example.org
+	
+	// Unmarshal configuration
+	var config Configuration
+	if err := v.Unmarshal(&config, viper.DecodeHook(
+		mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToTimeDurationHookFunc(),
+			mapstructure.StringToSliceHookFunc(","),
+		),
+	)); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal configuration: %w", err)
 	}
-
-	config.Service = ServiceConfig{
-		Name:   serviceName,
-		Domain: trustDomain,
+	
+	// Manual mapping for specific fields due to naming conventions
+	config.Service.Name = v.GetString("service_name")
+	config.Service.Domain = v.GetString("trust_domain")
+	if config.Service.Domain == "" {
+		config.Service.Domain = v.GetString("service.domain")
 	}
-
-	// Cache Configuration
-	if cacheTTL := os.Getenv(EnvCacheTTLMinutes); cacheTTL != "" {
-		if ttlMinutes, err := strconv.Atoi(cacheTTL); err == nil && ttlMinutes > 0 {
-			if config.Service.Cache == nil {
-				config.Service.Cache = &CacheConfig{}
-			}
-			config.Service.Cache.TTLMinutes = ttlMinutes
+	
+	// Initialize cache config if needed
+	if v.IsSet("cache_ttl_minutes") || v.IsSet("cache_refresh_minutes") {
+		if config.Service.Cache == nil {
+			config.Service.Cache = &CacheConfig{}
+		}
+		if v.IsSet("cache_ttl_minutes") {
+			config.Service.Cache.TTLMinutes = v.GetInt("cache_ttl_minutes")
+		}
+		if v.IsSet("cache_refresh_minutes") {
+			config.Service.Cache.ProactiveRefreshMinutes = v.GetInt("cache_refresh_minutes")
 		}
 	}
-
-	if cacheRefresh := os.Getenv(EnvCacheRefreshMinutes); cacheRefresh != "" {
-		if refreshMinutes, err := strconv.Atoi(cacheRefresh); err == nil && refreshMinutes > 0 {
-			if config.Service.Cache == nil {
-				config.Service.Cache = &CacheConfig{}
-			}
-			config.Service.Cache.ProactiveRefreshMinutes = refreshMinutes
-		}
+	
+	// Initialize agent config if needed
+	if config.Agent == nil {
+		config.Agent = &AgentConfig{}
 	}
-
-	// Agent Configuration
-	agentSocket := os.Getenv(EnvAgentSocket)
-	if agentSocket == "" {
-		agentSocket = "/run/sockets/agent.sock" // Default socket path
+	if socketPath := v.GetString("agent_socket"); socketPath != "" {
+		config.Agent.SocketPath = socketPath
+	} else {
+		config.Agent.SocketPath = v.GetString("agent.socketpath")
 	}
-
-	config.Agent = &AgentConfig{
-		SocketPath: agentSocket,
-	}
-
+	
 	// Validate the configuration
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("environment configuration validation failed: %w", err)
 	}
-
-	// NOTE: Production validation is NOT run here - it should only be run when explicitly requested
-	// via IsProductionReady() method
-
-	return config, nil
+	
+	return &config, nil
 }
 
 // MergeWithEnvironment merges file-based configuration with environment variables.
 // Environment variables take precedence over file values.
 func (c *Configuration) MergeWithEnvironment() error {
+	v := viper.New()
+	v.SetEnvPrefix("EPHEMOS")
+	v.AutomaticEnv()
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	
 	// Override service name if set via environment
-	if serviceName := os.Getenv(EnvServiceName); serviceName != "" {
+	if serviceName := v.GetString("service_name"); serviceName != "" {
 		c.Service.Name = serviceName
 	}
-
+	
 	// Override trust domain if set via environment
-	if trustDomain := os.Getenv(EnvTrustDomain); trustDomain != "" {
+	if trustDomain := v.GetString("trust_domain"); trustDomain != "" {
 		c.Service.Domain = trustDomain
 	}
-
+	
 	// Override agent socket path if set via environment
-	if agentSocket := os.Getenv(EnvAgentSocket); agentSocket != "" {
+	if agentSocket := v.GetString("agent_socket"); agentSocket != "" {
 		if c.Agent == nil {
 			c.Agent = &AgentConfig{}
 		}
 		c.Agent.SocketPath = agentSocket
 	}
-
+	
 	return c.Validate()
 }
 
@@ -287,18 +300,24 @@ func validateProductionSecurity(config *Configuration) error {
 		validationErrors = append(validationErrors, err)
 	}
 
+	// Use viper for security checks
+	v := viper.New()
+	v.SetEnvPrefix("EPHEMOS")
+	v.AutomaticEnv()
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	
 	// Check for insecure certificate validation setting
-	if strings.ToLower(os.Getenv(EnvInsecureSkipVerify)) == "true" {
+	if v.GetBool("insecure_skip_verify") {
 		validationErrors = append(validationErrors, errors.ErrInsecureSkipVerify)
 	}
 
 	// Check for debug environment variables that shouldn't be enabled in production
-	if debugEnabled := os.Getenv(EnvDebugEnabled); debugEnabled == "true" {
+	if v.GetBool("debug_enabled") {
 		validationErrors = append(validationErrors, errors.ErrDebugEnabled)
 	}
 
 	// Check for verbose logging
-	if logLevel := strings.ToLower(os.Getenv(EnvLogLevel)); logLevel == "debug" || logLevel == "trace" {
+	if logLevel := strings.ToLower(v.GetString("log_level")); logLevel == "debug" || logLevel == "trace" {
 		validationErrors = append(validationErrors, errors.ErrVerboseLogging)
 	}
 
@@ -358,7 +377,11 @@ func validateSocketPath(socketPath string) error {
 func (c *Configuration) ShouldSkipCertificateValidation() bool {
 	// Explicit opt-in following industry standard pattern
 	// Similar to DOCKER_TLS_VERIFY, ARGO_INSECURE_SKIP_VERIFY, CONSUL_TLS_SKIP_VERIFY
-	return strings.ToLower(os.Getenv(EnvInsecureSkipVerify)) == "true"
+	v := viper.New()
+	v.SetEnvPrefix("EPHEMOS")
+	v.AutomaticEnv()
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	return v.GetBool("insecure_skip_verify")
 }
 
 // IsInsecureModeExplicitlyEnabled checks if insecure mode was explicitly requested.
@@ -373,11 +396,11 @@ func (c *Configuration) IsProductionReady() error {
 }
 
 // GetBoolEnv returns a boolean environment variable value with a default.
+// Deprecated: Use viper.GetBool() with defaults instead.
 func GetBoolEnv(key string, defaultValue bool) bool {
-	if value := os.Getenv(key); value != "" {
-		if parsed, err := strconv.ParseBool(value); err == nil {
-			return parsed
-		}
-	}
-	return defaultValue
+	v := viper.New()
+	v.SetEnvPrefix("EPHEMOS")
+	v.AutomaticEnv()
+	v.SetDefault(strings.ToLower(key), defaultValue)
+	return v.GetBool(strings.ToLower(key))
 }
