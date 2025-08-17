@@ -1,14 +1,51 @@
+// Package interceptors provides gRPC interceptors for propagating identity and metadata in microservices,
+// including request IDs, call chains, and original callers. It supports cycle detection and depth limits
+// to prevent abuse in distributed systems.
+//
+// The package implements both unary and streaming interceptors for client and server-side gRPC operations,
+// with support for SPIFFE/SPIRE-based identity propagation, custom header forwarding, and comprehensive
+// observability through structured logging.
+//
+// Key features:
+//   - Request ID generation and propagation
+//   - Call chain building with cycle and depth detection
+//   - Original caller tracking across service boundaries
+//   - Custom header forwarding via gRPC metadata
+//   - Comprehensive error handling with typed errors
+//   - Dependency injection for testability (clock, ID generator, logger)
+//
+// Example usage:
+//
+//	config := &IdentityPropagationConfig{
+//		IdentityProvider: myIdentityProvider,
+//		PropagateOriginalCaller: true,
+//		PropagateCallChain: true,
+//		MaxCallChainDepth: 10,
+//	}
+//	clientInterceptor := NewIdentityPropagationInterceptor(config)
+//	serverInterceptor := NewIdentityPropagationServerInterceptor(nil)
+//
+//	// Use with gRPC client
+//	conn, err := grpc.Dial(address,
+//		grpc.WithUnaryInterceptor(clientInterceptor.UnaryClientInterceptor()),
+//		grpc.WithStreamInterceptor(clientInterceptor.StreamClientInterceptor()),
+//	)
+//
+//	// Use with gRPC server
+//	server := grpc.NewServer(
+//		grpc.UnaryInterceptor(serverInterceptor.UnaryServerInterceptor()),
+//		grpc.StreamInterceptor(serverInterceptor.StreamServerInterceptor()),
+//	)
 package interceptors
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/binary"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -35,8 +72,25 @@ type Clock func() time.Time
 // IDGen provides request ID generation for dependency injection.
 type IDGen func() string
 
-// RequestIDContextKey is the context key for storing request ID information.
-type RequestIDContextKey struct{}
+// MetricsCollector provides observability hooks for interceptor operations.
+// Implementations can integrate with Prometheus, OpenTelemetry, or other monitoring systems.
+type MetricsCollector interface {
+	// RecordPropagationSuccess records successful identity propagation
+	RecordPropagationSuccess(method string, requestID string)
+	
+	// RecordPropagationFailure records failed identity propagation
+	RecordPropagationFailure(method string, reason string, err error)
+	
+	// RecordExtractionSuccess records successful identity extraction
+	RecordExtractionSuccess(method string, requestID string)
+	
+	// RecordCallChainDepth records call chain depth for monitoring
+	RecordCallChainDepth(depth int)
+	
+	// RecordCircularCallDetected records detection of circular calls
+	RecordCircularCallDetected(identity string)
+}
+
 
 const (
 	// MetadataKeyOriginalCaller is the metadata key for original caller identity.
@@ -78,6 +132,9 @@ type IdentityPropagationConfig struct {
 
 	// IDGen for request ID generation (nil => defaultIDGen)
 	IDGen IDGen
+	
+	// MetricsCollector for observability (nil => no metrics)
+	MetricsCollector MetricsCollector
 }
 
 // IdentityPropagationInterceptor handles identity propagation for outgoing gRPC calls.
@@ -130,11 +187,41 @@ func (i *IdentityPropagationInterceptor) UnaryClientInterceptor() grpc.UnaryClie
 			i.logger.Error("Failed to propagate identity",
 				"method", method,
 				"error", err)
+			if i.config.MetricsCollector != nil {
+				i.config.MetricsCollector.RecordPropagationFailure(method, "propagation_error", err)
+			}
 			return err
 		}
 
 		// Make the call with propagated context
 		return invoker(propagatedCtx, method, req, reply, cc, opts...)
+	}
+}
+
+// StreamClientInterceptor returns a gRPC stream client interceptor for identity propagation.
+func (i *IdentityPropagationInterceptor) StreamClientInterceptor() grpc.StreamClientInterceptor {
+	return func(
+		ctx context.Context,
+		desc *grpc.StreamDesc,
+		cc *grpc.ClientConn,
+		method string,
+		streamer grpc.Streamer,
+		opts ...grpc.CallOption,
+	) (grpc.ClientStream, error) {
+		// Create context with propagated identity metadata
+		propagatedCtx, err := i.propagateIdentity(ctx, method)
+		if err != nil {
+			i.logger.Error("Failed to propagate identity in stream",
+				"method", method,
+				"error", err)
+			if i.config.MetricsCollector != nil {
+				i.config.MetricsCollector.RecordPropagationFailure(method, "stream_propagation_error", err)
+			}
+			return nil, err
+		}
+
+		// Create the stream with propagated context
+		return streamer(propagatedCtx, desc, cc, method, opts...)
 	}
 }
 
@@ -188,6 +275,11 @@ func (i *IdentityPropagationInterceptor) propagateIdentity(ctx context.Context, 
 		"method", method,
 		"service", identity.Name(),
 		"request_id", requestID)
+	
+	// Record metrics if collector is available
+	if i.config.MetricsCollector != nil {
+		i.config.MetricsCollector.RecordPropagationSuccess(method, requestID)
+	}
 
 	return metadata.NewOutgoingContext(ctx, md), nil
 }
@@ -205,7 +297,7 @@ func (i *IdentityPropagationInterceptor) getOriginalCaller(ctx context.Context, 
 	return currentIdentity
 }
 
-// buildCallChain creates or extends the call chain.
+// buildCallChain creates or extends the call chain with enhanced error handling and performance.
 func (i *IdentityPropagationInterceptor) buildCallChain(ctx context.Context, currentIdentity string) (string, error) {
 	var callChain []string
 
@@ -225,27 +317,48 @@ func (i *IdentityPropagationInterceptor) buildCallChain(ctx context.Context, cur
 	// Parse existing chain with delimiter constant
 	callChain = strings.Split(existingChain[0], chainSep)
 
-	// Validate chain depth limit
+	// Validate chain depth limit with enhanced error wrapping
 	if len(callChain) >= i.config.MaxCallChainDepth {
-		return "", ErrDepthLimitExceeded
+		if i.config.MetricsCollector != nil {
+			i.config.MetricsCollector.RecordPropagationFailure("depth_limit", "max_depth_exceeded", ErrDepthLimitExceeded)
+		}
+		return "", fmt.Errorf("chain length %d exceeds max %d: %w", 
+			len(callChain), i.config.MaxCallChainDepth, ErrDepthLimitExceeded)
 	}
 
-	// Check for circular calls
+	// Check for circular calls with enhanced error wrapping
 	if err := i.validateNoCycle(callChain, currentIdentity); err != nil {
-		return "", err
+		if i.config.MetricsCollector != nil {
+			i.config.MetricsCollector.RecordCircularCallDetected(currentIdentity)
+		}
+		return "", fmt.Errorf("circular call detected for identity %s: %w", currentIdentity, err)
 	}
 
 	// Add current service to the chain
 	callChain = append(callChain, currentIdentity)
 
+	// Use strings.Builder for better performance with large chains
+	if len(callChain) > 5 { // Use Builder for longer chains
+		var builder strings.Builder
+		for i, service := range callChain {
+			if i > 0 {
+				builder.WriteString(chainSep)
+			}
+			builder.WriteString(service)
+		}
+		return builder.String(), nil
+	}
+
+	// Use simple join for shorter chains
 	return strings.Join(callChain, chainSep), nil
 }
 
-// Helper function to validate no circular calls (reduces complexity).
+// validateNoCycle validates no circular calls with enhanced error information.
 func (i *IdentityPropagationInterceptor) validateNoCycle(callChain []string, currentIdentity string) error {
-	for _, service := range callChain {
+	for i, service := range callChain {
 		if service == currentIdentity {
-			return ErrCircularCall
+			return fmt.Errorf("service %s already exists at position %d in chain: %w", 
+				currentIdentity, i, ErrCircularCall)
 		}
 	}
 	return nil
@@ -279,33 +392,26 @@ func (i *IdentityPropagationInterceptor) getOrGenerateRequestID(ctx context.Cont
 		}
 	}
 
-	// Check for request ID in context value (set by application)
-	if requestID, ok := ctx.Value(RequestIDContextKey{}).(string); ok {
-		return requestID
-	}
 
 	// Generate new request ID using injected generator
 	return i.config.IDGen()
 }
 
-// generateRequestID creates a new unique request ID.
-func generateRequestID() string {
-	return fmt.Sprintf("req-%d", time.Now().UnixNano())
-}
-
 // IdentityPropagationServerInterceptor provides server-side identity extraction from propagated metadata.
 type IdentityPropagationServerInterceptor struct {
-	logger *slog.Logger
+	logger  *slog.Logger
+	metrics MetricsCollector
 }
 
 // NewIdentityPropagationServerInterceptor creates a server interceptor for identity extraction.
-func NewIdentityPropagationServerInterceptor(logger *slog.Logger) *IdentityPropagationServerInterceptor {
+func NewIdentityPropagationServerInterceptor(logger *slog.Logger, metrics MetricsCollector) *IdentityPropagationServerInterceptor {
 	if logger == nil {
 		logger = slog.Default()
 	}
 
 	return &IdentityPropagationServerInterceptor{
-		logger: logger,
+		logger:  logger,
+		metrics: metrics,
 	}
 }
 
@@ -324,6 +430,27 @@ func (i *IdentityPropagationServerInterceptor) UnaryServerInterceptor() grpc.Una
 	}
 }
 
+// StreamServerInterceptor returns a gRPC stream server interceptor for identity extraction.
+func (i *IdentityPropagationServerInterceptor) StreamServerInterceptor() grpc.StreamServerInterceptor {
+	return func(
+		srv interface{},
+		ss grpc.ServerStream,
+		info *grpc.StreamServerInfo,
+		handler grpc.StreamHandler,
+	) error {
+		// Extract and add identity information to context
+		enrichedCtx := i.extractIdentityMetadata(ss.Context(), info.FullMethod)
+		
+		// Wrap the server stream with the enriched context
+		wrappedStream := &wrappedServerStream{
+			ServerStream: ss,
+			ctx:          enrichedCtx,
+		}
+
+		return handler(srv, wrappedStream)
+	}
+}
+
 // extractIdentityMetadata extracts identity metadata from incoming context and enriches it.
 func (i *IdentityPropagationServerInterceptor) extractIdentityMetadata(ctx context.Context, method string) context.Context {
 	md, ok := metadata.FromIncomingContext(ctx)
@@ -331,68 +458,71 @@ func (i *IdentityPropagationServerInterceptor) extractIdentityMetadata(ctx conte
 		return ctx
 	}
 
-	enrichedCtx := ctx
-
-	// Use predefined context keys
+	// Create unified identity struct
+	identity := &PropagatedIdentity{}
 
 	// Extract propagated identity information
 	if originalCaller := md.Get(MetadataKeyOriginalCaller); len(originalCaller) > 0 {
-		enrichedCtx = context.WithValue(enrichedCtx, originalCallerKey, originalCaller[0])
+		identity.OriginalCaller = originalCaller[0]
 	}
 
 	if callChain := md.Get(MetadataKeyCallChain); len(callChain) > 0 {
-		enrichedCtx = context.WithValue(enrichedCtx, callChainKey, callChain[0])
+		identity.CallChain = callChain[0]
 	}
 
 	if trustDomain := md.Get(MetadataKeyTrustDomain); len(trustDomain) > 0 {
-		enrichedCtx = context.WithValue(enrichedCtx, callerTrustDomainKey, trustDomain[0])
+		identity.CallerTrustDomain = trustDomain[0]
 	}
 
 	if serviceName := md.Get(MetadataKeyServiceName); len(serviceName) > 0 {
-		enrichedCtx = context.WithValue(enrichedCtx, callerServiceKey, serviceName[0])
+		identity.CallerService = serviceName[0]
 	}
 
 	if requestID := md.Get(MetadataKeyRequestID); len(requestID) > 0 {
-		enrichedCtx = context.WithValue(enrichedCtx, requestIDKey, requestID[0])
+		identity.RequestID = requestID[0]
+	}
 
+	// Parse timestamp if available
+	if timestamp := md.Get(MetadataKeyTimestamp); len(timestamp) > 0 {
+		if ts, err := parseTimestamp(timestamp[0]); err == nil {
+			identity.Timestamp = ts
+		}
+	}
+
+	// Store unified identity in context
+	enrichedCtx := context.WithValue(ctx, propagatedIdentityKey, identity)
+
+	if identity.RequestID != "" {
 		i.logger.Debug("Identity metadata extracted",
 			"method", method,
-			"request_id", requestID[0],
-			"caller_service", mustGet(GetCallerService(enrichedCtx)),
-			"call_chain", mustGet(GetCallChain(enrichedCtx)))
+			"request_id", identity.RequestID,
+			"caller_service", identity.CallerService,
+			"call_chain", identity.CallChain)
+			
+		// Record metrics if collector is available
+		if i.metrics != nil {
+			i.metrics.RecordExtractionSuccess(method, identity.RequestID)
+			if identity.CallChain != "" {
+				chainDepth := len(strings.Split(identity.CallChain, chainSep))
+				i.metrics.RecordCallChainDepth(chainDepth)
+			}
+		}
 	}
 
 	return enrichedCtx
 }
 
-// Helper function to safely get string values from context.
-func getValueFromContext(ctx context.Context, key string) string {
-	if value, ok := ctx.Value(key).(string); ok {
-		return value
-	}
-	return ""
+// parseTimestamp parses a timestamp string to Unix milliseconds.
+func parseTimestamp(timestampStr string) (int64, error) {
+	var timestamp int64
+	_, err := fmt.Sscanf(timestampStr, "%d", &timestamp)
+	return timestamp, err
 }
 
-func mustGet(v string, ok bool) string {
-	if ok {
-		return v
-	}
-	return ""
-}
-
+// defaultIDGen generates a new request ID using UUID v4.
+// This replaces the custom UUID implementation for better maintainability.
 func defaultIDGen() string {
-	// RFC4122 v4 (simple, dependency-free)
-	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	return fmt.Sprintf("req-%08x-%04x-%04x-%04x-%012x",
-		binary.BigEndian.Uint32(b[0:4]),
-		binary.BigEndian.Uint16(b[4:6]),
-		binary.BigEndian.Uint16(b[6:8]),
-		binary.BigEndian.Uint16(b[8:10]),
-		b[10:16],
-	)
+	return "req-" + uuid.New().String()
 }
 
 // Identity propagation helper functions
@@ -402,41 +532,46 @@ type contextKey string
 
 // Context keys.
 const (
-	originalCallerKey    contextKey = "original-caller"
-	callChainKey         contextKey = "call-chain"
-	callerTrustDomainKey contextKey = "caller-trust-domain"
-	callerServiceKey     contextKey = "caller-service"
-	requestIDKey         contextKey = "request-id"
+	propagatedIdentityKey contextKey = "propagated-identity"
 )
 
-// GetOriginalCaller extracts the original caller from the context.
-func GetOriginalCaller(ctx context.Context) (string, bool) {
-	originalCaller, ok := ctx.Value(originalCallerKey).(string)
-	return originalCaller, ok
+// PropagatedIdentity contains all identity information extracted from metadata.
+// This unified struct reduces context key sprawl and improves type safety.
+type PropagatedIdentity struct {
+	// OriginalCaller is the first service in the call chain
+	OriginalCaller string `json:"original_caller,omitempty"`
+	
+	// CallChain is the complete chain of services in the call path
+	CallChain string `json:"call_chain,omitempty"`
+	
+	// CallerTrustDomain is the trust domain of the immediate caller
+	CallerTrustDomain string `json:"caller_trust_domain,omitempty"`
+	
+	// CallerService is the name of the immediate caller service
+	CallerService string `json:"caller_service,omitempty"`
+	
+	// RequestID is the unique identifier for this request
+	RequestID string `json:"request_id,omitempty"`
+	
+	// Timestamp is the Unix millisecond timestamp when the request was initiated
+	Timestamp int64 `json:"timestamp,omitempty"`
 }
 
-// GetCallChain extracts the call chain from the context.
-func GetCallChain(ctx context.Context) (string, bool) {
-	callChain, ok := ctx.Value(callChainKey).(string)
-	return callChain, ok
+// GetPropagatedIdentity extracts the complete propagated identity from the context.
+func GetPropagatedIdentity(ctx context.Context) (*PropagatedIdentity, bool) {
+	identity, ok := ctx.Value(propagatedIdentityKey).(*PropagatedIdentity)
+	return identity, ok
 }
 
-// GetCallerService extracts the immediate caller service from the context.
-func GetCallerService(ctx context.Context) (string, bool) {
-	callerService, ok := ctx.Value(callerServiceKey).(string)
-	return callerService, ok
+// wrappedServerStream wraps a gRPC ServerStream with an enriched context.
+type wrappedServerStream struct {
+	grpc.ServerStream
+	ctx context.Context
 }
 
-// GetCallerTrustDomain extracts the caller's trust domain from the context.
-func GetCallerTrustDomain(ctx context.Context) (string, bool) {
-	trustDomain, ok := ctx.Value(callerTrustDomainKey).(string)
-	return trustDomain, ok
-}
-
-// GetRequestID extracts the request ID from the context.
-func GetRequestID(ctx context.Context) (string, bool) {
-	requestID, ok := ctx.Value(requestIDKey).(string)
-	return requestID, ok
+// Context returns the enriched context for the wrapped stream.
+func (w *wrappedServerStream) Context() context.Context {
+	return w.ctx
 }
 
 // DefaultIdentityPropagationConfig returns a default identity propagation configuration.

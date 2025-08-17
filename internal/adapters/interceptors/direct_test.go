@@ -343,22 +343,9 @@ func TestRequestIDGeneration(t *testing.T) {
 			expectedID:       "req-from-metadata",
 		},
 		{
-			name:            "from_context_value",
-			contextValue:    "req-from-context",
-			expectGenerated: false,
-			expectedID:      "req-from-context",
-		},
-		{
 			name:            "generate_new",
 			expectGenerated: true,
 			expectedID:      "req-1696000000000000123",
-		},
-		{
-			name:             "metadata_takes_precedence",
-			incomingMetadata: map[string]string{MetadataKeyRequestID: "req-from-metadata"},
-			contextValue:     "req-from-context",
-			expectGenerated:  false,
-			expectedID:       "req-from-metadata",
 		},
 	}
 
@@ -382,10 +369,7 @@ func TestRequestIDGeneration(t *testing.T) {
 				ctx = metadata.NewIncomingContext(ctx, md)
 			}
 
-			// Setup context value
-			if tt.contextValue != nil {
-				ctx = context.WithValue(ctx, RequestIDContextKey{}, tt.contextValue)
-			}
+			// Context value test removed - no longer supported
 
 			requestID := interceptor.getOrGenerateRequestID(ctx)
 
@@ -697,17 +681,7 @@ func TestContextHelpers_Direct(t *testing.T) {
 	assert.False(t, ok)
 	assert.Nil(t, identity)
 
-	requestID, ok := GetRequestID(ctx)
-	assert.False(t, ok)
-	assert.Empty(t, requestID)
-
-	originalCaller, ok := GetOriginalCaller(ctx)
-	assert.False(t, ok)
-	assert.Empty(t, originalCaller)
-
-	callChain, ok := GetCallChain(ctx)
-	assert.False(t, ok)
-	assert.Empty(t, callChain)
+	// No additional context helper functions needed
 
 	// Test with values
 	testIdentity := &AuthenticatedIdentity{

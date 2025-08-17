@@ -8,15 +8,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// GetBoolEnv returns a boolean environment variable value with a default.
-// Deprecated: Use viper.GetBool() with defaults instead.
-func GetBoolEnv(key string, defaultValue bool) bool {
-	v := viper.New()
-	v.SetEnvPrefix("EPHEMOS")
-	v.AutomaticEnv()
-	v.SetDefault(strings.ToLower(key), defaultValue)
-	return v.GetBool(strings.ToLower(key))
-}
 
 // Environment variable names for configuration.
 const (

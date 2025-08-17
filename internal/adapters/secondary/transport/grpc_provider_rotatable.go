@@ -513,7 +513,7 @@ func (a *SourceAdapter) extractSPIFFEID(cert *domain.Certificate) (spiffeid.ID, 
 		}
 	}
 
-	// Strategy 4: Fallback to subject common name (legacy support)
+	// Strategy 4: Fallback to subject common name
 	if cert.Cert.Subject.CommonName != "" {
 		// This is a last resort and should be used carefully
 		// Only if we can derive meaningful SPIFFE ID from CN
