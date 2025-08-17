@@ -7,8 +7,8 @@ import (
 	"github.com/sufield/ephemos/internal/core/domain"
 )
 
-// Engine is the internal validation engine (V2 validator).
-type Engine = domain.V2Validator
+// Engine is the internal validation engine.
+type Engine = domain.Validator
 
 // Error represents a single validation error.
 type Error struct {
@@ -17,17 +17,17 @@ type Error struct {
 	Value   interface{}
 }
 
-// NewEngine creates a new V2 validation engine.
+// NewEngine creates a new validation engine.
 func NewEngine() *Engine {
-	return domain.NewV2Validator()
+	return domain.NewValidator()
 }
 
-// ValidateStruct validates a struct using the V2 validation engine.
+// ValidateStruct validates a struct using the validation engine.
 func ValidateStruct(v any) error {
-	return domain.ValidateStructV2(v)
+	return domain.ValidateStruct(v)
 }
 
-// ValidateStructWithEngine validates a struct with a custom V2 validation engine.
+// ValidateStructWithEngine validates a struct with a custom validation engine.
 func ValidateStructWithEngine(v any, engine *Engine) error {
 	return engine.Validate(v)
 }
@@ -39,7 +39,7 @@ func GetErrors(err error) []Error {
 		return nil
 	}
 
-	// Convert domain ValidationErrorV2 to internal Error
+	// Convert domain ValidationError to internal Error
 	result := make([]Error, len(validationErrors))
 	for i, validationErr := range validationErrors {
 		result[i] = Error{

@@ -95,8 +95,8 @@ func (c *Configuration) Validate() error {
 		}
 	}
 
-	// Use the new V2 validator with SPIFFE-specific validations
-	validator := domain.NewV2Validator()
+	// Use the new validator with SPIFFE-specific validations
+	validator := domain.NewValidator()
 	if err := validator.Validate(c); err != nil {
 		// Convert go-playground validation errors to our custom format
 		validationErrors := domain.ConvertValidationErrors(err)
