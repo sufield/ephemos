@@ -4,6 +4,7 @@ go 1.24
 
 require (
 	github.com/go-playground/validator/v10 v10.27.0
+	github.com/go-viper/mapstructure/v2 v2.3.0
 	github.com/prometheus/client_golang v1.19.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
