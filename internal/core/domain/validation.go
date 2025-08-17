@@ -1051,9 +1051,9 @@ func (ve *ValidationEngine) initializeRequiredNestedStruct(
 //nolint:gochecknoglobals // Global instance for convenience
 var GlobalValidationEngine = NewValidationEngine()
 
-// ValidateStruct is a convenience function that uses the global validation engine.
+// ValidateStruct is a convenience function that uses the V2 validation engine.
 func ValidateStruct(v any) error {
-	return GlobalValidationEngine.ValidateAndSetDefaults(v)
+	return ValidateStructV2(v)
 }
 
 // ValidateStructWithEngine validates a struct with a custom validation engine.

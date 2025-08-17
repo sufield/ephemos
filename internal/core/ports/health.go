@@ -53,11 +53,11 @@ type HealthConfig struct {
 // SpireServerHealthConfig configures SPIRE server health monitoring
 type SpireServerHealthConfig struct {
 	// Address of the SPIRE server health endpoint (e.g., "localhost:8080")
-	Address string `json:"address"`
+	Address string `json:"address" validate:"required"`
 	// LivePath is the liveness check endpoint path (default: "/live")
-	LivePath string `json:"live_path"`
+	LivePath string `json:"live_path" validate:"omitempty,startswith=/"`
 	// ReadyPath is the readiness check endpoint path (default: "/ready")
-	ReadyPath string `json:"ready_path"`
+	ReadyPath string `json:"ready_path" validate:"omitempty,startswith=/"`
 	// UseHTTPS enables HTTPS for health check requests
 	UseHTTPS bool `json:"use_https"`
 	// Headers are additional HTTP headers to include in health check requests
@@ -67,11 +67,11 @@ type SpireServerHealthConfig struct {
 // SpireAgentHealthConfig configures SPIRE agent health monitoring
 type SpireAgentHealthConfig struct {
 	// Address of the SPIRE agent health endpoint (e.g., "localhost:8080")
-	Address string `json:"address"`
+	Address string `json:"address" validate:"required"`
 	// LivePath is the liveness check endpoint path (default: "/live")
-	LivePath string `json:"live_path"`
+	LivePath string `json:"live_path" validate:"omitempty,startswith=/"`
 	// ReadyPath is the readiness check endpoint path (default: "/ready")
-	ReadyPath string `json:"ready_path"`
+	ReadyPath string `json:"ready_path" validate:"omitempty,startswith=/"`
 	// UseHTTPS enables HTTPS for health check requests
 	UseHTTPS bool `json:"use_https"`
 	// Headers are additional HTTP headers to include in health check requests
