@@ -6,7 +6,6 @@ package verification
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"net"
 	"time"
@@ -101,11 +100,7 @@ func (v *SpireIdentityVerifier) VerifyIdentity(ctx context.Context, expectedID s
 		},
 	}
 
-	// Extract key usage
-	if len(svid.Certificates) > 0 {
-		cert := svid.Certificates[0]
-		result.KeyUsage = extractKeyUsage(cert)
-	}
+	// Note: Key usage details available via SPIRE CLI tools if needed
 
 	if valid {
 		result.Message = "Identity verification successful"
@@ -227,19 +222,29 @@ func (v *SpireIdentityVerifier) ValidateConnection(ctx context.Context, targetID
 	}
 
 	peerCert := state.PeerCertificates[0]
-	peerID, err := extractSPIFFEIDFromCert(peerCert)
-	if err != nil {
+	
+	// Use go-spiffe to extract SPIFFE ID from certificate
+	var peerID spiffeid.ID
+	for _, uri := range peerCert.URIs {
+		if uri.Scheme == "spiffe" {
+			if id, err := spiffeid.FromURI(uri); err == nil {
+				peerID = id
+				break
+			}
+		}
+	}
+	
+	if peerID.IsZero() {
 		return &ports.IdentityVerificationResult{
 			Valid:      false,
 			Identity:   spiffeid.ID{},
-			Message:    fmt.Sprintf("Failed to extract SPIFFE ID from peer certificate: %v", err),
+			Message:    "No valid SPIFFE ID found in peer certificate",
 			VerifiedAt: time.Now(),
 			Details: map[string]interface{}{
 				"target_address": address,
 				"target_id":      targetID.String(),
-				"error":          err.Error(),
 			},
-		}, err
+		}, fmt.Errorf("no SPIFFE ID found in certificate")
 	}
 
 	valid := peerID.String() == targetID.String()
@@ -252,14 +257,14 @@ func (v *SpireIdentityVerifier) ValidateConnection(ctx context.Context, targetID
 		SerialNumber: peerCert.SerialNumber.String(),
 		Subject:      peerCert.Subject.String(),
 		Issuer:       peerCert.Issuer.String(),
-		KeyUsage:     extractKeyUsage(peerCert),
+		// KeyUsage details available via SPIRE CLI tools if needed
 		VerifiedAt:   time.Now(),
 		Details: map[string]interface{}{
 			"target_address": address,
 			"target_id":      targetID.String(),
 			"peer_id":        peerID.String(),
-			"tls_version":    tlsVersionString(state.Version),
-			"cipher_suite":   tlsCipherSuite(state.CipherSuite),
+			"tls_version":    fmt.Sprintf("0x%04x", state.Version),
+			"cipher_suite":   fmt.Sprintf("0x%04x", state.CipherSuite),
 		},
 	}
 
@@ -297,84 +302,8 @@ func (v *SpireIdentityVerifier) Close() error {
 	return nil
 }
 
-// extractSPIFFEIDFromCert extracts SPIFFE ID from certificate URI SAN
-func extractSPIFFEIDFromCert(cert *x509.Certificate) (spiffeid.ID, error) {
-	for _, uri := range cert.URIs {
-		if uri.Scheme == "spiffe" {
-			return spiffeid.FromURI(uri)
-		}
-	}
-	return spiffeid.ID{}, fmt.Errorf("no SPIFFE ID found in certificate")
-}
-
-// extractKeyUsage converts x509.KeyUsage to string slice
-func extractKeyUsage(cert *x509.Certificate) []string {
-	var usages []string
-	
-	if cert.KeyUsage&x509.KeyUsageDigitalSignature != 0 {
-		usages = append(usages, "DigitalSignature")
-	}
-	if cert.KeyUsage&x509.KeyUsageContentCommitment != 0 {
-		usages = append(usages, "ContentCommitment")
-	}
-	if cert.KeyUsage&x509.KeyUsageKeyEncipherment != 0 {
-		usages = append(usages, "KeyEncipherment")
-	}
-	if cert.KeyUsage&x509.KeyUsageDataEncipherment != 0 {
-		usages = append(usages, "DataEncipherment")
-	}
-	if cert.KeyUsage&x509.KeyUsageKeyAgreement != 0 {
-		usages = append(usages, "KeyAgreement")
-	}
-	if cert.KeyUsage&x509.KeyUsageCertSign != 0 {
-		usages = append(usages, "CertSign")
-	}
-	if cert.KeyUsage&x509.KeyUsageCRLSign != 0 {
-		usages = append(usages, "CRLSign")
-	}
-	if cert.KeyUsage&x509.KeyUsageEncipherOnly != 0 {
-		usages = append(usages, "EncipherOnly")
-	}
-	if cert.KeyUsage&x509.KeyUsageDecipherOnly != 0 {
-		usages = append(usages, "DecipherOnly")
-	}
-
-	return usages
-}
-
-// tlsVersionString converts TLS version number to string
-func tlsVersionString(version uint16) string {
-	switch version {
-	case 0x0301:
-		return "TLS 1.0"
-	case 0x0302:
-		return "TLS 1.1"
-	case 0x0303:
-		return "TLS 1.2"
-	case 0x0304:
-		return "TLS 1.3"
-	default:
-		return fmt.Sprintf("Unknown (0x%04x)", version)
-	}
-}
-
-// tlsCipherSuite converts cipher suite number to string
-func tlsCipherSuite(suite uint16) string {
-	// Common cipher suites - extend as needed
-	suites := map[uint16]string{
-		0x1301: "TLS_AES_128_GCM_SHA256",
-		0x1302: "TLS_AES_256_GCM_SHA384",
-		0x1303: "TLS_CHACHA20_POLY1305_SHA256",
-		0xc02f: "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-		0xc030: "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
-		0xcca8: "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
-		0xc02b: "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
-		0xc02c: "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
-		0xcca9: "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
-	}
-
-	if name, ok := suites[suite]; ok {
-		return name
-	}
-	return fmt.Sprintf("Unknown (0x%04x)", suite)
-}
+// Note: Detailed certificate inspection (key usage, TLS details, etc.) 
+// is available through SPIRE's built-in CLI tools:
+// - spire-agent api fetch x509 for SVID details
+// - openssl x509 commands for certificate parsing
+// - SPIRE server APIs for comprehensive certificate information

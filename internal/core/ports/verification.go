@@ -30,8 +30,7 @@ type IdentityVerificationResult struct {
 	Subject string `json:"subject"`
 	// Issuer contains the certificate issuer information
 	Issuer string `json:"issuer"`
-	// KeyUsage contains the certificate key usage
-	KeyUsage []string `json:"key_usage"`
+	// Note: Key usage details available via SPIRE CLI tools
 	// Message provides additional details about the verification
 	Message string `json:"message,omitempty"`
 	// VerifiedAt is when the verification was performed
