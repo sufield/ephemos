@@ -395,3 +395,12 @@ func (c *Configuration) IsProductionReady() error {
 	return validateProductionSecurity(c)
 }
 
+// GetBoolEnv gets a boolean value from an environment variable with a default fallback.
+// Returns the default value if the environment variable is not set or cannot be parsed.
+func GetBoolEnv(key string, defaultValue bool) bool {
+	v := viper.New()
+	v.AutomaticEnv()
+	v.SetDefault(key, defaultValue)
+	return v.GetBool(key)
+}
+
