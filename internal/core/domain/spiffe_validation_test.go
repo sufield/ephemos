@@ -104,6 +104,7 @@ func TestNewSPIFFEValidator(t *testing.T) {
 	validator := NewSPIFFEValidator(nil)
 	if validator == nil {
 		t.Error("NewSPIFFEValidator() returned nil")
+		return
 	}
 
 	if validator.bundleSource != nil {
@@ -115,6 +116,7 @@ func TestNewSPIFFEValidator(t *testing.T) {
 	validator = NewSPIFFEValidator(mockBundle)
 	if validator == nil {
 		t.Error("NewSPIFFEValidator() returned nil with bundle source")
+		return
 	}
 
 	if validator.bundleSource != mockBundle {

@@ -33,6 +33,3 @@ type IdentityService interface {
 	GetTrustBundle() (*TrustBundle, error)
 }
 
-// IdentityProvider is an alias for IdentityService for backwards compatibility.
-// Deprecated: Use IdentityService instead.
-type IdentityProvider = IdentityService

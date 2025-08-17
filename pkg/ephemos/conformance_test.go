@@ -88,12 +88,12 @@ func (m *mockServerPort) Addr() net.Addr {
 }
 
 type mockConfigLoader struct {
-	loadFunc func(source string) (*ports.Configuration, error)
+	loadFunc func(ctx context.Context, source string) (Configuration, error)
 }
 
-func (m *mockConfigLoader) LoadConfiguration(source string) (*ports.Configuration, error) {
+func (m *mockConfigLoader) LoadConfiguration(ctx context.Context, source string) (Configuration, error) {
 	if m.loadFunc != nil {
-		return m.loadFunc(source)
+		return m.loadFunc(ctx, source)
 	}
 	return &ports.Configuration{
 		Service: ports.ServiceConfig{

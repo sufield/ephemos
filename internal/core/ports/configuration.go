@@ -53,6 +53,9 @@ type ServiceConfig struct {
 	// Used for client-side authorization when connecting to services.
 	// If empty, all servers from the same trust domain are trusted.
 	TrustedServers []string `yaml:"trusted_servers,omitempty"`
+
+	// Cache contains caching configuration for certificate and trust bundle operations.
+	Cache *CacheConfig `yaml:"cache,omitempty"`
 }
 
 // AgentConfig contains identity agent connection settings.
@@ -61,6 +64,19 @@ type AgentConfig struct {
 	// Must be an absolute path to a valid Unix socket file.
 	// Common default: "/run/sockets/agent.sock"
 	SocketPath string `yaml:"socketPath"`
+}
+
+// CacheConfig contains caching configuration for certificate and trust bundle operations.
+type CacheConfig struct {
+	// TTLMinutes specifies the time-to-live for cached certificates and trust bundles in minutes.
+	// Default: 30 minutes (half of typical 1-hour SPIFFE certificate lifetime).
+	// Must be between 1 and 60 minutes for security and performance reasons.
+	TTLMinutes int `yaml:"ttl_minutes,omitempty"`
+
+	// ProactiveRefreshMinutes specifies when to proactively refresh certificates before expiry.
+	// Default: 10 minutes before expiry.
+	// Must be less than TTLMinutes and greater than 0.
+	ProactiveRefreshMinutes int `yaml:"proactive_refresh_minutes,omitempty"`
 }
 
 
@@ -96,6 +112,10 @@ func (c *Configuration) validateService() error {
 	}
 
 	if err := c.validateServiceDomain(); err != nil {
+		return err
+	}
+
+	if err := c.validateServiceCache(); err != nil {
 		return err
 	}
 
@@ -152,6 +172,50 @@ func (c *Configuration) validateServiceDomain() error {
 	return nil
 }
 
+func (c *Configuration) validateServiceCache() error {
+	if c.Service.Cache == nil {
+		return nil // Cache config is optional
+	}
+
+	cache := c.Service.Cache
+
+	// Validate TTL minutes
+	if cache.TTLMinutes < 0 {
+		return &errors.ValidationError{
+			Field:   "service.cache.ttl_minutes",
+			Value:   cache.TTLMinutes,
+			Message: "cache TTL cannot be negative",
+		}
+	}
+
+	if cache.TTLMinutes > 60 {
+		return &errors.ValidationError{
+			Field:   "service.cache.ttl_minutes",
+			Value:   cache.TTLMinutes,
+			Message: "cache TTL cannot exceed 60 minutes for security reasons",
+		}
+	}
+
+	// Validate proactive refresh minutes
+	if cache.ProactiveRefreshMinutes < 0 {
+		return &errors.ValidationError{
+			Field:   "service.cache.proactive_refresh_minutes",
+			Value:   cache.ProactiveRefreshMinutes,
+			Message: "proactive refresh time cannot be negative",
+		}
+	}
+
+	if cache.ProactiveRefreshMinutes >= cache.TTLMinutes && cache.TTLMinutes > 0 {
+		return &errors.ValidationError{
+			Field:   "service.cache.proactive_refresh_minutes",
+			Value:   cache.ProactiveRefreshMinutes,
+			Message: "proactive refresh time must be less than cache TTL",
+		}
+	}
+
+	return nil
+}
+
 func (c *Configuration) validateAgent() error {
 	if strings.TrimSpace(c.Agent.SocketPath) == "" {
 		return &errors.ValidationError{
@@ -196,6 +260,8 @@ const (
 	EnvBindAddress         = "EPHEMOS_BIND_ADDRESS"
 	EnvTLSMinVersion       = "EPHEMOS_TLS_MIN_VERSION"
 	EnvDebugEnabled        = "EPHEMOS_DEBUG_ENABLED"
+	EnvCacheTTLMinutes     = "EPHEMOS_CACHE_TTL_MINUTES"
+	EnvCacheRefreshMinutes = "EPHEMOS_CACHE_REFRESH_MINUTES"
 )
 
 // LoadFromEnvironment creates a configuration from environment variables.
@@ -222,6 +288,25 @@ func LoadFromEnvironment() (*Configuration, error) {
 	config.Service = ServiceConfig{
 		Name:   serviceName,
 		Domain: trustDomain,
+	}
+
+	// Cache Configuration
+	if cacheTTL := os.Getenv(EnvCacheTTLMinutes); cacheTTL != "" {
+		if ttlMinutes, err := strconv.Atoi(cacheTTL); err == nil && ttlMinutes > 0 {
+			if config.Service.Cache == nil {
+				config.Service.Cache = &CacheConfig{}
+			}
+			config.Service.Cache.TTLMinutes = ttlMinutes
+		}
+	}
+
+	if cacheRefresh := os.Getenv(EnvCacheRefreshMinutes); cacheRefresh != "" {
+		if refreshMinutes, err := strconv.Atoi(cacheRefresh); err == nil && refreshMinutes > 0 {
+			if config.Service.Cache == nil {
+				config.Service.Cache = &CacheConfig{}
+			}
+			config.Service.Cache.ProactiveRefreshMinutes = refreshMinutes
+		}
 	}
 
 	// Agent Configuration

@@ -4,6 +4,7 @@ package integration
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 
@@ -503,6 +504,7 @@ func (m *mockClient) Close() error { return nil }
 type mockConnection struct{}
 
 func (m *mockConnection) GetClientConnection() interface{} { return nil }
+func (m *mockConnection) AsNetConn() net.Conn              { return nil }
 func (m *mockConnection) Close() error                     { return nil }
 
 // BenchmarkIdentityOperations benchmarks key identity operations for performance testing.

@@ -42,7 +42,7 @@ func Test_PublicSurface_Compiles(t *testing.T) {
 	var _ ephemos.Server
 
 	// Type presence (compile-time)
-	var _ *ephemos.ClientConnection
+	var _ ephemos.ClientConnection
 }
 
 func Test_ClientConnection_HTTPClient_requiresSPIFFE(t *testing.T) {
@@ -52,7 +52,7 @@ func Test_ClientConnection_HTTPClient_requiresSPIFFE(t *testing.T) {
 	_ = ctx // Used for timeout safety
 
 	// Zero-value connection must not produce an HTTP client.
-	conn := &ephemos.ClientConnection{}
+	conn := ephemos.TestOnlyNewClientConnection(nil)
 	client, err := conn.HTTPClient()
 
 	if err == nil {
@@ -74,7 +74,7 @@ func Test_ClientConnection_Close_isIdempotent(t *testing.T) {
 	defer cancel()
 	_ = ctx // Used for timeout safety
 
-	conn := &ephemos.ClientConnection{}
+	conn := ephemos.TestOnlyNewClientConnection(nil)
 	if err := conn.Close(); err != nil {
 		t.Fatalf("Close() unexpected error: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestClient_ConcurrentConnectAndClose_NoRace(t *testing.T) {
 	t.Parallel()
 
 	// Test concurrent operations on ClientConnection
-	conn := &ephemos.ClientConnection{}
+	conn := ephemos.TestOnlyNewClientConnection(nil)
 	
 	done := make(chan struct{})
 	go func() {

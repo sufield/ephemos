@@ -63,8 +63,11 @@ func SPIFFEServer(ctx context.Context, cfg *ports.Configuration) (ports.Authenti
 	// Create configuration provider
 	configProvider := config.NewFileProvider()
 	
-	// Create transport provider
-	transportProvider := transport.NewGRPCProvider(cfg)
+	// Create transport provider with rotation support
+	transportProvider, err := transport.CreateGRPCProvider(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transport provider: %w", err)
+	}
 	
 	// Create the internal server adapter using proper dependency injection
 	// This factory is the appropriate place for this wiring, keeping the API package clean
