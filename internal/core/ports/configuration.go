@@ -30,6 +30,10 @@ type Configuration struct {
 	// Agent contains the connection settings for the identity agent.
 	// If nil, default agent settings will be used.
 	Agent *AgentConfig `yaml:"agent,omitempty"`
+
+	// Health contains the health monitoring configuration.
+	// If nil, health monitoring is disabled.
+	Health *HealthConfig `yaml:"health,omitempty"`
 }
 
 // ServiceConfig contains the core service identification settings.
@@ -100,6 +104,13 @@ func (c *Configuration) Validate() error {
 	if c.Agent != nil {
 		if err := c.validateAgent(); err != nil {
 			return fmt.Errorf("invalid agent configuration: %w", err)
+		}
+	}
+
+	// Validate health configuration if present
+	if c.Health != nil {
+		if err := c.validateHealth(); err != nil {
+			return fmt.Errorf("invalid health configuration: %w", err)
 		}
 	}
 
@@ -232,6 +243,106 @@ func (c *Configuration) validateAgent() error {
 			Field:   "agent.socketPath",
 			Value:   c.Agent.SocketPath,
 			Message: "agent socket path must be an absolute path",
+		}
+	}
+
+	return nil
+}
+
+func (c *Configuration) validateHealth() error {
+	if c.Health == nil {
+		return nil // Health config is optional
+	}
+
+	health := c.Health
+
+	// Validate timeout
+	if health.Timeout < 0 {
+		return &errors.ValidationError{
+			Field:   "health.timeout",
+			Value:   health.Timeout,
+			Message: "health check timeout cannot be negative",
+		}
+	}
+
+	// Validate interval
+	if health.Interval < 0 {
+		return &errors.ValidationError{
+			Field:   "health.interval",
+			Value:   health.Interval,
+			Message: "health check interval cannot be negative",
+		}
+	}
+
+	// Validate server configuration if present
+	if health.Server != nil {
+		if err := c.validateSpireServerHealth(health.Server); err != nil {
+			return err
+		}
+	}
+
+	// Validate agent configuration if present
+	if health.Agent != nil {
+		if err := c.validateSpireAgentHealth(health.Agent); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Configuration) validateSpireServerHealth(server *SpireServerHealthConfig) error {
+	if strings.TrimSpace(server.Address) == "" {
+		return &errors.ValidationError{
+			Field:   "health.server.address",
+			Value:   server.Address,
+			Message: "SPIRE server health address cannot be empty",
+		}
+	}
+
+	// Validate paths
+	if server.LivePath != "" && !strings.HasPrefix(server.LivePath, "/") {
+		return &errors.ValidationError{
+			Field:   "health.server.live_path",
+			Value:   server.LivePath,
+			Message: "SPIRE server live path must start with '/'",
+		}
+	}
+
+	if server.ReadyPath != "" && !strings.HasPrefix(server.ReadyPath, "/") {
+		return &errors.ValidationError{
+			Field:   "health.server.ready_path",
+			Value:   server.ReadyPath,
+			Message: "SPIRE server ready path must start with '/'",
+		}
+	}
+
+	return nil
+}
+
+func (c *Configuration) validateSpireAgentHealth(agent *SpireAgentHealthConfig) error {
+	if strings.TrimSpace(agent.Address) == "" {
+		return &errors.ValidationError{
+			Field:   "health.agent.address",
+			Value:   agent.Address,
+			Message: "SPIRE agent health address cannot be empty",
+		}
+	}
+
+	// Validate paths
+	if agent.LivePath != "" && !strings.HasPrefix(agent.LivePath, "/") {
+		return &errors.ValidationError{
+			Field:   "health.agent.live_path",
+			Value:   agent.LivePath,
+			Message: "SPIRE agent live path must start with '/'",
+		}
+	}
+
+	if agent.ReadyPath != "" && !strings.HasPrefix(agent.ReadyPath, "/") {
+		return &errors.ValidationError{
+			Field:   "health.agent.ready_path",
+			Value:   agent.ReadyPath,
+			Message: "SPIRE agent ready path must start with '/'",
 		}
 	}
 

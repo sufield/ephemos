@@ -1,0 +1,35 @@
+# Ephemos Health Monitoring Configuration Example
+# This configuration demonstrates how to set up health monitoring
+# for SPIRE infrastructure components using their built-in HTTP endpoints.
+
+service:
+  name: "example-service"
+  domain: "example.org"
+
+# Health monitoring configuration
+health:
+  enabled: true
+  timeout: "10s"
+  interval: "30s"
+  
+  # SPIRE server health configuration
+  server:
+    address: "localhost:8080"
+    live_path: "/live"
+    ready_path: "/ready"
+    use_https: false
+    headers:
+      X-Health-Check: "ephemos"
+      
+  # SPIRE agent health configuration  
+  agent:
+    address: "localhost:8081"
+    live_path: "/live"
+    ready_path: "/ready"
+    use_https: false
+    headers:
+      X-Health-Check: "ephemos"
+
+# Agent configuration (for SPIFFE identity)
+agent:
+  socketPath: "/tmp/spire-agent/public/api.sock"
