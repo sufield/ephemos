@@ -491,7 +491,7 @@ func (m *mockTransportProvider) CreateClient(
 type mockServer struct{}
 
 func (m *mockServer) RegisterService(_ ports.ServiceRegistrarPort) error { return nil }
-func (m *mockServer) Start(_ ports.ListenerPort) error                   { return nil }
+func (m *mockServer) Start(_ net.Listener) error                   { return nil }
 func (m *mockServer) Stop() error                                        { return nil }
 
 type mockClient struct{}

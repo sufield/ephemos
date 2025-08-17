@@ -381,7 +381,7 @@ func (m *MockServerPort) RegisterService(registrar ports.ServiceRegistrarPort) e
 	return nil
 }
 
-func (m *MockServerPort) Start(listener ports.ListenerPort) error {
+func (m *MockServerPort) Start(listener net.Listener) error {
 	return nil
 }
 

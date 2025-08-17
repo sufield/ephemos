@@ -192,10 +192,8 @@ func TestGRPCProviderRotation(t *testing.T) {
 	require.NoError(t, err)
 	defer listener.Close()
 
-	mockListener := &mockListenerPort{listener: listener}
-
 	go func() {
-		serverPort.Start(mockListener)
+		serverPort.Start(listener)
 	}()
 	defer serverPort.Stop()
 
@@ -284,21 +282,6 @@ func (m *mockServiceRegistrar) Register(server interface{}) {
 	// Mock registration - do nothing
 }
 
-type mockListenerPort struct {
-	listener net.Listener
-}
-
-func (m *mockListenerPort) Accept() (interface{}, error) {
-	return m.listener.Accept()
-}
-
-func (m *mockListenerPort) Close() error {
-	return m.listener.Close()
-}
-
-func (m *mockListenerPort) Addr() string {
-	return m.listener.Addr().String()
-}
 
 type mockIdentityProvider struct {
 	cert     *domain.Certificate

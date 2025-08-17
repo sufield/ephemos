@@ -216,7 +216,7 @@ func (s *grpcServer) initializeServer() error {
 }
 
 // Start starts the gRPC server on the provided listener.
-func (s *grpcServer) Start(listener ports.ListenerPort) error {
+func (s *grpcServer) Start(listener net.Listener) error {
 	// Validate inputs first (without lock)
 	if listener == nil {
 		return fmt.Errorf("listener cannot be nil")
@@ -246,11 +246,8 @@ func (s *grpcServer) Start(listener ports.ListenerPort) error {
 	s.serving = true
 	s.mu.Unlock()
 
-	// Create a net.Listener from the ListenerPort
-	netListener := &listenerAdapter{port: listener}
-
 	// Start serving (this call blocks until server stops)
-	err := s.server.Serve(netListener)
+	err := s.server.Serve(listener)
 
 	// Mark as not serving when we return
 	s.mu.Lock()
@@ -331,100 +328,3 @@ func (c *grpcConnection) Close() error {
 	return nil
 }
 
-// listenerAdapter adapts ports.ListenerPort to net.Listener.
-type listenerAdapter struct {
-	port   ports.ListenerPort
-	closed bool       // Track if listener has been closed
-	mu     sync.Mutex // Protect concurrent access to closed state
-}
-
-// Accept waits for and returns the next connection to the listener.
-func (l *listenerAdapter) Accept() (net.Conn, error) {
-	// Check if listener is closed
-	l.mu.Lock()
-	if l.closed {
-		l.mu.Unlock()
-		return nil, fmt.Errorf("listener is closed")
-	}
-	l.mu.Unlock()
-
-	conn, err := l.port.Accept()
-	if err != nil {
-		return nil, err
-	}
-
-	// Try to safely convert to ConnectionPort first
-	if connPort, ok := conn.(ports.ConnectionPort); ok {
-		// Use the safe AsNetConn method to get net.Conn
-		if netConn := connPort.AsNetConn(); netConn != nil {
-			return netConn, nil
-		}
-		return nil, fmt.Errorf("connection does not support net.Conn interface")
-	}
-
-	// Fallback: direct net.Conn type assertion for raw connections
-	if netConn, ok := conn.(net.Conn); ok {
-		return netConn, nil
-	}
-
-	return nil, fmt.Errorf("connection is neither ConnectionPort nor net.Conn (got %T)", conn)
-}
-
-// Close closes the listener.
-func (l *listenerAdapter) Close() error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	// Check if already closed to prevent double-close
-	if l.closed {
-		return nil // Safe to call multiple times
-	}
-
-	// Validate that port exists
-	if l.port == nil {
-		l.closed = true
-		return nil // Nothing to close
-	}
-
-	// Close the underlying port
-	err := l.port.Close()
-	l.closed = true // Mark as closed regardless of error
-
-	if err != nil {
-		return fmt.Errorf("failed to close listener adapter: %w", err)
-	}
-
-	return nil
-}
-
-// Addr returns the listener's network address.
-func (l *listenerAdapter) Addr() net.Addr {
-	// Get the actual address from the underlying port
-	addrStr := l.port.Addr()
-
-	// Parse the address string into a proper net.Addr
-	if tcpAddr, err := net.ResolveTCPAddr("tcp", addrStr); err == nil {
-		return tcpAddr
-	}
-
-	// Fallback for other address types or parsing errors
-	if addr, err := net.ResolveUnixAddr("unix", addrStr); err == nil {
-		return addr
-	}
-
-	// Last resort: return a custom address implementation
-	return &stringAddr{addr: addrStr}
-}
-
-// stringAddr implements net.Addr for addresses that can't be parsed as TCP/Unix
-type stringAddr struct {
-	addr string
-}
-
-func (s *stringAddr) Network() string {
-	return "unknown"
-}
-
-func (s *stringAddr) String() string {
-	return s.addr
-}
