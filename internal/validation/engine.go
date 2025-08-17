@@ -8,10 +8,7 @@ import (
 )
 
 // Engine is the internal validation engine.
-type Engine = domain.ValidationEngine
-
-// CollectionError represents multiple validation errors.
-type CollectionError = domain.ValidationCollectionError
+type Engine = domain.Validator
 
 // Error represents a single validation error.
 type Error struct {
@@ -22,33 +19,33 @@ type Error struct {
 
 // NewEngine creates a new validation engine.
 func NewEngine() *Engine {
-	return domain.NewValidationEngine()
+	return domain.NewValidator()
 }
 
-// ValidateStruct validates a struct using the domain validation engine.
+// ValidateStruct validates a struct using the validation engine.
 func ValidateStruct(v any) error {
 	return domain.ValidateStruct(v)
 }
 
 // ValidateStructWithEngine validates a struct with a custom validation engine.
 func ValidateStructWithEngine(v any, engine *Engine) error {
-	return domain.ValidateStructWithEngine(v, engine)
+	return engine.Validate(v)
 }
 
 // GetErrors extracts all validation errors from an error.
 func GetErrors(err error) []Error {
-	domainErrors := domain.GetValidationErrors(err)
-	if domainErrors == nil {
+	validationErrors := domain.ConvertValidationErrors(err)
+	if validationErrors == nil {
 		return nil
 	}
 
 	// Convert domain ValidationError to internal Error
-	result := make([]Error, len(domainErrors))
-	for i, domainErr := range domainErrors {
+	result := make([]Error, len(validationErrors))
+	for i, validationErr := range validationErrors {
 		result[i] = Error{
-			Field:   domainErr.Field,
-			Message: domainErr.Message,
-			Value:   domainErr.Value,
+			Field:   validationErr.Field,
+			Message: validationErr.Message,
+			Value:   validationErr.Value,
 		}
 	}
 	return result

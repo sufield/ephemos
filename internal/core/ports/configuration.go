@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/errors"
 )
 
@@ -25,7 +26,7 @@ const (
 type Configuration struct {
 	// Service contains the core service identification settings.
 	// This is required and must include at least a service name.
-	Service ServiceConfig `yaml:"service"`
+	Service ServiceConfig `yaml:"service" validate:"required"`
 
 	// Agent contains the connection settings for the identity agent.
 	// If nil, default agent settings will be used.
@@ -41,22 +42,22 @@ type ServiceConfig struct {
 	// Name is the unique identifier for this service.
 	// Required field, must be non-empty and contain only valid service name characters.
 	// Used for SPIFFE ID generation and service discovery.
-	Name string `yaml:"name"`
+	Name string `yaml:"name" validate:"required,min=1,max=50,service_name"`
 
 	// Domain is the trust domain for this service.
 	// Optional field that defaults to the SPIRE trust domain if not specified.
 	// Must be a valid domain name format if provided.
-	Domain string `yaml:"domain,omitempty"`
+	Domain string `yaml:"domain,omitempty" validate:"omitempty,domain"`
 
 	// AuthorizedClients is a list of SPIFFE IDs that are authorized to connect to this service.
 	// Used for server-side authorization enforcement.
 	// If empty, all clients from the same trust domain are authorized.
-	AuthorizedClients []string `yaml:"authorized_clients,omitempty"`
+	AuthorizedClients []string `yaml:"authorized_clients,omitempty" validate:"omitempty,dive,spiffe_id"`
 
 	// TrustedServers is a list of SPIFFE IDs that this service trusts as servers.
 	// Used for client-side authorization when connecting to services.
 	// If empty, all servers from the same trust domain are trusted.
-	TrustedServers []string `yaml:"trusted_servers,omitempty"`
+	TrustedServers []string `yaml:"trusted_servers,omitempty" validate:"omitempty,dive,spiffe_id"`
 
 	// Cache contains caching configuration for certificate and trust bundle operations.
 	Cache *CacheConfig `yaml:"cache,omitempty"`
@@ -67,7 +68,7 @@ type AgentConfig struct {
 	// SocketPath is the path to the identity agent's Unix domain socket.
 	// Must be an absolute path to a valid Unix socket file.
 	// Common default: "/run/sockets/agent.sock"
-	SocketPath string `yaml:"socketPath"`
+	SocketPath string `yaml:"socketPath" validate:"required,abs_path"`
 }
 
 // CacheConfig contains caching configuration for certificate and trust bundle operations.
@@ -75,15 +76,15 @@ type CacheConfig struct {
 	// TTLMinutes specifies the time-to-live for cached certificates and trust bundles in minutes.
 	// Default: 30 minutes (half of typical 1-hour SPIFFE certificate lifetime).
 	// Must be between 1 and 60 minutes for security and performance reasons.
-	TTLMinutes int `yaml:"ttl_minutes,omitempty"`
+	TTLMinutes int `yaml:"ttl_minutes,omitempty" validate:"omitempty,min=1,max=60"`
 
 	// ProactiveRefreshMinutes specifies when to proactively refresh certificates before expiry.
 	// Default: 10 minutes before expiry.
 	// Must be less than TTLMinutes and greater than 0.
-	ProactiveRefreshMinutes int `yaml:"proactive_refresh_minutes,omitempty"`
+	ProactiveRefreshMinutes int `yaml:"proactive_refresh_minutes,omitempty" validate:"omitempty,min=1"`
 }
 
-// Validate checks if the configuration is valid and returns any validation errors.
+// Validate checks if the configuration is valid using go-playground/validator.
 // This method ensures all required fields are present and properly formatted.
 func (c *Configuration) Validate() error {
 	if c == nil {
@@ -94,127 +95,40 @@ func (c *Configuration) Validate() error {
 		}
 	}
 
-	// Validate service configuration
-	if err := c.validateService(); err != nil {
-		return fmt.Errorf("invalid service configuration: %w", err)
-	}
-
-	// Validate agent configuration if present
-	if c.Agent != nil {
-		if err := c.validateAgent(); err != nil {
-			return fmt.Errorf("invalid agent configuration: %w", err)
-		}
-	}
-
-	// Validate health configuration if present
-	if c.Health != nil {
-		if err := c.validateHealth(); err != nil {
-			return fmt.Errorf("invalid health configuration: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func (c *Configuration) validateService() error {
-	if err := c.validateServiceName(); err != nil {
-		return err
-	}
-
-	if err := c.validateServiceDomain(); err != nil {
-		return err
-	}
-
-	if err := c.validateServiceCache(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-//nolint:cyclop // Validation function has inherent complexity from multiple checks
-func (c *Configuration) validateServiceName() error {
-	if strings.TrimSpace(c.Service.Name) == "" {
-		return &errors.ValidationError{
-			Field:   "service.name",
-			Value:   c.Service.Name,
-			Message: "service name is required and cannot be empty",
-		}
-	}
-
-	// Validate service name format (alphanumeric, hyphens, underscores)
-	name := strings.TrimSpace(c.Service.Name)
-	for _, char := range name {
-		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') ||
-			(char >= '0' && char <= '9') || char == '-' || char == '_') {
+	// Use the new validator with SPIFFE-specific validations
+	validator := domain.NewValidator()
+	if err := validator.Validate(c); err != nil {
+		// Convert go-playground validation errors to our custom format
+		validationErrors := domain.ConvertValidationErrors(err)
+		if len(validationErrors) == 1 {
 			return &errors.ValidationError{
-				Field:   "service.name",
-				Value:   c.Service.Name,
-				Message: "service name must contain only alphanumeric characters, hyphens, and underscores",
+				Field:   validationErrors[0].Field,
+				Value:   validationErrors[0].Value,
+				Message: validationErrors[0].Message,
 			}
 		}
+		// For multiple errors, return a combined error message
+		var messages []string
+		for _, vErr := range validationErrors {
+			messages = append(messages, fmt.Sprintf("%s: %s", vErr.Field, vErr.Message))
+		}
+		return fmt.Errorf("validation failed: %s", strings.Join(messages, "; "))
 	}
 
-	return nil
-}
-
-func (c *Configuration) validateServiceDomain() error {
-	// Validate domain format if provided
-	if c.Service.Domain != "" {
-		domain := strings.TrimSpace(c.Service.Domain)
-		if domain == "" {
-			return &errors.ValidationError{
-				Field:   "service.domain",
-				Value:   c.Service.Domain,
-				Message: "service domain cannot be whitespace only",
-			}
-		}
-		// Basic domain validation - contains dots and valid characters
-		if !strings.Contains(domain, ".") {
-			return &errors.ValidationError{
-				Field:   "service.domain",
-				Value:   c.Service.Domain,
-				Message: "service domain must be a valid domain name",
-			}
+	// Validate cache configuration cross-field constraints
+	if c.Service.Cache != nil {
+		if err := c.validateCacheConstraints(); err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-func (c *Configuration) validateServiceCache() error {
-	if c.Service.Cache == nil {
-		return nil // Cache config is optional
-	}
-
+// validateCacheConstraints validates cross-field constraints for cache configuration
+// that cannot be expressed with simple validation tags.
+func (c *Configuration) validateCacheConstraints() error {
 	cache := c.Service.Cache
-
-	// Validate TTL minutes
-	if cache.TTLMinutes < 0 {
-		return &errors.ValidationError{
-			Field:   "service.cache.ttl_minutes",
-			Value:   cache.TTLMinutes,
-			Message: "cache TTL cannot be negative",
-		}
-	}
-
-	if cache.TTLMinutes > 60 {
-		return &errors.ValidationError{
-			Field:   "service.cache.ttl_minutes",
-			Value:   cache.TTLMinutes,
-			Message: "cache TTL cannot exceed 60 minutes for security reasons",
-		}
-	}
-
-	// Validate proactive refresh minutes
-	if cache.ProactiveRefreshMinutes < 0 {
-		return &errors.ValidationError{
-			Field:   "service.cache.proactive_refresh_minutes",
-			Value:   cache.ProactiveRefreshMinutes,
-			Message: "proactive refresh time cannot be negative",
-		}
-	}
-
 	if cache.ProactiveRefreshMinutes >= cache.TTLMinutes && cache.TTLMinutes > 0 {
 		return &errors.ValidationError{
 			Field:   "service.cache.proactive_refresh_minutes",
@@ -222,131 +136,9 @@ func (c *Configuration) validateServiceCache() error {
 			Message: "proactive refresh time must be less than cache TTL",
 		}
 	}
-
 	return nil
 }
 
-func (c *Configuration) validateAgent() error {
-	if strings.TrimSpace(c.Agent.SocketPath) == "" {
-		return &errors.ValidationError{
-			Field:   "agent.socketPath",
-			Value:   c.Agent.SocketPath,
-			Message: "agent socket path is required when agent config is provided",
-		}
-	}
-
-	// Validate that socket path is absolute
-	socketPath := strings.TrimSpace(c.Agent.SocketPath)
-	if !strings.HasPrefix(socketPath, "/") {
-		return &errors.ValidationError{
-			Field:   "agent.socketPath",
-			Value:   c.Agent.SocketPath,
-			Message: "agent socket path must be an absolute path",
-		}
-	}
-
-	return nil
-}
-
-func (c *Configuration) validateHealth() error {
-	if c.Health == nil {
-		return nil // Health config is optional
-	}
-
-	health := c.Health
-
-	// Validate timeout
-	if health.Timeout < 0 {
-		return &errors.ValidationError{
-			Field:   "health.timeout",
-			Value:   health.Timeout,
-			Message: "health check timeout cannot be negative",
-		}
-	}
-
-	// Validate interval
-	if health.Interval < 0 {
-		return &errors.ValidationError{
-			Field:   "health.interval",
-			Value:   health.Interval,
-			Message: "health check interval cannot be negative",
-		}
-	}
-
-	// Validate server configuration if present
-	if health.Server != nil {
-		if err := c.validateSpireServerHealth(health.Server); err != nil {
-			return err
-		}
-	}
-
-	// Validate agent configuration if present
-	if health.Agent != nil {
-		if err := c.validateSpireAgentHealth(health.Agent); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (c *Configuration) validateSpireServerHealth(server *SpireServerHealthConfig) error {
-	if strings.TrimSpace(server.Address) == "" {
-		return &errors.ValidationError{
-			Field:   "health.server.address",
-			Value:   server.Address,
-			Message: "SPIRE server health address cannot be empty",
-		}
-	}
-
-	// Validate paths
-	if server.LivePath != "" && !strings.HasPrefix(server.LivePath, "/") {
-		return &errors.ValidationError{
-			Field:   "health.server.live_path",
-			Value:   server.LivePath,
-			Message: "SPIRE server live path must start with '/'",
-		}
-	}
-
-	if server.ReadyPath != "" && !strings.HasPrefix(server.ReadyPath, "/") {
-		return &errors.ValidationError{
-			Field:   "health.server.ready_path",
-			Value:   server.ReadyPath,
-			Message: "SPIRE server ready path must start with '/'",
-		}
-	}
-
-	return nil
-}
-
-func (c *Configuration) validateSpireAgentHealth(agent *SpireAgentHealthConfig) error {
-	if strings.TrimSpace(agent.Address) == "" {
-		return &errors.ValidationError{
-			Field:   "health.agent.address",
-			Value:   agent.Address,
-			Message: "SPIRE agent health address cannot be empty",
-		}
-	}
-
-	// Validate paths
-	if agent.LivePath != "" && !strings.HasPrefix(agent.LivePath, "/") {
-		return &errors.ValidationError{
-			Field:   "health.agent.live_path",
-			Value:   agent.LivePath,
-			Message: "SPIRE agent live path must start with '/'",
-		}
-	}
-
-	if agent.ReadyPath != "" && !strings.HasPrefix(agent.ReadyPath, "/") {
-		return &errors.ValidationError{
-			Field:   "health.agent.ready_path",
-			Value:   agent.ReadyPath,
-			Message: "SPIRE agent ready path must start with '/'",
-		}
-	}
-
-	return nil
-}
 
 // ConfigurationProvider defines the interface for loading and providing configurations.
 type ConfigurationProvider interface {
