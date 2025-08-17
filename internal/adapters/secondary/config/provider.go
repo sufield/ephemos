@@ -4,12 +4,11 @@ package config
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
-	yaml "gopkg.in/yaml.v3"
-
+	"github.com/go-viper/mapstructure/v2"
+	"github.com/spf13/viper"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
@@ -54,21 +53,39 @@ func (p *FileProvider) LoadConfiguration(ctx context.Context, path string) (*por
 		}
 	}
 
-	data, err := os.ReadFile(cleanPath)
-	if err != nil {
+	// Use Viper for multi-format configuration loading
+	v := viper.New()
+	v.SetConfigFile(cleanPath)
+	
+	// Also read from environment (env vars take precedence)
+	v.SetEnvPrefix("EPHEMOS")
+	v.AutomaticEnv()
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	
+	// Set defaults
+	p.setConfigDefaults(v)
+	
+	// Read the config file
+	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
 	}
-
+	
+	// Unmarshal configuration
 	var config ports.Configuration
-	if err := yaml.Unmarshal(data, &config); err != nil {
+	if err := v.Unmarshal(&config, viper.DecodeHook(
+		mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToTimeDurationHookFunc(),
+			mapstructure.StringToSliceHookFunc(","),
+		),
+	)); err != nil {
 		return nil, fmt.Errorf("failed to parse config file %s: %w", path, err)
 	}
-
+	
 	// Validate the loaded configuration
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration in file %s: %w", path, err)
 	}
-
+	
 	return &config, nil
 }
 
@@ -86,4 +103,13 @@ func (p *FileProvider) GetDefaultConfiguration(_ context.Context) *ports.Configu
 			SocketPath: "/run/sockets/agent.sock", // Standard agent socket path
 		},
 	}
+}
+
+// setConfigDefaults sets default values for configuration.
+func (p *FileProvider) setConfigDefaults(v *viper.Viper) {
+	v.SetDefault("service.name", "ephemos-service")
+	v.SetDefault("service.domain", "")
+	v.SetDefault("agent.socketpath", "/run/sockets/agent.sock")
+	v.SetDefault("service.cache.ttl_minutes", 30)
+	v.SetDefault("service.cache.proactive_refresh_minutes", 10)
 }

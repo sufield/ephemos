@@ -3,18 +3,19 @@ package config
 
 import (
 	"context"
-	"os"
-	"strconv"
+	"strings"
+
+	"github.com/spf13/viper"
 )
 
 // GetBoolEnv returns a boolean environment variable value with a default.
+// Deprecated: Use viper.GetBool() with defaults instead.
 func GetBoolEnv(key string, defaultValue bool) bool {
-	if value := os.Getenv(key); value != "" {
-		if parsed, err := strconv.ParseBool(value); err == nil {
-			return parsed
-		}
-	}
-	return defaultValue
+	v := viper.New()
+	v.SetEnvPrefix("EPHEMOS")
+	v.AutomaticEnv()
+	v.SetDefault(strings.ToLower(key), defaultValue)
+	return v.GetBool(strings.ToLower(key))
 }
 
 // Environment variable names for configuration.
@@ -56,42 +57,86 @@ type TLSConfig struct {
 
 // LoadFromEnvironment creates a configuration from environment variables.
 func LoadFromEnvironment() (*Configuration, error) {
-	config := &Configuration{}
-
-	// Set values from environment variables if present
-	if serviceName := os.Getenv(EnvServiceName); serviceName != "" {
-		config.Service.Name = serviceName
-	} else {
-		config.Service.Name = "ephemos-service"
+	v := viper.New()
+	
+	// Configure viper for environment variables
+	v.SetEnvPrefix("EPHEMOS")
+	v.AutomaticEnv()
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	
+	// Set defaults
+	setConfigDefaults(v)
+	
+	// Unmarshal configuration
+	var config Configuration
+	if err := v.Unmarshal(&config); err != nil {
+		return nil, err
 	}
-
-	if trustDomain := os.Getenv(EnvTrustDomain); trustDomain != "" {
-		config.Service.Domain = trustDomain
-	} else {
-		config.Service.Domain = "default.local"
-	}
-
-	// Set transport defaults
-	config.Transport.Type = "http"
-	if bindAddress := os.Getenv(EnvBindAddress); bindAddress != "" {
-		config.Transport.Address = bindAddress
-	} else {
-		config.Transport.Address = ":8080"
-	}
-
-	return config, nil
+	
+	return &config, nil
 }
 
 // LoadFromYAML loads configuration from a YAML file.
 func LoadFromYAML(ctx context.Context, path string) (*Configuration, error) {
-	// For now, fall back to environment loading
-	// In a real implementation, this would parse YAML
-	envConfig, err := LoadFromEnvironment()
-	if err != nil {
-		// If env loading fails, return default config
-		return GetDefault(), nil
+	return LoadFromFile(ctx, path, "yaml")
+}
+
+// LoadFromJSON loads configuration from a JSON file.
+func LoadFromJSON(ctx context.Context, path string) (*Configuration, error) {
+	return LoadFromFile(ctx, path, "json")
+}
+
+// LoadFromTOML loads configuration from a TOML file.
+func LoadFromTOML(ctx context.Context, path string) (*Configuration, error) {
+	return LoadFromFile(ctx, path, "toml")
+}
+
+// LoadFromFile loads configuration from a file with automatic format detection.
+// Supports YAML, JSON, and TOML formats.
+func LoadFromFile(ctx context.Context, path string, configType string) (*Configuration, error) {
+	v := viper.New()
+	
+	// Configure viper for file loading
+	if configType != "" {
+		v.SetConfigFile(path)
+		v.SetConfigType(configType)
+	} else {
+		// Auto-detect format from file extension
+		v.SetConfigFile(path)
 	}
-	return envConfig, nil
+	
+	// Also read from environment (env vars take precedence)
+	v.SetEnvPrefix("EPHEMOS")
+	v.AutomaticEnv()
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	
+	// Set defaults
+	setConfigDefaults(v)
+	
+	// Read the config file
+	if err := v.ReadInConfig(); err != nil {
+		// If file loading fails, fall back to environment loading
+		return LoadFromEnvironment()
+	}
+	
+	// Unmarshal configuration
+	var config Configuration
+	if err := v.Unmarshal(&config); err != nil {
+		return nil, err
+	}
+	
+	return &config, nil
+}
+
+// setConfigDefaults sets default values for configuration.
+func setConfigDefaults(v *viper.Viper) {
+	v.SetDefault("service.name", "ephemos-service")
+	v.SetDefault("service.domain", "default.local")
+	v.SetDefault("transport.type", "http")
+	v.SetDefault("transport.address", ":8080")
+	v.SetDefault("transport.tls.enabled", true)
+	v.SetDefault("transport.tls.certfile", "")
+	v.SetDefault("transport.tls.keyfile", "")
 }
 
 // GetDefault returns a configuration with sensible defaults.
