@@ -3,10 +3,12 @@ package transport
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"google.golang.org/grpc"
@@ -84,22 +86,49 @@ func (c *grpcClient) Connect(serviceName, address string) (ports.ConnectionPort,
 	}, nil
 }
 
-// isNetworkError checks if the error is network-related.
+// isNetworkError checks if the error is network-related using modern error handling.
 func isNetworkError(err error) bool {
-	// Check for common network error patterns
-	return strings.Contains(err.Error(), "connection refused") ||
-		strings.Contains(err.Error(), "network unreachable") ||
-		strings.Contains(err.Error(), "timeout") ||
-		strings.Contains(err.Error(), "no such host")
+	// Use errors.Is for syscall errors (Go 1.13+ best practice)
+	if errors.Is(err, syscall.ECONNREFUSED) || 
+		errors.Is(err, syscall.ENETUNREACH) ||
+		errors.Is(err, syscall.ETIMEDOUT) {
+		return true
+	}
+
+	// Check for net.OpError which wraps network errors
+	var netErr *net.OpError
+	if errors.As(err, &netErr) {
+		return true
+	}
+
+	// Fallback: check for common network error patterns in error messages
+	errStr := err.Error()
+	return strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "network unreachable") ||
+		strings.Contains(errStr, "timeout") ||
+		strings.Contains(errStr, "no such host")
 }
 
-// isTLSError checks if the error is TLS/authentication-related.
+// isTLSError checks if the error is TLS/authentication-related using modern error handling.
 func isTLSError(err error) bool {
-	// Check for common TLS error patterns
-	return strings.Contains(err.Error(), "certificate") ||
-		strings.Contains(err.Error(), "tls") ||
-		strings.Contains(err.Error(), "handshake") ||
-		strings.Contains(err.Error(), "authentication")
+	// Check for specific TLS error types (Go 1.13+ best practice)
+	var tlsErr tls.RecordHeaderError
+	if errors.As(err, &tlsErr) {
+		return true
+	}
+
+	// Check for certificate validation errors
+	var certErr *tls.CertificateVerificationError
+	if errors.As(err, &certErr) {
+		return true
+	}
+
+	// Fallback: check for common TLS error patterns in error messages
+	errStr := err.Error()
+	return strings.Contains(errStr, "certificate") ||
+		strings.Contains(errStr, "tls") ||
+		strings.Contains(errStr, "handshake") ||
+		strings.Contains(errStr, "authentication")
 }
 
 // Close releases any resources held by the client.

@@ -248,7 +248,7 @@ if command_exists go; then
     # golangci-lint (using official installer for latest version)
     if ! command_exists golangci-lint; then
         echo "Installing golangci-lint..."
-        if curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b "$GOPATH/bin" v1.55.2; then
+        if curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b "$GOPATH/bin" v1.64.8; then
             echo -e "${GREEN}✓ golangci-lint installed${NC}"
         else
             echo -e "${YELLOW}⚠️  Failed to install golangci-lint (optional)${NC}"

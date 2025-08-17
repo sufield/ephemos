@@ -5,6 +5,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -267,17 +268,17 @@ func (h *HealthMonitorService) Close() error {
 
 	// Close all reporters
 	h.mu.Lock()
-	var errors []error
+	var errs []error
 	for _, reporter := range h.reporters {
 		if err := reporter.Close(); err != nil {
-			errors = append(errors, err)
+			errs = append(errs, err)
 		}
 	}
 	h.reporters = nil
 	h.mu.Unlock()
 
-	if len(errors) > 0 {
-		return fmt.Errorf("failed to close some reporters: %v", errors)
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to close some reporters: %w", errors.Join(errs...))
 	}
 
 	h.logger.Info("Health monitoring service closed")

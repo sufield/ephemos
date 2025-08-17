@@ -166,7 +166,7 @@ func IdentityClient(ctx context.Context, opts ...ClientOption) (Client, error) {
 	// Load configuration from options
 	config, err := loadClientConfig(options)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConfigInvalid, err)
+		return nil, fmt.Errorf("%w: %w", ErrConfigInvalid, err)
 	}
 
 	// Create SPIFFE/SPIRE-backed dialer via factory
@@ -210,7 +210,7 @@ func IdentityServer(ctx context.Context, opts ...ServerOption) (Server, error) {
 	// Load configuration from options
 	config, err := loadServerConfig(options)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConfigInvalid, err)
+		return nil, fmt.Errorf("%w: %w", ErrConfigInvalid, err)
 	}
 
 	// Create SPIFFE/SPIRE-backed server via factory
@@ -295,7 +295,7 @@ func (c *clientWrapper) Connect(ctx context.Context, target string, opts ...Dial
 	// For now, use a default service name - this could be enhanced with service discovery
 	conn, err := c.dialer.Connect(dialCtx, "default", target)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
 
 	return &clientConnectionImpl{conn: conn}, nil

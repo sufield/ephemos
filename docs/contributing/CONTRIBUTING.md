@@ -71,7 +71,7 @@ source ~/.bashrc
 ### Optional Development Tools
 ```bash
 # golangci-lint for linting
-curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
+curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.8
 ```
 
 ## Development Workflow
