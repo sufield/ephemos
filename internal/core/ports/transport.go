@@ -2,6 +2,7 @@ package ports
 
 import (
 	"errors"
+	"net"
 
 	"github.com/sufield/ephemos/internal/core/domain"
 )
@@ -33,6 +34,9 @@ type ClientPort interface {
 type ConnectionPort interface {
 	// GetClientConnection returns the underlying connection for service clients
 	GetClientConnection() interface{}
+	// AsNetConn safely converts the connection to a net.Conn if possible
+	// Returns nil if the connection is not a net.Conn
+	AsNetConn() net.Conn
 	// Close closes the connection
 	Close() error
 }

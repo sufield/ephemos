@@ -46,7 +46,7 @@ func TestPublicAPI(t *testing.T) {
 
 func TestClientConnection(t *testing.T) {
 	// Test ClientConnection
-	conn := &ClientConnection{}
+	conn := &clientConnectionImpl{}
 	err := conn.Close()
 	if err != nil {
 		t.Errorf("ClientConnection.Close() returned error: %v", err)

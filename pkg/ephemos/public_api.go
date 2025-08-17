@@ -72,7 +72,7 @@ type Client interface {
 	// Connect establishes an authenticated connection to the specified target service.
 	// The target should be in "host:port" format.
 	// Options can be used to configure connection-specific behavior.
-	Connect(ctx context.Context, target string, opts ...DialOption) (*ClientConnection, error)
+	Connect(ctx context.Context, target string, opts ...DialOption) (ClientConnection, error)
 
 	// Close releases any resources held by the client.
 	// It is safe to call Close multiple times.
@@ -85,9 +85,9 @@ type clientConn interface {
 	Close() error
 }
 
-// ClientConnection represents an established authenticated connection to a service.
+// clientConnectionImpl represents an established authenticated connection to a service.
 // Methods are safe for concurrent use by multiple goroutines.
-type ClientConnection struct {
+type clientConnectionImpl struct {
 	conn   clientConn
 	mu     sync.RWMutex
 	closed bool
@@ -96,7 +96,7 @@ type ClientConnection struct {
 // HTTPClient returns an HTTP client configured with SPIFFE certificate authentication.
 // The returned client can be used to make authenticated HTTP requests to the connected service.
 // Multiple calls return the same client instance.
-func (c *ClientConnection) HTTPClient() (*http.Client, error) {
+func (c *clientConnectionImpl) HTTPClient() (*http.Client, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -113,7 +113,7 @@ func (c *ClientConnection) HTTPClient() (*http.Client, error) {
 
 // Close closes the connection and releases resources.
 // It is safe to call Close multiple times.
-func (c *ClientConnection) Close() error {
+func (c *clientConnectionImpl) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -263,7 +263,7 @@ type clientWrapper struct {
 	closed  bool
 }
 
-func (c *clientWrapper) Connect(ctx context.Context, target string, opts ...DialOption) (*ClientConnection, error) {
+func (c *clientWrapper) Connect(ctx context.Context, target string, opts ...DialOption) (ClientConnection, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -294,7 +294,7 @@ func (c *clientWrapper) Connect(ctx context.Context, target string, opts ...Dial
 		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, err)
 	}
 
-	return &ClientConnection{conn: conn}, nil
+	return &clientConnectionImpl{conn: conn}, nil
 }
 
 func (c *clientWrapper) Close() error {

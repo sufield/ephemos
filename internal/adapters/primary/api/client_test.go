@@ -3,6 +3,7 @@ package api_test
 import (
 	"context"
 	"errors"
+	"net"
 	"testing"
 
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
@@ -59,6 +60,11 @@ type mockConnection struct{}
 func (m *mockConnection) GetClientConnection() interface{} {
 	// Return a mock gRPC connection
 	return &grpc.ClientConn{}
+}
+
+func (m *mockConnection) AsNetConn() net.Conn {
+	// Mock connections don't support net.Conn interface
+	return nil
 }
 
 func (m *mockConnection) Close() error {

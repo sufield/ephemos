@@ -128,11 +128,3 @@ func WithDialTimeout(timeout time.Duration) DialOption {
 	}
 }
 
-// ConfigLoader defines an interface for loading configuration from various sources.
-// This allows for custom configuration loading strategies beyond simple file paths.
-type ConfigLoader interface {
-	// LoadConfiguration loads configuration from the specified source.
-	// The source parameter can be a file path, URL, or other identifier
-	// depending on the implementation.
-	LoadConfiguration(source string) (*ports.Configuration, error)
-}
