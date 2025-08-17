@@ -59,7 +59,7 @@ type mockServer struct {
 	stopped chan struct{}
 }
 
-func (m *mockServer) Start(listener ports.ListenerPort) error {
+func (m *mockServer) Start(listener net.Listener) error {
 	m.started.Done()
 	<-m.stopped
 	return nil

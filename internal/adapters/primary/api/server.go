@@ -138,10 +138,9 @@ func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
 
 	slog.Info("Server ready", "service", s.serviceName, "address", listener.Addr().String())
 
-	portListener := &netListenerAdapter{listener: listener}
 	errCh := make(chan error, 1)
 
-	go func() { errCh <- s.domainServer.Start(portListener) }()
+	go func() { errCh <- s.domainServer.Start(listener) }()
 
 	select {
 	case <-ctx.Done():
@@ -187,22 +186,3 @@ func (a *serviceRegistrarAdapter) Register(server interface{}) {
 	}
 }
 
-// netListenerAdapter adapts net.Listener to ports.ListenerPort.
-type netListenerAdapter struct {
-	listener net.Listener
-}
-
-// Accept waits for and returns the next connection.
-func (l *netListenerAdapter) Accept() (interface{}, error) {
-	return l.listener.Accept()
-}
-
-// Close closes the listener.
-func (l *netListenerAdapter) Close() error {
-	return l.listener.Close()
-}
-
-// Addr returns the listener's network address.
-func (l *netListenerAdapter) Addr() string {
-	return l.listener.Addr().String()
-}

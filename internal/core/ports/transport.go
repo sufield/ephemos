@@ -15,7 +15,7 @@ type ServerPort interface {
 	// RegisterService registers a service with the server
 	RegisterService(serviceRegistrar ServiceRegistrarPort) error
 	// Start begins listening on the provided listener
-	Start(listener ListenerPort) error
+	Start(listener net.Listener) error
 	// Stop gracefully shuts down the server
 	Stop() error
 }
@@ -39,15 +39,6 @@ type ConnectionPort interface {
 	Close() error
 }
 
-// ListenerPort represents a network listener abstraction.
-type ListenerPort interface {
-	// Accept waits for and returns the next connection
-	Accept() (interface{}, error)
-	// Close closes the listener
-	Close() error
-	// Addr returns the listener's network address
-	Addr() string
-}
 
 // ServiceRegistrarPort abstracts service registration without framework dependencies.
 type ServiceRegistrarPort interface {
