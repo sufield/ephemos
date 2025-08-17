@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
+	"text/template"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -14,6 +16,25 @@ import (
 	"github.com/sufield/ephemos/internal/adapters/secondary/verification"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
+
+// Output templates for verification results
+const verifyResultTemplate = `{{if .Valid}}✅{{else}}❌{{end}} Identity Verification
+Identity: {{.Identity}}
+Trust Domain: {{.TrustDomain}}
+Valid: {{.Valid}}
+Message: {{.Message}}
+Verified At: {{.VerifiedAt.Format "2006-01-02 15:04:05"}}
+{{if not .NotBefore.IsZero}}Not Before: {{.NotBefore.Format "2006-01-02 15:04:05"}}{{end}}
+{{if not .NotAfter.IsZero}}Not After: {{.NotAfter.Format "2006-01-02 15:04:05"}}{{end}}
+{{if .SerialNumber}}Serial Number: {{.SerialNumber}}{{end}}`
+
+const identityInfoTemplate = `🆔 Current Identity
+SPIFFE ID: {{.SPIFFEID}}
+Trust Domain: {{.SPIFFEID.TrustDomain}}
+Source: {{.Source}}
+Fetched At: {{.FetchedAt.Format "2006-01-02 15:04:05"}}
+Has SVID: {{if .SVID}}true{{else}}false{{end}}
+Has Trust Bundle: {{if .TrustBundle}}true{{else}}false{{end}}`
 
 var verifyCmd = &cobra.Command{
 	Use:   "verify",
@@ -37,8 +58,9 @@ identity matches the expected SPIFFE ID.
 
 Example:
   ephemos verify identity spiffe://example.org/myservice`,
-	Args: cobra.ExactArgs(1),
-	RunE: runVerifyIdentity,
+	Args:    cobra.ExactArgs(1),
+	PreRunE: validateVerifyIdentityArgs,
+	RunE:    runVerifyIdentity,
 }
 
 var verifyCurrentCmd = &cobra.Command{
@@ -59,8 +81,9 @@ and verifies the peer's identity.
 
 Example:
   ephemos verify connection spiffe://example.org/backend localhost:8080`,
-	Args: cobra.ExactArgs(2),
-	RunE: runVerifyConnection,
+	Args:    cobra.ExactArgs(2),
+	PreRunE: validateVerifyConnectionArgs,
+	RunE:    runVerifyConnection,
 }
 
 var verifyRefreshCmd = &cobra.Command{
@@ -79,6 +102,16 @@ func init() {
 	verifyCmd.PersistentFlags().String("trust-domain", "", "Expected trust domain")
 	verifyCmd.PersistentFlags().StringSlice("allowed-ids", []string{}, "Allowed SPIFFE IDs")
 
+	// Add completions for common values
+	verifyCmd.RegisterFlagCompletionFunc("trust-domain", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{
+			"example.org\tDefault domain",
+			"localhost\tLocal development",
+			"prod.company.com\tProduction",
+			"staging.company.com\tStaging",
+		}, cobra.ShellCompDirectiveNoFileComp
+	})
+
 	// Add subcommands
 	verifyCmd.AddCommand(verifyIdentityCmd)
 	verifyCmd.AddCommand(verifyCurrentCmd)
@@ -86,111 +119,100 @@ func init() {
 	verifyCmd.AddCommand(verifyRefreshCmd)
 }
 
-func runVerifyIdentity(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-	expectedIDStr := args[0]
-
-	// Parse expected SPIFFE ID
-	expectedID, err := spiffeid.FromString(expectedIDStr)
-	if err != nil {
-		return fmt.Errorf("invalid SPIFFE ID %s: %w", expectedIDStr, err)
+// validateVerifyIdentityArgs validates the SPIFFE ID argument
+func validateVerifyIdentityArgs(cmd *cobra.Command, args []string) error {
+	if _, err := spiffeid.FromString(args[0]); err != nil {
+		return fmt.Errorf("invalid SPIFFE ID %s: %w", args[0], err)
 	}
+	return nil
+}
 
-	// Create verifier
+// validateVerifyConnectionArgs validates connection arguments
+func validateVerifyConnectionArgs(cmd *cobra.Command, args []string) error {
+	if _, err := spiffeid.FromString(args[0]); err != nil {
+		return fmt.Errorf("invalid target SPIFFE ID %s: %w", args[0], err)
+	}
+	// Basic address validation could be added here
+	return nil
+}
+
+func runVerifyIdentity(cmd *cobra.Command, args []string) error {
+	expectedID, _ := spiffeid.FromString(args[0]) // Already validated in PreRunE
+
 	verifier, err := createIdentityVerifier(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to create identity verifier: %w", err)
 	}
 	defer verifier.Close()
 
-	// Verify identity
-	result, err := verifier.VerifyIdentity(ctx, expectedID)
+	result, err := verifier.VerifyIdentity(cmd.Context(), expectedID)
 	if err != nil {
 		return fmt.Errorf("identity verification failed: %w", err)
 	}
 
-	return outputVerificationResult(cmd, result)
+	return outputResult(cmd, result)
 }
 
 func runVerifyCurrent(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-
-	// Create verifier
 	verifier, err := createIdentityVerifier(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to create identity verifier: %w", err)
 	}
 	defer verifier.Close()
 
-	// Get current identity
-	identity, err := verifier.GetCurrentIdentity(ctx)
+	identity, err := verifier.GetCurrentIdentity(cmd.Context())
 	if err != nil {
 		return fmt.Errorf("failed to get current identity: %w", err)
 	}
 
-	return outputIdentityInfo(cmd, identity)
+	return outputIdentity(cmd, identity)
 }
 
 func runVerifyConnection(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-	targetIDStr := args[0]
+	targetID, _ := spiffeid.FromString(args[0]) // Already validated in PreRunE
 	address := args[1]
 
-	// Parse target SPIFFE ID
-	targetID, err := spiffeid.FromString(targetIDStr)
-	if err != nil {
-		return fmt.Errorf("invalid target SPIFFE ID %s: %w", targetIDStr, err)
-	}
-
-	// Create verifier
 	verifier, err := createIdentityVerifier(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to create identity verifier: %w", err)
 	}
 	defer verifier.Close()
 
-	// Validate connection
-	result, err := verifier.ValidateConnection(ctx, targetID, address)
+	result, err := verifier.ValidateConnection(cmd.Context(), targetID, address)
 	if err != nil {
 		return fmt.Errorf("connection validation failed: %w", err)
 	}
 
-	return outputVerificationResult(cmd, result)
+	return outputResult(cmd, result)
 }
 
 func runVerifyRefresh(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-
-	// Create verifier
 	verifier, err := createIdentityVerifier(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to create identity verifier: %w", err)
 	}
 	defer verifier.Close()
 
-	// Refresh identity
-	identity, err := verifier.RefreshIdentity(ctx)
+	identity, err := verifier.RefreshIdentity(cmd.Context())
 	if err != nil {
 		return fmt.Errorf("failed to refresh identity: %w", err)
 	}
 
-	return outputIdentityInfo(cmd, identity)
+	return outputIdentity(cmd, identity)
 }
 
 func createIdentityVerifier(cmd *cobra.Command) (*verification.SpireIdentityVerifier, error) {
 	config := &ports.VerificationConfig{}
 
-	// Get socket path
+	// Get configuration from flags
 	if socket, _ := cmd.Flags().GetString("socket"); socket != "" {
 		config.WorkloadAPISocket = socket
 	}
 
-	// Get timeout
 	if timeout, _ := cmd.Flags().GetDuration("timeout"); timeout > 0 {
 		config.Timeout = timeout
 	}
 
-	// Get trust domain
 	if trustDomain, _ := cmd.Flags().GetString("trust-domain"); trustDomain != "" {
 		td, err := spiffeid.TrustDomainFromString(trustDomain)
 		if err != nil {
@@ -199,7 +221,6 @@ func createIdentityVerifier(cmd *cobra.Command) (*verification.SpireIdentityVeri
 		config.TrustDomain = td
 	}
 
-	// Get allowed SPIFFE IDs
 	if allowedIDs, _ := cmd.Flags().GetStringSlice("allowed-ids"); len(allowedIDs) > 0 {
 		for _, idStr := range allowedIDs {
 			id, err := spiffeid.FromString(idStr)
@@ -213,64 +234,72 @@ func createIdentityVerifier(cmd *cobra.Command) (*verification.SpireIdentityVeri
 	return verification.NewSpireIdentityVerifier(config)
 }
 
-func outputVerificationResult(cmd *cobra.Command, result *ports.IdentityVerificationResult) error {
+// outputJSONData is a utility function to encode any data as JSON to stdout
+func outputJSONData(data interface{}) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(data)
+}
+
+// outputOptions holds common output configuration flags
+type outputOptions struct {
+	Format  string
+	Quiet   bool
+	NoEmoji bool
+}
+
+// getOutputOptions extracts common output flags from a Cobra command
+func getOutputOptions(cmd *cobra.Command) outputOptions {
 	format, _ := cmd.Flags().GetString("format")
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	noEmoji, _ := cmd.Flags().GetBool("no-emoji")
-
-	switch format {
-	case "json":
-		return json.NewEncoder(os.Stdout).Encode(result)
-	default:
-		return outputVerificationResultText(result, quiet, noEmoji)
-	}
-}
-
-func outputVerificationResultText(result *ports.IdentityVerificationResult, quiet, noEmoji bool) error {
-	// Status indicator
-	status := "❌"
-	if noEmoji {
-		status = "[FAIL]"
-	}
-	if result.Valid {
-		status = "✅"
-		if noEmoji {
-			status = "[PASS]"
-		}
-	}
-
-	fmt.Printf("%s Identity Verification\n", status)
 	
-	if !quiet {
-		fmt.Printf("Identity: %s\n", result.Identity)
-		fmt.Printf("Trust Domain: %s\n", result.TrustDomain)
-		fmt.Printf("Valid: %t\n", result.Valid)
-		fmt.Printf("Message: %s\n", result.Message)
-		fmt.Printf("Verified At: %s\n", result.VerifiedAt.Format(time.RFC3339))
-		
-		if !result.NotBefore.IsZero() {
-			fmt.Printf("Not Before: %s\n", result.NotBefore.Format(time.RFC3339))
-		}
-		if !result.NotAfter.IsZero() {
-			fmt.Printf("Not After: %s\n", result.NotAfter.Format(time.RFC3339))
-		}
-		if result.SerialNumber != "" {
-			fmt.Printf("Serial Number: %s\n", result.SerialNumber)
-		}
-		// Key usage details available via 'ephemos inspect svid' command
+	return outputOptions{
+		Format:  format,
+		Quiet:   quiet,
+		NoEmoji: noEmoji,
 	}
-
-	return nil
 }
 
-func outputIdentityInfo(cmd *cobra.Command, identity *ports.IdentityInfo) error {
-	format, _ := cmd.Flags().GetString("format")
-	quiet, _ := cmd.Flags().GetBool("quiet")
-	noEmoji, _ := cmd.Flags().GetBool("no-emoji")
+// outputResult outputs verification result using template or JSON
+func outputResult(cmd *cobra.Command, result *ports.IdentityVerificationResult) error {
+	opts := getOutputOptions(cmd)
 
-	switch format {
+	if opts.Quiet && !result.Valid {
+		return fmt.Errorf("verification failed")
+	}
+
+	if opts.Quiet {
+		return nil
+	}
+
+	switch opts.Format {
 	case "json":
-		// Create a JSON-safe version of identity info
+		return outputJSONData(result)
+	default:
+		// Use template for text output
+		tmplText := verifyResultTemplate
+		if opts.NoEmoji {
+			tmplText = replaceEmojis(tmplText)
+		}
+
+		tmpl := template.Must(template.New("result").Parse(tmplText))
+		return tmpl.Execute(os.Stdout, result)
+	}
+}
+
+// outputIdentity outputs identity info using template or JSON
+func outputIdentity(cmd *cobra.Command, identity *ports.IdentityInfo) error {
+	opts := getOutputOptions(cmd)
+
+	if opts.Quiet {
+		fmt.Println(identity.SPIFFEID.String())
+		return nil
+	}
+
+	switch opts.Format {
+	case "json":
+		// Create a JSON-safe version
 		jsonIdentity := struct {
 			SPIFFEID    string    `json:"spiffe_id"`
 			TrustDomain string    `json:"trust_domain"`
@@ -286,35 +315,30 @@ func outputIdentityInfo(cmd *cobra.Command, identity *ports.IdentityInfo) error 
 			HasSVID:     identity.SVID != nil,
 			HasBundle:   identity.TrustBundle != nil,
 		}
-		return json.NewEncoder(os.Stdout).Encode(jsonIdentity)
+		return outputJSONData(jsonIdentity)
 	default:
-		return outputIdentityInfoText(identity, quiet, noEmoji)
+		// Use template for text output
+		tmplText := identityInfoTemplate
+		if opts.NoEmoji {
+			tmplText = replaceEmojis(tmplText)
+		}
+
+		tmpl := template.Must(template.New("identity").Parse(tmplText))
+		return tmpl.Execute(os.Stdout, identity)
 	}
 }
 
-func outputIdentityInfoText(identity *ports.IdentityInfo, quiet, noEmoji bool) error {
-	// Status indicator
-	status := "🆔"
-	if noEmoji {
-		status = "[ID]"
+// replaceEmojis replaces emojis with text equivalents
+func replaceEmojis(text string) string {
+	replacements := map[string]string{
+		"✅": "[PASS]",
+		"❌": "[FAIL]",
+		"🆔": "[ID]",
 	}
 
-	fmt.Printf("%s Current Identity\n", status)
-	
-	if !quiet {
-		fmt.Printf("SPIFFE ID: %s\n", identity.SPIFFEID)
-		fmt.Printf("Trust Domain: %s\n", identity.SPIFFEID.TrustDomain())
-		fmt.Printf("Source: %s\n", identity.Source)
-		fmt.Printf("Fetched At: %s\n", identity.FetchedAt.Format(time.RFC3339))
-		fmt.Printf("Has SVID: %t\n", identity.SVID != nil)
-		fmt.Printf("Has Trust Bundle: %t\n", identity.TrustBundle != nil)
-
-		if identity.SVID != nil && len(identity.SVID.Certificates) > 0 {
-			cert := identity.SVID.Certificates[0]
-			fmt.Printf("Certificate Expires: %s\n", cert.NotAfter.Format(time.RFC3339))
-			fmt.Printf("Certificate Serial: %s\n", cert.SerialNumber.String())
-		}
+	result := text
+	for emoji, replacement := range replacements {
+		result = strings.ReplaceAll(result, emoji, replacement)
 	}
-
-	return nil
+	return result
 }

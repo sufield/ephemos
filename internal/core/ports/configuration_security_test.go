@@ -30,8 +30,8 @@ func TestLoadFromEnvironment(t *testing.T) {
 		{
 			name: "valid production configuration",
 			envVars: map[string]string{
-				ports.EnvServiceName:  "payment-service",
-				ports.EnvTrustDomain:  "prod.company.com",
+				ports.EnvServiceName: "payment-service",
+				ports.EnvTrustDomain: "prod.company.com",
 				ports.EnvAgentSocket: "/run/spire/sockets/api.sock",
 			},
 			expectError: false,

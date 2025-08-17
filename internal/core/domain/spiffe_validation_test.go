@@ -51,11 +51,11 @@ func TestSPIFFEValidator_ValidateSPIFFEID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validator.ValidateSPIFFEID(tt.spiffeID)
-			
+
 			if tt.wantError && err == nil {
 				t.Errorf("ValidateSPIFFEID() expected error for %q, got nil", tt.spiffeID)
 			}
-			
+
 			if !tt.wantError && err != nil {
 				t.Errorf("ValidateSPIFFEID() unexpected error for %q: %v", tt.spiffeID, err)
 			}
@@ -165,11 +165,11 @@ func TestSPIFFEValidator_ValidateSPIFFEID_EdgeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validator.ValidateSPIFFEID(tt.spiffeID)
-			
+
 			if tt.wantError && err == nil {
 				t.Errorf("ValidateSPIFFEID() expected error for %q, got nil", tt.spiffeID)
 			}
-			
+
 			if !tt.wantError && err != nil {
 				t.Errorf("ValidateSPIFFEID() unexpected error for %q: %v", tt.spiffeID, err)
 			}
@@ -201,7 +201,7 @@ func TestSPIFFEValidationIntegration(t *testing.T) {
 			isValid := err == nil
 
 			if isValid != tc.expected {
-				t.Errorf("SPIFFE ID %q: expected valid=%v, got valid=%v, error=%v", 
+				t.Errorf("SPIFFE ID %q: expected valid=%v, got valid=%v, error=%v",
 					tc.input, tc.expected, isValid, err)
 			}
 		})

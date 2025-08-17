@@ -18,10 +18,10 @@ var (
 	ErrDemoServiceName    = errors.New("service name contains demo")
 
 	// Configuration security errors
-	ErrDebugEnabled        = errors.New("debug mode enabled")
-	ErrInsecureSkipVerify  = errors.New("certificate validation disabled")
-	ErrWildcardClients     = errors.New("wildcard authorized clients")
-	ErrInsecureSocketPath  = errors.New("socket path not in secure directory")
+	ErrDebugEnabled       = errors.New("debug mode enabled")
+	ErrInsecureSkipVerify = errors.New("certificate validation disabled")
+	ErrWildcardClients    = errors.New("wildcard authorized clients")
+	ErrInsecureSocketPath = errors.New("socket path not in secure directory")
 
 	// Environment errors
 	ErrVerboseLogging = errors.New("verbose logging enabled")

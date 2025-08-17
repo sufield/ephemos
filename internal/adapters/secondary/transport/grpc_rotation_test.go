@@ -26,10 +26,10 @@ import (
 
 // TestRotatableSource implements both x509svid.Source and x509bundle.Source for testing
 type TestRotatableSource struct {
-	mu           sync.RWMutex
-	currentSVID  atomic.Value // *x509svid.SVID
+	mu            sync.RWMutex
+	currentSVID   atomic.Value // *x509svid.SVID
 	currentBundle atomic.Value // *x509bundle.Bundle
-	rotateCount  int
+	rotateCount   int
 }
 
 // Global test CA for all certificates
@@ -45,7 +45,7 @@ func initTestCA(t *testing.T) (*rsa.PrivateKey, *x509.Certificate) {
 		var err error
 		testCAKey, err = rsa.GenerateKey(rand.Reader, 2048)
 		require.NoError(t, err)
-		
+
 		caTemplate := &x509.Certificate{
 			SerialNumber: big.NewInt(1000),
 			Subject: pkix.Name{
@@ -59,10 +59,10 @@ func initTestCA(t *testing.T) (*rsa.PrivateKey, *x509.Certificate) {
 			BasicConstraintsValid: true,
 			IsCA:                  true,
 		}
-		
+
 		caCertDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &testCAKey.PublicKey, testCAKey)
 		require.NoError(t, err)
-		
+
 		testCACert, err = x509.ParseCertificate(caCertDER)
 		require.NoError(t, err)
 	})
@@ -72,15 +72,15 @@ func initTestCA(t *testing.T) (*rsa.PrivateKey, *x509.Certificate) {
 // NewTestRotatableSource creates a new test source
 func NewTestRotatableSource(t *testing.T, spiffeID string) *TestRotatableSource {
 	source := &TestRotatableSource{}
-	
+
 	// Initialize test CA
 	initTestCA(t)
-	
+
 	// Create initial SVID and bundle
 	svid, bundle := createTestSVIDAndBundle(t, spiffeID, 1)
 	source.currentSVID.Store(svid)
 	source.currentBundle.Store(bundle)
-	
+
 	return source
 }
 
@@ -106,10 +106,10 @@ func (s *TestRotatableSource) GetX509BundleForTrustDomain(td spiffeid.TrustDomai
 func (s *TestRotatableSource) Rotate(t *testing.T, spiffeID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	s.rotateCount++
 	svid, bundle := createTestSVIDAndBundle(t, spiffeID, s.rotateCount+1)
-	
+
 	s.currentSVID.Store(svid)
 	s.currentBundle.Store(bundle)
 }
@@ -124,14 +124,14 @@ func (s *TestRotatableSource) GetRotateCount() int {
 // createTestSVIDAndBundle creates test certificates
 func createTestSVIDAndBundle(t *testing.T, spiffeID string, serial int) (*x509svid.SVID, *x509bundle.Bundle) {
 	caPrivateKey, caCert := initTestCA(t)
-	
+
 	id, err := spiffeid.FromString(spiffeID)
 	require.NoError(t, err)
-	
+
 	// Generate leaf key pair
 	leafPrivateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
-	
+
 	// Create leaf certificate template
 	leafTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(int64(serial)),
@@ -146,25 +146,25 @@ func createTestSVIDAndBundle(t *testing.T, spiffeID string, serial int) (*x509sv
 		BasicConstraintsValid: true,
 		URIs:                  []*url.URL{id.URL()},
 	}
-	
+
 	// Sign the leaf certificate
 	leafCertDER, err := x509.CreateCertificate(rand.Reader, leafTemplate, caCert, &leafPrivateKey.PublicKey, caPrivateKey)
 	require.NoError(t, err)
-	
+
 	leafCert, err := x509.ParseCertificate(leafCertDER)
 	require.NoError(t, err)
-	
+
 	// Create SVID
 	svid := &x509svid.SVID{
 		ID:           id,
 		Certificates: []*x509.Certificate{leafCert, caCert},
 		PrivateKey:   leafPrivateKey,
 	}
-	
+
 	// Create trust bundle
 	bundle := x509bundle.New(id.TrustDomain())
 	bundle.AddX509Authority(caCert)
-	
+
 	return svid, bundle
 }
 
@@ -173,36 +173,36 @@ func TestGRPCProviderRotation(t *testing.T) {
 	// Create test sources
 	clientSource := NewTestRotatableSource(t, "spiffe://test.example.org/client")
 	serverSource := NewTestRotatableSource(t, "spiffe://test.example.org/server")
-	
+
 	// Create provider with sources
 	provider := NewRotatableGRPCProvider(nil)
 	provider.SetSources(serverSource, serverSource, tlsconfig.AuthorizeAny())
-	
+
 	// Create server
 	serverPort, err := provider.CreateServer(nil, nil, nil)
 	require.NoError(t, err)
-	
+
 	// Mock service registrar
 	registrar := &mockServiceRegistrar{}
 	err = serverPort.RegisterService(registrar)
 	require.NoError(t, err)
-	
+
 	// Start server on random port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	defer listener.Close()
-	
+
 	mockListener := &mockListenerPort{listener: listener}
-	
+
 	go func() {
 		serverPort.Start(mockListener)
 	}()
 	defer serverPort.Stop()
-	
+
 	// Create client provider
 	clientProvider := NewRotatableGRPCProvider(nil)
 	clientProvider.SetSources(clientSource, clientSource, tlsconfig.AuthorizeAny())
-	
+
 	// Helper function to test connection and get certificate serial
 	testConnection := func() (int64, error) {
 		clientPort, err := clientProvider.CreateClient(nil, nil, nil)
@@ -210,35 +210,35 @@ func TestGRPCProviderRotation(t *testing.T) {
 			return 0, err
 		}
 		defer clientPort.Close()
-		
+
 		conn, err := clientPort.Connect("test-service", listener.Addr().String())
 		if err != nil {
 			return 0, err
 		}
 		defer conn.Close()
-		
+
 		// For testing, we'll use the source directly to get the serial
 		svid, err := clientSource.GetX509SVID()
 		if err != nil {
 			return 0, err
 		}
-		
+
 		return svid.Certificates[0].SerialNumber.Int64(), nil
 	}
-	
+
 	// Test 1: Initial connection
 	serial1, err := testConnection()
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), serial1, "Initial serial should be 1")
-	
+
 	// Test 2: Rotate client certificate
 	clientSource.Rotate(t, "spiffe://test.example.org/client")
-	
+
 	// Test 3: New connection should see rotated certificate
 	serial2, err := testConnection()
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), serial2, "Serial after rotation should be 2")
-	
+
 	// Verify rotation count
 	assert.Equal(t, 1, clientSource.GetRotateCount(), "Should have rotated once")
 }
@@ -256,20 +256,20 @@ func TestSourceAdapter(t *testing.T) {
 		},
 		identity: domain.NewServiceIdentity("test-service", "test.example.org"),
 	}
-	
+
 	// Create adapter
 	adapter := NewSourceAdapter(mockProvider)
-	
+
 	// Test SVID source
 	svid, err := adapter.GetX509SVID()
 	require.NoError(t, err)
 	assert.NotNil(t, svid)
 	assert.Equal(t, "spiffe://test.example.org/service", svid.ID.String())
-	
+
 	// Test bundle source
 	td, err := spiffeid.TrustDomainFromString("test.example.org")
 	require.NoError(t, err)
-	
+
 	bundle, err := adapter.GetX509BundleForTrustDomain(td)
 	require.NoError(t, err)
 	assert.NotNil(t, bundle)
@@ -321,10 +321,10 @@ func (m *mockIdentityProvider) GetServiceIdentity() (*domain.ServiceIdentity, er
 func createMockCert(t *testing.T, spiffeID string) *x509.Certificate {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
-	
+
 	id, err := spiffeid.FromString(spiffeID)
 	require.NoError(t, err)
-	
+
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
@@ -336,13 +336,13 @@ func createMockCert(t *testing.T, spiffeID string) *x509.Certificate {
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		URIs:        []*url.URL{id.URL()},
 	}
-	
+
 	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
 	require.NoError(t, err)
-	
+
 	cert, err := x509.ParseCertificate(certDER)
 	require.NoError(t, err)
-	
+
 	return cert
 }
 
@@ -355,7 +355,7 @@ func createMockKey(t *testing.T) *rsa.PrivateKey {
 func createMockCACert(t *testing.T) *x509.Certificate {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
-	
+
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
@@ -367,12 +367,12 @@ func createMockCACert(t *testing.T) *x509.Certificate {
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 	}
-	
+
 	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
 	require.NoError(t, err)
-	
+
 	cert, err := x509.ParseCertificate(certDER)
 	require.NoError(t, err)
-	
+
 	return cert
 }

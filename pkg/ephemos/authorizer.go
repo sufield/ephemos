@@ -72,11 +72,11 @@ func AuthorizeOneOf(spiffeIDs ...string) (Authorizer, error) {
 		}
 		ids = append(ids, id)
 	}
-	
+
 	if len(ids) == 0 {
 		return nil, fmt.Errorf("no SPIFFE IDs provided")
 	}
-	
+
 	return tlsconfig.AuthorizeOneOf(ids...), nil
 }
 
@@ -86,11 +86,11 @@ type AuthorizationPolicy struct {
 	// TrustDomain specifies which trust domain is allowed.
 	// If empty, any trust domain is allowed.
 	TrustDomain string
-	
+
 	// AllowedServices specifies exact SPIFFE IDs that are allowed.
 	// If empty, this constraint is not applied.
 	AllowedServices []string
-	
+
 	// AllowAny allows any valid SPIFFE certificate.
 	// This overrides other settings and should only be used in development.
 	AllowAny bool
@@ -113,22 +113,22 @@ func NewAuthorizerFromPolicy(policy *AuthorizationPolicy) (Authorizer, error) {
 	if policy == nil {
 		return nil, fmt.Errorf("authorization policy is nil")
 	}
-	
+
 	// If AllowAny is set, return an authorizer that accepts any SPIFFE certificate
 	if policy.AllowAny {
 		return AuthorizeAny(), nil
 	}
-	
+
 	// If specific services are listed, authorize those
 	if len(policy.AllowedServices) > 0 {
 		return AuthorizeOneOf(policy.AllowedServices...)
 	}
-	
+
 	// If only trust domain is specified, authorize membership
 	if policy.TrustDomain != "" {
 		return AuthorizeMemberOf(policy.TrustDomain)
 	}
-	
+
 	// If no policy is specified, return an error
 	return nil, fmt.Errorf("authorization policy must specify TrustDomain, AllowedServices, or AllowAny")
 }

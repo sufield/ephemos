@@ -49,7 +49,7 @@ func NewServiceIdentity(name, domain string) *ServiceIdentity {
 			uri:    fmt.Sprintf("spiffe://%s/%s", domain, name),
 		}
 	}
-	
+
 	// Use official SPIFFE ID construction
 	spiffeID, err := spiffeid.FromPath(trustDomain, "/"+name)
 	if err != nil {
@@ -60,7 +60,7 @@ func NewServiceIdentity(name, domain string) *ServiceIdentity {
 			uri:    fmt.Sprintf("spiffe://%s/%s", domain, name),
 		}
 	}
-	
+
 	return &ServiceIdentity{
 		name:   name,
 		domain: domain,
@@ -79,19 +79,19 @@ func NewServiceIdentityWithValidation(name, domain string, validate bool) (*Serv
 		if err != nil {
 			return nil, fmt.Errorf("invalid trust domain %q: %w", domain, err)
 		}
-		
+
 		// Use official SPIFFE ID construction
 		spiffeID, err := spiffeid.FromPath(trustDomain, "/"+name)
 		if err != nil {
 			return nil, fmt.Errorf("invalid SPIFFE path %q: %w", name, err)
 		}
-		
+
 		identity = &ServiceIdentity{
 			name:   name,
 			domain: domain,
 			uri:    spiffeID.String(),
 		}
-		
+
 		if err := identity.Validate(); err != nil {
 			return nil, fmt.Errorf("service identity validation failed: %w", err)
 		}
@@ -145,7 +145,7 @@ func (s *ServiceIdentity) Validate() error {
 	if err != nil {
 		return fmt.Errorf("invalid SPIFFE URI %q: %w", s.uri, err)
 	}
-	
+
 	// Additional SPIFFE spec constraints
 	if err := s.validateSPIFFEConstraints(spiffeID); err != nil {
 		return fmt.Errorf("SPIFFE spec violation in URI %q: %w", s.uri, err)
@@ -192,33 +192,33 @@ func (s *ServiceIdentity) validateServiceName(name string) error {
 // beyond what the go-spiffe library checks.
 func (s *ServiceIdentity) validateSPIFFEConstraints(spiffeID spiffeid.ID) error {
 	path := spiffeID.Path()
-	
+
 	// Use official SPIFFE path validation if there's a path
 	if path != "" {
 		if err := spiffeid.ValidatePath(path); err != nil {
 			return fmt.Errorf("SPIFFE path validation failed: %w", err)
 		}
 	}
-	
+
 	// Additional practical constraints
 	// SPIFFE spec: path length should be reasonable (practical limit)
 	if len(path) > 2048 {
 		return fmt.Errorf("SPIFFE path exceeds maximum length of 2048 characters")
 	}
-	
+
 	// Trust domain validation (additional checks beyond go-spiffe)
 	trustDomain := spiffeID.TrustDomain().String()
-	
+
 	// SPIFFE spec: trust domain length limit (practical limit)
 	if len(trustDomain) > 255 {
 		return fmt.Errorf("trust domain exceeds maximum length of 255 characters")
 	}
-	
+
 	// SPIFFE spec: trust domain must not contain uppercase (should be normalized)
 	if trustDomain != strings.ToLower(trustDomain) {
 		return fmt.Errorf("trust domain must be lowercase")
 	}
-	
+
 	return nil
 }
 
@@ -344,12 +344,12 @@ func (c *Certificate) Validate(opts CertValidationOptions) error {
 		if err != nil {
 			return fmt.Errorf("failed to extract SPIFFE ID: %w", err)
 		}
-		
+
 		expectedID, err := opts.ExpectedIdentity.ToSPIFFEID()
 		if err != nil {
 			return fmt.Errorf("failed to get expected SPIFFE ID: %w", err)
 		}
-		
+
 		// Compare SPIFFE IDs using String() representation
 		if actualID.String() != expectedID.String() {
 			return fmt.Errorf("SPIFFE ID mismatch: expected %s, got %s", expectedID, actualID)
@@ -359,14 +359,13 @@ func (c *Certificate) Validate(opts CertValidationOptions) error {
 	return nil
 }
 
-
 // validateChainOrder checks that the certificate chain is properly ordered
 // and cryptographically valid with full signature verification.
 func (c *Certificate) validateChainOrder() error {
 	if len(c.Chain) == 0 {
 		return nil // No chain to validate
 	}
-	
+
 	// Start with the leaf certificate and verify each link in the chain
 	current := c.Cert
 	for i, next := range c.Chain {
@@ -375,26 +374,26 @@ func (c *Certificate) validateChainOrder() error {
 			return fmt.Errorf("chain order invalid at position %d: current issuer %q != next subject %q",
 				i, current.Issuer.String(), next.Subject.String())
 		}
-		
+
 		// Perform cryptographic signature verification
 		// Create a certificate pool with just the issuer certificate
 		issuerPool := x509.NewCertPool()
 		issuerPool.AddCert(next)
-		
+
 		// Verify the current certificate was signed by the next certificate
 		verifyOpts := x509.VerifyOptions{
 			Roots:         issuerPool,
-			Intermediates: x509.NewCertPool(), // Empty intermediate pool for single-step verification
+			Intermediates: x509.NewCertPool(),   // Empty intermediate pool for single-step verification
 			KeyUsages:     []x509.ExtKeyUsage{}, // Don't enforce key usage for chain validation
 		}
-		
+
 		// Verify the signature (this checks the cryptographic validity)
 		_, err := current.Verify(verifyOpts)
 		if err != nil {
 			return fmt.Errorf("signature verification failed at chain position %d: certificate %q was not properly signed by %q: %w",
 				i, current.Subject.String(), next.Subject.String(), err)
 		}
-		
+
 		// Check that the signing certificate is authorized to sign other certificates
 		if !next.IsCA {
 			slog.Warn("Certificate in chain is not marked as CA but is signing other certificates",
@@ -403,11 +402,11 @@ func (c *Certificate) validateChainOrder() error {
 				"serial_number", next.SerialNumber.String(),
 			)
 		}
-		
+
 		// Move to the next link in the chain
 		current = next
 	}
-	
+
 	return nil
 }
 
@@ -450,7 +449,7 @@ func (c *Certificate) ToServiceIdentity() (*ServiceIdentity, error) {
 	if serviceName == "" {
 		return nil, fmt.Errorf("SPIFFE ID path is empty")
 	}
-	
+
 	// Validate that the path doesn't contain invalid characters or patterns
 	if strings.Contains(serviceName, "//") {
 		return nil, fmt.Errorf("SPIFFE ID path contains invalid double slashes")
@@ -468,9 +467,9 @@ func (c *Certificate) verifyKeyMatch() error {
 	if c.Cert == nil {
 		return fmt.Errorf("certificate is nil")
 	}
-	
+
 	privateKeyPublic := c.PrivateKey.Public()
-	
+
 	// First try the modern Equal method (available in Go 1.15+)
 	switch pubKey := c.Cert.PublicKey.(type) {
 	case interface{ Equal(interface{}) bool }:
@@ -479,7 +478,7 @@ func (c *Certificate) verifyKeyMatch() error {
 		}
 		return nil
 	}
-	
+
 	// Fallback to manual field comparison for specific key types
 	switch certPubKey := c.Cert.PublicKey.(type) {
 	case *rsa.PublicKey:
@@ -491,7 +490,7 @@ func (c *Certificate) verifyKeyMatch() error {
 			return fmt.Errorf("RSA private key does not match certificate public key")
 		}
 		return nil
-		
+
 	case *ecdsa.PublicKey:
 		privPubKey, ok := privateKeyPublic.(*ecdsa.PublicKey)
 		if !ok {
@@ -503,7 +502,7 @@ func (c *Certificate) verifyKeyMatch() error {
 			return fmt.Errorf("ECDSA private key does not match certificate public key")
 		}
 		return nil
-		
+
 	default:
 		// For unknown key types, we can't verify the match
 		return fmt.Errorf("unable to verify key match for unsupported public key type %T", c.Cert.PublicKey)
@@ -515,33 +514,33 @@ func (c *Certificate) verifyWithTrustBundle(trustBundle *TrustBundle) error {
 	if trustBundle == nil {
 		return fmt.Errorf("trust bundle is nil")
 	}
-	
+
 	// Create cert pool from trust bundle
 	roots := trustBundle.CreateCertPool()
 	if roots == nil {
 		return fmt.Errorf("failed to create cert pool from trust bundle")
 	}
-	
+
 	// Setup verification options
 	opts := x509.VerifyOptions{
 		Roots:         roots,
 		Intermediates: x509.NewCertPool(),
 		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 	}
-	
+
 	// Add intermediate certificates to the pool if present
 	if len(c.Chain) > 0 {
 		for _, intermediate := range c.Chain {
 			opts.Intermediates.AddCert(intermediate)
 		}
 	}
-	
+
 	// Perform cryptographic verification
 	_, err := c.Cert.Verify(opts)
 	if err != nil {
 		return fmt.Errorf("certificate chain cryptographic verification failed: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -650,13 +649,13 @@ func (tb *TrustBundle) ContainsCertificate(cert *x509.Certificate) bool {
 // to support dynamic reloading scenarios where trust bundles change.
 func (tb *TrustBundle) CreateCertPool() *x509.CertPool {
 	pool := x509.NewCertPool()
-	
+
 	for _, cert := range tb.Certificates {
 		if cert != nil {
 			pool.AddCert(cert)
 		}
 	}
-	
+
 	return pool
 }
 
@@ -666,7 +665,7 @@ type TrustBundleProvider interface {
 	// GetTrustBundle returns the current trust bundle.
 	// Implementations should return the most up-to-date bundle.
 	GetTrustBundle() (*TrustBundle, error)
-	
+
 	// CreateCertPool creates a cert pool from the current trust bundle.
 	// This is a convenience method that calls GetTrustBundle().CreateCertPool().
 	CreateCertPool() (*x509.CertPool, error)
@@ -699,16 +698,15 @@ func (p *StaticTrustBundleProvider) CreateCertPool() (*x509.CertPool, error) {
 	return bundle.CreateCertPool(), nil
 }
 
-
 // AuthenticationPolicy defines authentication and authorization context.
 // This includes both identity verification and access control policies.
 type AuthenticationPolicy struct {
-	ServiceIdentity    *ServiceIdentity
-	AuthorizedClients  []spiffeid.ID // For server-side: SPIFFE IDs allowed to connect
-	TrustedServers     []spiffeid.ID // For client-side: SPIFFE IDs this service trusts
-	TrustDomain        string        // Trust domain for authorization
-	AllowedSPIFFEIDs   []spiffeid.ID // Specific SPIFFE IDs for precise authorization
-	RequireAuth        bool          // Whether authentication is required
+	ServiceIdentity   *ServiceIdentity
+	AuthorizedClients []spiffeid.ID // For server-side: SPIFFE IDs allowed to connect
+	TrustedServers    []spiffeid.ID // For client-side: SPIFFE IDs this service trusts
+	TrustDomain       string        // Trust domain for authorization
+	AllowedSPIFFEIDs  []spiffeid.ID // Specific SPIFFE IDs for precise authorization
+	RequireAuth       bool          // Whether authentication is required
 }
 
 // NewAuthenticationPolicy creates a policy for authentication only.
@@ -717,12 +715,12 @@ func NewAuthenticationPolicy(identity *ServiceIdentity) *AuthenticationPolicy {
 	policy := &AuthenticationPolicy{
 		ServiceIdentity: identity,
 	}
-	
+
 	// Auto-set trust domain from identity if available
 	if identity != nil {
 		policy.TrustDomain = identity.Domain()
 	}
-	
+
 	return policy
 }
 
@@ -739,7 +737,7 @@ func NewAuthorizationPolicy(identity *ServiceIdentity, authorizedClients, truste
 		}
 		clientIDs = append(clientIDs, clientID)
 	}
-	
+
 	// Parse and validate trusted servers
 	var serverIDs []spiffeid.ID
 	for i, serverStr := range trustedServers {
@@ -749,18 +747,18 @@ func NewAuthorizationPolicy(identity *ServiceIdentity, authorizedClients, truste
 		}
 		serverIDs = append(serverIDs, serverID)
 	}
-	
+
 	policy := &AuthenticationPolicy{
 		ServiceIdentity:   identity,
 		AuthorizedClients: clientIDs,
 		TrustedServers:    serverIDs,
 	}
-	
+
 	// Auto-set trust domain from identity if not already set
 	if policy.TrustDomain == "" && identity != nil {
 		policy.TrustDomain = identity.Domain()
 	}
-	
+
 	return policy, nil
 }
 
@@ -778,7 +776,7 @@ func (p *AuthenticationPolicy) IsClientAuthorized(clientSPIFFEID spiffeid.ID) bo
 		}
 		return true
 	}
-	
+
 	for _, authorized := range p.AuthorizedClients {
 		if authorized.String() == clientSPIFFEID.String() {
 			return true
@@ -805,7 +803,7 @@ func (p *AuthenticationPolicy) IsServerTrusted(serverSPIFFEID spiffeid.ID) bool 
 		}
 		return true
 	}
-	
+
 	for _, trusted := range p.TrustedServers {
 		if trusted.String() == serverSPIFFEID.String() {
 			return true

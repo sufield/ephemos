@@ -26,14 +26,14 @@ func TestLogHealthReporter_ReportHealth(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
-	
+
 	reporter := NewLogHealthReporter(logger)
 
 	tests := []struct {
-		name           string
-		result         *ports.HealthResult
-		expectedLevel  string
-		shouldContain  []string
+		name          string
+		result        *ports.HealthResult
+		expectedLevel string
+		shouldContain []string
 	}{
 		{
 			name: "healthy component",
@@ -105,15 +105,15 @@ func TestLogHealthReporter_ReportHealth(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf.Reset()
-			
+
 			err := reporter.ReportHealth(tt.result)
 			assert.NoError(t, err)
 
 			output := buf.String()
-			
+
 			// Check log level
 			assert.Contains(t, output, tt.expectedLevel)
-			
+
 			// Check all expected content
 			for _, expected := range tt.shouldContain {
 				assert.Contains(t, output, expected)
@@ -129,7 +129,7 @@ func TestLogHealthReporter_ReportHealth_NilResult(t *testing.T) {
 
 	err := reporter.ReportHealth(nil)
 	assert.NoError(t, err)
-	
+
 	// Should not log anything for nil result
 	assert.Empty(t, buf.String())
 }
@@ -139,7 +139,7 @@ func TestLogHealthReporter_ReportOverallHealth(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
-	
+
 	reporter := NewLogHealthReporter(logger)
 
 	tests := []struct {
@@ -210,15 +210,15 @@ func TestLogHealthReporter_ReportOverallHealth(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf.Reset()
-			
+
 			err := reporter.ReportOverallHealth(tt.results)
 			assert.NoError(t, err)
 
 			output := buf.String()
-			
+
 			// Check log level
 			assert.Contains(t, output, tt.expectedLevel)
-			
+
 			// Check all expected content
 			for _, expected := range tt.shouldContain {
 				assert.Contains(t, output, expected)
@@ -229,7 +229,7 @@ func TestLogHealthReporter_ReportOverallHealth(t *testing.T) {
 
 func TestLogHealthReporter_Close(t *testing.T) {
 	reporter := NewLogHealthReporter(slog.Default())
-	
+
 	err := reporter.Close()
 	assert.NoError(t, err)
 }

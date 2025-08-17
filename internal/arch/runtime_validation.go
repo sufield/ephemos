@@ -70,9 +70,9 @@ func (v *Validator) ValidateCall(operation string) error {
 
 		fn := frame.Function // import path + function
 		// Filter noisy frames by package path rather than file path
-		if strings.HasPrefix(fn, "runtime.") || 
-		   strings.HasPrefix(fn, "testing.") ||
-		   strings.Contains(fn, "/internal/arch") { // Skip our own frames
+		if strings.HasPrefix(fn, "runtime.") ||
+			strings.HasPrefix(fn, "testing.") ||
+			strings.Contains(fn, "/internal/arch") { // Skip our own frames
 			continue
 		}
 		callStack = append(callStack, fn)

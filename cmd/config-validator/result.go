@@ -12,7 +12,7 @@ type Result struct {
 
 // Config represents the configuration details for JSON output
 type Config struct {
-	ServiceName  string `json:"service_name"`
-	TrustDomain  string `json:"trust_domain"`
-	AgentSocket  string `json:"agent_socket,omitempty"`
+	ServiceName string `json:"service_name"`
+	TrustDomain string `json:"trust_domain"`
+	AgentSocket string `json:"agent_socket,omitempty"`
 }

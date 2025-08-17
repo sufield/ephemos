@@ -188,12 +188,12 @@ func TestNewServiceIdentityFromSPIFFEID_EdgeCases(t *testing.T) {
 // Test edge cases for the new constructor with validation flag
 func TestNewServiceIdentityWithValidation_EdgeCases(t *testing.T) {
 	tests := []struct {
-		name         string
-		serviceName  string
-		domain       string
-		validate     bool
-		wantErr      bool
-		errContains  string
+		name        string
+		serviceName string
+		domain      string
+		validate    bool
+		wantErr     bool
+		errContains string
 	}{
 		{
 			name:        "valid identity with validation",

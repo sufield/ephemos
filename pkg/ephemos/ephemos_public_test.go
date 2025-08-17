@@ -94,7 +94,7 @@ func TestClientConnect_ErrorMapping(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error for nonexistent config")
 	}
-	
+
 	// Test with nil configuration
 	_, err = ephemos.IdentityClient(ctx)
 	if err == nil {
@@ -146,13 +146,13 @@ func TestClient_ConcurrentConnectAndClose_NoRace(t *testing.T) {
 
 	// Test concurrent operations on ClientConnection
 	conn := ephemos.TestOnlyNewClientConnection(nil)
-	
+
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		for i := 0; i < 10; i++ {
 			_, _ = conn.HTTPClient() // Safe to call concurrently
-			_ = conn.Close()        // Idempotent
+			_ = conn.Close()         // Idempotent
 		}
 	}()
 

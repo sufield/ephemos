@@ -47,7 +47,7 @@ func IsConfigurationError(err error) bool {
 	if errors.As(err, &configErr) {
 		return true
 	}
-	
+
 	// Check for known config errors
 	return errors.Is(err, ErrInvalidConfig) ||
 		errors.Is(err, ErrConfigFileNotFound) ||

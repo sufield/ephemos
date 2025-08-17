@@ -24,7 +24,7 @@ func main() {
 	// Example 1: Identity Verification using go-spiffe/v2
 	fmt.Println("1. Identity Verification using SPIRE's Workload API")
 	fmt.Println("--------------------------------------------------")
-	
+
 	if err := demonstrateIdentityVerification(ctx); err != nil {
 		log.Printf("Identity verification example failed: %v", err)
 	}
@@ -33,7 +33,7 @@ func main() {
 	// Example 2: Diagnostics using SPIRE CLI tools
 	fmt.Println("2. SPIRE Diagnostics using built-in CLI tools")
 	fmt.Println("--------------------------------------------")
-	
+
 	if err := demonstrateDiagnostics(ctx); err != nil {
 		log.Printf("Diagnostics example failed: %v", err)
 	}
@@ -42,7 +42,7 @@ func main() {
 	// Example 3: Comprehensive monitoring setup
 	fmt.Println("3. Comprehensive SPIRE Monitoring Setup")
 	fmt.Println("--------------------------------------")
-	
+
 	if err := demonstrateComprehensiveMonitoring(ctx); err != nil {
 		log.Printf("Comprehensive monitoring example failed: %v", err)
 	}
@@ -83,13 +83,13 @@ func demonstrateIdentityVerification(ctx context.Context) error {
 	// Example: Verify a specific identity
 	expectedID := spiffeid.RequireFromString("spiffe://example.org/my-service")
 	fmt.Printf("   🔍 Verifying identity against: %s\n", expectedID)
-	
+
 	result, err := verifier.VerifyIdentity(ctx, expectedID)
 	if err != nil {
 		fmt.Printf("   ⚠️  Identity verification failed: %v\n", err)
 		fmt.Println("   💡 This is expected if not running with the expected SPIFFE ID")
 	} else {
-		fmt.Printf("   %s Identity verification result: %t\n", 
+		fmt.Printf("   %s Identity verification result: %t\n",
 			getStatusEmoji(result.Valid), result.Valid)
 		fmt.Printf("   📝 Message: %s\n", result.Message)
 		if result.Valid {
@@ -123,7 +123,7 @@ func demonstrateDiagnostics(ctx context.Context) error {
 		fmt.Printf("   ✅ Server Status: %s\n", serverDiag.Status)
 		fmt.Printf("   ✅ Server Version: %s\n", serverDiag.Version)
 		if serverDiag.Entries != nil {
-			fmt.Printf("   📊 Registration Entries: %d total, %d recent\n", 
+			fmt.Printf("   📊 Registration Entries: %d total, %d recent\n",
 				serverDiag.Entries.Total, serverDiag.Entries.Recent)
 		}
 		if serverDiag.Agents != nil {
@@ -219,7 +219,7 @@ func demonstrateComprehensiveMonitoring(ctx context.Context) error {
 
 	// Step 3: Validate trust relationships
 	fmt.Println("      3️⃣  Validating trust relationships...")
-	
+
 	trustDomain := spiffeid.RequireTrustDomainFromString("example.org")
 	bundleInfo, err := provider.ShowTrustBundle(ctx, trustDomain)
 	if err != nil {

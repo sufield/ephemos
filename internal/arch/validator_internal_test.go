@@ -50,7 +50,7 @@ func Test_checkCallStackViolation_directAdapterToAdapter(t *testing.T) {
 	if violation == "" {
 		t.Fatalf("expected adapter->adapter violation, got none")
 	}
-	
+
 	// Should mention both adapter types
 	if !contains(violation, "http") || !contains(violation, "grpc") {
 		t.Fatalf("violation should mention both adapter types, got: %q", violation)
@@ -82,7 +82,7 @@ func Test_checkCallStackViolation_domainToAdapter(t *testing.T) {
 	if violation == "" {
 		t.Fatalf("expected domain->adapter violation")
 	}
-	
+
 	// Should mention domain and adapter
 	if !contains(violation, "domain") || !contains(violation, "http") {
 		t.Fatalf("violation should mention domain and adapter, got: %q", violation)
@@ -107,7 +107,7 @@ func Test_checkCallStackViolation_indirectCallOkay(t *testing.T) {
 func Test_checkCallStackViolation_allowlistRespected(t *testing.T) {
 	t.Parallel()
 	v := NewValidator(true)
-	
+
 	// Add http->shared to allowlist
 	v.Allow("http", "shared")
 
@@ -123,7 +123,7 @@ func Test_checkCallStackViolation_allowlistRespected(t *testing.T) {
 func Test_checkCallStackViolation_allowlistNotBidirectional(t *testing.T) {
 	t.Parallel()
 	v := NewValidator(true)
-	
+
 	// Allow http->shared but not shared->http
 	v.Allow("http", "shared")
 
@@ -140,7 +140,7 @@ func Test_checkCallStackViolation_allowlistNotBidirectional(t *testing.T) {
 func Test_allowed_threadSafety(t *testing.T) {
 	t.Parallel()
 	v := NewValidator(true)
-	
+
 	const workers = 10
 	const iterations = 100
 	var wg sync.WaitGroup
@@ -163,9 +163,9 @@ func Test_allowed_threadSafety(t *testing.T) {
 
 // Helper function
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || (len(s) > len(substr) && 
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		 indexOf(s, substr) >= 0)))
+	return len(s) >= len(substr) && (s == substr || (len(s) > len(substr) &&
+		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			indexOf(s, substr) >= 0)))
 }
 
 func indexOf(s, substr string) int {

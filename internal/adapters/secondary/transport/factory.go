@@ -13,14 +13,14 @@ import (
 // If sources are provided, the provider will support automatic SVID rotation.
 func CreateGRPCProvider(config *ports.Configuration, opts ...ProviderOption) (*RotatableGRPCProvider, error) {
 	provider := NewRotatableGRPCProvider(config)
-	
+
 	// Apply options - collect any errors
 	for _, opt := range opts {
 		if err := opt(provider); err != nil {
 			return nil, err
 		}
 	}
-	
+
 	return provider, nil
 }
 

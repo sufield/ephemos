@@ -153,4 +153,3 @@ func (h *RedactorHandler) redactSensitiveStrings(value string) string {
 
 	return value
 }
-

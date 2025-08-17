@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -13,6 +14,21 @@ import (
 	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/sufield/ephemos/internal/core/services"
 )
+
+// Output templates for health check results
+const healthOverallTemplate = `{{.Icon}} Overall Health: {{.Status}}
+`
+
+const healthComponentTemplate = `{{.Icon}} {{.Component}}: {{.Status}}{{if .ResponseTime}} ({{.ResponseTime}}){{end}}{{if .Message}} - {{.Message}}{{end}}
+{{if .ShowDetails}}{{range $key, $value := .Details}}  {{$key}}: {{$value}}
+{{end}}{{end}}`
+
+const healthQuietTemplate = `{{.Icon}} {{.Component}}: {{.Status}}
+`
+
+const healthMonitorStartTemplate = `🔍 Starting health monitoring (interval: {{.Interval}}, timeout: {{.Timeout}})
+Press Ctrl+C to stop...
+`
 
 var healthCmd = &cobra.Command{
 	Use:   "health",
@@ -169,7 +185,7 @@ func runHealthMonitor(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to register health checkers: %w", err)
 	}
 
-	fmt.Printf("🔍 Starting health monitoring (interval: %v, timeout: %v)\n", 
+	fmt.Printf("🔍 Starting health monitoring (interval: %v, timeout: %v)\n",
 		config.Interval, config.Timeout)
 	fmt.Println("Press Ctrl+C to stop...")
 
@@ -181,7 +197,9 @@ func runHealthMonitor(cmd *cobra.Command, args []string) error {
 	// Wait for context cancellation (Ctrl+C)
 	<-ctx.Done()
 
-	fmt.Println("\n🛑 Health monitoring stopped")
+	const stopTemplate = `
+🛑 Health monitoring stopped`
+	fmt.Println(stopTemplate)
 	return nil
 }
 
@@ -294,15 +312,15 @@ func outputHealthResults(cmd *cobra.Command, results map[string]*ports.HealthRes
 	case "json":
 		return outputJSON(results, overallHealth)
 	default:
-		return outputText(results, overallHealth, verbose, quiet)
+		return outputText(cmd, results, overallHealth, verbose, quiet)
 	}
 }
 
 func outputJSON(results map[string]*ports.HealthResult, overallHealth ports.HealthStatus) error {
 	output := struct {
-		OverallHealth string                              `json:"overall_health"`
-		Components    map[string]*ports.HealthResult     `json:"components"`
-		Timestamp     time.Time                          `json:"timestamp"`
+		OverallHealth string                         `json:"overall_health"`
+		Components    map[string]*ports.HealthResult `json:"components"`
+		Timestamp     time.Time                      `json:"timestamp"`
 	}{
 		OverallHealth: string(overallHealth),
 		Components:    results,
@@ -314,50 +332,76 @@ func outputJSON(results map[string]*ports.HealthResult, overallHealth ports.Heal
 	return encoder.Encode(output)
 }
 
-func outputText(results map[string]*ports.HealthResult, overallHealth ports.HealthStatus, verbose, quiet bool) error {
+func outputText(cmd *cobra.Command, results map[string]*ports.HealthResult, overallHealth ports.HealthStatus, verbose, quiet bool) error {
+	noEmoji, _ := cmd.Flags().GetBool("no-emoji")
+
 	if !quiet {
-		// Overall status
-		statusIcon := getStatusIcon(overallHealth)
-		fmt.Printf("%s Overall Health: %s\n\n", statusIcon, strings.ToUpper(string(overallHealth)))
+		// Overall status using template
+		overallData := struct {
+			Icon   string
+			Status string
+		}{
+			Icon:   getStatusIcon(overallHealth),
+			Status: strings.ToUpper(string(overallHealth)),
+		}
+
+		tmplText := healthOverallTemplate
+		if noEmoji {
+			tmplText = replaceHealthEmojis(tmplText)
+			overallData.Icon = replaceHealthEmojis(overallData.Icon)
+		}
+
+		tmpl := template.Must(template.New("overall").Parse(tmplText))
+		if err := tmpl.Execute(os.Stdout, overallData); err != nil {
+			return fmt.Errorf("failed to render overall health: %w", err)
+		}
+		fmt.Println() // Add spacing
 	}
 
-	// Component details
+	// Component details using templates
 	for component, result := range results {
 		if result == nil {
 			continue
 		}
 
-		icon := getStatusIcon(result.Status)
-		
-		if quiet {
-			// Minimal output
-			fmt.Printf("%s %s: %s\n", icon, component, strings.ToUpper(string(result.Status)))
-		} else {
-			// Standard output
-			fmt.Printf("%s %s: %s", icon, component, strings.ToUpper(string(result.Status)))
-			
-			if result.ResponseTime > 0 {
-				fmt.Printf(" (%v)", result.ResponseTime)
-			}
-			
-			if result.Message != "" {
-				fmt.Printf(" - %s", result.Message)
-			}
-			
-			fmt.Println()
+		componentData := struct {
+			Icon         string
+			Component    string
+			Status       string
+			ResponseTime time.Duration
+			Message      string
+			ShowDetails  bool
+			Details      map[string]interface{}
+		}{
+			Icon:         getStatusIcon(result.Status),
+			Component:    component,
+			Status:       strings.ToUpper(string(result.Status)),
+			ResponseTime: result.ResponseTime,
+			Message:      result.Message,
+			ShowDetails:  verbose && len(result.Details) > 0,
+			Details:      result.Details,
+		}
 
-			if verbose && len(result.Details) > 0 {
-				fmt.Println("  Details:")
-				for key, value := range result.Details {
-					fmt.Printf("    %s: %v\n", key, value)
-				}
-			}
+		var tmplText string
+		if quiet {
+			tmplText = healthQuietTemplate
+		} else {
+			tmplText = healthComponentTemplate
+		}
+
+		if noEmoji {
+			tmplText = replaceHealthEmojis(tmplText)
+			componentData.Icon = replaceHealthEmojis(componentData.Icon)
+		}
+
+		tmpl := template.Must(template.New("component").Parse(tmplText))
+		if err := tmpl.Execute(os.Stdout, componentData); err != nil {
+			return fmt.Errorf("failed to render component %s: %w", component, err)
 		}
 	}
 
 	// Set exit code based on overall health
 	if overallHealth != ports.HealthStatusHealthy {
-		// Don't call os.Exit directly, return error instead
 		return fmt.Errorf("health check failed: overall status is %s", overallHealth)
 	}
 
@@ -375,4 +419,22 @@ func getStatusIcon(status ports.HealthStatus) string {
 	default:
 		return "⚠️"
 	}
+}
+
+// replaceHealthEmojis replaces emojis with text equivalents for --no-emoji flag
+func replaceHealthEmojis(text string) string {
+	replacements := map[string]string{
+		"✅":  "[HEALTHY]",
+		"❌":  "[UNHEALTHY]",
+		"❓":  "[UNKNOWN]",
+		"⚠️": "[WARNING]",
+		"🔍":  "[MONITOR]",
+		"🛑":  "[STOP]",
+	}
+
+	result := text
+	for emoji, replacement := range replacements {
+		result = strings.ReplaceAll(result, emoji, replacement)
+	}
+	return result
 }

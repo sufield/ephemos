@@ -8,7 +8,7 @@ import (
 // Test helper functions with proper function signatures
 func TestIsAdapterFunc(t *testing.T) {
 	t.Parallel()
-	
+
 	tests := []struct {
 		name string
 		fn   string
@@ -34,7 +34,7 @@ func TestIsAdapterFunc(t *testing.T) {
 
 func TestIsDomainFunc(t *testing.T) {
 	t.Parallel()
-	
+
 	tests := []struct {
 		name string
 		fn   string
@@ -61,7 +61,7 @@ func TestIsDomainFunc(t *testing.T) {
 // Test ValidateCall behavior without asserting specific violations
 func TestValidator_ValidateCall_NoPanic(t *testing.T) {
 	t.Parallel()
-	
+
 	enabled := NewValidator(true)
 	disabled := NewValidator(false)
 
@@ -69,7 +69,7 @@ func TestValidator_ValidateCall_NoPanic(t *testing.T) {
 	if err := disabled.ValidateCall("test operation"); err != nil {
 		t.Fatalf("disabled validator should never fail, got %v", err)
 	}
-	
+
 	// Enabled may or may not flag something depending on stack; just ensure no panic
 	_ = enabled.ValidateCall("test operation")
 }
@@ -77,32 +77,32 @@ func TestValidator_ValidateCall_NoPanic(t *testing.T) {
 // Test global API with proper state management
 func TestGlobalAPI_Behavior(t *testing.T) {
 	t.Parallel()
-	
+
 	// Save and restore original state
 	originalEnabled := IsGlobalValidationEnabled()
 	defer func() {
 		SetGlobalValidationEnabled(originalEnabled)
 		ClearGlobalViolations()
 	}()
-	
+
 	// Test enable/disable atomicity
 	SetGlobalValidationEnabled(false)
 	if IsGlobalValidationEnabled() {
 		t.Fatalf("Expected validation to be disabled")
 	}
-	
+
 	SetGlobalValidationEnabled(true)
 	if !IsGlobalValidationEnabled() {
 		t.Fatalf("Expected validation to be enabled")
 	}
-	
+
 	// Test violations management
 	ClearGlobalViolations()
 	initialCount := len(GetGlobalViolations())
 	if initialCount != 0 {
 		t.Fatalf("Expected 0 violations after clear, got %d", initialCount)
 	}
-	
+
 	// Test allowlist API
 	AllowGlobalCrossing("http", "shared")
 	// Can't easily test the internal state without exposing internals,
@@ -112,7 +112,7 @@ func TestGlobalAPI_Behavior(t *testing.T) {
 // Comprehensive race test for global validator
 func TestGlobalValidator_NoDataRaces(t *testing.T) {
 	t.Parallel()
-	
+
 	const workers = 8
 	const iterations = 500
 	var wg sync.WaitGroup
@@ -128,16 +128,16 @@ func TestGlobalValidator_NoDataRaces(t *testing.T) {
 				} else {
 					SetGlobalValidationEnabled(false)
 				}
-				
+
 				// Concurrent validation calls
 				_ = ValidateBoundary("race test operation")
-				
+
 				// Concurrent violation management
 				_ = GetGlobalViolations()
 				if j%5 == 0 {
 					ClearGlobalViolations()
 				}
-				
+
 				// Concurrent allowlist changes
 				AllowGlobalCrossing("worker", "target")
 			}
@@ -149,7 +149,7 @@ func TestGlobalValidator_NoDataRaces(t *testing.T) {
 // Test individual validator instance race safety
 func TestValidator_InstanceRaceSafety(t *testing.T) {
 	t.Parallel()
-	
+
 	v := NewValidator(true)
 	const workers = 10
 	const iterations = 100
@@ -180,7 +180,7 @@ func BenchmarkValidationOverhead(b *testing.B) {
 	v := NewValidator(true)
 	b.ReportAllocs()
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = v.ValidateCall("benchmark operation")
 	}
@@ -190,7 +190,7 @@ func BenchmarkValidationDisabled(b *testing.B) {
 	v := NewValidator(false)
 	b.ReportAllocs()
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = v.ValidateCall("benchmark operation")
 	}
@@ -200,11 +200,11 @@ func BenchmarkGlobalValidation(b *testing.B) {
 	// Save and restore state
 	originalEnabled := IsGlobalValidationEnabled()
 	defer SetGlobalValidationEnabled(originalEnabled)
-	
+
 	SetGlobalValidationEnabled(true)
 	b.ReportAllocs()
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = ValidateBoundary("global benchmark")
 	}
@@ -214,7 +214,7 @@ func BenchmarkAtomicEnabledCheck(b *testing.B) {
 	v := NewValidator(true)
 	b.ReportAllocs()
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = v.IsEnabled()
 	}

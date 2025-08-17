@@ -18,7 +18,7 @@ import (
 // Helper function to create a test certificate
 func createTestCertificate(t *testing.T, spiffeID string) (*x509.Certificate, *rsa.PrivateKey) {
 	t.Helper()
-	
+
 	// Generate a private key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -64,7 +64,7 @@ func createTestCertificate(t *testing.T, spiffeID string) (*x509.Certificate, *r
 // Helper function to create a test CA certificate
 func createTestCACertificate(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
 	t.Helper()
-	
+
 	// Generate a private key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -101,7 +101,7 @@ func createTestCACertificate(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) 
 // Test edge cases for NewCertificateWithValidation
 func TestNewCertificateWithValidation_EdgeCases(t *testing.T) {
 	validCert, validKey := createTestCertificate(t, "spiffe://example.com/service")
-	
+
 	tests := []struct {
 		name        string
 		cert        *x509.Certificate
@@ -193,7 +193,7 @@ func TestNewTrustBundleWithValidation_EdgeCases(t *testing.T) {
 	expiredCA, _ := createTestCACertificate(t)
 	// Make the expired CA actually expired
 	expiredCA.NotAfter = time.Now().Add(-time.Hour)
-	
+
 	tests := []struct {
 		name        string
 		certs       []*x509.Certificate
@@ -322,10 +322,10 @@ func TestConstructors_DefaultValidation(t *testing.T) {
 func TestCertificate_ChainValidation_EdgeCases(t *testing.T) {
 	// Create a leaf certificate
 	leafCert, leafKey := createTestCertificate(t, "spiffe://example.com/service")
-	
+
 	// Create a CA certificate that can sign the leaf
 	caCert, caKey := createTestCACertificate(t)
-	
+
 	// Create a certificate signed by the CA
 	signedTemplate := x509.Certificate{
 		SerialNumber: big.NewInt(2),
@@ -338,16 +338,16 @@ func TestCertificate_ChainValidation_EdgeCases(t *testing.T) {
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
 	}
-	
+
 	// Add SPIFFE ID
 	uri, _ := url.Parse("spiffe://example.com/signed-service")
 	signedTemplate.URIs = []*url.URL{uri}
-	
+
 	signedCertDER, err := x509.CreateCertificate(rand.Reader, &signedTemplate, caCert, &leafKey.PublicKey, caKey)
 	if err != nil {
 		t.Fatalf("Failed to create signed certificate: %v", err)
 	}
-	
+
 	signedCert, err := x509.ParseCertificate(signedCertDER)
 	if err != nil {
 		t.Fatalf("Failed to parse signed certificate: %v", err)
@@ -415,15 +415,16 @@ func TestCertificate_ChainValidation_EdgeCases(t *testing.T) {
 		})
 	}
 }
+
 // Test dynamic cert pool functionality
 func TestTrustBundle_CreateCertPool(t *testing.T) {
 	validCA1, _ := createTestCACertificate(t)
 	validCA2, _ := createTestCACertificate(t)
-	
+
 	tests := []struct {
-		name       string
-		certs      []*x509.Certificate
-		wantNil    bool
+		name    string
+		certs   []*x509.Certificate
+		wantNil bool
 	}{
 		{
 			name:    "single CA certificate",
@@ -488,13 +489,13 @@ func TestStaticTrustBundleProvider(t *testing.T) {
 
 	t.Run("GetTrustBundle", func(t *testing.T) {
 		provider := domain.NewStaticTrustBundleProvider(bundle)
-		
+
 		retrievedBundle, err := provider.GetTrustBundle()
 		if err != nil {
 			t.Errorf("GetTrustBundle() error = %v", err)
 			return
 		}
-		
+
 		if retrievedBundle != bundle {
 			t.Error("GetTrustBundle() returned different bundle than provided")
 		}
@@ -502,7 +503,7 @@ func TestStaticTrustBundleProvider(t *testing.T) {
 
 	t.Run("GetTrustBundle with nil bundle", func(t *testing.T) {
 		provider := domain.NewStaticTrustBundleProvider(nil)
-		
+
 		_, err := provider.GetTrustBundle()
 		if err == nil {
 			t.Error("GetTrustBundle() with nil bundle should return error")
@@ -514,13 +515,13 @@ func TestStaticTrustBundleProvider(t *testing.T) {
 
 	t.Run("CreateCertPool", func(t *testing.T) {
 		provider := domain.NewStaticTrustBundleProvider(bundle)
-		
+
 		pool, err := provider.CreateCertPool()
 		if err != nil {
 			t.Errorf("CreateCertPool() error = %v", err)
 			return
 		}
-		
+
 		if pool == nil {
 			t.Error("CreateCertPool() returned nil pool")
 		}
@@ -528,7 +529,7 @@ func TestStaticTrustBundleProvider(t *testing.T) {
 
 	t.Run("CreateCertPool with nil bundle", func(t *testing.T) {
 		provider := domain.NewStaticTrustBundleProvider(nil)
-		
+
 		_, err := provider.CreateCertPool()
 		if err == nil {
 			t.Error("CreateCertPool() with nil bundle should return error")

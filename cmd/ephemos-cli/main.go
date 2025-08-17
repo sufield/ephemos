@@ -39,61 +39,49 @@ import (
 	"github.com/sufield/ephemos/internal/cli"
 )
 
-// Exit codes for different types of failures
+// Exit codes - Cobra handles usage errors (exit 2) automatically
 const (
-	exitOK       = 0
-	exitUsage    = 2
-	exitConfig   = 3
-	exitRuntime  = 4
-	exitInternal = 10
+	exitOK     = 0
+	exitConfig = 3 // Configuration/business logic errors
+	exitAuth   = 4 // Authentication errors
 )
 
 // main is the entry point for the Ephemos CLI tool.
 // It sets up signal handling, executes the CLI with context, and handles errors with appropriate exit codes.
 func main() {
-	// Build information is now injected directly into the buildinfo package via x_defs
-	// No need to manually inject - the CLI package imports buildinfo directly
-
 	// Create a context that cancels on SIGINT or SIGTERM
 	ctx, stop := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Execute the CLI with context
+	// Execute the CLI with context - Cobra handles most error display
 	if err := cli.ExecuteContext(ctx); err != nil {
-		// Redact sensitive information from error messages
-		redactedError := cli.RedactError(err)
-		code := classifyExitCode(err)
-		
-		// Cobra already prints usage errors, so only print for non-usage errors
-		if code != exitUsage {
-			fmt.Fprintf(os.Stderr, "Error: %s\n", redactedError)
-		}
-		os.Exit(code)
-	}
-}
+		// Only handle business logic errors - Cobra handles usage/flag errors
+		code := exitOK
 
-// classifyExitCode maps error types to appropriate exit codes for CI/automation
-func classifyExitCode(err error) int {
-	switch {
-	case errors.Is(err, cli.ErrUsage):
-		return exitUsage
-	case errors.Is(err, cli.ErrConfig):
-		return exitConfig
-	case errors.Is(err, cli.ErrAuth):
-		return exitRuntime // Auth failures are runtime issues
-	case errors.Is(err, cli.ErrRuntime):
-		return exitRuntime
-	case errors.Is(err, cli.ErrInternal):
-		return exitInternal
-	case errors.Is(err, context.Canceled):
-		// Graceful shutdown via signal
-		return exitOK
-	case errors.Is(err, context.DeadlineExceeded):
-		// Timeout
-		return exitRuntime
-	default:
-		// Unknown error type
-		return exitRuntime
+		// Check for specific business logic errors
+		switch {
+		case errors.Is(err, cli.ErrConfig):
+			code = exitConfig
+		case errors.Is(err, cli.ErrAuth):
+			code = exitAuth
+		case errors.Is(err, context.Canceled):
+			// Graceful shutdown via signal - no error message needed
+			os.Exit(exitOK)
+		default:
+			// For any other error, Cobra has already printed it
+			code = 1
+		}
+
+		// Redact sensitive information if we need to print
+		if code != 0 && !errors.Is(err, context.Canceled) {
+			// Only print if Cobra hasn't already (for our custom errors)
+			if errors.Is(err, cli.ErrConfig) || errors.Is(err, cli.ErrAuth) {
+				redactedError := cli.RedactError(err)
+				fmt.Fprintf(os.Stderr, "Error: %s\n", redactedError)
+			}
+		}
+
+		os.Exit(code)
 	}
 }

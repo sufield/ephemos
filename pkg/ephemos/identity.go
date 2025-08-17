@@ -27,9 +27,8 @@ type IdentityService interface {
 	// GetCertificate returns the current service certificate with its chain and private key.
 	// This certificate is used for mTLS authentication.
 	GetCertificate() (*Certificate, error)
-	
+
 	// GetTrustBundle returns the current trust bundle containing root certificates.
 	// This bundle is used to verify peer certificates during mTLS.
 	GetTrustBundle() (*TrustBundle, error)
 }
-

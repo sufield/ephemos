@@ -50,14 +50,14 @@ func DefaultConfig() *Config {
 
 // Coordinator coordinates shutdown of all server resources.
 type Coordinator struct {
-	config          *Config
-	servers         []Server
-	clients         []Client
-	listeners       []Listener
-	cleanupFuncs    []func() error
-	mu              sync.Mutex
-	shutdownOnce    sync.Once
-	isShuttingDown  bool
+	config         *Config
+	servers        []Server
+	clients        []Client
+	listeners      []Listener
+	cleanupFuncs   []func() error
+	mu             sync.Mutex
+	shutdownOnce   sync.Once
+	isShuttingDown bool
 }
 
 // Server represents a server that can be gracefully stopped.
@@ -81,11 +81,11 @@ func NewCoordinator(config *Config) *Coordinator {
 		config = DefaultConfig()
 	}
 	return &Coordinator{
-		config:          config,
-		servers:         make([]Server, 0),
-		clients:         make([]Client, 0),
-		listeners:       make([]Listener, 0),
-		cleanupFuncs:    make([]func() error, 0),
+		config:       config,
+		servers:      make([]Server, 0),
+		clients:      make([]Client, 0),
+		listeners:    make([]Listener, 0),
+		cleanupFuncs: make([]func() error, 0),
 	}
 }
 

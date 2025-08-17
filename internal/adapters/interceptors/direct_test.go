@@ -815,7 +815,6 @@ func TestIdentityPropagationEdgeCases_Direct(t *testing.T) {
 
 // TestMetricsInterceptorEdgeCases_Direct removed - only authentication metrics are relevant
 
-
 func TestAdditionalCoverageTests_Direct(t *testing.T) {
 	// Additional tests to increase coverage
 
@@ -887,4 +886,3 @@ func TestIdentityContextKeys_Direct(t *testing.T) {
 	assert.False(t, ok)
 	assert.Nil(t, retrieved)
 }
-

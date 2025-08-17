@@ -20,16 +20,16 @@ import (
 
 // ArchConfig holds configuration for architecture tests.
 type ArchConfig struct {
-	ProhibitedImports     []string `json:"prohibited_imports"`
-	AllowedHTTPFiles      []string `json:"allowed_http_files"`
-	AllowedHTTPDirs       []string `json:"allowed_http_dirs"`
-	AllowedPaths          []string `json:"allowed_paths"`
-	HTTPFrameworks        []string `json:"http_frameworks"`
-	CoreDirs              []string `json:"core_dirs"`
-	AllowedExternalDeps   []string `json:"allowed_external_deps"`
-	SkipPatterns          []string `json:"skip_patterns"`
-	IncludeTestFiles      bool     `json:"include_test_files"`
-	
+	ProhibitedImports   []string `json:"prohibited_imports"`
+	AllowedHTTPFiles    []string `json:"allowed_http_files"`
+	AllowedHTTPDirs     []string `json:"allowed_http_dirs"`
+	AllowedPaths        []string `json:"allowed_paths"`
+	HTTPFrameworks      []string `json:"http_frameworks"`
+	CoreDirs            []string `json:"core_dirs"`
+	AllowedExternalDeps []string `json:"allowed_external_deps"`
+	SkipPatterns        []string `json:"skip_patterns"`
+	IncludeTestFiles    bool     `json:"include_test_files"`
+
 	// Compiled regexes for performance (populated during config load)
 	compiledFrameworkRegexes map[string]*regexp.Regexp `json:"-"`
 }
@@ -93,10 +93,10 @@ func getDefaultConfig() *ArchConfig {
 // loadConfig loads configuration from file or returns default.
 func loadConfig(t *testing.T, repoRoot string) *ArchConfig {
 	t.Helper()
-	
+
 	configPath := filepath.Join(repoRoot, ".arch-test-config.json")
 	var config *ArchConfig
-	
+
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		config = getDefaultConfig()
 	} else {
@@ -114,7 +114,7 @@ func loadConfig(t *testing.T, repoRoot string) *ArchConfig {
 			}
 		}
 	}
-	
+
 	// Precompile framework regexes for performance
 	config.compiledFrameworkRegexes = make(map[string]*regexp.Regexp)
 	for _, framework := range config.HTTPFrameworks {
@@ -124,14 +124,14 @@ func loadConfig(t *testing.T, repoRoot string) *ArchConfig {
 			t.Logf("Failed to compile regex for framework %s: %v", framework, err)
 		}
 	}
-	
+
 	return config
 }
 
 // getRepoRoot returns the absolute path to the repository root
 func getRepoRoot(t *testing.T) string {
 	t.Helper()
-	
+
 	// First try git rev-parse for most reliable method
 	if cmd := exec.Command("git", "rev-parse", "--show-toplevel"); cmd.Dir == "" {
 		if output, err := cmd.Output(); err == nil {
@@ -141,20 +141,20 @@ func getRepoRoot(t *testing.T) string {
 			}
 		}
 	}
-	
+
 	// Fallback: start from current test file and find go.mod
 	_, filename, _, ok := runtime.Caller(0)
 	require.True(t, ok, "Failed to get current file path")
-	
+
 	dir := filepath.Dir(filename)
 	for {
 		absDir, err := filepath.Abs(dir)
 		require.NoError(t, err, "Failed to get absolute path")
-		
+
 		if _, err := os.Stat(filepath.Join(absDir, "go.mod")); err == nil {
 			return absDir
 		}
-		
+
 		parent := filepath.Dir(absDir)
 		if parent == absDir {
 			t.Fatal("Could not find repository root (no go.mod or git repo)")
@@ -166,60 +166,60 @@ func getRepoRoot(t *testing.T) string {
 // parseImports extracts import paths from a Go file with consistent error handling
 func parseImports(t *testing.T, filePath string) ([]string, error) {
 	t.Helper()
-	
+
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, filePath, nil, parser.ImportsOnly)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse Go file %s: %w", filePath, err)
 	}
-	
+
 	var imports []string
 	for _, imp := range node.Imports {
 		importPath := strings.Trim(imp.Path.Value, "\"")
 		imports = append(imports, importPath)
 	}
-	
+
 	return imports, nil
 }
 
 // shouldSkipFile determines if a file should be skipped based on patterns and test file inclusion
 func shouldSkipFile(filePath string, config *ArchConfig) bool {
 	fileName := filepath.Base(filePath)
-	
+
 	// Skip non-Go files
 	if !strings.HasSuffix(fileName, ".go") {
 		return true
 	}
-	
+
 	// Skip test files unless explicitly included
 	if !config.IncludeTestFiles && strings.HasSuffix(fileName, "_test.go") {
 		return true
 	}
-	
+
 	// Skip files matching skip patterns
 	for _, pattern := range config.SkipPatterns {
 		if strings.Contains(fileName, pattern) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
 // normalizeRelPath converts a file path to a normalized relative path from repo root
 func normalizeRelPath(t *testing.T, filePath, repoRoot string) (string, error) {
 	t.Helper()
-	
+
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
 		return "", fmt.Errorf("getting absolute path for %s: %w", filePath, err)
 	}
-	
+
 	relPath, err := filepath.Rel(repoRoot, absPath)
 	if err != nil {
 		return "", fmt.Errorf("getting relative path for %s: %w", filePath, err)
 	}
-	
+
 	// Normalize path separators for cross-platform compatibility
 	return filepath.ToSlash(relPath), nil
 }
@@ -247,56 +247,56 @@ func (fe *FileError) Error() string {
 // It collects all errors and is safe for concurrent use with testing.T.
 func walkDirectoryParallel(t *testing.T, rootDir string, processFn func(path string, info os.FileInfo) error) []FileError {
 	t.Helper()
-	
+
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var errors []FileError
-	
+
 	// Function to safely add errors
 	addError := func(path string, err error) {
 		mu.Lock()
 		errors = append(errors, FileError{Path: path, Err: err})
 		mu.Unlock()
 	}
-	
+
 	err := filepath.WalkDir(rootDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			addError(path, fmt.Errorf("walking directory: %w", err))
 			return nil // Continue walking
 		}
-		
+
 		if d.IsDir() {
 			return nil
 		}
-		
+
 		wg.Add(1)
 		go func(p string, dirEntry os.DirEntry) {
 			defer wg.Done()
-			
+
 			info, err := dirEntry.Info()
 			if err != nil {
 				addError(p, fmt.Errorf("getting file info: %w", err))
 				return
 			}
-			
+
 			if err := processFn(p, info); err != nil {
 				addError(p, err)
 			}
 		}(path, d)
-		
+
 		return nil
 	})
-	
+
 	// Wait for all goroutines to complete
 	wg.Wait()
-	
+
 	// Add walk error if any
 	if err != nil {
 		mu.Lock()
 		errors = append(errors, FileError{Path: rootDir, Err: fmt.Errorf("directory walk failed: %w", err)})
 		mu.Unlock()
 	}
-	
+
 	return errors
 }
 
@@ -309,7 +309,7 @@ func TestNoHTTPInCore(t *testing.T) {
 	for _, coreDir := range config.CoreDirs {
 		t.Run(coreDir, func(t *testing.T) {
 			fullPath := filepath.Join(repoRoot, coreDir)
-			
+
 			errorList := walkDirectoryParallel(t, fullPath, func(path string, _ os.FileInfo) error {
 				// Skip files based on configuration
 				if shouldSkipFile(path, config) {
@@ -337,7 +337,7 @@ func TestNoHTTPInCore(t *testing.T) {
 
 				return nil
 			})
-			
+
 			// Report all errors found during parallel processing
 			for _, fileErr := range errorList {
 				t.Error(fileErr.Error())
@@ -357,7 +357,7 @@ func checkProhibitedImport(importPath, relPath string, config *ArchConfig) error
 			}
 			return fmt.Errorf("imports prohibited HTTP package: %s", importPath)
 		}
-		
+
 		// Handle framework imports with cached regex for versioned imports
 		if frameworkRegex, exists := config.compiledFrameworkRegexes[prohibited]; exists {
 			if frameworkRegex.MatchString(importPath) {
@@ -365,7 +365,7 @@ func checkProhibitedImport(importPath, relPath string, config *ArchConfig) error
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -377,7 +377,7 @@ func isAllowedHTTPUsage(relPath string, config *ArchConfig) bool {
 			return true
 		}
 	}
-	
+
 	// Check directory prefixes
 	for _, allowedDir := range config.AllowedHTTPDirs {
 		if strings.HasPrefix(relPath, allowedDir) {
@@ -392,7 +392,7 @@ func isAllowedHTTPUsage(relPath string, config *ArchConfig) bool {
 func TestContribHasHTTPFrameworks(t *testing.T) {
 	repoRoot := getRepoRoot(t)
 	config := loadConfig(t, repoRoot)
-	
+
 	testCases := []struct {
 		dir      string
 		expected string
@@ -404,7 +404,7 @@ func TestContribHasHTTPFrameworks(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.dir, func(t *testing.T) {
 			filePath := filepath.Join(repoRoot, tc.dir)
-			
+
 			// Parse imports from the file
 			imports, err := parseImports(t, filePath)
 			require.NoError(t, err)
@@ -412,7 +412,7 @@ func TestContribHasHTTPFrameworks(t *testing.T) {
 			// Check that it imports the expected framework using cached regex
 			frameworkRegex, exists := config.compiledFrameworkRegexes[tc.expected]
 			require.True(t, exists, "Framework %s not found in compiled regexes", tc.expected)
-			
+
 			found := false
 			for _, importPath := range imports {
 				if frameworkRegex.MatchString(importPath) {
@@ -475,7 +475,7 @@ func TestHTTPFrameworkIsolation(t *testing.T) {
 
 		return nil
 	})
-	
+
 	// Report all errors found during parallel processing
 	for _, fileErr := range errorList {
 		t.Error(fileErr.Error())
@@ -486,11 +486,11 @@ func TestHTTPFrameworkIsolation(t *testing.T) {
 func TestCoreArchitectureBoundaries(t *testing.T) {
 	repoRoot := getRepoRoot(t)
 	config := loadConfig(t, repoRoot)
-	
+
 	t.Run("core_only_imports_core", func(t *testing.T) {
 		// internal/core should only import other internal/core packages and stdlib
 		coreDir := filepath.Join(repoRoot, "internal/core")
-		
+
 		errorList := walkDirectoryParallel(t, coreDir, func(path string, _ os.FileInfo) error {
 			// Skip files based on configuration (includes test files if configured)
 			if shouldSkipFile(path, config) {
@@ -515,7 +515,7 @@ func TestCoreArchitectureBoundaries(t *testing.T) {
 				if !strings.Contains(importPath, "/") {
 					continue
 				}
-				
+
 				// Allow specific external dependencies that core legitimately needs
 				allowed := false
 				for _, allowedDep := range config.AllowedExternalDeps {
@@ -524,7 +524,7 @@ func TestCoreArchitectureBoundaries(t *testing.T) {
 						break
 					}
 				}
-				
+
 				if allowed {
 					continue
 				}
@@ -542,7 +542,7 @@ func TestCoreArchitectureBoundaries(t *testing.T) {
 
 			return nil
 		})
-		
+
 		// Report all errors found during parallel processing
 		for _, fileErr := range errorList {
 			t.Error(fileErr.Error())
