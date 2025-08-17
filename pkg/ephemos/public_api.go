@@ -320,33 +320,38 @@ type serverWrapper struct {
 }
 
 func (s *serverWrapper) ListenAndServe(ctx context.Context) error {
+	// Copy state under read lock to avoid blocking Close while serving
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	if s.closed {
+		s.mu.RUnlock()
 		return ErrServerClosed
 	}
 
-	// Create listener if not provided
 	listener := s.listener
+	address := s.address
+	timeout := s.timeout
+	impl := s.impl
+	s.mu.RUnlock()
+
+	// Create listener if not provided
 	if listener == nil {
 		var err error
-		listener, err = net.Listen("tcp", s.address)
+		listener, err = net.Listen("tcp", address)
 		if err != nil {
-			return fmt.Errorf("%w: failed to listen on %s: %v", ErrInvalidAddress, s.address, err)
+			return fmt.Errorf("%w: failed to listen on %s: %v", ErrInvalidAddress, address, err)
 		}
 		defer listener.Close()
 	}
 
 	// Apply timeout to context if configured
 	serverCtx := ctx
-	if s.timeout > 0 {
+	if timeout > 0 {
 		var cancel context.CancelFunc
-		serverCtx, cancel = context.WithTimeout(ctx, s.timeout)
+		serverCtx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
 
-	return s.impl.Serve(serverCtx, listener)
+	return impl.Serve(serverCtx, listener)
 }
 
 func (s *serverWrapper) Close() error {
