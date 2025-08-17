@@ -19,13 +19,13 @@ func GetBoolEnv(key string, defaultValue bool) bool {
 
 // Environment variable names for configuration.
 const (
-	EnvServiceName     = "EPHEMOS_SERVICE_NAME"
-	EnvTrustDomain     = "EPHEMOS_TRUST_DOMAIN"
-	EnvRequireAuth     = "EPHEMOS_REQUIRE_AUTHENTICATION"
-	EnvLogLevel        = "EPHEMOS_LOG_LEVEL"
-	EnvBindAddress     = "EPHEMOS_BIND_ADDRESS"
-	EnvTLSMinVersion   = "EPHEMOS_TLS_MIN_VERSION"
-	EnvDebugEnabled    = "EPHEMOS_DEBUG_ENABLED"
+	EnvServiceName   = "EPHEMOS_SERVICE_NAME"
+	EnvTrustDomain   = "EPHEMOS_TRUST_DOMAIN"
+	EnvRequireAuth   = "EPHEMOS_REQUIRE_AUTHENTICATION"
+	EnvLogLevel      = "EPHEMOS_LOG_LEVEL"
+	EnvBindAddress   = "EPHEMOS_BIND_ADDRESS"
+	EnvTLSMinVersion = "EPHEMOS_TLS_MIN_VERSION"
+	EnvDebugEnabled  = "EPHEMOS_DEBUG_ENABLED"
 )
 
 // Configuration represents internal configuration structure.

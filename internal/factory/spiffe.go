@@ -22,24 +22,24 @@ func SPIFFEDialer(ctx context.Context, cfg *ports.Configuration) (ports.Dialer, 
 	if cfg == nil {
 		return nil, fmt.Errorf("configuration cannot be nil")
 	}
-	
+
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
-	
+
 	// Create identity provider
 	identityProvider, err := createIdentityProvider(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity provider: %w", err)
 	}
-	
+
 	// Create the internal client adapter using the proper constructor
 	// Note: This is the only place where we directly depend on the adapter
 	internalClient, err := api.NewClient(identityProvider, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SPIFFE dialer: %w", err)
 	}
-	
+
 	return &spiffeDialerAdapter{client: internalClient}, nil
 }
 
@@ -49,33 +49,33 @@ func SPIFFEServer(ctx context.Context, cfg *ports.Configuration) (ports.Authenti
 	if cfg == nil {
 		return nil, fmt.Errorf("configuration cannot be nil")
 	}
-	
+
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
-	
+
 	// Create identity provider
 	identityProvider, err := createIdentityProvider(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity provider: %w", err)
 	}
-	
+
 	// Create configuration provider
 	configProvider := config.NewFileProvider()
-	
+
 	// Create transport provider with rotation support
 	transportProvider, err := transport.CreateGRPCProvider(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transport provider: %w", err)
 	}
-	
+
 	// Create the internal server adapter using proper dependency injection
 	// This factory is the appropriate place for this wiring, keeping the API package clean
 	internalServer, err := api.WorkloadServer(identityProvider, transportProvider, configProvider, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SPIFFE server: %w", err)
 	}
-	
+
 	return &spiffeServerAdapter{server: internalServer}, nil
 }
 
@@ -86,7 +86,7 @@ func createIdentityProvider(cfg *ports.Configuration) (ports.IdentityProvider, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity provider: %w", err)
 	}
-	
+
 	return identityProvider, nil
 }
 
@@ -100,7 +100,7 @@ func (d *spiffeDialerAdapter) Connect(ctx context.Context, serviceName, address 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &spiffeConnAdapter{conn: internalConn}, nil
 }
 

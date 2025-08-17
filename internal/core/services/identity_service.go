@@ -38,37 +38,57 @@ import (
 //   - Invalid/expired certificates cause immediate connection failure
 //
 // 4. AUTHORIZATION ENFORCEMENT:
+//
 //   - Checks 'authorized_clients' config for server-side authorization
-//   - Checks 'trusted_servers' config for client-side authorization  
+//
+//   - Checks 'trusted_servers' config for client-side authorization
+//
 //   - Creates AuthorizationPolicy when rules are configured
+//
 //   - Falls back to trust domain authorization when no explicit rules
+//
 //   - Unauthorized services are rejected at transport layer
 //
-// 5. CERTIFICATE ROTATION AND LIFECYCLE MANAGEMENT:
-//   The service implements comprehensive certificate rotation handling to ensure continuous
-//   security and zero-downtime operations. This follows SPIFFE best practices for short-lived certificates.
+//     5. CERTIFICATE ROTATION AND LIFECYCLE MANAGEMENT:
+//     The service implements comprehensive certificate rotation handling to ensure continuous
+//     security and zero-downtime operations. This follows SPIFFE best practices for short-lived certificates.
 //
-//   Cache-Based Rotation Strategy:
+//     Cache-Based Rotation Strategy:
+//
 //   - Certificates are cached with configurable TTL (default: 30 minutes, half of typical 1-hour SPIFFE lifetime)
+//
 //   - Trust bundles are also cached to reduce load on SPIRE and improve performance
+//
 //   - Cache TTL can be configured via service.cache.ttl_minutes (max 60 minutes for security)
 //
-//   Proactive Refresh Mechanism:
+//     Proactive Refresh Mechanism:
+//
 //   - Certificates are proactively refreshed before expiry (default: 10 minutes before expiry)
+//
 //   - Refresh threshold is configurable via service.cache.proactive_refresh_minutes
+//
 //   - This prevents certificate expiry during high-traffic periods and ensures continuous service
+//
 //   - Refresh operations include full cryptographic validation of new certificates
 //
-//   Rotation Triggers:
+//     Rotation Triggers:
+//
 //   - Time-based: Automatic refresh when cache TTL expires
+//
 //   - Expiry-based: Proactive refresh when certificate approaches expiry
+//
 //   - Validation-based: Immediate refresh if cached certificate fails validation
+//
 //   - Error-based: Retry with exponential backoff on provider failures
 //
-//   Thread Safety and Metrics:
+//     Thread Safety and Metrics:
+//
 //   - All cache operations are protected by RWMutex for concurrent access
+//
 //   - Cache performance metrics (hits/misses/ratios) are tracked for monitoring
+//
 //   - Atomic operations ensure thread-safe metric updates
+//
 //   - Structured logging provides observability into rotation events
 //
 // Security Properties:
@@ -87,15 +107,15 @@ type IdentityService struct {
 	cachedIdentity    *domain.ServiceIdentity
 	validator         ports.CertValidatorPort // Certificate validator
 	metrics           MetricsReporter         // Metrics reporter (Prometheus or NoOp)
-	
+
 	// Certificate caching for rotation support
-	cachedCert       *domain.Certificate
-	cachedBundle     *domain.TrustBundle
-	certCachedAt     time.Time
-	bundleCachedAt   time.Time
-	cacheTTL         time.Duration
-	
-	mu               sync.RWMutex
+	cachedCert     *domain.Certificate
+	cachedBundle   *domain.TrustBundle
+	certCachedAt   time.Time
+	bundleCachedAt time.Time
+	cacheTTL       time.Duration
+
+	mu sync.RWMutex
 }
 
 // NewIdentityService creates a new IdentityService with full customization.
@@ -131,7 +151,7 @@ func NewIdentityService(
 	if validator == nil {
 		validator = &domain.DefaultCertValidator{}
 	}
-	
+
 	// Use NoOp metrics if none provided
 	if metrics == nil {
 		metrics = &NoOpMetrics{}
@@ -252,7 +272,7 @@ func (s *IdentityService) CreateClientIdentity() (ports.ClientPort, error) {
 func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// Check if cached certificate is still valid and not expiring soon
 	if s.cachedCert != nil && time.Since(s.certCachedAt) < s.cacheTTL {
 		// Validate the cached certificate is not expired
@@ -262,7 +282,7 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 			if s.config.Service.Cache != nil && s.config.Service.Cache.ProactiveRefreshMinutes > 0 {
 				refreshThreshold = time.Duration(s.config.Service.Cache.ProactiveRefreshMinutes) * time.Minute
 			}
-			
+
 			// Proactive refresh if certificate expires soon
 			// This aligns with SPIFFE short-lived cert best practices
 			now := time.Now()
@@ -285,10 +305,10 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 			s.cachedCert = nil
 		}
 	}
-	
+
 	// Cache miss - fetch fresh certificate from provider with retry logic for transient failures
 	s.metrics.RecordCacheMiss("certificate")
-	
+
 	// Track refresh duration
 	refreshStart := time.Now()
 	cert, err := s.fetchCertificateWithRetry()
@@ -296,27 +316,27 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 		return nil, fmt.Errorf("identity provider failed for service %s: %w", s.cachedIdentity.Name(), err)
 	}
 	refreshDuration := time.Since(refreshStart).Seconds()
-	
+
 	// Determine refresh reason
 	refreshReason := "cache_miss"
 	if s.cachedCert == nil {
 		refreshReason = "initial"
 	} else if time.Now().After(s.cachedCert.Cert.NotAfter) {
 		refreshReason = "expired"
-	} else if time.Now().Add(10*time.Minute).After(s.cachedCert.Cert.NotAfter) {
+	} else if time.Now().Add(10 * time.Minute).After(s.cachedCert.Cert.NotAfter) {
 		refreshReason = "proactive"
 	}
 	s.metrics.RecordRefresh(refreshReason, refreshDuration)
-	
+
 	// Update certificate expiry metric
 	if cert != nil && cert.Cert != nil {
 		s.metrics.UpdateCertExpiry(s.cachedIdentity.Name(), float64(cert.Cert.NotAfter.Unix()))
 	}
-	
+
 	// Cache the new certificate
 	s.cachedCert = cert
 	s.certCachedAt = time.Now()
-	
+
 	return cert, nil
 }
 
@@ -325,12 +345,12 @@ func (s *IdentityService) validateCertificateExpiry(cert *domain.Certificate) er
 	if cert == nil || cert.Cert == nil {
 		return fmt.Errorf("certificate is nil")
 	}
-	
+
 	now := time.Now()
 	if now.After(cert.Cert.NotAfter) {
 		return fmt.Errorf("certificate has expired")
 	}
-	
+
 	return nil
 }
 
@@ -352,25 +372,25 @@ func (s *IdentityService) validateCertificateExpiry(cert *domain.Certificate) er
 func (s *IdentityService) getTrustBundle() (*domain.TrustBundle, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// Check if cached trust bundle is still valid
 	if s.cachedBundle != nil && time.Since(s.bundleCachedAt) < s.cacheTTL {
 		// Cache hit
 		s.metrics.RecordCacheHit("bundle")
 		return s.cachedBundle, nil
 	}
-	
+
 	// Cache miss - fetch fresh trust bundle from provider with retry logic for transient failures
 	s.metrics.RecordCacheMiss("bundle")
 	bundle, err := s.fetchTrustBundleWithRetry()
 	if err != nil {
 		return nil, fmt.Errorf("trust bundle provider failed for service %s: %w", s.cachedIdentity.Name(), err)
 	}
-	
+
 	// Cache the new trust bundle
 	s.cachedBundle = bundle
 	s.bundleCachedAt = time.Now()
-	
+
 	return bundle, nil
 }
 
@@ -419,12 +439,12 @@ func (s *IdentityService) ValidateServiceIdentity(cert *domain.Certificate) erro
 	// Check certificate validity period
 	now := time.Now()
 	if now.Before(cert.Cert.NotBefore) {
-		return fmt.Errorf("certificate is not yet valid (NotBefore: %v, now: %v)", 
+		return fmt.Errorf("certificate is not yet valid (NotBefore: %v, now: %v)",
 			cert.Cert.NotBefore, now)
 	}
 
 	if now.After(cert.Cert.NotAfter) {
-		return fmt.Errorf("certificate has expired (NotAfter: %v, now: %v)", 
+		return fmt.Errorf("certificate has expired (NotAfter: %v, now: %v)",
 			cert.Cert.NotAfter, now)
 	}
 
@@ -471,21 +491,21 @@ func (s *IdentityService) ValidateServiceIdentity(cert *domain.Certificate) erro
 	}
 
 	if certSPIFFEID.String() != expectedSPIFFEID {
-		return fmt.Errorf("certificate SPIFFE ID mismatch: expected %s, got %s", 
+		return fmt.Errorf("certificate SPIFFE ID mismatch: expected %s, got %s",
 			expectedSPIFFEID, certSPIFFEID.String())
 	}
-	
+
 	// Additional validation using go-spiffe features: verify trust domain matches expected
 	expectedID, err := spiffeid.FromString(expectedSPIFFEID)
 	if err != nil {
 		return fmt.Errorf("invalid expected SPIFFE ID %q: %w", expectedSPIFFEID, err)
 	}
-	
+
 	if certSPIFFEID.TrustDomain().String() != expectedID.TrustDomain().String() {
 		return fmt.Errorf("certificate trust domain mismatch: expected %s, got %s",
 			expectedID.TrustDomain().String(), certSPIFFEID.TrustDomain().String())
 	}
-	
+
 	slog.Debug("Certificate SPIFFE ID validation successful",
 		"service_name", serviceName,
 		"spiffe_id", certSPIFFEID.String(),
@@ -510,7 +530,7 @@ func (s *IdentityService) validateCertificateChain(cert *domain.Certificate) err
 	serviceName := s.cachedIdentity.Name()
 	identity := s.cachedIdentity
 	s.mu.RUnlock()
-	
+
 	// Get the trust bundle for chain verification
 	trustBundle, err := s.getTrustBundle()
 	if err != nil {
@@ -519,11 +539,11 @@ func (s *IdentityService) validateCertificateChain(cert *domain.Certificate) err
 
 	// Use centralized validation with comprehensive options
 	opts := domain.CertValidationOptions{
-		ExpectedIdentity: identity,           // Verify SPIFFE ID matches our identity
-		WarningThreshold: 30 * time.Minute,   // Warn if expires within 30 minutes
-		TrustBundle:      trustBundle,         // Verify chain against trust bundle
-		SkipExpiry:       false,               // Always check expiry in production
-		SkipChainVerify:  false,               // Always verify chain cryptographically
+		ExpectedIdentity: identity,         // Verify SPIFFE ID matches our identity
+		WarningThreshold: 30 * time.Minute, // Warn if expires within 30 minutes
+		TrustBundle:      trustBundle,      // Verify chain against trust bundle
+		SkipExpiry:       false,            // Always check expiry in production
+		SkipChainVerify:  false,            // Always verify chain cryptographically
 	}
 
 	// Perform validation through the validator port
@@ -550,20 +570,20 @@ func (s *IdentityService) fetchCertificateWithRetry() (*domain.Certificate, erro
 	s.mu.RLock()
 	serviceName := s.cachedIdentity.Name()
 	s.mu.RUnlock()
-	
+
 	maxRetries := 3
 	baseDelay := 100 * time.Millisecond
-	
+
 	var lastErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		cert, err := s.identityProvider.GetCertificate()
 		if err == nil {
 			return cert, nil
 		}
-		
+
 		lastErr = err
 		s.metrics.RecordRetry("certificate", attempt+1)
-		
+
 		// Log retry attempts with structured logging
 		if attempt < maxRetries-1 {
 			delay := baseDelay * time.Duration(1<<attempt) // Exponential backoff
@@ -577,13 +597,13 @@ func (s *IdentityService) fetchCertificateWithRetry() (*domain.Certificate, erro
 			time.Sleep(delay)
 		}
 	}
-	
+
 	slog.Error("Certificate fetch failed after all retries",
 		"service_name", serviceName,
 		"max_retries", maxRetries,
 		"final_error", lastErr.Error(),
 	)
-	
+
 	return nil, fmt.Errorf("failed to get certificate after %d retries: %w", maxRetries, lastErr)
 }
 
@@ -593,19 +613,19 @@ func (s *IdentityService) fetchTrustBundleWithRetry() (*domain.TrustBundle, erro
 	s.mu.RLock()
 	serviceName := s.cachedIdentity.Name()
 	s.mu.RUnlock()
-	
+
 	maxRetries := 3
 	baseDelay := 100 * time.Millisecond
-	
+
 	var lastErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		bundle, err := s.identityProvider.GetTrustBundle()
 		if err == nil {
 			return bundle, nil
 		}
-		
+
 		lastErr = err
-		
+
 		// Log retry attempts with structured logging
 		if attempt < maxRetries-1 {
 			delay := baseDelay * time.Duration(1<<attempt) // Exponential backoff
@@ -619,16 +639,15 @@ func (s *IdentityService) fetchTrustBundleWithRetry() (*domain.TrustBundle, erro
 			time.Sleep(delay)
 		}
 	}
-	
+
 	slog.Error("Trust bundle fetch failed after all retries",
 		"service_name", serviceName,
 		"max_retries", maxRetries,
 		"final_error", lastErr.Error(),
 	)
-	
+
 	return nil, fmt.Errorf("failed to get trust bundle after %d retries: %w", maxRetries, lastErr)
 }
-
 
 // createPolicy creates an authentication policy based on the service configuration.
 // It consolidates the policy creation logic that was duplicated between CreateServerIdentity and CreateClientIdentity.

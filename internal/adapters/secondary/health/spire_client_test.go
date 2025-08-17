@@ -60,7 +60,7 @@ func TestNewSpireHealthClient(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client, err := NewSpireHealthClient(tt.component, tt.config)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Nil(t, client)
@@ -123,7 +123,7 @@ func TestSpireHealthClient_CheckLiveness(t *testing.T) {
 				assert.Equal(t, "/live", r.URL.Path)
 				assert.Equal(t, "GET", r.Method)
 				assert.Equal(t, "ephemos-health-checker/1.0", r.Header.Get("User-Agent"))
-				
+
 				w.WriteHeader(tt.serverResponse)
 				w.Write([]byte(tt.responseBody))
 			}))
@@ -238,11 +238,11 @@ func TestSpireHealthClient_CheckHealth(t *testing.T) {
 	assert.Equal(t, ports.HealthStatusHealthy, result.Status)
 	assert.Equal(t, "spire-server", result.Component)
 	assert.Contains(t, result.Message, "healthy and ready")
-	
+
 	// Verify both endpoints were called
 	assert.Equal(t, 1, liveCallCount)
 	assert.Equal(t, 1, readyCallCount)
-	
+
 	// Check details
 	assert.Contains(t, result.Details, "liveness_status")
 	assert.Contains(t, result.Details, "readiness_status")
@@ -285,7 +285,7 @@ func TestSpireHealthClient_InvalidComponent(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	
+
 	// Should fail because no server or agent config
 	_, err = client.CheckLiveness(ctx)
 	assert.Error(t, err)
@@ -349,12 +349,12 @@ func TestSpireHealthClient_CustomPaths(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	
+
 	// Test custom liveness path
 	result, err := client.CheckLiveness(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, ports.HealthStatusHealthy, result.Status)
-	
+
 	// Test custom readiness path
 	result, err = client.CheckReadiness(ctx)
 	assert.NoError(t, err)

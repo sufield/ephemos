@@ -16,7 +16,7 @@ type Dialer interface {
 	// The serviceName is used for identity verification and authorization.
 	// The address specifies where to connect (host:port format).
 	Connect(ctx context.Context, serviceName, address string) (Conn, error)
-	
+
 	// Close releases any resources held by the dialer.
 	// Must be safe to call multiple times.
 	Close() error
@@ -28,7 +28,7 @@ type Conn interface {
 	// HTTPClient returns an HTTP client configured for this authenticated connection.
 	// The client will automatically include authentication credentials in requests.
 	HTTPClient() (*http.Client, error)
-	
+
 	// Close closes the connection and releases associated resources.
 	// Must be safe to call multiple times.
 	Close() error
@@ -41,11 +41,11 @@ type AuthenticatedServer interface {
 	// The server will automatically verify client authentication.
 	// Blocks until the context is cancelled or an error occurs.
 	Serve(ctx context.Context, lis net.Listener) error
-	
+
 	// Close gracefully shuts down the server.
 	// Must be safe to call multiple times.
 	Close() error
-	
+
 	// Addr returns the network address the server is listening on.
 	// Returns nil if the server is not currently listening.
 	Addr() net.Addr

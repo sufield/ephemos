@@ -30,7 +30,7 @@ func runHTTPClient() error {
 
 	// Step 1: Connect to SPIRE Workload API to get certificates and trust bundle
 	fmt.Println("🔗 Connecting to SPIRE Workload API...")
-	
+
 	// Create X509Source to fetch certificates and trust bundles from SPIRE
 	source, err := workloadapi.NewX509Source(ctx)
 	if err != nil {
@@ -40,7 +40,7 @@ func runHTTPClient() error {
 
 	// Step 2: Get our service's SVID (certificate) and trust bundle
 	fmt.Println("📜 Fetching SPIFFE certificate and trust bundle...")
-	
+
 	svid, err := source.GetX509SVID()
 	if err != nil {
 		return fmt.Errorf("failed to get X509 SVID: %w", err)
@@ -61,7 +61,7 @@ func runHTTPClient() error {
 	// Step 4: Create authorizer for peer validation
 	// In this example, we accept any service in our trust domain
 	authorizer := tlsconfig.AuthorizeMemberOf(trustDomain)
-	
+
 	// For stricter authorization, you could use:
 	// authorizer := tlsconfig.AuthorizeID(spiffeid.Must("spiffe://prod.company.com/specific-service"))
 	// or
@@ -72,13 +72,13 @@ func runHTTPClient() error {
 
 	// Step 5: Create TLS configuration using go-spiffe primitives
 	fmt.Println("🔐 Creating mTLS configuration...")
-	
+
 	tlsConfig := tlsconfig.MTLSClientConfig(source, bundleSource, authorizer)
 	tlsConfig.MinVersion = tls.VersionTLS13 // Enforce TLS 1.3
 
 	// Step 6: Create HTTP client with SPIFFE mTLS transport
 	fmt.Println("🌐 Creating HTTP client with SPIFFE authentication...")
-	
+
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig:       tlsConfig,
@@ -93,10 +93,10 @@ func runHTTPClient() error {
 
 	// Step 7: Make authenticated HTTP requests
 	fmt.Println("📡 Making authenticated HTTP request...")
-	
+
 	// Example request - replace with your target service URL
 	targetURL := "https://localhost:8080/api/health"
-	
+
 	// For demo purposes, we'll show how to make a request
 	// In real usage, this would be your target service's HTTPS endpoint
 	resp, err := httpClient.Get(targetURL)
@@ -126,22 +126,22 @@ func runHTTPClient() error {
 func runHTTPClientWithEphemosHelpers() error {
 	// Note: This example assumes PR2 exports are available
 	// See pkg/ephemos/http.go for NewHTTPClient, NewTLSConfig functions
-	
+
 	fmt.Println("📦 Using Ephemos high-level HTTP client helpers...")
-	
+
 	// Example using hypothetical exported functions:
-	// 
+	//
 	// config := &ephemos.HTTPClientConfig{
 	//     IdentityService: identityService, // From core
 	//     Authorizer: ephemos.AuthorizeMemberOf("prod.company.com"),
 	//     Timeout: 30 * time.Second,
 	// }
-	// 
+	//
 	// client, err := ephemos.NewHTTPClient(config)
 	// if err != nil {
 	//     return fmt.Errorf("failed to create HTTP client: %w", err)
 	// }
-	// 
+	//
 	// resp, err := client.Get("https://target-service/api/data")
 
 	fmt.Println("💡 See pkg/ephemos package for high-level HTTP client helpers")
@@ -151,7 +151,7 @@ func runHTTPClientWithEphemosHelpers() error {
 // Example showing manual TLS configuration for advanced use cases
 func createAdvancedTLSConfig() (*tls.Config, error) {
 	ctx := context.Background()
-	
+
 	// Get X509Source for certificates
 	source, err := workloadapi.NewX509Source(ctx)
 	if err != nil {
@@ -179,7 +179,7 @@ func createAdvancedTLSConfig() (*tls.Config, error) {
 
 	// Build TLS config with custom settings
 	tlsConfig := tlsconfig.MTLSClientConfig(source, bundleSource, authorizer)
-	
+
 	// Customize TLS settings
 	tlsConfig.MinVersion = tls.VersionTLS13
 	tlsConfig.MaxVersion = tls.VersionTLS13
@@ -187,14 +187,14 @@ func createAdvancedTLSConfig() (*tls.Config, error) {
 		tls.TLS_AES_256_GCM_SHA384,
 		tls.TLS_AES_128_GCM_SHA256,
 	}
-	
+
 	return tlsConfig, nil
 }
 
 // Example helper function for creating HTTP transports with different configurations
 func createHTTPTransportVariations() {
 	fmt.Println("🔧 HTTP Transport Configuration Examples:")
-	
+
 	examples := []struct {
 		name        string
 		description string
@@ -256,9 +256,9 @@ func createHTTPTransportVariations() {
 // Example of common authorization patterns
 func authorizationExamples() {
 	fmt.Println("🔒 Authorization Pattern Examples:")
-	
+
 	trustDomain := spiffeid.RequireTrustDomainFromString("prod.company.com")
-	
+
 	patterns := []struct {
 		name        string
 		description string

@@ -290,7 +290,7 @@ func outputDiagnosticInfoText(info *ports.DiagnosticInfo, quiet, noEmoji bool) e
 	}
 
 	fmt.Printf("%s %s Diagnostics\n", status, info.Component)
-	
+
 	if !quiet {
 		fmt.Printf("Version: %s\n", info.Version)
 		fmt.Printf("Status: %s\n", info.Status)
@@ -354,7 +354,7 @@ func outputRegistrationEntriesText(entries []*ports.RegistrationEntry, quiet, no
 	}
 
 	fmt.Printf("%s Registration Entries (%d total)\n", status, len(entries))
-	
+
 	if !quiet {
 		for i, entry := range entries {
 			fmt.Printf("\n%d. ID: %s\n", i+1, entry.ID)
@@ -399,7 +399,7 @@ func outputTrustBundleInfoText(bundleInfo *ports.TrustBundleInfo, quiet, noEmoji
 	}
 
 	fmt.Printf("%s Trust Bundle Information\n", status)
-	
+
 	if !quiet {
 		if bundleInfo.Local != nil {
 			fmt.Printf("\nLocal Bundle:\n")
@@ -444,7 +444,7 @@ func outputAgentsText(agents []*ports.Agent, quiet, noEmoji bool) error {
 	}
 
 	fmt.Printf("%s SPIRE Agents (%d total)\n", status, len(agents))
-	
+
 	if !quiet {
 		for i, agent := range agents {
 			fmt.Printf("\n%d. ID: %s\n", i+1, agent.ID)

@@ -315,7 +315,7 @@ func testInterceptorConfigurations(t *testing.T) {
 
 // TODO: Implement these interceptor configuration functions in public API
 // func testDefaultInterceptorConfig(t *testing.T) { ... }
-// func testProductionInterceptorConfig(t *testing.T) { ... }  
+// func testProductionInterceptorConfig(t *testing.T) { ... }
 // func testDevelopmentInterceptorConfig(t *testing.T) { ... }
 
 // TestErrorHandlingFlow tests error handling throughout the identity stack.
@@ -492,7 +492,7 @@ type mockServer struct{}
 
 func (m *mockServer) RegisterService(_ ports.ServiceRegistrarPort) error { return nil }
 func (m *mockServer) Start(_ ports.ListenerPort) error                   { return nil }
-func (m *mockServer) Stop() error                                    { return nil }
+func (m *mockServer) Stop() error                                        { return nil }
 
 type mockClient struct{}
 

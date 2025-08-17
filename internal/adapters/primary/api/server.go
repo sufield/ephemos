@@ -92,7 +92,7 @@ func (s *Server) RegisterService(ctx context.Context, serviceRegistrar ServiceRe
 			Message: "context cannot be nil",
 		}
 	}
-	
+
 	if serviceRegistrar == nil {
 		return &errors.ValidationError{
 			Field:   "serviceRegistrar",

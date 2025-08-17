@@ -161,7 +161,7 @@ func runContinuousMonitoring(logger *slog.Logger) error {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	// Start monitoring
-	logger.Info("Starting continuous health monitoring", 
+	logger.Info("Starting continuous health monitoring",
 		"interval", config.Interval,
 		"timeout", config.Timeout)
 

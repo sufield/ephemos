@@ -280,7 +280,7 @@ func outputSvidInfo(cmd *cobra.Command, svid *x509svid.SVID) error {
 			"certificate_count": len(svid.Certificates),
 			"has_private_key":   svid.PrivateKey != nil,
 		}
-		
+
 		if len(svid.Certificates) > 0 {
 			cert := svid.Certificates[0]
 			svidInfo["not_before"] = cert.NotBefore
@@ -289,7 +289,7 @@ func outputSvidInfo(cmd *cobra.Command, svid *x509svid.SVID) error {
 			svidInfo["subject"] = cert.Subject.String()
 			svidInfo["issuer"] = cert.Issuer.String()
 		}
-		
+
 		return json.NewEncoder(os.Stdout).Encode(svidInfo)
 	default:
 		return outputSvidInfoText(svid, quiet, noEmoji)
@@ -303,7 +303,7 @@ func outputSvidInfoText(svid *x509svid.SVID, quiet, noEmoji bool) error {
 	}
 
 	fmt.Printf("%s X.509 SVID Information\n", status)
-	
+
 	if !quiet {
 		fmt.Printf("SPIFFE ID: %s\n", svid.ID)
 		fmt.Printf("Trust Domain: %s\n", svid.ID.TrustDomain())
@@ -332,11 +332,11 @@ func outputBundleInfo(cmd *cobra.Command, trustDomain spiffeid.TrustDomain, bund
 	case "json":
 		authorities := bundle.X509Authorities()
 		bundleInfo := map[string]interface{}{
-			"trust_domain":       trustDomain.String(),
-			"certificate_count":  len(authorities),
-			"authorities":        make([]map[string]interface{}, len(authorities)),
+			"trust_domain":      trustDomain.String(),
+			"certificate_count": len(authorities),
+			"authorities":       make([]map[string]interface{}, len(authorities)),
 		}
-		
+
 		for i, cert := range authorities {
 			bundleInfo["authorities"].([]map[string]interface{})[i] = map[string]interface{}{
 				"subject":       cert.Subject.String(),
@@ -346,7 +346,7 @@ func outputBundleInfo(cmd *cobra.Command, trustDomain spiffeid.TrustDomain, bund
 				"is_ca":         cert.IsCA,
 			}
 		}
-		
+
 		return json.NewEncoder(os.Stdout).Encode(bundleInfo)
 	default:
 		return outputBundleInfoText(trustDomain, bundle, quiet, noEmoji)
@@ -360,13 +360,13 @@ func outputBundleInfoText(trustDomain spiffeid.TrustDomain, bundle *x509bundle.B
 	}
 
 	fmt.Printf("%s Trust Bundle Information\n", status)
-	
+
 	if !quiet {
 		fmt.Printf("Trust Domain: %s\n", trustDomain)
-		
+
 		authorities := bundle.X509Authorities()
 		fmt.Printf("Certificate Count: %d\n", len(authorities))
-		
+
 		for i, cert := range authorities {
 			fmt.Printf("\nAuthority %d:\n", i+1)
 			fmt.Printf("  Subject: %s\n", cert.Subject.String())

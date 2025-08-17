@@ -83,7 +83,6 @@ type CacheConfig struct {
 	ProactiveRefreshMinutes int `yaml:"proactive_refresh_minutes,omitempty"`
 }
 
-
 // Validate checks if the configuration is valid and returns any validation errors.
 // This method ensures all required fields are present and properly formatted.
 func (c *Configuration) Validate() error {

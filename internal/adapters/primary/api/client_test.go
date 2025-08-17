@@ -125,9 +125,9 @@ func TestClient_IdentityClient(t *testing.T) {
 					Domain: "test.local",
 				},
 			},
-			authorizer:        authorizer,
-			trustDomain:       trustDomain,
-			wantErr:           false,
+			authorizer:  authorizer,
+			trustDomain: trustDomain,
+			wantErr:     false,
 		},
 	}
 
@@ -138,14 +138,14 @@ func TestClient_IdentityClient(t *testing.T) {
 				t.Errorf("IdentityClient() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if tt.wantErr && tt.wantErrType != "" {
 				var validationErr *epherrors.ValidationError
 				if !errors.As(err, &validationErr) {
 					t.Errorf("IdentityClient() error type = %T, want %s", err, tt.wantErrType)
 				}
 			}
-			
+
 			if !tt.wantErr && client == nil {
 				t.Error("IdentityClient() returned nil client")
 			}

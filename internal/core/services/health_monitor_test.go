@@ -92,7 +92,7 @@ func TestNewHealthMonitorService(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service, err := NewHealthMonitorService(tt.config, tt.logger)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Nil(t, service)
@@ -145,7 +145,7 @@ func TestHealthMonitorService_RegisterChecker(t *testing.T) {
 			}
 
 			err := service.RegisterChecker(tt.checker)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -167,7 +167,7 @@ func TestHealthMonitorService_UnregisterChecker(t *testing.T) {
 	// Register a checker first
 	checker := &MockHealthChecker{}
 	checker.On("GetComponentName").Return("test-component")
-	
+
 	err = service.RegisterChecker(checker)
 	require.NoError(t, err)
 
@@ -192,7 +192,7 @@ func TestHealthMonitorService_UnregisterChecker(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := service.UnregisterChecker(tt.componentName)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -213,7 +213,7 @@ func TestHealthMonitorService_CheckAll(t *testing.T) {
 	t.Run("no checkers", func(t *testing.T) {
 		ctx := context.Background()
 		results, err := service.CheckAll(ctx)
-		
+
 		assert.NoError(t, err)
 		assert.Empty(t, results)
 	})
@@ -222,7 +222,7 @@ func TestHealthMonitorService_CheckAll(t *testing.T) {
 	t.Run("healthy checker", func(t *testing.T) {
 		checker := &MockHealthChecker{}
 		checker.On("GetComponentName").Return("test-component")
-		
+
 		healthResult := &ports.HealthResult{
 			Status:    ports.HealthStatusHealthy,
 			Component: "test-component",
@@ -236,7 +236,7 @@ func TestHealthMonitorService_CheckAll(t *testing.T) {
 
 		ctx := context.Background()
 		results, err := service.CheckAll(ctx)
-		
+
 		assert.NoError(t, err)
 		assert.Len(t, results, 1)
 		assert.Contains(t, results, "test-component")
@@ -252,7 +252,7 @@ func TestHealthMonitorService_CheckAll(t *testing.T) {
 
 		checker := &MockHealthChecker{}
 		checker.On("GetComponentName").Return("failing-component")
-		
+
 		// Checker returns error
 		checker.On("CheckHealth", mock.Anything).Return((*ports.HealthResult)(nil), assert.AnError)
 
@@ -261,7 +261,7 @@ func TestHealthMonitorService_CheckAll(t *testing.T) {
 
 		ctx := context.Background()
 		results, err := service2.CheckAll(ctx)
-		
+
 		assert.NoError(t, err)
 		assert.Len(t, results, 1)
 		assert.Contains(t, results, "failing-component")
@@ -296,7 +296,7 @@ func TestHealthMonitorService_RegisterReporter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := service.RegisterReporter(tt.reporter)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -312,9 +312,9 @@ func TestHealthMonitorService_GetOverallHealth(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name            string
-		results         map[string]*ports.HealthResult
-		expectedStatus  ports.HealthStatus
+		name           string
+		results        map[string]*ports.HealthResult
+		expectedStatus ports.HealthStatus
 	}{
 		{
 			name:           "no results",
@@ -407,7 +407,7 @@ func TestHealthMonitorService_Close(t *testing.T) {
 	// Register a reporter
 	reporter := &MockHealthReporter{}
 	reporter.On("Close").Return(nil)
-	
+
 	err = service.RegisterReporter(reporter)
 	require.NoError(t, err)
 
@@ -442,7 +442,7 @@ func TestHealthMonitorService_GetResults(t *testing.T) {
 
 	// Get results
 	results := service.GetResults()
-	
+
 	assert.Len(t, results, 1)
 	assert.Contains(t, results, "comp1")
 	assert.Equal(t, ports.HealthStatusHealthy, results["comp1"].Status)

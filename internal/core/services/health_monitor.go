@@ -149,8 +149,8 @@ func (h *HealthMonitorService) CheckAll(ctx context.Context) (map[string]*ports.
 		case result := <-resultsCh:
 			results[result.name] = result.result
 			if result.err != nil {
-				h.logger.Error("Health check failed", 
-					"component", result.name, 
+				h.logger.Error("Health check failed",
+					"component", result.name,
 					"error", result.err)
 			}
 		case <-ctx.Done():
@@ -191,8 +191,8 @@ func (h *HealthMonitorService) StartMonitoring(ctx context.Context) error {
 		interval = 30 * time.Second // Default interval
 	}
 
-	h.logger.Info("Starting health monitoring", 
-		"interval", interval, 
+	h.logger.Info("Starting health monitoring",
+		"interval", interval,
 		"checkers", len(h.checkers))
 
 	go h.monitoringLoop(ctx, interval)
@@ -330,8 +330,8 @@ func (h *HealthMonitorService) reportToAll(results map[string]*ports.HealthResul
 		// Report individual results
 		for _, result := range results {
 			if err := reporter.ReportHealth(result); err != nil {
-				h.logger.Error("Failed to report health result", 
-					"component", result.Component, 
+				h.logger.Error("Failed to report health result",
+					"component", result.Component,
 					"error", err)
 			}
 		}

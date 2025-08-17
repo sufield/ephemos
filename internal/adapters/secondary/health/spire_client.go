@@ -62,7 +62,7 @@ func (c *SpireHealthClient) GetComponentName() string {
 // This uses the /live endpoint which indicates if the process is running
 func (c *SpireHealthClient) CheckLiveness(ctx context.Context) (*ports.HealthResult, error) {
 	startTime := time.Now()
-	
+
 	var address, livePath string
 	var headers map[string]string
 	var useHTTPS bool
@@ -104,7 +104,7 @@ func (c *SpireHealthClient) CheckLiveness(ctx context.Context) (*ports.HealthRes
 	// Perform health check
 	result, err := c.performHealthCheck(ctx, url, "liveness", headers)
 	result.ResponseTime = time.Since(startTime)
-	
+
 	return result, err
 }
 
@@ -112,7 +112,7 @@ func (c *SpireHealthClient) CheckLiveness(ctx context.Context) (*ports.HealthRes
 // This uses the /ready endpoint which indicates if the component can serve requests
 func (c *SpireHealthClient) CheckReadiness(ctx context.Context) (*ports.HealthResult, error) {
 	startTime := time.Now()
-	
+
 	var address, readyPath string
 	var headers map[string]string
 	var useHTTPS bool
@@ -154,7 +154,7 @@ func (c *SpireHealthClient) CheckReadiness(ctx context.Context) (*ports.HealthRe
 	// Perform health check
 	result, err := c.performHealthCheck(ctx, url, "readiness", headers)
 	result.ResponseTime = time.Since(startTime)
-	
+
 	return result, err
 }
 
@@ -164,16 +164,16 @@ func (c *SpireHealthClient) CheckHealth(ctx context.Context) (*ports.HealthResul
 
 	// Check liveness first
 	livenessResult, livenessErr := c.CheckLiveness(ctx)
-	
+
 	// Check readiness
 	readinessResult, readinessErr := c.CheckReadiness(ctx)
 
 	// Combine results
 	result := &ports.HealthResult{
-		Component: c.component,
-		CheckedAt: time.Now(),
+		Component:    c.component,
+		CheckedAt:    time.Now(),
 		ResponseTime: time.Since(startTime),
-		Details: make(map[string]interface{}),
+		Details:      make(map[string]interface{}),
 	}
 
 	// Add liveness details
@@ -198,7 +198,7 @@ func (c *SpireHealthClient) CheckHealth(ctx context.Context) (*ports.HealthResul
 	if livenessErr != nil || readinessErr != nil {
 		result.Status = ports.HealthStatusUnhealthy
 		result.Message = "Health check failed"
-		
+
 		var errors []string
 		if livenessErr != nil {
 			errors = append(errors, fmt.Sprintf("liveness: %v", livenessErr))

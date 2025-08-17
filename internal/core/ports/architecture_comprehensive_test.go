@@ -72,7 +72,7 @@ func checkInterfaceSize(t *testing.T, _ *packages.Package, file *ast.File) []str
 		if !ok {
 			return true
 		}
-		
+
 		// Count only actual methods (FuncType), not embedded interfaces
 		count := 0
 		for _, fld := range it.Methods.List {
@@ -80,7 +80,7 @@ func checkInterfaceSize(t *testing.T, _ *packages.Package, file *ast.File) []str
 				count++
 			}
 		}
-		
+
 		if count > maxMethods {
 			out = append(out, fmt.Sprintf("Interface %s has %d declared methods (max %d)", ts.Name.Name, count, maxMethods))
 		}
@@ -94,14 +94,14 @@ func Test_Interface_Segregation(t *testing.T) {
 	t.Parallel()
 	mp := modulePathTB(t)
 	pkgs := loadSyntax(t, mp+"/internal/core/ports/...")
-	
+
 	var violations []string
 	for _, p := range pkgs {
 		for _, f := range p.Syntax {
 			violations = append(violations, checkInterfaceSize(t, p, f)...)
 		}
 	}
-	
+
 	if len(violations) > 0 {
 		t.Fatalf("Interface Segregation violations:\n%s", strings.Join(violations, "\n"))
 	}
@@ -134,12 +134,12 @@ func Test_Adapter_Structure(t *testing.T) {
 	t.Parallel()
 	mp := modulePathTB(t)
 	pkgs := loadSyntax(t, mp+"/internal/adapters/...")
-	
+
 	var violations []string
 	for _, p := range pkgs {
 		violations = append(violations, checkAdapterPackageHasStruct(p)...)
 	}
-	
+
 	if len(violations) > 0 {
 		t.Fatalf("Adapter structure violations:\n%s", strings.Join(violations, "\n"))
 	}
@@ -187,7 +187,7 @@ func checkDomainPurityAST(t *testing.T, p *packages.Package, f *ast.File) []stri
 		if !ok {
 			return true
 		}
-		
+
 		for _, fld := range st.Fields.List {
 			nameHit := false
 			for _, nm := range fld.Names {
@@ -199,11 +199,11 @@ func checkDomainPurityAST(t *testing.T, p *packages.Package, f *ast.File) []stri
 					}
 				}
 			}
-			
+
 			typ := strings.ToLower(checkType(fld.Type))
 			typeHit := strings.Contains(typ, "http") || strings.Contains(typ, "grpc") ||
 				strings.Contains(typ, "sql") || strings.Contains(typ, "redis") || strings.Contains(typ, "kafka")
-				
+
 			if nameHit || typeHit {
 				out = append(out, fmt.Sprintf("domain struct %s has infrastructure concern in field %v", ts.Name.Name, fld.Names))
 			}
@@ -219,14 +219,14 @@ func Test_Domain_Purity(t *testing.T) {
 	t.Parallel()
 	mp := modulePathTB(t)
 	pkgs := loadSyntax(t, mp+"/internal/core/domain/...")
-	
+
 	var violations []string
 	for _, p := range pkgs {
 		for _, f := range p.Syntax {
 			violations = append(violations, checkDomainPurityAST(t, p, f)...)
 		}
 	}
-	
+
 	if len(violations) > 0 {
 		t.Fatalf("Domain purity violations:\n%s", strings.Join(violations, "\n"))
 	}
@@ -237,34 +237,34 @@ func checkPackageBoundaries(t *testing.T, p *packages.Package, chain []string) [
 	t.Helper()
 	var violations []string
 	mp := modulePathTB(t)
-	
+
 	// Track current chain to avoid cycles
 	currentChain := append(chain, p.PkgPath)
 	if len(currentChain) > 5 { // Limit depth to prevent infinite recursion
 		return violations
 	}
-	
+
 	for _, imp := range p.Imports {
 		// Check if core imports adapters (boundary violation)
-		if strings.HasPrefix(p.PkgPath, mp+"/internal/core/") && 
-		   strings.HasPrefix(imp.PkgPath, mp+"/internal/adapters/") {
+		if strings.HasPrefix(p.PkgPath, mp+"/internal/core/") &&
+			strings.HasPrefix(imp.PkgPath, mp+"/internal/adapters/") {
 			chainStr := strings.Join(append(currentChain, imp.PkgPath), " -> ")
 			violations = append(violations, fmt.Sprintf("Core imports adapters via: %s", chainStr))
 		}
-		
+
 		// Check if domain imports forbidden packages
-		if strings.HasPrefix(p.PkgPath, mp+"/internal/core/domain/") && 
-		   isForbiddenImport(imp.PkgPath) {
+		if strings.HasPrefix(p.PkgPath, mp+"/internal/core/domain/") &&
+			isForbiddenImport(imp.PkgPath) {
 			chainStr := strings.Join(append(currentChain, imp.PkgPath), " -> ")
 			violations = append(violations, fmt.Sprintf("Domain imports forbidden package via: %s", chainStr))
 		}
-		
+
 		// Recurse into internal packages (limited depth)
 		if strings.HasPrefix(imp.PkgPath, mp+"/internal/") && len(currentChain) < 4 {
 			violations = append(violations, checkPackageBoundaries(t, imp, currentChain)...)
 		}
 	}
-	
+
 	return violations
 }
 
@@ -273,12 +273,12 @@ func Test_Package_Boundaries(t *testing.T) {
 	t.Parallel()
 	mp := modulePathTB(t)
 	pkgs := loadSyntax(t, mp+"/internal/...")
-	
+
 	var violations []string
 	for _, p := range pkgs {
 		violations = append(violations, checkPackageBoundaries(t, p, nil)...)
 	}
-	
+
 	if len(violations) > 0 {
 		t.Fatalf("Package boundary violations:\n%s", strings.Join(violations, "\n"))
 	}

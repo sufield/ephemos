@@ -237,7 +237,6 @@ func TestValidationRules(t *testing.T) {
 	}
 }
 
-
 func TestFileValidation(t *testing.T) {
 	// Create a temporary file
 	tmpFile, err := os.CreateTemp("", "validation_test")
@@ -328,7 +327,7 @@ func TestValidationEngineOptions(t *testing.T) {
 	// Use a struct with multiple validation errors
 	config := &testConfiguration{
 		Service: testServiceConfig{
-			Name:   "", // error 1
+			Name:   "",        // error 1
 			Domain: "invalid", // error 2
 		},
 	}
@@ -357,7 +356,6 @@ type testStruct struct {
 	MaxField      string `validate:"max=10"`
 	DefaultField  string `default:"default_value"`
 }
-
 
 type testFileStruct struct {
 	FilePath string `validate:"file_exists"`

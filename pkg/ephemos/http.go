@@ -19,23 +19,23 @@ import (
 type HTTPClientConfig struct {
 	// IdentityService provides certificates and trust bundles.
 	IdentityService IdentityService
-	
+
 	// Authorizer validates peer certificates.
 	// If nil, AuthorizeAny() is used.
 	Authorizer Authorizer
-	
+
 	// TrustDomain restricts which trust domains are accepted.
 	// If empty, any trust domain is accepted.
 	TrustDomain string
-	
+
 	// Timeout specifies the timeout for HTTP requests.
 	// If zero, DefaultClientTimeout is used.
 	Timeout time.Duration
-	
+
 	// MaxIdleConns controls the maximum number of idle connections.
 	// If zero, 100 is used.
 	MaxIdleConns int
-	
+
 	// IdleConnTimeout is the maximum amount of time an idle connection will remain idle.
 	// If zero, 90 seconds is used.
 	IdleConnTimeout time.Duration
@@ -60,7 +60,7 @@ func NewHTTPClient(config *HTTPClientConfig) (*http.Client, error) {
 	if config.IdentityService == nil {
 		return nil, fmt.Errorf("identity service is required")
 	}
-	
+
 	// Set defaults
 	if config.Authorizer == nil {
 		config.Authorizer = AuthorizeAny()
@@ -74,13 +74,13 @@ func NewHTTPClient(config *HTTPClientConfig) (*http.Client, error) {
 	if config.IdleConnTimeout == 0 {
 		config.IdleConnTimeout = 90 * time.Second
 	}
-	
+
 	// Create TLS config
 	tlsConfig, err := NewTLSConfig(config.IdentityService, config.Authorizer, config.TrustDomain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TLS config: %w", err)
 	}
-	
+
 	// Create HTTP transport
 	transport := &http.Transport{
 		TLSClientConfig:       tlsConfig,
@@ -92,7 +92,7 @@ func NewHTTPClient(config *HTTPClientConfig) (*http.Client, error) {
 		DisableKeepAlives:     false,
 		DisableCompression:    false,
 	}
-	
+
 	// Create HTTP client
 	return &http.Client{
 		Transport: transport,
@@ -124,10 +124,10 @@ func NewTLSConfig(identityService IdentityService, authorizer Authorizer, trustD
 	if identityService == nil {
 		return nil, fmt.Errorf("identity service is required")
 	}
-	
+
 	// Create SVID source adapter
 	svidSource := &svidSourceAdapter{identityService: identityService}
-	
+
 	// Create bundle source adapter
 	var bundleSource x509bundle.Source
 	if trustDomain != "" {
@@ -144,13 +144,13 @@ func NewTLSConfig(identityService IdentityService, authorizer Authorizer, trustD
 			identityService: identityService,
 		}
 	}
-	
+
 	// Use go-spiffe to create mTLS config
 	tlsConfig := tlsconfig.MTLSClientConfig(svidSource, bundleSource, authorizer)
-	
+
 	// Ensure TLS 1.3 minimum
 	tlsConfig.MinVersion = tls.VersionTLS13
-	
+
 	return tlsConfig, nil
 }
 
@@ -165,28 +165,28 @@ func (s *svidSourceAdapter) GetX509SVID() (*x509svid.SVID, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get certificate: %w", err)
 	}
-	
+
 	if cert.Cert == nil {
 		return nil, fmt.Errorf("certificate is nil")
 	}
-	
+
 	// Build certificate chain
 	var certChain []*x509.Certificate
 	certChain = append(certChain, cert.Cert)
 	certChain = append(certChain, cert.Chain...)
-	
+
 	// Ensure private key implements crypto.Signer
 	signer, ok := cert.PrivateKey.(crypto.Signer)
 	if !ok {
 		return nil, fmt.Errorf("private key does not implement crypto.Signer")
 	}
-	
+
 	// Extract SPIFFE ID from certificate
 	spiffeID, err := extractSPIFFEIDFromCert(cert.Cert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract SPIFFE ID: %w", err)
 	}
-	
+
 	return &x509svid.SVID{
 		ID:           spiffeID,
 		Certificates: certChain,
@@ -206,16 +206,16 @@ func (b *bundleSourceAdapter) GetX509BundleForTrustDomain(td spiffeid.TrustDomai
 	if !b.restrictedTrustDomain.IsZero() && td != b.restrictedTrustDomain {
 		return nil, fmt.Errorf("trust domain %s not allowed, restricted to %s", td, b.restrictedTrustDomain)
 	}
-	
+
 	trustBundle, err := b.identityService.GetTrustBundle()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get trust bundle: %w", err)
 	}
-	
+
 	if len(trustBundle.Certificates) == 0 {
 		return nil, fmt.Errorf("trust bundle is empty")
 	}
-	
+
 	// Create bundle for the requested trust domain
 	bundle := x509bundle.FromX509Authorities(td, trustBundle.Certificates)
 	return bundle, nil
@@ -238,7 +238,7 @@ func extractSPIFFEIDFromCert(cert *x509.Certificate) (spiffeid.ID, error) {
 type HTTPTransportConfig struct {
 	// Base configuration
 	HTTPClientConfig
-	
+
 	// Transport-specific settings
 	MaxConnsPerHost       int
 	ResponseHeaderTimeout time.Duration
@@ -269,7 +269,7 @@ func NewHTTPTransport(config *HTTPTransportConfig) (*http.Transport, error) {
 	if config.IdentityService == nil {
 		return nil, fmt.Errorf("identity service is required")
 	}
-	
+
 	// Set defaults
 	if config.Authorizer == nil {
 		config.Authorizer = AuthorizeAny()
@@ -280,13 +280,13 @@ func NewHTTPTransport(config *HTTPTransportConfig) (*http.Transport, error) {
 	if config.IdleConnTimeout == 0 {
 		config.IdleConnTimeout = 90 * time.Second
 	}
-	
+
 	// Create TLS config
 	tlsConfig, err := NewTLSConfig(config.IdentityService, config.Authorizer, config.TrustDomain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TLS config: %w", err)
 	}
-	
+
 	// Create HTTP transport with all settings
 	transport := &http.Transport{
 		TLSClientConfig:       tlsConfig,
@@ -300,6 +300,6 @@ func NewHTTPTransport(config *HTTPTransportConfig) (*http.Transport, error) {
 		DisableCompression:    config.DisableCompression,
 		ForceAttemptHTTP2:     config.ForceAttemptHTTP2,
 	}
-	
+
 	return transport, nil
 }

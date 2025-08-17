@@ -17,7 +17,6 @@ import (
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
-
 // grpcClient implements ports.ClientPort.
 type grpcClient struct {
 	tlsConfig *tls.Config
@@ -34,20 +33,20 @@ func (c *grpcClient) Connect(serviceName, address string) (ports.ConnectionPort,
 	if address == "" {
 		return nil, fmt.Errorf("address cannot be empty")
 	}
-	
+
 	// Check if client is closed
 	if c.closed {
 		return nil, fmt.Errorf("client has been closed and cannot create new connections")
 	}
-	
+
 	// Validate TLS configuration
 	if c.tlsConfig == nil {
 		return nil, fmt.Errorf("TLS configuration is required but not provided")
 	}
-	
+
 	// Create credentials
 	creds := credentials.NewTLS(c.tlsConfig)
-	
+
 	// Configure connection options with modern gRPC practices
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(creds),
@@ -63,7 +62,7 @@ func (c *grpcClient) Connect(serviceName, address string) (ports.ConnectionPort,
 			grpc.MaxCallSendMsgSize(4*1024*1024), // 4MB
 		),
 	}
-	
+
 	// Establish connection with modern gRPC practices (grpc.NewClient is preferred over grpc.Dial)
 	conn, err := grpc.NewClient(address, opts...)
 	if err != nil {
@@ -75,7 +74,7 @@ func (c *grpcClient) Connect(serviceName, address string) (ports.ConnectionPort,
 		}
 		return nil, fmt.Errorf("failed to connect to service %q at %s: %w", serviceName, address, err)
 	}
-	
+
 	// Note: grpc.NewClient establishes connections lazily, so we don't need to wait for readiness here
 	// The connection will be established on the first RPC call
 
@@ -107,7 +106,7 @@ func isTLSError(err error) bool {
 func (c *grpcClient) Close() error {
 	// Mark as closed to prevent new connections
 	c.closed = true
-	
+
 	// No persistent resources to clean up in this implementation
 	// Individual connections are responsible for their own cleanup
 	return nil
@@ -127,17 +126,17 @@ type grpcServer struct {
 func (s *grpcServer) RegisterService(registrar ports.ServiceRegistrarPort) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// Validate inputs
 	if registrar == nil {
 		return fmt.Errorf("service registrar cannot be nil")
 	}
-	
+
 	// Check if server is already serving
 	if s.serving {
 		return fmt.Errorf("cannot register services on a server that is already serving")
 	}
-	
+
 	// Initialize server if needed
 	if s.server == nil {
 		if err := s.initializeServer(); err != nil {
@@ -156,10 +155,10 @@ func (s *grpcServer) initializeServer() error {
 	if s.tlsConfig == nil {
 		return fmt.Errorf("TLS configuration is required but not provided")
 	}
-	
+
 	// Create credentials
 	creds := credentials.NewTLS(s.tlsConfig)
-	
+
 	// Configure server options with modern gRPC practices
 	opts := []grpc.ServerOption{
 		grpc.Creds(creds),
@@ -177,12 +176,12 @@ func (s *grpcServer) initializeServer() error {
 			Timeout:               1 * time.Second,  // Wait 1 second for ping ack before considering connection dead
 		}),
 		// Set maximum message sizes
-		grpc.MaxRecvMsgSize(4*1024*1024), // 4MB
-		grpc.MaxSendMsgSize(4*1024*1024), // 4MB
+		grpc.MaxRecvMsgSize(4 * 1024 * 1024), // 4MB
+		grpc.MaxSendMsgSize(4 * 1024 * 1024), // 4MB
 		// Set maximum concurrent streams per connection
 		grpc.MaxConcurrentStreams(1000),
 	}
-	
+
 	s.server = grpc.NewServer(opts...)
 	return nil
 }
@@ -193,21 +192,21 @@ func (s *grpcServer) Start(listener ports.ListenerPort) error {
 	if listener == nil {
 		return fmt.Errorf("listener cannot be nil")
 	}
-	
+
 	// Acquire lock for state checks and updates
 	s.mu.Lock()
-	
+
 	// Check initialization state
 	if s.server == nil {
 		s.mu.Unlock()
 		return fmt.Errorf("server not initialized - call RegisterService first")
 	}
-	
+
 	if !s.initialized {
 		s.mu.Unlock()
 		return fmt.Errorf("no services registered - call RegisterService first")
 	}
-	
+
 	// Check if already serving
 	if s.serving {
 		s.mu.Unlock()
@@ -217,18 +216,18 @@ func (s *grpcServer) Start(listener ports.ListenerPort) error {
 	// Mark as serving before starting (in case Serve blocks)
 	s.serving = true
 	s.mu.Unlock()
-	
+
 	// Create a net.Listener from the ListenerPort
 	netListener := &listenerAdapter{port: listener}
-	
+
 	// Start serving (this call blocks until server stops)
 	err := s.server.Serve(netListener)
-	
+
 	// Mark as not serving when we return
 	s.mu.Lock()
 	s.serving = false
 	s.mu.Unlock()
-	
+
 	return err
 }
 
@@ -236,22 +235,22 @@ func (s *grpcServer) Start(listener ports.ListenerPort) error {
 func (s *grpcServer) Stop() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if s.server == nil {
 		// Already stopped or never initialized
 		return nil
 	}
-	
+
 	if !s.serving {
 		// Not currently serving, but server exists - this is fine
 		return nil
 	}
-	
+
 	// Gracefully stop the server
 	// Note: This call may block briefly while stopping active connections
 	s.server.GracefulStop()
 	s.serving = false
-	
+
 	return nil
 }
 
@@ -280,26 +279,26 @@ func (c *grpcConnection) AsNetConn() net.Conn {
 func (c *grpcConnection) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	// Check if already closed to prevent double-close
 	if c.closed {
 		return nil // Safe to call multiple times
 	}
-	
+
 	// Validate that connection exists
 	if c.conn == nil {
 		c.closed = true
 		return nil // Nothing to close
 	}
-	
+
 	// Close the underlying connection
 	err := c.conn.Close()
 	c.closed = true // Mark as closed regardless of error
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to close gRPC connection to service %q: %w", c.serviceName, err)
 	}
-	
+
 	return nil
 }
 
@@ -319,12 +318,12 @@ func (l *listenerAdapter) Accept() (net.Conn, error) {
 		return nil, fmt.Errorf("listener is closed")
 	}
 	l.mu.Unlock()
-	
+
 	conn, err := l.port.Accept()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Try to safely convert to ConnectionPort first
 	if connPort, ok := conn.(ports.ConnectionPort); ok {
 		// Use the safe AsNetConn method to get net.Conn
@@ -333,12 +332,12 @@ func (l *listenerAdapter) Accept() (net.Conn, error) {
 		}
 		return nil, fmt.Errorf("connection does not support net.Conn interface")
 	}
-	
+
 	// Fallback: direct net.Conn type assertion for raw connections
 	if netConn, ok := conn.(net.Conn); ok {
 		return netConn, nil
 	}
-	
+
 	return nil, fmt.Errorf("connection is neither ConnectionPort nor net.Conn (got %T)", conn)
 }
 
@@ -346,26 +345,26 @@ func (l *listenerAdapter) Accept() (net.Conn, error) {
 func (l *listenerAdapter) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	
+
 	// Check if already closed to prevent double-close
 	if l.closed {
 		return nil // Safe to call multiple times
 	}
-	
+
 	// Validate that port exists
 	if l.port == nil {
 		l.closed = true
 		return nil // Nothing to close
 	}
-	
+
 	// Close the underlying port
 	err := l.port.Close()
 	l.closed = true // Mark as closed regardless of error
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to close listener adapter: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -373,17 +372,17 @@ func (l *listenerAdapter) Close() error {
 func (l *listenerAdapter) Addr() net.Addr {
 	// Get the actual address from the underlying port
 	addrStr := l.port.Addr()
-	
+
 	// Parse the address string into a proper net.Addr
 	if tcpAddr, err := net.ResolveTCPAddr("tcp", addrStr); err == nil {
 		return tcpAddr
 	}
-	
+
 	// Fallback for other address types or parsing errors
 	if addr, err := net.ResolveUnixAddr("unix", addrStr); err == nil {
 		return addr
 	}
-	
+
 	// Last resort: return a custom address implementation
 	return &stringAddr{addr: addrStr}
 }
@@ -400,4 +399,3 @@ func (s *stringAddr) Network() string {
 func (s *stringAddr) String() string {
 	return s.addr
 }
-

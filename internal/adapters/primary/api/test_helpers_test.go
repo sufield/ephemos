@@ -90,7 +90,7 @@ var _ TestServiceServer = (*TestService)(nil)
 
 // Service descriptor and handler for TestService.TestMethod.
 var _TestService_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "api.TestService", 
+	ServiceName: "api.TestService",
 	HandlerType: (*TestServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

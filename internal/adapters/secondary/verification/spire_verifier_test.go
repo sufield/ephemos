@@ -32,7 +32,7 @@ func TestNewSpireIdentityVerifier(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "config with defaults",
+			name:   "config with defaults",
 			config: &ports.VerificationConfig{
 				// Empty config should get defaults
 			},
@@ -86,12 +86,12 @@ func TestSpireIdentityVerifier_Close(t *testing.T) {
 // Note: Key usage extraction tests removed as we now rely on SPIRE's built-in tools
 // Use 'ephemos inspect svid --use-cli' for detailed certificate inspection
 
-// Note: TLS version and cipher suite parsing tests removed as we now rely on 
+// Note: TLS version and cipher suite parsing tests removed as we now rely on
 // standard Go crypto/tls package and SPIRE's built-in tools for detailed TLS inspection
 
 func TestValidateConnectionTimeout(t *testing.T) {
 	t.Skip("Skipping timeout test - requires integration testing environment")
-	
+
 	// Test that connection timeout is properly handled
 	config := &ports.VerificationConfig{
 		WorkloadAPISocket: "unix:///tmp/test.sock",
@@ -107,7 +107,7 @@ func TestValidateConnectionTimeout(t *testing.T) {
 
 	// This should timeout quickly when trying to connect to a non-existent address
 	result, err := verifier.ValidateConnection(ctx, targetID, "localhost:99999")
-	
+
 	// We expect this to fail due to connection issues, not timeout issues in this test
 	// The actual timeout behavior would require integration testing with real network calls
 	assert.Error(t, err)

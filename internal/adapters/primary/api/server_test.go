@@ -32,7 +32,7 @@ func (m *mockServerIdentityProvider) Close() error {
 	return nil
 }
 
-type mockServerTransportProvider struct{
+type mockServerTransportProvider struct {
 	server *mockServer
 }
 
@@ -54,7 +54,7 @@ func (m *mockConfigProvider) GetDefaultConfiguration(ctx context.Context) *ports
 	return &ports.Configuration{}
 }
 
-type mockServer struct{
+type mockServer struct {
 	started sync.WaitGroup
 	stopped chan struct{}
 }
@@ -65,7 +65,7 @@ func (m *mockServer) Start(listener ports.ListenerPort) error {
 	return nil
 }
 
-func (m *mockServer) Stop() error { 
+func (m *mockServer) Stop() error {
 	select {
 	case <-m.stopped:
 		// already closed
@@ -85,11 +85,11 @@ func (m *mockServer) Close() error {
 
 func TestServer_WorkloadServer(t *testing.T) {
 	t.Parallel()
-	
+
 	ms := &mockServer{stopped: make(chan struct{})}
 	ms.started.Add(1)
 	tp := &mockServerTransportProvider{server: ms}
-	
+
 	tests := []struct {
 		name              string
 		identityProvider  ports.IdentityProvider
@@ -119,8 +119,8 @@ func TestServer_WorkloadServer(t *testing.T) {
 					Domain: "test.local",
 				},
 			},
-			wantErr:           true,
-			wantErrField:      "identityProvider",
+			wantErr:      true,
+			wantErrField: "identityProvider",
 		},
 	}
 
@@ -132,14 +132,14 @@ func TestServer_WorkloadServer(t *testing.T) {
 				t.Errorf("api.WorkloadServer() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if tt.wantErr && tt.wantErrField != "" {
 				var ve *epherrors.ValidationError
 				if !errors.As(err, &ve) || ve.Field != tt.wantErrField {
 					t.Fatalf("want ValidationError{Field:%s}, got %v", tt.wantErrField, err)
 				}
 			}
-			
+
 			if !tt.wantErr && server == nil {
 				t.Error("api.WorkloadServer() returned nil server")
 			}
@@ -149,11 +149,11 @@ func TestServer_WorkloadServer(t *testing.T) {
 
 func TestServer_RegisterService(t *testing.T) {
 	t.Parallel()
-	
+
 	ms := &mockServer{stopped: make(chan struct{})}
 	ms.started.Add(1)
 	tp := &mockServerTransportProvider{server: ms}
-	
+
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
 			Name:   "test-service",
@@ -182,11 +182,11 @@ func TestServer_RegisterService(t *testing.T) {
 
 func TestServer_Serve(t *testing.T) {
 	t.Parallel()
-	
+
 	ms := &mockServer{stopped: make(chan struct{})}
 	ms.started.Add(1)
 	tp := &mockServerTransportProvider{server: ms}
-	
+
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
 			Name:   "test-service",
@@ -213,7 +213,7 @@ func TestServer_Serve(t *testing.T) {
 		// Since the mock returns immediately, we test that the cancellation path exists
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel immediately
-		
+
 		// Create a listener on a random port
 		lis, err := net.Listen("tcp", "127.0.0.1:0")
 		if err != nil {
@@ -226,7 +226,7 @@ func TestServer_Serve(t *testing.T) {
 		simpleMock.started.Add(1)
 		close(simpleMock.stopped) // Don't block
 		simpleTP := &mockServerTransportProvider{server: simpleMock}
-		
+
 		testServer, err := api.WorkloadServer(&mockServerIdentityProvider{}, simpleTP, &mockConfigProvider{}, config)
 		if err != nil {
 			t.Skip("Could not create test server:", err)
@@ -242,11 +242,11 @@ func TestServer_Serve(t *testing.T) {
 
 func TestServer_Close(t *testing.T) {
 	t.Parallel()
-	
+
 	ms := &mockServer{stopped: make(chan struct{})}
 	ms.started.Add(1)
 	tp := &mockServerTransportProvider{server: ms}
-	
+
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
 			Name:   "test-service",
@@ -268,4 +268,3 @@ func TestServer_Close(t *testing.T) {
 		t.Errorf("Second Close() returned error: %v", err)
 	}
 }
-

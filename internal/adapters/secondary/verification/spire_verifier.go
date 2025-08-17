@@ -104,14 +104,14 @@ func (v *SpireIdentityVerifier) VerifyIdentity(ctx context.Context, expectedID s
 
 	if valid {
 		result.Message = "Identity verification successful"
-		
+
 		// Verify trust domain if configured
 		if !v.config.TrustDomain.IsZero() && svid.ID.TrustDomain().String() != v.config.TrustDomain.String() {
 			result.Valid = false
-			result.Message = fmt.Sprintf("Trust domain mismatch: expected %s, got %s", 
+			result.Message = fmt.Sprintf("Trust domain mismatch: expected %s, got %s",
 				v.config.TrustDomain, svid.ID.TrustDomain())
 		}
-		
+
 		// Check allowed SPIFFE IDs if configured
 		if len(v.config.AllowedSPIFFEIDs) > 0 {
 			allowed := false
@@ -222,7 +222,7 @@ func (v *SpireIdentityVerifier) ValidateConnection(ctx context.Context, targetID
 	}
 
 	peerCert := state.PeerCertificates[0]
-	
+
 	// Use go-spiffe to extract SPIFFE ID from certificate
 	var peerID spiffeid.ID
 	for _, uri := range peerCert.URIs {
@@ -233,7 +233,7 @@ func (v *SpireIdentityVerifier) ValidateConnection(ctx context.Context, targetID
 			}
 		}
 	}
-	
+
 	if peerID.IsZero() {
 		return &ports.IdentityVerificationResult{
 			Valid:      false,
@@ -258,7 +258,7 @@ func (v *SpireIdentityVerifier) ValidateConnection(ctx context.Context, targetID
 		Subject:      peerCert.Subject.String(),
 		Issuer:       peerCert.Issuer.String(),
 		// KeyUsage details available via SPIRE CLI tools if needed
-		VerifiedAt:   time.Now(),
+		VerifiedAt: time.Now(),
 		Details: map[string]interface{}{
 			"target_address": address,
 			"target_id":      targetID.String(),
@@ -302,7 +302,7 @@ func (v *SpireIdentityVerifier) Close() error {
 	return nil
 }
 
-// Note: Detailed certificate inspection (key usage, TLS details, etc.) 
+// Note: Detailed certificate inspection (key usage, TLS details, etc.)
 // is available through SPIRE's built-in CLI tools:
 // - spire-agent api fetch x509 for SVID details
 // - openssl x509 commands for certificate parsing

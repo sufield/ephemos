@@ -24,23 +24,23 @@ var (
 
 // Global flags
 var (
-	configFile  string
-	envOnly     bool
-	production  bool
-	verbose     bool
-	noEmoji     bool
-	format      string
-	quiet       bool
-	timeout     time.Duration
+	configFile string
+	envOnly    bool
+	production bool
+	verbose    bool
+	noEmoji    bool
+	format     string
+	quiet      bool
+	timeout    time.Duration
 )
 
 // Exit codes
 const (
-	ExitSuccess            = 0
-	ExitUsageError         = 2
-	ExitBasicValidation    = 3
+	ExitSuccess             = 0
+	ExitUsageError          = 2
+	ExitBasicValidation     = 3
 	ExitProductionReadiness = 4
-	ExitLoadError          = 5
+	ExitLoadError           = 5
 )
 
 var rootCmd = &cobra.Command{

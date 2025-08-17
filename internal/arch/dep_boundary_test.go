@@ -225,14 +225,14 @@ func (ic *importChecker) formatSingleViolationWithChain(b *strings.Builder, imp 
 
 		b.WriteString("      * ")
 		b.WriteString(owner)
-		
+
 		// Add import chain if available
 		if chain, exists := ic.importChains[imp]; exists && len(chain) > 1 {
 			b.WriteString(" (via: ")
 			b.WriteString(strings.Join(chain[:len(chain)-1], " -> "))
 			b.WriteString(")")
 		}
-		
+
 		b.WriteString("\n")
 
 		count++
@@ -303,7 +303,7 @@ func Test_Adapters_Cannot_Import_Other_Adapters(t *testing.T) {
 				if isSharedAdapterPath(importPath, adaptersPrefix) {
 					continue
 				}
-				
+
 				// Extract adapter types
 				ownerAdapter := extractAdapterType(pkg.PkgPath, adaptersPrefix)
 				importedAdapter := extractAdapterType(importPath, adaptersPrefix)
@@ -367,7 +367,7 @@ func Test_Core_Domain_Has_No_External_Dependencies(t *testing.T) {
 	for _, pkg := range pkgs {
 		for importPath := range pkg.Imports {
 			allowed := false
-			
+
 			// Check if it's an allowed stdlib package
 			if !strings.Contains(importPath, ".") {
 				if allowedStdlib[importPath] {
@@ -569,9 +569,9 @@ func isSharedAdapterPath(path, adaptersPrefix string) bool {
 	if !strings.HasPrefix(path, adaptersPrefix) {
 		return false
 	}
-	
+
 	remainder := strings.TrimPrefix(path, adaptersPrefix+"/")
-	
+
 	// Allow shared utilities, common types, etc.
 	sharedPrefixes := []string{
 		"shared/",
@@ -579,13 +579,13 @@ func isSharedAdapterPath(path, adaptersPrefix string) bool {
 		"utils/",
 		"types/",
 	}
-	
+
 	for _, prefix := range sharedPrefixes {
 		if strings.HasPrefix(remainder, prefix) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 

@@ -50,13 +50,13 @@ func TestDomainPortsHaveNoProtocolDependencies(t *testing.T) {
 func TestIdentityAdaptersCanImportAuthPackages(t *testing.T) {
 	// Test that identity adapters import authentication packages
 	spiffeAdapterPath := "../../../internal/adapters/secondary/spiffe"
-	
+
 	// Check that SPIFFE adapter directory exists
 	if _, err := os.Stat(spiffeAdapterPath); os.IsNotExist(err) {
 		t.Skip("SPIFFE adapter not found - this is expected for identity-focused library")
 		return
 	}
-	
+
 	// For identity authentication library, we expect SPIFFE/crypto imports
 	t.Log("Identity authentication adapters can import authentication protocol packages")
 }

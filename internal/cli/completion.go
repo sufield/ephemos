@@ -38,7 +38,7 @@ func runMan(cmd *cobra.Command, args []string) error {
 	}
 
 	if err := doc.GenManTree(cmd.Root(), header, dir); err != nil {
-		return fmt.Errorf("%w: failed to generate manual pages: %v", ErrInternal, err)
+		return fmt.Errorf("failed to generate manual pages: %w", err)
 	}
 
 	fmt.Fprintf(os.Stderr, "Manual pages generated in directory: %s\n", dir)

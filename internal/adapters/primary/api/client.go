@@ -238,7 +238,7 @@ type ClientConnection struct {
 	identityService CertificateProvider
 	authorizer      tlsconfig.Authorizer
 	trustDomain     spiffeid.TrustDomain
-	
+
 	tlsOnce sync.Once
 	tlsCfg  *tls.Config
 	tlsErr  error
@@ -384,9 +384,9 @@ func (s *svidSourceAdapter) GetX509SVID() (*x509svid.SVID, error) {
 	return svid, nil
 }
 
-// bundleSourceAdapter adapts the domain trust bundle to go-spiffe x509bundle.Source  
+// bundleSourceAdapter adapts the domain trust bundle to go-spiffe x509bundle.Source
 type bundleSourceAdapter struct {
-	identityService     CertificateProvider
+	identityService       CertificateProvider
 	restrictedTrustDomain spiffeid.TrustDomain
 }
 
@@ -459,4 +459,3 @@ func extractSPIFFEIDFromCert(cert *x509.Certificate) (spiffeid.ID, error) {
 	// Return error if no valid SPIFFE ID found
 	return spiffeid.ID{}, fmt.Errorf("no valid SPIFFE ID found in certificate URI SANs")
 }
-

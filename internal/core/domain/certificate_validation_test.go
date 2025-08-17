@@ -112,7 +112,7 @@ func TestCertificateValidateWithOptions(t *testing.T) {
 
 	t.Run("SPIFFE ID matching", func(t *testing.T) {
 		expectedIdentity := domain.NewServiceIdentity("service", "example.com")
-		
+
 		opts := domain.CertValidationOptions{
 			ExpectedIdentity: expectedIdentity,
 		}
@@ -122,7 +122,7 @@ func TestCertificateValidateWithOptions(t *testing.T) {
 
 	t.Run("SPIFFE ID mismatch", func(t *testing.T) {
 		wrongIdentity := domain.NewServiceIdentity("wrong-service", "example.com")
-		
+
 		opts := domain.CertValidationOptions{
 			ExpectedIdentity: wrongIdentity,
 		}

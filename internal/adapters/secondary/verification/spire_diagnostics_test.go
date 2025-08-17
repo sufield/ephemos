@@ -14,10 +14,10 @@ import (
 
 func TestNewSpireDiagnosticsProvider(t *testing.T) {
 	tests := []struct {
-		name           string
-		config         *ports.DiagnosticsConfig
-		expectedSocket string
-		expectedAgent  string
+		name            string
+		config          *ports.DiagnosticsConfig
+		expectedSocket  string
+		expectedAgent   string
 		expectedTimeout time.Duration
 	}{
 		{
@@ -79,7 +79,7 @@ func TestParseBundleData(t *testing.T) {
 	}
 
 	bundle, err := provider.parseBundleData(trustDomain, testData)
-	
+
 	assert.NoError(t, err)
 	assert.NotNil(t, bundle)
 	assert.Equal(t, trustDomain, bundle.TrustDomain)
@@ -120,10 +120,10 @@ func TestGetComponentVersionParsing(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Simulate the actual parsing logic more accurately
 			output := tt.output
-			
+
 			// Trim whitespace like strings.TrimSpace
 			output = strings.TrimSpace(output)
-			
+
 			var result string
 			if output != "" {
 				// Split on newlines like the actual function
@@ -186,7 +186,7 @@ func TestDiagnosticsConfigValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			provider := NewSpireDiagnosticsProvider(tt.config)
 			assert.NotNil(t, provider)
-			
+
 			if tt.valid {
 				assert.NotNil(t, provider.config)
 			}
@@ -208,7 +208,7 @@ func TestRegistrationEntryInfoCalculation(t *testing.T) {
 			Selectors: []string{"unix:uid:1000", "docker:label:app:service1"},
 		},
 		{
-			ID:        "entry2", 
+			ID:        "entry2",
 			SPIFFEID:  spiffeid.RequireFromString("spiffe://example.org/service2"),
 			CreatedAt: oldTime,
 			Selectors: []string{"unix:gid:1001", "k8s:sa:default"},

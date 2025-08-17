@@ -3,7 +3,7 @@ package validation
 
 import (
 	"strings"
-	
+
 	"github.com/sufield/ephemos/internal/core/domain"
 )
 
@@ -41,7 +41,7 @@ func GetErrors(err error) []Error {
 	if domainErrors == nil {
 		return nil
 	}
-	
+
 	// Convert domain ValidationError to internal Error
 	result := make([]Error, len(domainErrors))
 	for i, domainErr := range domainErrors {

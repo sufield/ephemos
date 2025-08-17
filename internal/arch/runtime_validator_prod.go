@@ -33,9 +33,9 @@ func (v *Validator) Allow(from, to string) {}
 // Global API stubs for production
 var globalValidator = NewValidator(false) //nolint:gochecknoglobals
 
-func SetGlobalValidationEnabled(enabled bool)     {}
-func IsGlobalValidationEnabled() bool             { return false }
-func ValidateBoundary(operation string) error     { return nil }
-func GetGlobalViolations() []string               { return nil }
-func ClearGlobalViolations()                      {}
-func AllowGlobalCrossing(from, to string)         {}
+func SetGlobalValidationEnabled(enabled bool) {}
+func IsGlobalValidationEnabled() bool         { return false }
+func ValidateBoundary(operation string) error { return nil }
+func GetGlobalViolations() []string           { return nil }
+func ClearGlobalViolations()                  {}
+func AllowGlobalCrossing(from, to string)     {}

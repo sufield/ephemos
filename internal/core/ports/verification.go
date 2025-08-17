@@ -7,9 +7,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
-	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
 )
 
 // IdentityVerificationResult contains the result of an identity verification

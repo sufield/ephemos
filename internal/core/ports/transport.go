@@ -20,7 +20,6 @@ type ServerPort interface {
 	Stop() error
 }
 
-
 // ClientPort represents a secure client abstraction without framework dependencies.
 type ClientPort interface {
 	// Connect establishes a connection to a service
@@ -28,7 +27,6 @@ type ClientPort interface {
 	// Close releases client resources
 	Close() error
 }
-
 
 // ConnectionPort represents a connection to a service.
 type ConnectionPort interface {
@@ -41,7 +39,6 @@ type ConnectionPort interface {
 	Close() error
 }
 
-
 // ListenerPort represents a network listener abstraction.
 type ListenerPort interface {
 	// Accept waits for and returns the next connection
@@ -52,13 +49,11 @@ type ListenerPort interface {
 	Addr() string
 }
 
-
 // ServiceRegistrarPort abstracts service registration without framework dependencies.
 type ServiceRegistrarPort interface {
 	// Register registers the service with the provided server
 	Register(server interface{})
 }
-
 
 // TransportProvider provides secure transport without framework dependencies.
 type TransportProvider interface {
