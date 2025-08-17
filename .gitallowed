@@ -6,6 +6,9 @@ spiffe://example\.org/.*
 spiffe://example\.org/[^/]*
 spiffe://test\.example\.org/.*
 
+# SPIFFE test URIs with test.example.com domain
+spiffe://test\.example\.com/.*
+
 # Test SPIFFE patterns with wildcards (for pattern matching tests)
 spiffe://test\.com/.*
 spiffe://test\.local/.*
