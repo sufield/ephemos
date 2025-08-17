@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	metricsadapter "github.com/sufield/ephemos/internal/adapters/metrics"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 	"github.com/sufield/ephemos/internal/core/services"
@@ -115,11 +117,11 @@ func createTestCertificate(notBefore, notAfter time.Time, withSPIFFE bool) (*dom
 // TestCertificateCacheExpiry tests certificate expiry handling
 func TestCertificateCacheExpiry(t *testing.T) {
 	tests := []struct {
-		name           string
-		certNotBefore  time.Time
-		certNotAfter   time.Time
-		expectRefresh  bool
-		expectError    bool
+		name          string
+		certNotBefore time.Time
+		certNotAfter  time.Time
+		expectRefresh bool
+		expectError   bool
 	}{
 		{
 			name:          "valid certificate",
@@ -156,11 +158,11 @@ func TestCertificateCacheExpiry(t *testing.T) {
 			// Setup mocks
 			mockProvider := new(CacheMockIdentityProvider)
 			mockTransport := new(CacheMockTransportProvider)
-			
+
 			// Create test certificate
 			cert, err := createTestCertificate(tt.certNotBefore, tt.certNotAfter, true)
 			require.NoError(t, err)
-			
+
 			// Create fresh certificate for refresh
 			freshCert, err := createTestCertificate(
 				time.Now().Add(-time.Hour),
@@ -168,25 +170,25 @@ func TestCertificateCacheExpiry(t *testing.T) {
 				true,
 			)
 			require.NoError(t, err)
-			
+
 			// Setup mock expectations
 			if tt.expectRefresh {
 				mockProvider.On("GetCertificate").Return(freshCert, nil).Once()
 			}
 			mockProvider.On("GetCertificate").Return(cert, nil).Maybe()
-			
+
 			// Create service configuration
 			config := &ports.Configuration{
 				Service: ports.ServiceConfig{
 					Name:   "test-service",
 					Domain: "example.com",
 					Cache: &ports.CacheConfig{
-						TTLMinutes:               30,
-						ProactiveRefreshMinutes:  10,
+						TTLMinutes:              30,
+						ProactiveRefreshMinutes: 10,
 					},
 				},
 			}
-			
+
 			// Create identity service
 			service, err := services.NewIdentityService(
 				mockProvider,
@@ -196,20 +198,20 @@ func TestCertificateCacheExpiry(t *testing.T) {
 				nil, // no-op metrics
 			)
 			require.NoError(t, err)
-			
+
 			// First call to populate cache
 			_, err = service.GetCertificate()
 			require.NoError(t, err)
-			
+
 			// Second call to test cache behavior
 			resultCert, err := service.GetCertificate()
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, resultCert)
-				
+
 				if tt.expectRefresh {
 					// Should have gotten fresh certificate
 					assert.Equal(t, freshCert.Cert.NotAfter, resultCert.Cert.NotAfter)
@@ -218,7 +220,7 @@ func TestCertificateCacheExpiry(t *testing.T) {
 					assert.Equal(t, cert.Cert.NotAfter, resultCert.Cert.NotAfter)
 				}
 			}
-			
+
 			mockProvider.AssertExpectations(t)
 		})
 	}
@@ -229,7 +231,7 @@ func TestConcurrentCacheAccess(t *testing.T) {
 	// Setup mocks
 	mockProvider := new(CacheMockIdentityProvider)
 	mockTransport := new(CacheMockTransportProvider)
-	
+
 	// Create test certificate
 	cert, err := createTestCertificate(
 		time.Now().Add(-time.Hour),
@@ -237,7 +239,7 @@ func TestConcurrentCacheAccess(t *testing.T) {
 		true,
 	)
 	require.NoError(t, err)
-	
+
 	// Create trust bundle
 	rootCert, err := createTestCertificate(
 		time.Now().Add(-time.Hour),
@@ -245,15 +247,15 @@ func TestConcurrentCacheAccess(t *testing.T) {
 		false,
 	)
 	require.NoError(t, err)
-	
+
 	trustBundle := &domain.TrustBundle{
 		Certificates: []*x509.Certificate{rootCert.Cert},
 	}
-	
+
 	// Setup mock to return certificate and trust bundle
 	mockProvider.On("GetCertificate").Return(cert, nil)
 	mockProvider.On("GetTrustBundle").Return(trustBundle, nil)
-	
+
 	// Create service configuration
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
@@ -264,7 +266,7 @@ func TestConcurrentCacheAccess(t *testing.T) {
 			},
 		},
 	}
-	
+
 	// Create identity service
 	service, err := services.NewIdentityService(
 		mockProvider,
@@ -274,11 +276,11 @@ func TestConcurrentCacheAccess(t *testing.T) {
 		nil, // no-op metrics
 	)
 	require.NoError(t, err)
-	
+
 	// Run concurrent operations
 	var wg sync.WaitGroup
 	errors := make(chan error, 100)
-	
+
 	// Concurrent certificate fetches
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
@@ -290,7 +292,7 @@ func TestConcurrentCacheAccess(t *testing.T) {
 			}
 		}()
 	}
-	
+
 	// Concurrent trust bundle fetches
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
@@ -302,16 +304,16 @@ func TestConcurrentCacheAccess(t *testing.T) {
 			}
 		}()
 	}
-	
+
 	// Wait for all goroutines
 	wg.Wait()
 	close(errors)
-	
+
 	// Check for errors
 	for err := range errors {
 		t.Errorf("Concurrent access error: %v", err)
 	}
-	
+
 	// Cache operations completed successfully
 	// Metrics would be tracked in Prometheus if configured
 }
@@ -344,13 +346,13 @@ func TestProviderRetryLogic(t *testing.T) {
 			expectSuccess: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup mocks
 			mockProvider := new(CacheMockIdentityProvider)
 			mockTransport := new(CacheMockTransportProvider)
-			
+
 			// Create test certificate
 			cert, err := createTestCertificate(
 				time.Now().Add(-time.Hour),
@@ -358,16 +360,16 @@ func TestProviderRetryLogic(t *testing.T) {
 				true,
 			)
 			require.NoError(t, err)
-			
+
 			// Setup mock expectations
 			for i := 0; i < tt.failures; i++ {
 				mockProvider.On("GetCertificate").Return(nil, fmt.Errorf("temporary failure")).Once()
 			}
-			
+
 			if tt.expectSuccess {
 				mockProvider.On("GetCertificate").Return(cert, nil).Once()
 			}
-			
+
 			// Create service configuration
 			config := &ports.Configuration{
 				Service: ports.ServiceConfig{
@@ -375,7 +377,7 @@ func TestProviderRetryLogic(t *testing.T) {
 					Domain: "example.com",
 				},
 			}
-			
+
 			// Create identity service
 			service, err := services.NewIdentityService(
 				mockProvider,
@@ -385,10 +387,10 @@ func TestProviderRetryLogic(t *testing.T) {
 				nil, // no-op metrics
 			)
 			require.NoError(t, err)
-			
+
 			// Attempt to get certificate
 			resultCert, err := service.GetCertificate()
-			
+
 			if tt.expectSuccess {
 				assert.NoError(t, err)
 				assert.NotNil(t, resultCert)
@@ -396,7 +398,7 @@ func TestProviderRetryLogic(t *testing.T) {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "temporary failure")
 			}
-			
+
 			mockProvider.AssertExpectations(t)
 		})
 	}
@@ -407,7 +409,7 @@ func TestCacheMetricsAccuracy(t *testing.T) {
 	// Setup mocks
 	mockProvider := new(CacheMockIdentityProvider)
 	mockTransport := new(CacheMockTransportProvider)
-	
+
 	// Create test certificates
 	cert1, err := createTestCertificate(
 		time.Now().Add(-time.Hour),
@@ -415,10 +417,10 @@ func TestCacheMetricsAccuracy(t *testing.T) {
 		true,
 	)
 	require.NoError(t, err)
-	
+
 	// Setup mock expectations
 	mockProvider.On("GetCertificate").Return(cert1, nil)
-	
+
 	// Create service configuration with short TTL for testing
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
@@ -429,9 +431,9 @@ func TestCacheMetricsAccuracy(t *testing.T) {
 			},
 		},
 	}
-	
+
 	// Create identity service with metrics
-	metrics := services.NewPrometheusMetrics()
+	metrics := metricsadapter.NewPrometheusMetrics()
 	service, err := services.NewIdentityService(
 		mockProvider,
 		mockTransport,
@@ -440,19 +442,19 @@ func TestCacheMetricsAccuracy(t *testing.T) {
 		metrics,
 	)
 	require.NoError(t, err)
-	
+
 	// First call - cache miss
 	_, err = service.GetCertificate()
 	require.NoError(t, err)
-	
+
 	// Second call - cache hit
 	_, err = service.GetCertificate()
 	require.NoError(t, err)
-	
+
 	// Third call - cache hit
 	_, err = service.GetCertificate()
 	require.NoError(t, err)
-	
+
 	// Metrics are now tracked through the Prometheus metrics system
 	// The test demonstrates that cache hits and misses are properly tracked
 	// but validation would require checking Prometheus metrics directly
