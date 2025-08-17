@@ -206,8 +206,8 @@ func TestDefaultCertValidator(t *testing.T) {
 	})
 }
 
-// TestValidateBasicBackwardCompatibility tests that ValidateBasic maintains backward compatibility
-func TestValidateBasicBackwardCompatibility(t *testing.T) {
+// TestValidateWithEmptyOptions tests that Validate works with empty options
+func TestValidateWithEmptyOptions(t *testing.T) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
@@ -231,9 +231,7 @@ func TestValidateBasicBackwardCompatibility(t *testing.T) {
 		PrivateKey: key,
 	}
 
-	// ValidateBasic should work the same as Validate with empty options
-	err1 := validCert.ValidateBasic()
-	err2 := validCert.Validate(domain.CertValidationOptions{})
-	
-	assert.Equal(t, err1, err2)
+	// Test that basic validation with empty options works
+	validationErr := validCert.Validate(domain.CertValidationOptions{})
+	assert.NoError(t, validationErr)
 }

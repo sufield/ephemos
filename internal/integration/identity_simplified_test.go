@@ -266,7 +266,7 @@ func testCreateIdentityService(t *testing.T, provider ports.IdentityProvider) *s
 	}
 
 	mockTransportProvider := &mockTransportProvider{}
-	identityService, err := services.NewIdentityService(provider, mockTransportProvider, mockConfig)
+	identityService, err := services.NewIdentityService(provider, mockTransportProvider, mockConfig, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to create identity service: %v", err)
 	}

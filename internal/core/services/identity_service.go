@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
@@ -96,43 +95,14 @@ type IdentityService struct {
 	bundleCachedAt   time.Time
 	cacheTTL         time.Duration
 	
-	// Cache metrics for monitoring and observability
-	certCacheHits     int64
-	certCacheMisses   int64
-	bundleCacheHits   int64
-	bundleCacheMisses int64
-	
 	mu               sync.RWMutex
 }
 
-// NewIdentityService creates a new IdentityService with the provided configuration.
-// The configuration is validated and cached during initialization for better performance.
-// Uses the default certificate validator. Returns an error if the configuration is invalid.
-func NewIdentityService(
-	identityProvider ports.IdentityProvider,
-	transportProvider ports.TransportProvider,
-	config *ports.Configuration,
-) (*IdentityService, error) {
-	return NewIdentityServiceWithValidator(identityProvider, transportProvider, config, nil)
-}
-
-// NewIdentityServiceWithValidator creates a new IdentityService with a custom validator.
-// If validator is nil, uses the default certificate validator.
-// Returns an error if the configuration is invalid.
-func NewIdentityServiceWithValidator(
-	identityProvider ports.IdentityProvider,
-	transportProvider ports.TransportProvider,
-	config *ports.Configuration,
-	validator ports.CertValidatorPort,
-) (*IdentityService, error) {
-	return NewIdentityServiceWithOptions(identityProvider, transportProvider, config, validator, nil)
-}
-
-// NewIdentityServiceWithOptions creates a new IdentityService with full customization.
+// NewIdentityService creates a new IdentityService with full customization.
 // If validator is nil, uses the default certificate validator.
 // If metrics is nil, uses NoOp metrics reporter.
 // Returns an error if the configuration is invalid.
-func NewIdentityServiceWithOptions(
+func NewIdentityService(
 	identityProvider ports.IdentityProvider,
 	transportProvider ports.TransportProvider,
 	config *ports.Configuration,
@@ -307,7 +277,6 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 				s.cachedCert = nil
 			} else {
 				// Certificate is valid and not expiring soon - cache hit
-				atomic.AddInt64(&s.certCacheHits, 1)
 				s.metrics.RecordCacheHit("certificate")
 				return s.cachedCert, nil
 			}
@@ -318,7 +287,6 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 	}
 	
 	// Cache miss - fetch fresh certificate from provider with retry logic for transient failures
-	atomic.AddInt64(&s.certCacheMisses, 1)
 	s.metrics.RecordCacheMiss("certificate")
 	
 	// Track refresh duration
@@ -388,12 +356,12 @@ func (s *IdentityService) getTrustBundle() (*domain.TrustBundle, error) {
 	// Check if cached trust bundle is still valid
 	if s.cachedBundle != nil && time.Since(s.bundleCachedAt) < s.cacheTTL {
 		// Cache hit
-		atomic.AddInt64(&s.bundleCacheHits, 1)
+		s.metrics.RecordCacheHit("bundle")
 		return s.cachedBundle, nil
 	}
 	
 	// Cache miss - fetch fresh trust bundle from provider with retry logic for transient failures
-	atomic.AddInt64(&s.bundleCacheMisses, 1)
+	s.metrics.RecordCacheMiss("bundle")
 	bundle, err := s.fetchTrustBundleWithRetry()
 	if err != nil {
 		return nil, fmt.Errorf("trust bundle provider failed for service %s: %w", s.cachedIdentity.Name(), err)
@@ -661,84 +629,6 @@ func (s *IdentityService) fetchTrustBundleWithRetry() (*domain.TrustBundle, erro
 	return nil, fmt.Errorf("failed to get trust bundle after %d retries: %w", maxRetries, lastErr)
 }
 
-// CacheMetrics holds cache performance metrics for monitoring.
-type CacheMetrics struct {
-	CertCacheHits     int64
-	CertCacheMisses   int64
-	BundleCacheHits   int64
-	BundleCacheMisses int64
-	CertCacheRatio    float64
-	BundleCacheRatio  float64
-}
-
-// GetCacheMetrics returns current cache performance metrics for monitoring and observability.
-// These metrics help track cache effectiveness and can be exported to monitoring systems.
-func (s *IdentityService) GetCacheMetrics() CacheMetrics {
-	certHits := atomic.LoadInt64(&s.certCacheHits)
-	certMisses := atomic.LoadInt64(&s.certCacheMisses)
-	bundleHits := atomic.LoadInt64(&s.bundleCacheHits)
-	bundleMisses := atomic.LoadInt64(&s.bundleCacheMisses)
-	
-	var certRatio, bundleRatio float64
-	
-	// Calculate cache hit ratios
-	if certTotal := certHits + certMisses; certTotal > 0 {
-		certRatio = float64(certHits) / float64(certTotal)
-	}
-	
-	if bundleTotal := bundleHits + bundleMisses; bundleTotal > 0 {
-		bundleRatio = float64(bundleHits) / float64(bundleTotal)
-	}
-	
-	return CacheMetrics{
-		CertCacheHits:     certHits,
-		CertCacheMisses:   certMisses,
-		BundleCacheHits:   bundleHits,
-		BundleCacheMisses: bundleMisses,
-		CertCacheRatio:    certRatio,
-		BundleCacheRatio:  bundleRatio,
-	}
-}
-
-// LogCacheMetrics logs current cache performance metrics using structured logging.
-// This is useful for periodic monitoring and debugging cache performance issues.
-func (s *IdentityService) LogCacheMetrics() {
-	metrics := s.GetCacheMetrics()
-	
-	// Get service name with proper locking for thread safety
-	s.mu.RLock()
-	serviceName := s.cachedIdentity.Name()
-	s.mu.RUnlock()
-	
-	slog.Info("Identity service cache metrics",
-		"service_name", serviceName,
-		"cert_cache_hits", metrics.CertCacheHits,
-		"cert_cache_misses", metrics.CertCacheMisses,
-		"cert_cache_ratio", fmt.Sprintf("%.2f", metrics.CertCacheRatio),
-		"bundle_cache_hits", metrics.BundleCacheHits,
-		"bundle_cache_misses", metrics.BundleCacheMisses,
-		"bundle_cache_ratio", fmt.Sprintf("%.2f", metrics.BundleCacheRatio),
-		"cache_ttl", s.cacheTTL.String(),
-	)
-}
-
-// ResetCacheMetrics resets all cache performance counters to zero.
-// This is useful for testing or when restarting metric collection periods.
-func (s *IdentityService) ResetCacheMetrics() {
-	atomic.StoreInt64(&s.certCacheHits, 0)
-	atomic.StoreInt64(&s.certCacheMisses, 0)
-	atomic.StoreInt64(&s.bundleCacheHits, 0)
-	atomic.StoreInt64(&s.bundleCacheMisses, 0)
-	
-	// Get service name with proper locking for thread safety
-	s.mu.RLock()
-	serviceName := s.cachedIdentity.Name()
-	s.mu.RUnlock()
-	
-	slog.Debug("Cache metrics reset",
-		"service_name", serviceName,
-	)
-}
 
 // createPolicy creates an authentication policy based on the service configuration.
 // It consolidates the policy creation logic that was duplicated between CreateServerIdentity and CreateClientIdentity.
