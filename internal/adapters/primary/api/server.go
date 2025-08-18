@@ -185,4 +185,3 @@ func (a *serviceRegistrarAdapter) Register(server interface{}) {
 		a.registrar.Register(grpcServer)
 	}
 }
-

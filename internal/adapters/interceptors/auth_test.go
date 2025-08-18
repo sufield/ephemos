@@ -280,14 +280,14 @@ func TestExtractIdentityFromCertificate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var cert *x509.Certificate
 			var err error
-			
+
 			if tt.spiffeID == "" {
 				// Create a certificate without SPIFFE ID for error testing
 				cert = createTestCertWithoutSPIFFE(t)
 			} else {
 				cert = createTestSPIFFECert(t, tt.spiffeID)
 			}
-			
+
 			result, err := interceptor.extractIdentityFromCertificate(cert)
 
 			if tt.expectError {

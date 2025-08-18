@@ -43,7 +43,8 @@ This leverages SPIRE's built-in certificate management without custom parsing.
 
 The command uses workloadapi.X509Source to fetch and display SVID information
 including SPIFFE ID, certificate validity, and chain details.`,
-	RunE: runInspectSvid,
+	PreRunE: validateInspectEnvironment,
+	RunE:    runInspectSvid,
 }
 
 var inspectBundleCmd = &cobra.Command{
@@ -55,8 +56,9 @@ If no trust domain is specified, shows the local trust domain bundle.
 This command can use either:
 1. go-spiffe/v2 Workload API for programmatic access
 2. spire-server bundle show CLI command for detailed output`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: runInspectBundle,
+	Args:    cobra.MaximumNArgs(1),
+	PreRunE: validateTrustDomainArg,
+	RunE:    runInspectBundle,
 }
 
 var inspectAuthoritiesCmd = &cobra.Command{
@@ -67,7 +69,8 @@ var inspectAuthoritiesCmd = &cobra.Command{
 
 This displays information about active and prepared CAs including
 expiration dates and authority IDs.`,
-	RunE: runInspectAuthorities,
+	PreRunE: validateInspectEnvironment,
+	RunE:    runInspectAuthorities,
 }
 
 func init() {
@@ -407,4 +410,51 @@ func outputAuthoritiesCLIAsJSON(output []byte) error {
 		"source":     "spire-server-cli",
 	}
 	return json.NewEncoder(os.Stdout).Encode(result)
+}
+
+// validateInspectEnvironment validates that SPIRE components are accessible
+func validateInspectEnvironment(cmd *cobra.Command, args []string) error {
+	useCLI, _ := cmd.Flags().GetBool("use-cli")
+
+	if useCLI {
+		// Check if SPIRE CLI tools are available
+		if _, err := exec.LookPath("spire-agent"); err != nil {
+			return fmt.Errorf("spire-agent CLI not found in PATH: %w", err)
+		}
+		if _, err := exec.LookPath("spire-server"); err != nil {
+			return fmt.Errorf("spire-server CLI not found in PATH: %w", err)
+		}
+	}
+
+	// Validate socket paths if provided
+	if socket, _ := cmd.Flags().GetString("socket"); socket != "" {
+		if !strings.HasPrefix(socket, "unix://") && !strings.HasPrefix(socket, "/") {
+			return fmt.Errorf("socket path must be absolute or start with unix://")
+		}
+	}
+
+	if serverSocket, _ := cmd.Flags().GetString("server-socket"); serverSocket != "" {
+		if !strings.HasPrefix(serverSocket, "unix://") && !strings.HasPrefix(serverSocket, "/") {
+			return fmt.Errorf("server socket path must be absolute or start with unix://")
+		}
+	}
+
+	return nil
+}
+
+// validateTrustDomainArg validates trust domain argument format
+func validateTrustDomainArg(cmd *cobra.Command, args []string) error {
+	// First run common environment validation
+	if err := validateInspectEnvironment(cmd, args); err != nil {
+		return err
+	}
+
+	// Validate trust domain argument if provided
+	if len(args) > 0 {
+		if _, err := spiffeid.TrustDomainFromString(args[0]); err != nil {
+			return fmt.Errorf("invalid trust domain %s: %w", args[0], err)
+		}
+	}
+
+	return nil
 }

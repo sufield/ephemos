@@ -482,7 +482,6 @@ func runServerInterceptorTest(t *testing.T, tt *serverInterceptorTestCase) {
 	validatePropagatedMetadata(enrichedContext, t, tt)
 }
 
-
 // Helper function to validate propagated metadata using unified API.
 func validatePropagatedMetadata(ctx context.Context, t *testing.T, expected *serverInterceptorTestCase) {
 	t.Helper()
@@ -510,7 +509,6 @@ func validatePropagatedMetadata(ctx context.Context, t *testing.T, expected *ser
 		t.Errorf("Trust domain: got %q, want %q", identity.CallerTrustDomain, expected.expectedTrustDomain)
 	}
 }
-
 
 func TestGenerateRequestID(t *testing.T) {
 	id1 := defaultIDGen()
@@ -599,13 +597,13 @@ func TestContextHelperFunctions(t *testing.T) {
 				Timestamp:         1640995200000,
 			}
 			ctx := context.WithValue(context.Background(), propagatedIdentityKey, expectedIdentity)
-			
+
 			actualIdentity, ok := GetPropagatedIdentity(ctx)
-			
+
 			if !ok {
 				t.Fatal("Expected identity to be present")
 			}
-			
+
 			if actualIdentity.OriginalCaller != expectedIdentity.OriginalCaller {
 				t.Errorf("OriginalCaller = %q, want %q", actualIdentity.OriginalCaller, expectedIdentity.OriginalCaller)
 			}
@@ -625,31 +623,31 @@ func TestContextHelperFunctions(t *testing.T) {
 				t.Errorf("Timestamp = %d, want %d", actualIdentity.Timestamp, expectedIdentity.Timestamp)
 			}
 		})
-		
+
 		t.Run("identity_absent", func(t *testing.T) {
 			ctx := context.Background()
-			
+
 			_, ok := GetPropagatedIdentity(ctx)
-			
+
 			if ok {
 				t.Error("Expected identity to be absent")
 			}
 		})
-		
+
 		t.Run("partial_identity", func(t *testing.T) {
 			expectedIdentity := &PropagatedIdentity{
-				RequestID: "partial-req-456",
+				RequestID:     "partial-req-456",
 				CallerService: "partial-service",
 				// Other fields intentionally empty
 			}
 			ctx := context.WithValue(context.Background(), propagatedIdentityKey, expectedIdentity)
-			
+
 			actualIdentity, ok := GetPropagatedIdentity(ctx)
-			
+
 			if !ok {
 				t.Fatal("Expected identity to be present")
 			}
-			
+
 			if actualIdentity.RequestID != expectedIdentity.RequestID {
 				t.Errorf("RequestID = %q, want %q", actualIdentity.RequestID, expectedIdentity.RequestID)
 			}
@@ -666,4 +664,3 @@ func TestContextHelperFunctions(t *testing.T) {
 		})
 	})
 }
-

@@ -51,7 +51,7 @@ func Example_metricsCollection() {
 
 	// Simulate successful propagation
 	md := metadata.New(map[string]string{
-		"x-ephemos-request-id": "test-123",
+		"x-ephemos-request-id":   "test-123",
 		"x-ephemos-service-name": "test-service",
 	})
 	ctx = metadata.NewIncomingContext(ctx, md)
@@ -110,7 +110,7 @@ func Example_enhancedErrorHandling() {
 
 	// This would trigger a depth limit error with enhanced error message
 	err := interceptor.UnaryClientInterceptor()(
-		ctx, "/test.Service/Method", nil, nil, nil, 
+		ctx, "/test.Service/Method", nil, nil, nil,
 		func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, opts ...grpc.CallOption) error {
 			return nil
 		},

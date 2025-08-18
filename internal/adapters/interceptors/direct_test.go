@@ -69,7 +69,7 @@ func TestExtractIdentityFromCertificateComprehensive(t *testing.T) {
 			expectError: true, // go-spiffe/v2 correctly rejects trailing slashes
 		},
 		{
-			name:        "query_parameter_behavior", 
+			name:        "query_parameter_behavior",
 			spiffeID:    "spiffe://example.org/service?param=value",
 			expectError: true, // go-spiffe/v2 correctly rejects query parameters
 		},
@@ -80,7 +80,7 @@ func TestExtractIdentityFromCertificateComprehensive(t *testing.T) {
 		},
 		{
 			name:        "percent_encoded_path_segments",
-			spiffeID:    "spiffe://example.org/workload/test%2Dservice", 
+			spiffeID:    "spiffe://example.org/workload/test%2Dservice",
 			expectError: true, // go-spiffe/v2 correctly rejects invalid characters
 		},
 		{
@@ -121,14 +121,14 @@ func TestExtractIdentityFromCertificateComprehensive(t *testing.T) {
 			t.Parallel()
 
 			interceptor := NewAuthInterceptor(DefaultAuthConfig())
-			
+
 			var cert *x509.Certificate
 			if tt.spiffeID == "" {
 				cert = createTestCertWithoutSPIFFE(t)
 			} else {
 				cert = createTestSPIFFECert(t, tt.spiffeID)
 			}
-			
+
 			result, err := interceptor.extractIdentityFromCertificate(cert)
 
 			if tt.expectError {
@@ -851,4 +851,3 @@ func TestIdentityContextKeys_Direct(t *testing.T) {
 	assert.False(t, ok)
 	assert.Nil(t, retrieved)
 }
-

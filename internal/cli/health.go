@@ -85,6 +85,17 @@ func init() {
 	healthCmd.Flags().Duration("interval", 30*time.Second, "Monitoring interval")
 	healthCmd.Flags().Bool("verbose", false, "Show detailed health information")
 
+	// Use Cobra's built-in flag validation
+	healthCmd.MarkFlagFilename("config", "yaml", "yml", "json")
+
+	// Create mutually exclusive groups - either config OR address flags
+	healthCmd.MarkFlagsMutuallyExclusive("config", "server-address")
+	healthCmd.MarkFlagsMutuallyExclusive("config", "agent-address")
+
+	// Group path flags with their corresponding address flags
+	healthCmd.MarkFlagsRequiredTogether("server-address", "server-live-path", "server-ready-path")
+	healthCmd.MarkFlagsRequiredTogether("agent-address", "agent-live-path", "agent-ready-path")
+
 	// Sub-commands
 	healthCmd.AddCommand(healthCheckCmd)
 	healthCmd.AddCommand(healthMonitorCmd)
@@ -97,12 +108,22 @@ func init() {
 	healthMonitorCmd.Flags().Duration("check-timeout", 10*time.Second, "Timeout for individual health checks")
 	healthMonitorCmd.Flags().Bool("verbose", false, "Show detailed health information")
 
+	// Apply same validations to monitor command
+	healthMonitorCmd.MarkFlagFilename("config", "yaml", "yml", "json")
+	healthMonitorCmd.MarkFlagsMutuallyExclusive("config", "server-address")
+	healthMonitorCmd.MarkFlagsMutuallyExclusive("config", "agent-address")
+
 	// Check-specific flags (inherit from parent)
 	healthCheckCmd.Flags().String("config", "", "Path to configuration file")
 	healthCheckCmd.Flags().String("server-address", "", "SPIRE server health endpoint address")
 	healthCheckCmd.Flags().String("agent-address", "", "SPIRE agent health endpoint address")
 	healthCheckCmd.Flags().Duration("check-timeout", 10*time.Second, "Timeout for individual health checks")
 	healthCheckCmd.Flags().Bool("verbose", false, "Show detailed health information")
+
+	// Apply same validations to check command
+	healthCheckCmd.MarkFlagFilename("config", "yaml", "yml", "json")
+	healthCheckCmd.MarkFlagsMutuallyExclusive("config", "server-address")
+	healthCheckCmd.MarkFlagsMutuallyExclusive("config", "agent-address")
 }
 
 func runHealthCheck(cmd *cobra.Command, args []string) error {
