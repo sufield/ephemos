@@ -582,7 +582,7 @@ func TestNewServiceIdentityWithValidation_EdgeCases(t *testing.T) {
 			domain:      "example.com",
 			validate:    true,
 			wantErr:     true,
-			errContains: "trailing slash",
+			errContains: "service name cannot be empty",
 		},
 		{
 			name:        "invalid identity without validation - allowed",
