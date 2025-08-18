@@ -449,34 +449,31 @@ ephemos register --name echo-server --domain example.org --selector unix:uid:100
 ```
 
 **CLI Components:**
-- **Binary**: `cmd/ephemos-cli/main.go` - Production CLI tool
-- **Register Command**: `internal/cli/register.go` - Registration interface
-- **Registrar Logic**: `internal/adapters/primary/cli/registrar.go` - Core implementation
+- **Binary**: Removed (use official SPIRE CLI tools instead)
+- **Registration**: Handled by `spire-server entry create` (removed from Ephemos)
 
 **2. Programmatic Registration**
 
-The CLI uses the `internal/adapters/primary/cli/registrar.go` component that can also be used programmatically:
+For programmatic registration, use the SPIRE Server API directly or shell out to SPIRE CLI commands:
 
-```go
-// For advanced use cases or custom tooling
-registrar := cli.NewRegistrar(configProvider, registrarConfig)
-err := registrar.RegisterService(ctx, "service.yaml")
+```bash
+# Use SPIRE CLI directly in scripts
+spire-server entry create \
+  -spiffeID spiffe://company.com/service-name \
+  -parentID spiffe://company.com/spire-agent \
+  -selector unix:uid:1000
 ```
 
 #### Registration Process Detail
 
 **Manual Registration (Security-Required, One-Time):**
 ```bash
-# Step 1: Administrator or developer runs this
-ephemos register --name payment-service --domain prod.company.com
-
-# What happens under the hood:
-# - CLI validates service name and domain
-# - Calls: spire-server entry create \
-#     -spiffeID spiffe://prod.company.com/payment-service \
-#     -parentID spiffe://prod.company.com/spire-agent \
-#     -selector unix:uid:1000 \
-#     -ttl 3600
+# Step 1: Administrator or developer runs SPIRE CLI directly
+spire-server entry create \
+  -spiffeID spiffe://prod.company.com/payment-service \
+  -parentID spiffe://prod.company.com/spire-agent \
+  -selector unix:uid:1000 \
+  -ttl 3600
 ```
 
 **Automatic Identity Retrieval (Runtime):**
