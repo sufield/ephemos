@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/sufield/ephemos/internal/core/domain"
-	"github.com/sufield/ephemos/internal/core/ports"
 )
 
 const testTrustDomain = "example.org"
@@ -49,38 +48,49 @@ func TestNewIdentityPropagationInterceptor(t *testing.T) {
 		identity: domain.NewServiceIdentity("test-service", testTrustDomain),
 	}
 
-	config := &IdentityPropagationConfig{
-		IdentityProvider: provider,
-		Logger:           slog.Default(),
-	}
-
-	interceptor := NewIdentityPropagationInterceptor(config)
+	// Test new direct injection constructor
+	interceptor := NewIdentityPropagationInterceptor(
+		provider,
+		WithLogger(slog.Default()),
+	)
 
 	if interceptor == nil {
 		t.Fatal("NewIdentityPropagationInterceptor returned nil")
 	}
-	if interceptor.config != config {
-		t.Error("Config not properly set")
+	if interceptor.identityProvider != provider {
+		t.Error("IdentityProvider not properly set")
 	}
 	if interceptor.logger == nil {
 		t.Error("Logger not set")
 	}
-	if interceptor.config.MaxCallChainDepth != 10 {
-		t.Errorf("Expected default MaxCallChainDepth 10, got: %d", interceptor.config.MaxCallChainDepth)
+	if interceptor.maxCallChainDepth != 10 {
+		t.Errorf("Expected default MaxCallChainDepth 10, got: %d", interceptor.maxCallChainDepth)
+	}
+
+	// Test with options
+	interceptorWithOptions := NewIdentityPropagationInterceptor(
+		provider,
+		WithLogger(slog.Default()),
+	)
+	if interceptorWithOptions == nil {
+		t.Fatal("NewIdentityPropagationInterceptor with options returned nil")
 	}
 }
 
 func TestNewIdentityPropagationInterceptor_WithNilLogger(t *testing.T) {
 	provider := &mockIdentityProvider{}
-	config := &IdentityPropagationConfig{
-		IdentityProvider: provider,
-		Logger:           nil,
-	}
 
-	interceptor := NewIdentityPropagationInterceptor(config)
+	// Test that default logger is set when none provided
+	interceptor := NewIdentityPropagationInterceptor(provider)
 
 	if interceptor.logger == nil {
-		t.Error("Logger should be set to default when nil provided")
+		t.Error("Logger should be set to default when none provided")
+	}
+
+	// Test that constructor without logger option still sets default
+	interceptorNoLogger := NewIdentityPropagationInterceptor(provider)
+	if interceptorNoLogger.logger == nil {
+		t.Error("Logger should be set to default when none provided")
 	}
 }
 
@@ -89,14 +99,12 @@ func TestIdentityPropagationInterceptor_UnaryClientInterceptor_Success(t *testin
 		identity: domain.NewServiceIdentity("test-service", testTrustDomain),
 	}
 
-	config := &IdentityPropagationConfig{
-		IdentityProvider:        provider,
-		PropagateOriginalCaller: true,
-		PropagateCallChain:      true,
-		Logger:                  slog.Default(),
-	}
-
-	interceptor := NewIdentityPropagationInterceptor(config)
+	interceptor := NewIdentityPropagationInterceptor(
+		provider,
+		WithPropagateOriginalCaller(true),
+		WithPropagateCallChain(true),
+		WithLogger(slog.Default()),
+	)
 
 	var capturedMetadata metadata.MD
 	invoker := func(ctx context.Context, _ string, _, _ interface{}, _ *grpc.ClientConn, _ ...grpc.CallOption) error {
@@ -146,12 +154,10 @@ func TestIdentityPropagationInterceptor_UnaryClientInterceptor_ProviderError(t *
 		err: errors.New("provider error"),
 	}
 
-	config := &IdentityPropagationConfig{
-		IdentityProvider: provider,
-		Logger:           slog.Default(),
-	}
-
-	interceptor := NewIdentityPropagationInterceptor(config)
+	interceptor := NewIdentityPropagationInterceptor(
+		provider,
+		WithLogger(slog.Default()),
+	)
 
 	invoker := func(_ context.Context, _ string, _, _ interface{}, _ *grpc.ClientConn, _ ...grpc.CallOption) error {
 		return nil
@@ -171,13 +177,11 @@ func TestIdentityPropagationInterceptor_PropagateOriginalCaller(t *testing.T) {
 		identity: domain.NewServiceIdentity("current-service", testTrustDomain),
 	}
 
-	config := &IdentityPropagationConfig{
-		IdentityProvider:        provider,
-		PropagateOriginalCaller: true,
-		Logger:                  slog.Default(),
-	}
-
-	interceptor := NewIdentityPropagationInterceptor(config)
+	interceptor := NewIdentityPropagationInterceptor(
+		provider,
+		WithPropagateOriginalCaller(true),
+		WithLogger(slog.Default()),
+	)
 
 	t.Run("new_call_chain", func(t *testing.T) {
 		ctx := t.Context()
@@ -277,14 +281,12 @@ func runCallChainPropagationTest(t *testing.T, tt struct {
 		identity: domain.NewServiceIdentity("current-service", testTrustDomain),
 	}
 
-	config := &IdentityPropagationConfig{
-		IdentityProvider:   provider,
-		PropagateCallChain: true,
-		MaxCallChainDepth:  tt.maxDepth,
-		Logger:             slog.Default(),
-	}
-
-	interceptor := NewIdentityPropagationInterceptor(config)
+	interceptor := NewIdentityPropagationInterceptor(
+		provider,
+		WithPropagateCallChain(true),
+		WithMaxCallChainDepth(tt.maxDepth),
+		WithLogger(slog.Default()),
+	)
 	ctx := setupCallChainContext(t.Context(), tt.incomingChain)
 
 	result, err := interceptor.propagateIdentity(ctx, "/test.Service/TestMethod")
@@ -340,13 +342,11 @@ func TestIdentityPropagationInterceptor_PropagateCustomHeaders(t *testing.T) {
 		identity: domain.NewServiceIdentity("current-service", testTrustDomain),
 	}
 
-	config := &IdentityPropagationConfig{
-		IdentityProvider: provider,
-		CustomHeaders:    []string{"x-custom-header", "x-trace-id"},
-		Logger:           slog.Default(),
-	}
-
-	interceptor := NewIdentityPropagationInterceptor(config)
+	interceptor := NewIdentityPropagationInterceptor(
+		provider,
+		WithCustomHeaders([]string{"x-custom-header", "x-trace-id"}),
+		WithLogger(slog.Default()),
+	)
 
 	// Create context with incoming custom headers
 	incomingMD := metadata.New(map[string]string{
@@ -531,11 +531,10 @@ func TestGenerateRequestID(t *testing.T) {
 
 func TestGetOrGenerateRequestID(t *testing.T) {
 	provider := &mockIdentityProvider{}
-	config := &IdentityPropagationConfig{
-		IdentityProvider: provider,
-		Logger:           slog.Default(),
-	}
-	interceptor := NewIdentityPropagationInterceptor(config)
+	interceptor := NewIdentityPropagationInterceptor(
+		provider,
+		WithLogger(slog.Default()),
+	)
 
 	t.Run("from_incoming_metadata", func(t *testing.T) {
 		incomingMD := metadata.New(map[string]string{
@@ -564,26 +563,26 @@ func TestGetOrGenerateRequestID(t *testing.T) {
 	})
 }
 
-func TestDefaultIdentityPropagationConfig(t *testing.T) {
+func TestInterceptorDefaults(t *testing.T) {
 	provider := &mockIdentityProvider{}
-	config := DefaultIdentityPropagationConfig(ports.IdentityProvider(provider))
+	interceptor := NewIdentityPropagationInterceptor(provider)
 
-	if config.IdentityProvider != provider {
+	if interceptor.identityProvider != provider {
 		t.Error("Identity provider not set correctly")
 	}
-	if !config.PropagateOriginalCaller {
-		t.Error("Expected PropagateOriginalCaller to be true")
+	if !interceptor.propagateOriginalCaller {
+		t.Error("Expected propagateOriginalCaller to be true by default")
 	}
-	if !config.PropagateCallChain {
-		t.Error("Expected PropagateCallChain to be true")
+	if !interceptor.propagateCallChain {
+		t.Error("Expected propagateCallChain to be true by default")
 	}
-	if config.MaxCallChainDepth != 10 {
-		t.Errorf("Expected MaxCallChainDepth 10, got: %d", config.MaxCallChainDepth)
+	if interceptor.maxCallChainDepth != 10 {
+		t.Errorf("Expected maxCallChainDepth 10, got: %d", interceptor.maxCallChainDepth)
 	}
-	if len(config.CustomHeaders) != 0 {
-		t.Error("Expected empty CustomHeaders by default")
+	if len(interceptor.customHeaders) != 0 {
+		t.Error("Expected empty customHeaders by default")
 	}
-	if config.Logger == nil {
+	if interceptor.logger == nil {
 		t.Error("Expected default logger")
 	}
 }

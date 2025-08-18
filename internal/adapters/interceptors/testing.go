@@ -123,19 +123,20 @@ func (m *MockMetricsCollector) RecordCircularCallDetected(identity string) {
 	m.CircularCallDetections = append(m.CircularCallDetections, identity)
 }
 
-// TestingConfig creates a complete configuration for testing with all features enabled.
-func TestingConfig() *IdentityPropagationConfig {
-	return &IdentityPropagationConfig{
-		IdentityProvider:        NewMockIdentityProvider(),
-		PropagateOriginalCaller: true,
-		PropagateCallChain:      true,
-		MaxCallChainDepth:       5, // Lower for testing
-		CustomHeaders:           []string{"x-test-header", "x-trace-id"},
-		Logger:                  slog.Default(),
-		Clock:                   func() time.Time { return time.Unix(1640995200, 0) }, // Fixed time for testing
-		IDGen:                   func() string { return "test-req-123" },              // Fixed ID for testing
-		MetricsCollector:        NewMockMetricsCollector(),
-	}
+
+// NewTestingInterceptor creates a complete interceptor for testing with all features enabled.
+func NewTestingInterceptor() *IdentityPropagationInterceptor {
+	return NewIdentityPropagationInterceptor(
+		NewMockIdentityProvider(),
+		WithLogger(slog.Default()),
+		WithMetricsCollector(NewMockMetricsCollector()),
+		WithClock(func() time.Time { return time.Unix(1640995200, 0) }), // Fixed time for testing
+		WithIDGenerator(func() string { return "test-req-123" }),         // Fixed ID for testing
+		WithMaxCallChainDepth(5), // Lower for testing
+		WithCustomHeaders([]string{"x-test-header", "x-trace-id"}),
+		WithPropagateOriginalCaller(true),
+		WithPropagateCallChain(true),
+	)
 }
 
 // CreateTestContext creates a context with sample propagated identity for testing.
@@ -158,3 +159,4 @@ func ExtractMetrics(collector *MockMetricsCollector) (int, int, int) {
 		len(collector.PropagationFailures),
 		len(collector.ExtractionSuccesses)
 }
+

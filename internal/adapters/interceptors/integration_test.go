@@ -260,8 +260,7 @@ func buildIntegrationClientOptions(tc *integrationTestCase, lis *bufconn.Listene
 		provider := &mockIdentityProvider{
 			identity: domain.NewServiceIdentity("test-client", "example.org"),
 		}
-		identityConfig := DefaultIdentityPropagationConfig(provider)
-		propagationInterceptor := NewIdentityPropagationInterceptor(identityConfig)
+		propagationInterceptor := NewIdentityPropagationInterceptor(provider)
 		clientOpts = append(clientOpts, grpc.WithUnaryInterceptor(propagationInterceptor.UnaryClientInterceptor()))
 	}
 
