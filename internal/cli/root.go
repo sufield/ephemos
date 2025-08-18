@@ -16,10 +16,10 @@ var rootCmd = &cobra.Command{ //nolint:gochecknoglobals // Cobra command pattern
 	Long: `Identity-based authentication CLI for SPIFFE/SPIRE services.
 
 Ephemos provides identity-based authentication for backend services using SPIFFE/SPIRE.
-Use this CLI to register services, manage identities, and configure authentication policies.
+Use this CLI to manage identities, validate configurations, and diagnose authentication.
 
-The CLI provides commands for service registration, configuration validation,
-identity verification, and SPIRE infrastructure management.`,
+The CLI provides commands for configuration validation, identity verification, 
+health monitoring, and SPIRE infrastructure diagnostics.`,
 	Version: getVersionString(),
 }
 
@@ -59,7 +59,6 @@ func init() { //nolint:gochecknoinits // Cobra requires init for command setup
 	rootCmd.SetVersionTemplate("{{.Version}}\n")
 
 	// Add subcommands
-	rootCmd.AddCommand(registerCmd)
 	rootCmd.AddCommand(healthCmd)
 	rootCmd.AddCommand(verifyCmd)
 	rootCmd.AddCommand(diagnoseCmd)

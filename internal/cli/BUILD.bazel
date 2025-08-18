@@ -6,25 +6,19 @@ go_library(
         "completion.go",
         "errors.go",
         "redaction.go",
-        "register.go",
         "root.go",
     ],
     importpath = "github.com/sufield/ephemos/internal/cli",
     visibility = ["//:__subpackages__"],
     deps = [
-        "//internal/adapters/primary/cli",
-        "//internal/adapters/secondary/config",
         "//internal/buildinfo",
-        "//internal/core/ports",
         "@com_github_spf13_cobra//:cobra",
-        "@com_github_spf13_cobra//doc",
     ],
 )
 
 go_test(
     name = "cli_test",
     srcs = [
-        "register_test.go",
         "root_test.go",
     ],
     deps = [

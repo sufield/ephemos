@@ -6,23 +6,22 @@
 // development and production environments.
 //
 // Core functionality includes:
-//   - Service registration with SPIRE server
 //   - Configuration validation and management
 //   - Identity verification and diagnostics
 //   - SPIRE infrastructure health checks
 //   - Certificate and trust bundle inspection
-//   - Service selector management
+//   - Authentication monitoring
 //
 // Usage:
 //
-//	ephemos register --config config.yaml --selector unix:user:1000
-//	ephemos validate --config config.yaml
+//	ephemos verify --config config.yaml
 //	ephemos health --config config.yaml --verbose
+//	ephemos diagnose --config config.yaml
 //
 // The tool integrates with SPIRE infrastructure to provide streamlined
 // service identity management for microservices and distributed systems.
-// It abstracts SPIFFE/SPIRE complexity while providing full administrative
-// control over identity policies and service registration.
+// It abstracts SPIFFE/SPIRE complexity while providing diagnostic and
+// validation capabilities for identity-based authentication.
 //
 // This is a production CLI binary built from cmd/ephemos-cli according to
 // Go project layout conventions for production command-line tools.
