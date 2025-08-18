@@ -2,8 +2,10 @@
 package domain
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
@@ -251,12 +253,14 @@ type Certificate struct {
 }
 
 // CertValidationOptions configures certificate validation behavior.
+// Supports RSA, ECDSA, and Ed25519 key types per go-spiffe v2.5.0 compatibility.
 type CertValidationOptions struct {
 	ExpectedIdentity *ServiceIdentity // Optional: Expected SPIFFE identity for matching
 	WarningThreshold time.Duration    // Optional: Warning threshold for near-expiry (e.g., 1h)
 	TrustBundle      *TrustBundle     // Optional: Trust bundle for chain verification
 	SkipExpiry       bool             // Optional: Skip expiry checks (testing only)
 	SkipChainVerify  bool             // Optional: Skip chain cryptographic verification
+	Logger           *slog.Logger     // Optional: Logger for warnings and info (uses default if nil)
 }
 
 // NewCertificate creates a new Certificate with validation.
@@ -315,7 +319,11 @@ func (c *Certificate) Validate(opts CertValidationOptions) error {
 			warningThreshold = 30 * time.Minute // Default warning threshold
 		}
 		if now.Add(warningThreshold).After(c.Cert.NotAfter) {
-			slog.Warn("Certificate expires soon",
+			logger := opts.Logger
+			if logger == nil {
+				logger = slog.Default()
+			}
+			logger.Warn("Certificate expires soon",
 				"cert_subject", c.Cert.Subject.String(),
 				"expires_at", c.Cert.NotAfter,
 				"expires_in", time.Until(c.Cert.NotAfter).String(),
@@ -350,7 +358,8 @@ func (c *Certificate) Validate(opts CertValidationOptions) error {
 			return fmt.Errorf("failed to get expected SPIFFE ID: %w", err)
 		}
 
-		// Compare SPIFFE IDs using String() representation
+		// Compare SPIFFE IDs using String() for compatibility
+		// Note: go-spiffe v2.5.0 may add Equal method in future releases
 		if actualID.String() != expectedID.String() {
 			return fmt.Errorf("SPIFFE ID mismatch: expected %s, got %s", expectedID, actualID)
 		}
@@ -500,6 +509,16 @@ func (c *Certificate) verifyKeyMatch() error {
 			certPubKey.X.Cmp(privPubKey.X) != 0 ||
 			certPubKey.Y.Cmp(privPubKey.Y) != 0 {
 			return fmt.Errorf("ECDSA private key does not match certificate public key")
+		}
+		return nil
+
+	case ed25519.PublicKey:
+		privPubKey, ok := privateKeyPublic.(ed25519.PublicKey)
+		if !ok {
+			return fmt.Errorf("certificate has Ed25519 public key but private key is %T", privateKeyPublic)
+		}
+		if !bytes.Equal(certPubKey, privPubKey) {
+			return fmt.Errorf("Ed25519 private key does not match certificate public key")
 		}
 		return nil
 
