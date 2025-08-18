@@ -226,9 +226,9 @@ service:
 
 **For Administrators (one-time setup per service):**
 ```bash
-# Admin registers each service once when it's created
-ephemos register service --name time-client
-ephemos register service --name time-server
+# Admin registers each service once using SPIRE CLI
+spire-server entry create -spiffeID spiffe://example.org/time-client -parentID spiffe://example.org/spire-agent -selector unix:uid:1000
+spire-server entry create -spiffeID spiffe://example.org/time-server -parentID spiffe://example.org/spire-agent -selector unix:uid:1000
 ```
 
 **For Developers (zero setup needed):**
@@ -239,7 +239,7 @@ ephemos register service --name time-server
 
 **Key Difference:**
 - **Before:** Developers had to manage secrets for every service interaction
-- **After:** Admin registers services once; developers just configure service identity in YAML
+- **After:** Admin registers services once using SPIRE CLI; developers just configure service identity in YAML
 
 ## Quick Start
 
@@ -267,11 +267,11 @@ service := ephemos.NewServiceClient(conn)
 
 ### 3. Set Up Service Identity (One Time)
 
-Instead of generating API keys, register your services:
+Instead of generating API keys, register your services using SPIRE CLI:
 ```bash
 # One-time setup per service (like creating a database user)
-ephemos register service --name time-client
-ephemos register service --name time-server
+spire-server entry create -spiffeID spiffe://example.org/time-client -parentID spiffe://example.org/spire-agent -selector unix:uid:1000
+spire-server entry create -spiffeID spiffe://example.org/time-server -parentID spiffe://example.org/spire-agent -selector unix:uid:1000
 ```
 
 ### 4. Deploy Without Secrets
@@ -371,9 +371,9 @@ go get github.com/sufield/ephemos
 # 2. Install the identity system (one-time setup)
 ./scripts/setup-ephemos.sh
 
-# 3. Register your services (like creating database users)
-ephemos register service --name my-service
-ephemos register service --name other-service
+# 3. Register your services using SPIRE CLI (like creating database users)
+spire-server entry create -spiffeID spiffe://example.org/my-service -parentID spiffe://example.org/spire-agent -selector unix:uid:1000
+spire-server entry create -spiffeID spiffe://example.org/other-service -parentID spiffe://example.org/spire-agent -selector unix:uid:1000
 
 # 4. Replace your API key code with Ephemos code
 # (see examples above)

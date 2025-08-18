@@ -1,5 +1,7 @@
 # Ephemos FAQ
 
+> **📢 Important Note:** The `ephemos register` command has been removed to keep the core library lean. Service registration is now handled using official SPIRE tooling. See the [SPIRE documentation](https://spiffe.io/docs/latest/deploying/spire_server/) for registration workflows.
+
 ## General Questions
 
 ### What is Ephemos?
@@ -30,9 +32,9 @@ client := ephemos.IdentityClient(ctx, configPath)
 conn, _ := client.Connect(ctx, "service-name", "localhost:50051")
 ```
 
-**Service Registration** (CLI-only, for administrators):
+**Service Registration** (Using SPIRE CLI, for administrators):
 ```bash
-ephemos-cli register --name my-service --domain company.com
+spire-server entry create -spiffeID spiffe://company.com/my-service -parentID spiffe://company.com/spire-agent -selector unix:uid:1000
 ```
 
 ## Technical Questions
@@ -160,12 +162,12 @@ service.RegisterSelf("payment-service")  // Could be malicious impersonator
 **Service registration is an infrastructure operation, not an application operation.**
 
 ```bash
-# 🔐 SECURE: Admin registers service out-of-band
-ephemos-cli register \
-    --name payment-service \
-    --domain company.com \
-    --selector k8s:ns:production \
-    --selector k8s:sa:payment-service
+# 🔐 SECURE: Admin registers service out-of-band using SPIRE CLI
+spire-server entry create \
+    -spiffeID spiffe://company.com/payment-service \
+    -parentID spiffe://company.com/spire-agent \
+    -selector k8s:ns:production \
+    -selector k8s:sa:payment-service
 
 # ✅ SIMPLE: Service uses pre-registered identity
 server := ephemos.IdentityServer(ctx, configPath)  // Gets registered identity
@@ -199,7 +201,7 @@ client := ephemos.IdentityClient(ctx, configPath)  // Gets registered identity
 
 ```bash
 # 1. 👨‍💼 Admin registers service (one-time, secure)
-ephemos-cli register --config payment-service.yaml
+spire-server entry create -spiffeID spiffe://company.com/payment-service -parentID spiffe://company.com/spire-agent -selector unix:uid:1000
 
 # 2. 🏗️ Service deploys and automatically gets identity
 apiVersion: apps/v1
@@ -371,7 +373,7 @@ trusted_servers:
 1. **Manual Registration Tool**: 
    ```bash
    # Register a service with SPIRE (one-time setup)
-   ephemos register --name echo-server --domain example.org
+   spire-server entry create -spiffeID spiffe://example.org/echo-server -parentID spiffe://example.org/spire-agent -selector unix:uid:$(id -u)
    ```
 
 2. **Automatic Identity Retrieval** (after registration):
@@ -447,34 +449,31 @@ ephemos register --name echo-server --domain example.org --selector unix:uid:100
 ```
 
 **CLI Components:**
-- **Binary**: `cmd/ephemos-cli/main.go` - Production CLI tool
-- **Register Command**: `internal/cli/register.go` - Registration interface
-- **Registrar Logic**: `internal/adapters/primary/cli/registrar.go` - Core implementation
+- **Binary**: Removed (use official SPIRE CLI tools instead)
+- **Registration**: Handled by `spire-server entry create` (removed from Ephemos)
 
 **2. Programmatic Registration**
 
-The CLI uses the `internal/adapters/primary/cli/registrar.go` component that can also be used programmatically:
+For programmatic registration, use the SPIRE Server API directly or shell out to SPIRE CLI commands:
 
-```go
-// For advanced use cases or custom tooling
-registrar := cli.NewRegistrar(configProvider, registrarConfig)
-err := registrar.RegisterService(ctx, "service.yaml")
+```bash
+# Use SPIRE CLI directly in scripts
+spire-server entry create \
+  -spiffeID spiffe://company.com/service-name \
+  -parentID spiffe://company.com/spire-agent \
+  -selector unix:uid:1000
 ```
 
 #### Registration Process Detail
 
 **Manual Registration (Security-Required, One-Time):**
 ```bash
-# Step 1: Administrator or developer runs this
-ephemos register --name payment-service --domain prod.company.com
-
-# What happens under the hood:
-# - CLI validates service name and domain
-# - Calls: spire-server entry create \
-#     -spiffeID spiffe://prod.company.com/payment-service \
-#     -parentID spiffe://prod.company.com/spire-agent \
-#     -selector unix:uid:1000 \
-#     -ttl 3600
+# Step 1: Administrator or developer runs SPIRE CLI directly
+spire-server entry create \
+  -spiffeID spiffe://prod.company.com/payment-service \
+  -parentID spiffe://prod.company.com/spire-agent \
+  -selector unix:uid:1000 \
+  -ttl 3600
 ```
 
 **Automatic Identity Retrieval (Runtime):**
@@ -505,7 +504,7 @@ server := ephemos.IdentityServer(ctx, "config.yaml")
 
 | Step | Component | Action | Method |
 |------|-----------|--------|---------|
-| 1 | **Admin/Developer** | Register service identity | `ephemos register --config service.yaml` |
+| 1 | **Admin/Developer** | Register service identity | `spire-server entry create -spiffeID spiffe://domain/service -parentID spiffe://domain/spire-agent -selector unix:uid:1000` |
 | 2 | **Service Runtime** | Retrieve identity automatically | `ephemos.IdentityServer(ctx, "config.yaml")` |
 | 3 | **SPIRE Agent** | Provide certificates | Automatic (background) |
 | 4 | **Authentication** | mTLS between services | Automatic (transparent) |
@@ -514,7 +513,7 @@ server := ephemos.IdentityServer(ctx, "config.yaml")
 
 | Component | Registration Required | Method |
 |-----------|----------------------|---------|
-| **Your Services** (payment-service, user-service, etc.) | ✅ **Yes** | `ephemos register --config service.yaml` |
+| **Your Services** (payment-service, user-service, etc.) | ✅ **Yes** | Use SPIRE CLI for registration (see migration guide) |
 | **Ephemos Framework** | ❌ **No** | (Library code - runs in your services) |
 | **SPIRE Server** | ❌ **No** | (Infrastructure component) |
 | **SPIRE Agent** | ❌ **No** | (Infrastructure component) |
@@ -602,7 +601,7 @@ The fundamental SPIFFE/SPIRE mechanism is the same, but the **attestation method
 
 #### Demo Environment (Local Development)
 - **Attestation**: Unix UID (`unix:uid:0` for root) - any root process gets the certificate
-- **Registration**: Manual via CLI (`ephemos register --name service-name`)
+- **Registration**: Manual via SPIRE CLI (`spire-server entry create -spiffeID spiffe://domain/service-name ...`)
 - **Bootstrap**: Insecure (`insecure_bootstrap = true` in agent config)
 - **Socket Path**: `/tmp/spire-agent/public/api.sock`
 - **Security**: Weak - suitable only for local testing
@@ -690,7 +689,7 @@ This will:
 ### How do I deploy in production?
 
 1. **Install SPIRE**: Use production-ready SPIRE deployment
-2. **Register Services**: Use `ephemos register` for each service
+2. **Register Services**: Use `spire-server entry create` for each service
 3. **Configure Services**: Provide appropriate `ephemos.yaml` for each service
 4. **Deploy**: Services automatically obtain identities on startup
 5. **Monitor**: SPIRE handles certificate lifecycle automatically
@@ -810,7 +809,7 @@ This separation allows developers to run fast tests continuously while reserving
 
 **"Connection failed"**: Check that SPIRE agent is running and socket path is correct
 
-**"Service not registered"**: Run `ephemos register --config your-config.yaml`
+**"Service not registered"**: Register with `spire-server entry create -spiffeID spiffe://your-domain/service-name -parentID spiffe://your-domain/spire-agent -selector unix:uid:1000`
 
 **"Permission denied"**: Ensure user has access to SPIRE socket (typically owned by root)
 

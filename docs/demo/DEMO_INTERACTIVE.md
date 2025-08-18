@@ -51,10 +51,10 @@ make build
 ### Step 2: Register Services with SPIRE
 ```bash
 # Register echo-server
-sudo bin/ephemos register --name echo-server --domain example.org
+sudo spire-server entry create -spiffeID spiffe://example.org/echo-server -parentID spiffe://example.org/spire-agent -selector unix:uid:0
 
 # Register echo-client  
-sudo bin/ephemos register --name echo-client --domain example.org
+sudo spire-server entry create -spiffeID spiffe://example.org/echo-client -parentID spiffe://example.org/spire-agent -selector unix:uid:0
 
 # Verify registrations
 sudo spire-server entry show -socketPath /tmp/spire-server/private/api.sock

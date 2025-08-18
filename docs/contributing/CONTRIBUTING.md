@@ -118,7 +118,7 @@ This will:
 ```
 ephemos/
 ├── cmd/
-│   └── ephemos-cli/        # CLI tool for service registration
+│   └── config-validator/   # Configuration validation tool
 ├── internal/
 │   ├── core/
 │   │   ├── domain/         # Business entities (no external deps)
