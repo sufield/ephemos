@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
@@ -341,17 +340,16 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 }
 
 // validateCertificateExpiry checks if a certificate is still valid (not expired).
+// This is a lightweight check used for cache validation without full validation overhead.
 func (s *IdentityService) validateCertificateExpiry(cert *domain.Certificate) error {
-	if cert == nil || cert.Cert == nil {
-		return fmt.Errorf("certificate is nil")
+	// Use centralized validation with minimal options for quick expiry check
+	opts := domain.CertValidationOptions{
+		SkipChainVerify: true,  // Skip chain verification for performance
+		// Other checks like expiry and basic structure are still performed
 	}
-
-	now := time.Now()
-	if now.After(cert.Cert.NotAfter) {
-		return fmt.Errorf("certificate has expired")
-	}
-
-	return nil
+	
+	// Use centralized validator for consistency
+	return s.validator.Validate(cert, opts)
 }
 
 // getTrustBundle retrieves the trust bundle from the identity provider with TTL-based caching.
@@ -428,95 +426,35 @@ func (s *IdentityService) GetTrustBundle() (*domain.TrustBundle, error) {
 //
 // Failed validation triggers certificate rotation by clearing the cache and fetching fresh certificates.
 func (s *IdentityService) ValidateServiceIdentity(cert *domain.Certificate) error {
-	if cert == nil {
-		return fmt.Errorf("certificate is nil")
-	}
-
-	if cert.Cert == nil {
-		return fmt.Errorf("X.509 certificate is nil")
-	}
-
-	// Check certificate validity period
-	now := time.Now()
-	if now.Before(cert.Cert.NotBefore) {
-		return fmt.Errorf("certificate is not yet valid (NotBefore: %v, now: %v)",
-			cert.Cert.NotBefore, now)
-	}
-
-	if now.After(cert.Cert.NotAfter) {
-		return fmt.Errorf("certificate has expired (NotAfter: %v, now: %v)",
-			cert.Cert.NotAfter, now)
-	}
-
-	// Warn if certificate expires within the next hour (SPIFFE certs typically have 1-hour TTL)
-	if now.Add(time.Hour).After(cert.Cert.NotAfter) {
-		slog.Warn("Certificate expires soon",
-			"service_name", s.cachedIdentity.Name(),
-			"cert_not_after", cert.Cert.NotAfter,
-			"current_time", now,
-			"expires_in", time.Until(cert.Cert.NotAfter).String(),
-			"cert_subject", cert.Cert.Subject.String(),
-			"serial_number", cert.Cert.SerialNumber.String(),
-		)
-	}
-
-	// Validate SPIFFE ID matches expected service identity
+	// Get cached identity and trust bundle for validation
 	s.mu.RLock()
-	expectedSPIFFEID := s.cachedIdentity.URI()
-	serviceName := s.cachedIdentity.Name() // Cache for thread-safe access
+	expectedIdentity := s.cachedIdentity
+	trustBundle := s.cachedBundle
 	s.mu.RUnlock()
 
-	// Extract SPIFFE ID from certificate using go-spiffe's official FromURI method
-	var certSPIFFEID spiffeid.ID
-	var found bool
-	for _, uri := range cert.Cert.URIs {
-		if uri.Scheme == "spiffe" {
-			id, err := spiffeid.FromURI(uri)
-			if err != nil {
-				slog.Warn("Invalid SPIFFE ID format in certificate URI SAN",
-					"service_name", serviceName,
-					"uri", uri.String(),
-					"error", err.Error(),
-				)
-				continue
-			}
-			certSPIFFEID = id
-			found = true
-			break
-		}
+	// Configure validation options
+	opts := domain.CertValidationOptions{
+		ExpectedIdentity: expectedIdentity,
+		WarningThreshold: time.Hour,      // Warn when certificate expires within 1 hour
+		TrustBundle:      trustBundle,     // Use cached trust bundle if available
+		SkipExpiry:       false,           // Always check expiry in production
+		SkipChainVerify:  false,           // Always verify chain in production
+		Logger:           slog.Default(),  // Use default logger for warnings
 	}
 
-	if !found {
-		return fmt.Errorf("certificate contains no valid SPIFFE ID in URI SANs")
+	// Use centralized validator
+	if err := s.validator.Validate(cert, opts); err != nil {
+		return fmt.Errorf("certificate validation failed for service %s: %w", expectedIdentity.Name(), err)
 	}
 
-	if certSPIFFEID.String() != expectedSPIFFEID {
-		return fmt.Errorf("certificate SPIFFE ID mismatch: expected %s, got %s",
-			expectedSPIFFEID, certSPIFFEID.String())
-	}
-
-	// Additional validation using go-spiffe features: verify trust domain matches expected
-	expectedID, err := spiffeid.FromString(expectedSPIFFEID)
-	if err != nil {
-		return fmt.Errorf("invalid expected SPIFFE ID %q: %w", expectedSPIFFEID, err)
-	}
-
-	if certSPIFFEID.TrustDomain().String() != expectedID.TrustDomain().String() {
-		return fmt.Errorf("certificate trust domain mismatch: expected %s, got %s",
-			expectedID.TrustDomain().String(), certSPIFFEID.TrustDomain().String())
-	}
-
-	slog.Debug("Certificate SPIFFE ID validation successful",
-		"service_name", serviceName,
-		"spiffe_id", certSPIFFEID.String(),
-		"trust_domain", certSPIFFEID.TrustDomain().String(),
-		"path", certSPIFFEID.Path(),
-	)
-
-	// Add full certificate validation with chain verification for cryptographic integrity
-	// This extends beyond expiry and ID checks to verify signatures
-	if err := s.validateCertificateChain(cert); err != nil {
-		return fmt.Errorf("certificate chain validation failed: %w", err)
+	// Log successful validation for observability
+	if spiffeID, err := cert.ToSPIFFEID(); err == nil {
+		slog.Debug("Certificate SPIFFE ID validation successful",
+			"service_name", expectedIdentity.Name(),
+			"spiffe_id", spiffeID.String(),
+			"trust_domain", spiffeID.TrustDomain().String(),
+			"path", spiffeID.Path(),
+		)
 	}
 
 	return nil
