@@ -43,9 +43,9 @@ func createTestCertificate(t *testing.T, spiffeID string) (*x509.Certificate, *r
 
 	// Add SPIFFE ID as URI SAN if provided
 	if spiffeID != "" {
-		uri, err := url.Parse(spiffeID)
-		if err != nil {
-			t.Fatalf("Failed to parse SPIFFE ID %q: %v", spiffeID, err)
+		uri, parseErr := url.Parse(spiffeID)
+		if parseErr != nil {
+			t.Fatalf("Failed to parse SPIFFE ID %q: %v", spiffeID, parseErr)
 		}
 		template.URIs = []*url.URL{uri}
 	}

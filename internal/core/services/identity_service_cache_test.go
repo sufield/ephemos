@@ -51,6 +51,14 @@ func (m *CacheMockIdentityProvider) GetServiceIdentity() (*domain.ServiceIdentit
 	return args.Get(0).(*domain.ServiceIdentity), args.Error(1)
 }
 
+func (m *CacheMockIdentityProvider) GetIdentityDocument() (*domain.IdentityDocument, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.IdentityDocument), args.Error(1)
+}
+
 func (m *CacheMockIdentityProvider) Close() error {
 	args := m.Called()
 	return args.Error(0)
@@ -178,9 +186,10 @@ func TestCertificateCacheExpiry(t *testing.T) {
 			mockProvider.On("GetCertificate").Return(cert, nil).Maybe()
 
 			// Create service configuration
+			serviceName, _ := domain.NewServiceName("test-service")
 			config := &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "test-service",
+					Name:   serviceName,
 					Domain: "example.com",
 					Cache: &ports.CacheConfig{
 						TTLMinutes:              30,
@@ -256,9 +265,10 @@ func TestConcurrentCacheAccess(t *testing.T) {
 	mockProvider.On("GetTrustBundle").Return(trustBundle, nil)
 
 	// Create service configuration
+	serviceName, _ := domain.NewServiceName("test-service")
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
-			Name:   "test-service",
+			Name:   serviceName,
 			Domain: "example.com",
 			Cache: &ports.CacheConfig{
 				TTLMinutes: 30,
@@ -370,9 +380,10 @@ func TestProviderRetryLogic(t *testing.T) {
 			}
 
 			// Create service configuration
+			serviceName, _ := domain.NewServiceName("test-service")
 			config := &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "test-service",
+					Name:   serviceName,
 					Domain: "example.com",
 				},
 			}
@@ -421,9 +432,10 @@ func TestCacheMetricsAccuracy(t *testing.T) {
 	mockProvider.On("GetCertificate").Return(cert1, nil)
 
 	// Create service configuration with short TTL for testing
+	serviceName, _ := domain.NewServiceName("test-service")
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
-			Name:   "test-service",
+			Name:   serviceName,
 			Domain: "example.com",
 			Cache: &ports.CacheConfig{
 				TTLMinutes: 1, // Short TTL for testing

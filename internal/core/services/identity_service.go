@@ -148,7 +148,15 @@ func NewIdentityService(
 	}
 
 	// Create and validate identity during initialization
-	identity := domain.NewServiceIdentity(config.Service.Name.Value(), config.Service.Domain)
+	// Extract intermediate to avoid deep selector chains
+	serviceConfig := config.Service
+	if serviceConfig.Name.Value() == "" {
+		return nil, fmt.Errorf("service name is required")
+	}
+	if serviceConfig.Domain == "" {
+		return nil, fmt.Errorf("service domain is required")
+	}
+	identity := domain.NewServiceIdentity(serviceConfig.Name.Value(), serviceConfig.Domain)
 	if err := identity.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid service identity: %w", err)
 	}
@@ -165,8 +173,9 @@ func NewIdentityService(
 
 	// Determine cache TTL from configuration or use default
 	cacheTTL := 30 * time.Minute // Default: 30 minutes (half of typical 1-hour SPIFFE cert lifetime)
-	if config.Service.Cache != nil && config.Service.Cache.TTLMinutes > 0 {
-		cacheTTL = time.Duration(config.Service.Cache.TTLMinutes) * time.Minute
+	// Extract intermediate to avoid deep selector chains
+	if serviceConfig.Cache != nil && serviceConfig.Cache.TTLMinutes > 0 {
+		cacheTTL = time.Duration(serviceConfig.Cache.TTLMinutes) * time.Minute
 	}
 
 	service := &IdentityService{
@@ -205,8 +214,8 @@ func (s *IdentityService) CreateServerIdentity() (ports.ServerPort, error) {
 	}
 
 	// Explicitly validate certificate as described in architecture documentation
-	if err := s.ValidateServiceIdentity(cert); err != nil {
-		return nil, fmt.Errorf("certificate validation failed for service %s: %w", identity.Name(), err)
+	if validationErr := s.ValidateServiceIdentity(cert); validationErr != nil {
+		return nil, fmt.Errorf("certificate validation failed for service %s: %w", identity.Name(), validationErr)
 	}
 
 	trustBundle, err := s.getTrustBundle()
@@ -242,8 +251,8 @@ func (s *IdentityService) CreateClientIdentity() (ports.ClientPort, error) {
 	}
 
 	// Explicitly validate certificate as described in architecture documentation
-	if err := s.ValidateServiceIdentity(cert); err != nil {
-		return nil, fmt.Errorf("certificate validation failed for service %s: %w", identity.Name(), err)
+	if validationErr := s.ValidateServiceIdentity(cert); validationErr != nil {
+		return nil, fmt.Errorf("certificate validation failed for service %s: %w", identity.Name(), validationErr)
 	}
 
 	trustBundle, err := s.getTrustBundle()
@@ -296,19 +305,20 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 		if err := s.validateCertificateExpiry(s.cachedCert); err == nil {
 			// Determine proactive refresh threshold from configuration or use default
 			refreshThreshold := 10 * time.Minute // Default: 10 minutes before expiry
-			if s.config.Service.Cache != nil && s.config.Service.Cache.ProactiveRefreshMinutes > 0 {
-				refreshThreshold = time.Duration(s.config.Service.Cache.ProactiveRefreshMinutes) * time.Minute
+			// Extract intermediates to avoid deep selector chains
+			service := s.config.Service
+			if service.Cache != nil && service.Cache.ProactiveRefreshMinutes > 0 {
+				refreshThreshold = time.Duration(service.Cache.ProactiveRefreshMinutes) * time.Minute
 			}
 
 			// Proactive refresh if certificate expires soon
 			// This aligns with SPIFFE short-lived cert best practices
-			now := time.Now()
-			if now.Add(refreshThreshold).After(s.cachedCert.Cert.NotAfter) {
+			if s.cachedCert.IsExpiringWithin(refreshThreshold) {
 				slog.Info("Proactively refreshing certificate expiring soon",
 					"service_name", s.cachedIdentity.Name(),
-					"cert_not_after", s.cachedCert.Cert.NotAfter,
+					"cert_expires_at", s.cachedCert.ExpiresAt(),
 					"refresh_threshold", refreshThreshold.String(),
-					"expires_in", time.Until(s.cachedCert.Cert.NotAfter).String(),
+					"expires_in", s.cachedCert.TimeToExpiry().String(),
 				)
 				// Clear cache to force refresh
 				s.cachedCert = nil
@@ -609,9 +619,11 @@ func (s *IdentityService) fetchTrustBundleWithRetry() (*domain.TrustBundle, erro
 // It consolidates the policy creation logic that was duplicated between CreateServerIdentity and CreateClientIdentity.
 func (s *IdentityService) createPolicy(identity *domain.ServiceIdentity) (*domain.AuthenticationPolicy, error) {
 	// Create authentication policy with authorization based on configuration
-	if len(s.config.Service.AuthorizedClients) > 0 || len(s.config.Service.TrustedServers) > 0 {
+	// Extract intermediate to avoid deep selector chains
+	serviceConfig := s.config.Service
+	if len(serviceConfig.AuthorizedClients) > 0 || len(serviceConfig.TrustedServers) > 0 {
 		// Use authorization policy when rules are configured
-		policy, err := domain.NewAuthorizationPolicy(identity, s.config.Service.AuthorizedClients, s.config.Service.TrustedServers)
+		policy, err := domain.NewAuthorizationPolicy(identity, serviceConfig.AuthorizedClients, serviceConfig.TrustedServers)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create authorization policy: %w", err)
 		}
