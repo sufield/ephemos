@@ -118,6 +118,6 @@ func (a *SPIFFELibraryAdapter) CreateServiceIdentityFromNamespace(namespace Iden
 
 	trustDomain := namespace.GetTrustDomain()
 	
-	// Create ServiceIdentity using existing constructor
-	return NewServiceIdentityWithValidation(serviceName, trustDomain.String(), true)
+	// Create ServiceIdentity using validated constructor
+	return NewServiceIdentityValidated(serviceName, trustDomain.String())
 }
