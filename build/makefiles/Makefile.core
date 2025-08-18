@@ -18,7 +18,6 @@ LDFLAGS := -X main.Version=$(VERSION) \
 GO_BUILD_FLAGS := -trimpath -ldflags "$(LDFLAGS)"
 
 # Variables
-CLI_BINARY := ephemos
 CONFIG_VALIDATOR_BINARY := config-validator
 
 # PHONY targets - all targets that don't create files
@@ -29,14 +28,13 @@ CONFIG_VALIDATOR_BINARY := config-validator
 # Default target
 all: build
 
-# Build library and CLI with reproducible builds
+# Build config validator with reproducible builds
 build: check-deps show-build-info
-	@echo "Building Ephemos CLI with reproducible build flags..."
+	@echo "Building Ephemos config validator with reproducible build flags..."
 	@mkdir -p bin
-	go build $(GO_BUILD_FLAGS) -v -o "bin/$(CLI_BINARY)" ./cmd/ephemos-cli
 	go build $(GO_BUILD_FLAGS) -v -o "bin/$(CONFIG_VALIDATOR_BINARY)" ./cmd/config-validator
 	@echo "Build completed!"
-	@echo "Binaries built with version: $(VERSION)"
+	@echo "Binary built with version: $(VERSION)"
 
 
 # Build example applications with reproducible builds
@@ -105,7 +103,7 @@ core-help:
 	@echo "Core Ephemos Build Targets:"
 	@echo ""
 	@echo "Build targets (with reproducible builds):"
-	@echo "  make build          - Build library and CLI with version info"
+	@echo "  make build          - Build config validator with version info"
 	@echo "  make clean          - Clean build artifacts"
 	@echo ""
 	@echo "Development targets:"
