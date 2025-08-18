@@ -439,11 +439,10 @@ func TestServiceIdentity_ValidateSPIFFEConstraints(t *testing.T) {
 			errContains: "invalid characters",
 		},
 		{
-			name:        "invalid uppercase in domain",
+			name:        "uppercase domain normalized to lowercase",
 			serviceName: "service",
 			domain:      "Example.COM",
-			wantErr:     true,
-			errContains: "trust domain must be lowercase",
+			wantErr:     false, // Trust domains are automatically normalized to lowercase
 		},
 		{
 			name:        "very long path - within limit",

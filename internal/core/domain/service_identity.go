@@ -11,9 +11,9 @@ import (
 // ServiceIdentity represents a SPIFFE service identity with name, domain, and URI.
 // Use the constructors (NewServiceIdentity, NewServiceIdentityFromSPIFFEID) to ensure proper validation.
 type ServiceIdentity struct {
-	name   string
-	domain string
-	uri    string
+	name        string
+	trustDomain TrustDomain
+	uri         string
 }
 
 // Name returns the service name.
@@ -21,9 +21,14 @@ func (s *ServiceIdentity) Name() string {
 	return s.name
 }
 
-// Domain returns the trust domain.
+// Domain returns the trust domain as a string.
 func (s *ServiceIdentity) Domain() string {
-	return s.domain
+	return s.trustDomain.String()
+}
+
+// TrustDomain returns the trust domain value object.
+func (s *ServiceIdentity) TrustDomain() TrustDomain {
+	return s.trustDomain
 }
 
 // URI returns the SPIFFE URI.
@@ -31,41 +36,96 @@ func (s *ServiceIdentity) URI() string {
 	return s.uri
 }
 
-// NewServiceIdentity creates a new ServiceIdentity with the given name and domain.
-func NewServiceIdentity(name, domain string) *ServiceIdentity {
-	// Parse trust domain to ensure it's valid
-	trustDomain, err := spiffeid.TrustDomainFromString(domain)
+// NewServiceIdentity creates a new ServiceIdentity with the given name and domain string.
+// This constructor validates the trust domain and creates a proper domain value object.
+func NewServiceIdentity(name, domainStr string) *ServiceIdentity {
+	// Create and validate trust domain using our value object
+	trustDomain, err := NewTrustDomain(domainStr)
+	if err != nil {
+		// Fallback to simple construction with invalid trust domain
+		// This maintains backward compatibility for existing code
+		return &ServiceIdentity{
+			name:        name,
+			trustDomain: TrustDomain(domainStr), // Raw assignment for backward compatibility
+			uri:         fmt.Sprintf("spiffe://%s/%s", domainStr, name),
+		}
+	}
+
+	// Try to validate with go-spiffe for additional compatibility
+	goTrustDomain, err := spiffeid.TrustDomainFromString(trustDomain.String())
 	if err != nil {
 		// Fallback to simple construction
 		return &ServiceIdentity{
-			name:   name,
-			domain: domain,
-			uri:    fmt.Sprintf("spiffe://%s/%s", domain, name),
+			name:        name,
+			trustDomain: trustDomain,
+			uri:         fmt.Sprintf("spiffe://%s/%s", trustDomain.String(), name),
 		}
 	}
 
 	// Use official SPIFFE ID construction
-	spiffeID, err := spiffeid.FromPath(trustDomain, "/"+name)
+	spiffeID, err := spiffeid.FromPath(goTrustDomain, "/"+name)
 	if err != nil {
 		// Fallback to simple construction
 		return &ServiceIdentity{
-			name:   name,
-			domain: domain,
-			uri:    fmt.Sprintf("spiffe://%s/%s", domain, name),
+			name:        name,
+			trustDomain: trustDomain,
+			uri:         fmt.Sprintf("spiffe://%s/%s", trustDomain.String(), name),
 		}
 	}
 
 	return &ServiceIdentity{
-		name:   name,
-		domain: domain,
-		uri:    spiffeID.String(),
+		name:        name,
+		trustDomain: trustDomain,
+		uri:         spiffeID.String(),
+	}
+}
+
+// NewServiceIdentityWithTrustDomain creates a new ServiceIdentity with our TrustDomain value object.
+// This is the preferred constructor for new code using our domain value objects.
+func NewServiceIdentityWithTrustDomain(name string, trustDomain TrustDomain) *ServiceIdentity {
+	// Validate trust domain
+	if err := trustDomain.Validate(); err != nil {
+		// Return with error - this shouldn't happen with proper usage
+		return &ServiceIdentity{
+			name:        name,
+			trustDomain: trustDomain,
+			uri:         fmt.Sprintf("spiffe://%s/%s", trustDomain.String(), name),
+		}
+	}
+
+	// Try to create with go-spiffe for compatibility
+	goTrustDomain, err := spiffeid.TrustDomainFromString(trustDomain.String())
+	if err != nil {
+		// Fallback to simple construction
+		return &ServiceIdentity{
+			name:        name,
+			trustDomain: trustDomain,
+			uri:         fmt.Sprintf("spiffe://%s/%s", trustDomain.String(), name),
+		}
+	}
+
+	// Use official SPIFFE ID construction
+	spiffeID, err := spiffeid.FromPath(goTrustDomain, "/"+name)
+	if err != nil {
+		// Fallback to simple construction
+		return &ServiceIdentity{
+			name:        name,
+			trustDomain: trustDomain,
+			uri:         fmt.Sprintf("spiffe://%s/%s", trustDomain.String(), name),
+		}
+	}
+
+	return &ServiceIdentity{
+		name:        name,
+		trustDomain: trustDomain,
+		uri:         spiffeID.String(),
 	}
 }
 
 // NewServiceIdentityWithValidation creates a new ServiceIdentity with optional validation.
 // Set validate to false only in trusted contexts where performance is critical
 // and you're certain the identity data is valid (e.g., internal caching).
-func NewServiceIdentityWithValidation(name, domain string, validate bool) (*ServiceIdentity, error) {
+func NewServiceIdentityWithValidation(name, domainStr string, validate bool) (*ServiceIdentity, error) {
 	// Parse trust domain to ensure it's valid when validating
 	var identity *ServiceIdentity
 	if validate {
@@ -73,36 +133,44 @@ func NewServiceIdentityWithValidation(name, domain string, validate bool) (*Serv
 		if name == "" {
 			return nil, fmt.Errorf("service name cannot be empty")
 		}
-		if domain == "" {
+		if domainStr == "" {
 			return nil, fmt.Errorf("domain cannot be empty")
 		}
 
-		trustDomain, err := spiffeid.TrustDomainFromString(domain)
+		// Create and validate our trust domain value object
+		trustDomain, err := NewTrustDomain(domainStr)
 		if err != nil {
-			return nil, fmt.Errorf("invalid trust domain %q: %w", domain, err)
+			return nil, fmt.Errorf("invalid trust domain %q: %w", domainStr, err)
+		}
+
+		// Also validate with go-spiffe for compatibility
+		goTrustDomain, err := spiffeid.TrustDomainFromString(trustDomain.String())
+		if err != nil {
+			return nil, fmt.Errorf("invalid trust domain for go-spiffe %q: %w", domainStr, err)
 		}
 
 		// Use official SPIFFE ID construction
-		spiffeID, err := spiffeid.FromPath(trustDomain, "/"+name)
+		spiffeID, err := spiffeid.FromPath(goTrustDomain, "/"+name)
 		if err != nil {
 			return nil, fmt.Errorf("invalid SPIFFE path %q: %w", name, err)
 		}
 
 		identity = &ServiceIdentity{
-			name:   name,
-			domain: domain,
-			uri:    spiffeID.String(),
+			name:        name,
+			trustDomain: trustDomain,
+			uri:         spiffeID.String(),
 		}
 
 		if err := identity.Validate(); err != nil {
 			return nil, fmt.Errorf("service identity validation failed: %w", err)
 		}
 	} else {
-		// Simple construction without validation
+		// Simple construction without validation - create trust domain without validation
+		trustDomain := TrustDomain(domainStr) // Raw assignment for performance
 		identity = &ServiceIdentity{
-			name:   name,
-			domain: domain,
-			uri:    fmt.Sprintf("spiffe://%s/%s", domain, name),
+			name:        name,
+			trustDomain: trustDomain,
+			uri:         fmt.Sprintf("spiffe://%s/%s", domainStr, name),
 		}
 	}
 
@@ -112,14 +180,21 @@ func NewServiceIdentityWithValidation(name, domain string, validate bool) (*Serv
 // NewServiceIdentityFromSPIFFEID creates a ServiceIdentity from a SPIFFE ID.
 // Supports multi-segment paths (e.g., "/api/v1/service" becomes "api/v1/service").
 func NewServiceIdentityFromSPIFFEID(id spiffeid.ID) *ServiceIdentity {
-	trustDomain := id.TrustDomain().String()
+	// Create trust domain from go-spiffe trust domain
+	trustDomainStr := id.TrustDomain().String()
+	trustDomain, err := NewTrustDomain(trustDomainStr)
+	if err != nil {
+		// Fallback to raw assignment for backward compatibility
+		trustDomain = TrustDomain(trustDomainStr)
+	}
+
 	// Support multi-segment paths by preserving the full path structure
 	serviceName := strings.TrimPrefix(id.Path(), "/")
 
 	return &ServiceIdentity{
-		name:   serviceName,
-		domain: trustDomain,
-		uri:    id.String(),
+		name:        serviceName,
+		trustDomain: trustDomain,
+		uri:         id.String(),
 	}
 }
 
@@ -128,13 +203,13 @@ func (s *ServiceIdentity) Validate() error {
 	if s.name == "" {
 		return fmt.Errorf("service name cannot be empty")
 	}
-	if s.domain == "" {
-		return fmt.Errorf("domain cannot be empty")
+	if s.trustDomain.IsZero() {
+		return fmt.Errorf("trust domain cannot be empty")
 	}
 
-	// Validate trust domain format (must be valid DNS-like string)
-	if err := s.validateTrustDomain(s.domain); err != nil {
-		return fmt.Errorf("invalid trust domain %q: %w", s.domain, err)
+	// Validate trust domain using our value object validation
+	if err := s.trustDomain.Validate(); err != nil {
+		return fmt.Errorf("invalid trust domain %q: %w", s.trustDomain.String(), err)
 	}
 
 	// Validate service name format (SPIFFE path component)
@@ -156,27 +231,6 @@ func (s *ServiceIdentity) Validate() error {
 	return nil
 }
 
-// validateTrustDomain checks if a trust domain follows SPIFFE specifications.
-func (s *ServiceIdentity) validateTrustDomain(domain string) error {
-	// Trust domain must be lowercase and DNS-compliant
-	if domain != strings.ToLower(domain) {
-		return fmt.Errorf("trust domain must be lowercase")
-	}
-
-	// Check for invalid characters in trust domain
-	invalidChars := " !@#$%^&*()+=[]{}|\\:;\"'<>?/`~"
-	if strings.ContainsAny(domain, invalidChars) {
-		return fmt.Errorf("trust domain contains invalid characters")
-	}
-
-	// Must not start or end with hyphen or period
-	if strings.HasPrefix(domain, "-") || strings.HasSuffix(domain, "-") ||
-		strings.HasPrefix(domain, ".") || strings.HasSuffix(domain, ".") {
-		return fmt.Errorf("trust domain cannot start or end with hyphen or period")
-	}
-
-	return nil
-}
 
 // validateServiceName checks if a service name is valid for SPIFFE path component.
 // Now supports multi-segment paths (e.g., "api/v1/service") using official SPIFFE validation.
