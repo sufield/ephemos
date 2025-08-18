@@ -322,12 +322,12 @@ type SourceAdapter struct {
 	cacheTTL time.Duration // TTL for cached values (default: 5 minutes)
 
 	// Cached SVID values with expiration
-	cachedSVID   *x509svid.SVID
-	svidCachedAt time.Time
+	cachedSVID      *x509svid.SVID
+	svidCacheEntry  *domain.CacheEntry
 
 	// Cached bundle values with expiration
-	cachedBundle   *x509bundle.Bundle
-	bundleCachedAt time.Time
+	cachedBundle      *x509bundle.Bundle
+	bundleCacheEntry  *domain.CacheEntry
 }
 
 // Default cache TTL for source adapters (5 minutes)
@@ -354,7 +354,7 @@ func NewSourceAdapterWithTTL(provider IdentityProvider, cacheTTL time.Duration) 
 func (a *SourceAdapter) GetX509SVID() (*x509svid.SVID, error) {
 	// Check cache first
 	a.mu.RLock()
-	if a.cachedSVID != nil && time.Since(a.svidCachedAt) < a.cacheTTL {
+	if a.cachedSVID != nil && a.svidCacheEntry != nil && a.svidCacheEntry.IsFresh() {
 		cached := a.cachedSVID
 		a.mu.RUnlock()
 		return cached, nil
@@ -366,7 +366,7 @@ func (a *SourceAdapter) GetX509SVID() (*x509svid.SVID, error) {
 	defer a.mu.Unlock()
 
 	// Double-check pattern - another goroutine might have updated cache
-	if a.cachedSVID != nil && time.Since(a.svidCachedAt) < a.cacheTTL {
+	if a.cachedSVID != nil && a.svidCacheEntry != nil && a.svidCacheEntry.IsFresh() {
 		return a.cachedSVID, nil
 	}
 
@@ -397,7 +397,7 @@ func (a *SourceAdapter) GetX509SVID() (*x509svid.SVID, error) {
 
 	// Update cache with TTL
 	a.cachedSVID = svid
-	a.svidCachedAt = time.Now()
+	a.svidCacheEntry = domain.NewCacheEntry(a.cacheTTL)
 
 	return svid, nil
 }
@@ -406,7 +406,7 @@ func (a *SourceAdapter) GetX509SVID() (*x509svid.SVID, error) {
 func (a *SourceAdapter) GetX509BundleForTrustDomain(td spiffeid.TrustDomain) (*x509bundle.Bundle, error) {
 	// Check cache first
 	a.mu.RLock()
-	if a.cachedBundle != nil && time.Since(a.bundleCachedAt) < a.cacheTTL {
+	if a.cachedBundle != nil && a.bundleCacheEntry != nil && a.bundleCacheEntry.IsFresh() {
 		cached := a.cachedBundle
 		a.mu.RUnlock()
 		return cached, nil
@@ -418,7 +418,7 @@ func (a *SourceAdapter) GetX509BundleForTrustDomain(td spiffeid.TrustDomain) (*x
 	defer a.mu.Unlock()
 
 	// Double-check pattern - another goroutine might have updated cache
-	if a.cachedBundle != nil && time.Since(a.bundleCachedAt) < a.cacheTTL {
+	if a.cachedBundle != nil && a.bundleCacheEntry != nil && a.bundleCacheEntry.IsFresh() {
 		return a.cachedBundle, nil
 	}
 
@@ -442,7 +442,7 @@ func (a *SourceAdapter) GetX509BundleForTrustDomain(td spiffeid.TrustDomain) (*x
 
 	// Update cache with TTL
 	a.cachedBundle = bundle
-	a.bundleCachedAt = time.Now()
+	a.bundleCacheEntry = domain.NewCacheEntry(a.cacheTTL)
 
 	return bundle, nil
 }
@@ -454,9 +454,9 @@ func (a *SourceAdapter) InvalidateCache() {
 	defer a.mu.Unlock()
 
 	a.cachedSVID = nil
-	a.svidCachedAt = time.Time{}
+	a.svidCacheEntry = nil
 	a.cachedBundle = nil
-	a.bundleCachedAt = time.Time{}
+	a.bundleCacheEntry = nil
 }
 
 // SetCacheTTL updates the cache TTL. Setting to 0 disables caching.
@@ -469,9 +469,9 @@ func (a *SourceAdapter) SetCacheTTL(ttl time.Duration) {
 	// If TTL is set to 0, invalidate cache
 	if ttl == 0 {
 		a.cachedSVID = nil
-		a.svidCachedAt = time.Time{}
+		a.svidCacheEntry = nil
 		a.cachedBundle = nil
-		a.bundleCachedAt = time.Time{}
+		a.bundleCacheEntry = nil
 	}
 }
 
