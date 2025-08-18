@@ -191,6 +191,38 @@ func (c *Certificate) validateChainOrder() error {
 	return nil
 }
 
+// IsExpired returns true if the certificate has expired.
+func (c *Certificate) IsExpired() bool {
+	if c.Cert == nil {
+		return true // Treat nil certificate as expired
+	}
+	return time.Now().After(c.Cert.NotAfter)
+}
+
+// ExpiresAt returns the certificate's expiration time.
+func (c *Certificate) ExpiresAt() time.Time {
+	if c.Cert == nil {
+		return time.Time{} // Return zero time for nil certificate
+	}
+	return c.Cert.NotAfter
+}
+
+// TimeToExpiry returns the duration until the certificate expires.
+func (c *Certificate) TimeToExpiry() time.Duration {
+	if c.Cert == nil {
+		return 0 // Return zero duration for nil certificate
+	}
+	return time.Until(c.Cert.NotAfter)
+}
+
+// IsExpiringWithin returns true if the certificate expires within the given threshold.
+func (c *Certificate) IsExpiringWithin(threshold time.Duration) bool {
+	if c.Cert == nil {
+		return true // Treat nil certificate as expired
+	}
+	return time.Until(c.Cert.NotAfter) <= threshold
+}
+
 // IsExpiringSoon returns true if the certificate expires within the given duration.
 func (c *Certificate) IsExpiringSoon(threshold time.Duration) bool {
 	if c.Cert == nil {
