@@ -1,0 +1,155 @@
+# Complete mTLS Scenario Configuration Example
+# This configuration demonstrates production-ready settings for Ephemos mTLS scenarios
+
+service:
+  name: "api-server"
+  domain: "production.company.com"
+  
+  # Authorization configuration
+  authorized_clients:
+    - "spiffe://production.company.com/web-client"
+    - "spiffe://production.company.com/mobile-client" 
+    - "spiffe://production.company.com/admin-client"
+  
+  trusted_servers:
+    - "spiffe://production.company.com/auth-service"
+    - "spiffe://production.company.com/db-proxy"
+    - "spiffe://production.company.com/cache-service"
+  
+  # Certificate caching configuration
+  cache:
+    ttl_minutes: 30                    # Cache certificates for 30 minutes
+    proactive_refresh_minutes: 10      # Refresh 10 minutes before expiry
+
+agent:
+  socket_path: "/tmp/spire-agent/public/api.sock"
+  timeout: "30s"
+
+# mTLS enforcement policy
+mtls:
+  enforcement:
+    fail_on_violation: true            # Fail fast on security violations
+    check_interval: "30s"              # Check invariants every 30 seconds  
+    max_violations: 3                  # Max violations before taking action
+    violation_action: "close_connection" # Action: log, close_connection, restart_service, alert_only
+  
+  # Security invariants configuration
+  invariants:
+    certificate_validity:
+      enabled: true
+      warning_threshold: "1h"          # Warn when cert expires within 1 hour
+    
+    mutual_authentication:
+      enabled: true
+      require_peer_certificates: true
+    
+    trust_domain_validation:
+      enabled: true
+      strict_mode: true                # Strict trust domain validation
+    
+    certificate_rotation:
+      enabled: true
+      rotation_threshold: "15m"        # Start rotation 15 minutes before expiry
+      max_connection_age: "1h"         # Max connection age without rotation
+    
+    identity_matching:
+      enabled: true
+      strict_identity_check: true
+
+# Rotation continuity configuration  
+rotation:
+  continuity:
+    overlap_duration: "5m"             # 5 minutes overlap period
+    graceful_shutdown_timeout: "30s"   # 30 seconds for graceful shutdown
+    pre_rotation_prep_time: "30s"      # 30 seconds preparation time
+    post_rotation_validation_time: "30s" # 30 seconds validation time
+    max_concurrent_rotations: 2        # Allow max 2 concurrent rotations
+  
+  # Rotation policy
+  policy:
+    auto_rotate: true                  # Enable automatic rotation
+    rotation_window: "02:00-04:00"     # Preferred rotation time window (UTC)
+    emergency_rotation: true           # Allow emergency rotations outside window
+    backup_cert_overlap: true          # Keep backup cert during rotation
+
+# Connection management
+connections:
+  # Connection pooling
+  pool:
+    max_idle_connections: 100
+    max_connections_per_host: 20
+    idle_timeout: "5m"
+  
+  # Health checking
+  health:
+    check_interval: "10s"
+    timeout: "5s"
+    failure_threshold: 3
+  
+  # Circuit breaker
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5
+    recovery_timeout: "30s"
+    half_open_max_calls: 3
+
+# Observability configuration
+observability:
+  # Metrics
+  metrics:
+    enabled: true
+    endpoint: ":8080/metrics"
+    include_connection_stats: true
+    include_rotation_stats: true
+    include_invariant_stats: true
+  
+  # Logging
+  logging:
+    level: "info"                      # debug, info, warn, error
+    format: "json"                     # json, text
+    include_rotation_events: true
+    include_invariant_violations: true
+    include_connection_events: true
+  
+  # Tracing  
+  tracing:
+    enabled: true
+    endpoint: "http://jaeger:14268/api/traces"
+    sample_rate: 0.1                   # 10% sampling rate
+    include_mtls_spans: true
+
+# Environment-specific overrides
+environments:
+  development:
+    mtls:
+      enforcement:
+        fail_on_violation: false       # More lenient in development
+        check_interval: "60s"
+    rotation:
+      continuity:
+        overlap_duration: "1m"         # Shorter overlap in dev
+    observability:
+      logging:
+        level: "debug"                 # More verbose logging in dev
+        
+  staging:
+    mtls:
+      enforcement:
+        max_violations: 5              # Slightly more lenient in staging
+    observability:
+      tracing:
+        sample_rate: 0.5               # Higher sampling rate in staging
+        
+  production:
+    mtls:
+      enforcement:
+        fail_on_violation: true        # Strict enforcement in production
+        violation_action: "restart_service" # Restart service on critical violations
+    rotation:
+      policy:
+        rotation_window: "02:00-04:00" # Rotate during low-traffic hours
+    observability:
+      metrics:
+        scrape_interval: "15s"         # More frequent metrics collection
+      tracing:
+        sample_rate: 0.01              # Lower sampling rate to reduce overhead

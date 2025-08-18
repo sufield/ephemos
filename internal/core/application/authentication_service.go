@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
@@ -155,17 +154,17 @@ func (s *AuthenticationService) CreateAuthenticatedConnection(ctx context.Contex
 		return nil, fmt.Errorf("failed to get trust bundle for domain %s: %w", targetDomain, err)
 	}
 	
-	// Parse target service as SPIFFE ID
-	targetSPIFFEID, err := s.parseAsSPIFFEID(targetService)
+	// Parse target service as identity namespace
+	targetIdentity, err := s.parseAsIdentityNamespace(targetService)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse target service as SPIFFE ID: %w", err)
+		return nil, fmt.Errorf("failed to parse target service as identity: %w", err)
 	}
 	
 	// Create authentication policy
 	policy := &domain.AuthenticationPolicy{
-		TrustDomain:      targetDomain,
-		RequireAuth:      true,
-		AllowedSPIFFEIDs: []spiffeid.ID{targetSPIFFEID}, // Only allow the specific target service
+		TrustDomain:       targetDomain,
+		RequireAuth:       true,
+		AllowedIdentities: []string{targetIdentity.String()}, // Only allow the specific target service
 	}
 	
 	return &AuthenticatedConnection{
@@ -294,9 +293,9 @@ func (s *AuthenticationService) extractTrustDomain(serviceIdentifier string) (do
 	return namespace.GetTrustDomain(), nil
 }
 
-// parseAsSPIFFEID parses a string as a SPIFFE ID.
-func (s *AuthenticationService) parseAsSPIFFEID(identifier string) (spiffeid.ID, error) {
-	return spiffeid.FromString(identifier)
+// parseAsIdentityNamespace parses a string as an identity namespace.
+func (s *AuthenticationService) parseAsIdentityNamespace(identifier string) (domain.IdentityNamespace, error) {
+	return domain.NewIdentityNamespaceFromString(identifier)
 }
 
 // AuthenticatedConnection represents a connection with authentication information.
