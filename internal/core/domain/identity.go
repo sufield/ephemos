@@ -723,7 +723,7 @@ type AuthenticationPolicy struct {
 	ServiceIdentity   *ServiceIdentity
 	AuthorizedClients []spiffeid.ID // For server-side: SPIFFE IDs allowed to connect
 	TrustedServers    []spiffeid.ID // For client-side: SPIFFE IDs this service trusts
-	TrustDomain       string        // Trust domain for authorization
+	TrustDomain       TrustDomain   // Trust domain for authorization
 	AllowedSPIFFEIDs  []spiffeid.ID // Specific SPIFFE IDs for precise authorization
 	RequireAuth       bool          // Whether authentication is required
 }
@@ -737,7 +737,8 @@ func NewAuthenticationPolicy(identity *ServiceIdentity) *AuthenticationPolicy {
 
 	// Auto-set trust domain from identity if available
 	if identity != nil {
-		policy.TrustDomain = identity.Domain()
+		td, _ := NewTrustDomain(identity.Domain())
+		policy.TrustDomain = td
 	}
 
 	return policy
@@ -774,8 +775,9 @@ func NewAuthorizationPolicy(identity *ServiceIdentity, authorizedClients, truste
 	}
 
 	// Auto-set trust domain from identity if not already set
-	if policy.TrustDomain == "" && identity != nil {
-		policy.TrustDomain = identity.Domain()
+	if policy.TrustDomain.IsZero() && identity != nil {
+		td, _ := NewTrustDomain(identity.Domain())
+		policy.TrustDomain = td
 	}
 
 	return policy, nil
@@ -790,8 +792,9 @@ func (p *AuthenticationPolicy) HasAuthorization() bool {
 func (p *AuthenticationPolicy) IsClientAuthorized(clientSPIFFEID spiffeid.ID) bool {
 	if len(p.AuthorizedClients) == 0 {
 		// No explicit authorization rules - allow same trust domain
-		if p.TrustDomain != "" {
-			return clientSPIFFEID.TrustDomain().String() == p.TrustDomain
+		if !p.TrustDomain.IsZero() {
+			clientTD := TrustDomain(clientSPIFFEID.TrustDomain().String())
+			return p.TrustDomain.Equals(clientTD)
 		}
 		return true
 	}
@@ -817,8 +820,9 @@ func (p *AuthenticationPolicy) IsClientAuthorizedString(clientSPIFFEID string) b
 func (p *AuthenticationPolicy) IsServerTrusted(serverSPIFFEID spiffeid.ID) bool {
 	if len(p.TrustedServers) == 0 {
 		// No explicit trust rules - trust same trust domain
-		if p.TrustDomain != "" {
-			return serverSPIFFEID.TrustDomain().String() == p.TrustDomain
+		if !p.TrustDomain.IsZero() {
+			serverTD := TrustDomain(serverSPIFFEID.TrustDomain().String())
+			return p.TrustDomain.Equals(serverTD)
 		}
 		return true
 	}
