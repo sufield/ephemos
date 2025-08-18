@@ -148,6 +148,65 @@ ephemos/
 - Add tests for new functionality
 - Use meaningful variable and function names
 
+### Code Quality Tools
+
+#### Variable Shadowing Detection
+To maintain code clarity and prevent bugs from variable shadowing, use the Go shadow analyzer:
+
+```bash
+# Install the shadow analyzer (one-time setup)
+go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest
+
+# Check for variable shadowing in specific packages
+go vet -vettool=$(which shadow) ./internal/core/services/
+go vet -vettool=$(which shadow) ./internal/adapters/...
+
+# Check entire codebase (may include some expected shadowing in test files)
+go vet -vettool=$(which shadow) ./...
+
+# Filter out type errors to focus on shadowing issues only
+go vet -vettool=$(which shadow) ./... 2>&1 | grep "declaration of"
+```
+
+**Common shadowing patterns to avoid:**
+```go
+// ❌ Bad: Variable shadowing
+cert, err := getCertificate()
+if err != nil {
+    return err
+}
+if err := validateCert(cert); err != nil {  // shadows outer 'err'
+    return err
+}
+
+// ✅ Good: Use specific variable names
+cert, err := getCertificate()
+if err != nil {
+    return err
+}
+if validationErr := validateCert(cert); validationErr != nil {
+    return validationErr
+}
+```
+
+#### Architecture Testing
+The project includes automated architecture tests to prevent design violations:
+
+```bash
+# Run architecture constraint tests
+go test ./internal/arch/ -v
+
+# Run specific architecture tests
+go test ./internal/arch/ -run TestNoLongSelectorChains -v
+go test ./internal/arch/ -run TestVendorTypeIsolation -v
+```
+
+These tests enforce:
+- Selector chain depth limits (Law of Demeter)
+- Package dependency boundaries
+- Vendor type isolation
+- Cross-package coupling prevention
+
 ### Commits
 - Use conventional commit format
 - Keep commits focused and atomic
@@ -231,17 +290,27 @@ Before submitting changes:
    make test
    ```
 
-3. **Lint code:**
+3. **Run architecture tests:**
+   ```bash
+   go test ./internal/arch/ -v
+   ```
+
+4. **Check for variable shadowing:**
+   ```bash
+   go vet -vettool=$(which shadow) ./internal/... 2>&1 | grep "declaration of"
+   ```
+
+5. **Lint code:**
    ```bash
    make lint
    ```
 
-4. **Test demo:**
+6. **Test demo:**
    ```bash
    make demo
    ```
 
-5. **Verify requirements:**
+7. **Verify requirements:**
    ```bash
    make check-requirements
    ```
