@@ -294,8 +294,8 @@ EPHEMOS_CONFIG=/etc/ephemos/config.yaml ./your-service
 ### 1. Static Registration (Simple)
 ```bash
 # Pre-register services during deployment
-ephemos register --name service-a --domain company.com --selector unix:uid:1000
-ephemos register --name service-b --domain company.com --selector docker:label:app:service-b
+spire-server entry create -spiffeID spiffe://company.com/service-a -parentID spiffe://company.com/spire-agent -selector unix:uid:1000
+spire-server entry create -spiffeID spiffe://company.com/service-b -parentID spiffe://company.com/spire-agent -selector docker:label:app:service-b
 ```
 
 ### 2. Dynamic Registration (CI/CD)
@@ -303,7 +303,7 @@ ephemos register --name service-b --domain company.com --selector docker:label:a
 # GitLab CI/CD example
 deploy:
   script:
-    - ephemos register --name $CI_PROJECT_NAME --domain company.com
+    - spire-server entry create -spiffeID spiffe://company.com/$CI_PROJECT_NAME -parentID spiffe://company.com/spire-agent -selector k8s:ns:production
     - kubectl apply -f k8s/
 ```
 

@@ -14,7 +14,7 @@ The fundamental SPIFFE/SPIRE mechanism is the same, but the **attestation method
 ├─────────────────────────────────────────────────┤
 │                                                  │
 │  1. Manual Registration:                        │
-│     $ sudo ephemos register --name echo-server  │
+│     $ sudo spire-server entry create -spiffeID spiffe://example.org/echo-server -parentID spiffe://example.org/spire-agent -selector unix:uid:0  │
 │                                                  │
 │  2. Unix UID Attestation (uid:0/root):         │
 │     Selector: unix:uid:0                        │
@@ -192,7 +192,7 @@ authorized_clients:
 ```bash
 # Current demo - manual registration
 cd scripts/demo
-sudo ./ephemos register --name echo-server --domain example.org
+sudo spire-server entry create -spiffeID spiffe://example.org/echo-server -parentID spiffe://example.org/spire-agent -selector unix:uid:0
 ```
 
 ### Production Registration (Automated)
@@ -316,7 +316,7 @@ spiffe:
 if [ "$ENVIRONMENT" = "production" ]; then
   kubectl apply -f k8s/spiffe-id.yaml
 else
-  ephemos register --name $SERVICE_NAME
+  spire-server entry create -spiffeID spiffe://company.com/$SERVICE_NAME -parentID spiffe://company.com/spire-agent -selector k8s:ns:production
 fi
 ```
 
