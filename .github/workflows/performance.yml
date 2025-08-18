@@ -20,7 +20,7 @@ jobs:
       # PR path: checkout the fork + branch that opened the PR
       - name: Checkout PR head
         if: github.event_name == 'pull_request'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
@@ -29,7 +29,7 @@ jobs:
       # Push path: checkout this repo/branch
       - name: Checkout push ref
         if: github.event_name != 'pull_request'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.ref }}
           fetch-depth: 0
@@ -113,7 +113,7 @@ jobs:
       # PR path: checkout the fork + branch that opened the PR
       - name: Checkout PR head
         if: github.event_name == 'pull_request'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
@@ -121,7 +121,7 @@ jobs:
       # Push path: checkout this repo/branch
       - name: Checkout push ref
         if: github.event_name != 'pull_request'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.ref }}
       - name: Set up Go
