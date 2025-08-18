@@ -6,13 +6,16 @@ import (
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 
+	"github.com/sufield/ephemos/internal/adapters/secondary/config"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
 // CreateGRPCProvider creates a rotation-capable gRPC transport provider.
 // If sources are provided, the provider will support automatic SVID rotation.
-func CreateGRPCProvider(config *ports.Configuration, opts ...ProviderOption) (*RotatableGRPCProvider, error) {
-	provider := NewRotatableGRPCProvider(config)
+func CreateGRPCProvider(cfg *ports.Configuration, opts ...ProviderOption) (*RotatableGRPCProvider, error) {
+	// Create trust domain provider using dependency injection
+	trustProvider := config.NewTrustDomainAdapter(cfg)
+	provider := NewRotatableGRPCProvider(trustProvider)
 
 	// Apply options - collect any errors
 	for _, opt := range opts {

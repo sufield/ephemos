@@ -21,17 +21,17 @@ import (
 // RotatableGRPCProvider provides gRPC-based transport with SPIFFE mTLS authentication
 // that supports automatic SVID rotation through go-spiffe sources.
 type RotatableGRPCProvider struct {
-	config       *ports.Configuration
-	svidSource   x509svid.Source
-	bundleSource x509bundle.Source
-	authorizer   tlsconfig.Authorizer
-	mu           sync.RWMutex
+	svidSource    x509svid.Source
+	bundleSource  x509bundle.Source
+	authorizer    tlsconfig.Authorizer
+	trustProvider ports.TrustDomainProvider // Injected capability
+	mu            sync.RWMutex
 }
 
 // NewRotatableGRPCProvider creates a new rotation-capable gRPC transport provider.
-func NewRotatableGRPCProvider(config *ports.Configuration) *RotatableGRPCProvider {
+func NewRotatableGRPCProvider(trustProvider ports.TrustDomainProvider) *RotatableGRPCProvider {
 	return &RotatableGRPCProvider{
-		config: config,
+		trustProvider: trustProvider,
 	}
 }
 
@@ -61,7 +61,7 @@ func (p *RotatableGRPCProvider) CreateClient(cert *domain.Certificate, bundle *d
 	defer p.mu.RUnlock()
 
 	// Check for development mode
-	if p.config != nil && p.config.ShouldSkipCertificateValidation() {
+	if p.trustProvider != nil && p.trustProvider.ShouldSkipCertificateValidation() {
 		log.Printf("⚠️  [EPHEMOS] Certificate validation disabled (EPHEMOS_INSECURE_SKIP_VERIFY=true) - development only!")
 		return &grpcClient{
 			tlsConfig: &tls.Config{InsecureSkipVerify: true},
@@ -111,7 +111,7 @@ func (p *RotatableGRPCProvider) CreateServer(cert *domain.Certificate, bundle *d
 	defer p.mu.RUnlock()
 
 	// Check for development mode
-	if p.config != nil && p.config.ShouldSkipCertificateValidation() {
+	if p.trustProvider != nil && p.trustProvider.ShouldSkipCertificateValidation() {
 		log.Printf("⚠️  [EPHEMOS] Certificate validation disabled (EPHEMOS_INSECURE_SKIP_VERIFY=true) - development only!")
 		return &grpcServer{
 			tlsConfig: &tls.Config{InsecureSkipVerify: true},
@@ -209,15 +209,14 @@ func (p *RotatableGRPCProvider) determineAuthorizer(policy *domain.Authenticatio
 	return p.createSecureDefaultAuthorizer(), nil
 }
 
-// createSecureDefaultAuthorizer creates a secure default authorizer based on configuration.
+// createSecureDefaultAuthorizer creates a secure default authorizer using injected capability.
 // SECURITY NOTE: This method ensures we never fall back to AuthorizeAny() without explicit configuration.
 func (p *RotatableGRPCProvider) createSecureDefaultAuthorizer() tlsconfig.Authorizer {
-	// Try to get trust domain from configuration
-	if p.config != nil && p.config.Service.Domain != "" {
-		if td, err := spiffeid.TrustDomainFromString(p.config.Service.Domain); err == nil {
-			// Default to authorizing members of the same trust domain
-			// This is much more secure than AuthorizeAny() but still practical
-			return tlsconfig.AuthorizeMemberOf(td)
+	// Use injected capability instead of direct config access
+	if p.trustProvider != nil {
+		if authorizer, err := p.trustProvider.CreateDefaultAuthorizer(); err == nil {
+			// Use the authorizer from our trust domain provider
+			return authorizer
 		}
 	}
 
