@@ -19,7 +19,7 @@ import (
 // IdentityDocumentAdapter adapts SPIFFE workload API to IdentityProviderPort.
 // This adapter handles SVID fetching and identity document creation from SPIFFE sources.
 type IdentityDocumentAdapter struct {
-	socketPath   string
+	socketPath   domain.SocketPath
 	x509Source   *workloadapi.X509Source
 	logger       *slog.Logger
 	
@@ -32,7 +32,7 @@ type IdentityDocumentAdapter struct {
 
 // IdentityDocumentAdapterConfig provides configuration for the adapter.
 type IdentityDocumentAdapterConfig struct {
-	SocketPath string
+	SocketPath domain.SocketPath
 	Logger     *slog.Logger
 }
 
@@ -325,13 +325,15 @@ func (a *IdentityDocumentAdapter) ensureSource(ctx context.Context) error {
 	}
 	
 	// Determine actual socket path to use
-	actualSocketPath := a.socketPath
-	if actualSocketPath == "" {
+	var actualSocketPath string
+	if a.socketPath.IsEmpty() {
 		var found bool
 		actualSocketPath, found = workloadapi.GetDefaultAddress()
 		if !found {
 			actualSocketPath = "unix:///tmp/spire-agent/public/api.sock" // Fallback
 		}
+	} else {
+		actualSocketPath = a.socketPath.WithUnixPrefix()
 	}
 	
 	a.logger.Debug("initializing X509 source", "socket_path", actualSocketPath)

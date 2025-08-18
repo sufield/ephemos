@@ -143,7 +143,7 @@ func runValidator(cmd *cobra.Command, args []string) error {
 	}
 
 	if cfg.Agent != nil {
-		result.Configuration.AgentSocket = cfg.Agent.SocketPath
+		result.Configuration.AgentSocket = cfg.Agent.SocketPath.Value()
 	}
 
 	// Display configuration if verbose

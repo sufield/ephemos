@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
@@ -26,7 +27,7 @@ func NewInMemoryProvider() *InMemoryProvider {
 				Domain: "default.org",
 			},
 			Agent: &ports.AgentConfig{
-				SocketPath: "/run/sockets/agent.sock",
+				SocketPath: domain.NewSocketPathUnsafe("/run/sockets/agent.sock"),
 			},
 		},
 	}

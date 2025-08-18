@@ -23,12 +23,12 @@ type Provider struct {
 
 // NewProvider creates a provider using the new adapter architecture.
 func NewProvider(config *ports.AgentConfig) (*Provider, error) {
-	var socketPath string
+	var socketPath domain.SocketPath
 	if config != nil {
 		socketPath = config.SocketPath
 	} else {
 		// For nil config, use default path without unix:// prefix to match tests
-		socketPath = "/tmp/spire-agent/public/api.sock"
+		socketPath = domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock")
 	}
 	
 	logger := slog.Default()
@@ -110,7 +110,7 @@ func (p *Provider) GetX509Source() *workloadapi.X509Source {
 // GetSocketPath returns path from identity adapter.
 func (p *Provider) GetSocketPath() string {
 	if p.identityAdapter != nil {
-		return p.identityAdapter.socketPath
+		return p.identityAdapter.socketPath.Value()
 	}
 	return ""
 }

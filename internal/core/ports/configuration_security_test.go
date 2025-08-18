@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
@@ -140,7 +141,7 @@ func TestMergeWithEnvironment(t *testing.T) {
 			Domain: "file.domain.com",
 		},
 		Agent: &ports.AgentConfig{
-			SocketPath: "/tmp/file/socket",
+			SocketPath: domain.NewSocketPathUnsafe("/tmp/file/socket"),
 		},
 	}
 
@@ -156,7 +157,7 @@ func TestMergeWithEnvironment(t *testing.T) {
 	assert.Equal(t, "env.domain.com", config.Service.Domain)
 
 	// Verify file values remain where no environment override
-	assert.Equal(t, "/tmp/file/socket", config.Agent.SocketPath)
+	assert.Equal(t, "/tmp/file/socket", config.Agent.SocketPath.Value())
 }
 
 func TestValidateProductionSecurity(t *testing.T) {
@@ -174,7 +175,7 @@ func TestValidateProductionSecurity(t *testing.T) {
 					Domain: "prod.company.com",
 				},
 				Agent: &ports.AgentConfig{
-					SocketPath: "/run/spire/sockets/api.sock",
+					SocketPath: domain.NewSocketPathUnsafe("/run/spire/sockets/api.sock"),
 				},
 			},
 			expectError: false,
@@ -187,7 +188,7 @@ func TestValidateProductionSecurity(t *testing.T) {
 					Domain: "example.org",
 				},
 				Agent: &ports.AgentConfig{
-					SocketPath: "/run/spire/sockets/api.sock",
+					SocketPath: domain.NewSocketPathUnsafe("/run/spire/sockets/api.sock"),
 				},
 			},
 			expectError:   true,
@@ -201,7 +202,7 @@ func TestValidateProductionSecurity(t *testing.T) {
 					Domain: "localhost",
 				},
 				Agent: &ports.AgentConfig{
-					SocketPath: "/run/spire/sockets/api.sock",
+					SocketPath: domain.NewSocketPathUnsafe("/run/spire/sockets/api.sock"),
 				},
 			},
 			expectError:   true,
@@ -215,7 +216,7 @@ func TestValidateProductionSecurity(t *testing.T) {
 					Domain: "test.example.com",
 				},
 				Agent: &ports.AgentConfig{
-					SocketPath: "/run/spire/sockets/api.sock",
+					SocketPath: domain.NewSocketPathUnsafe("/run/spire/sockets/api.sock"),
 				},
 			},
 			expectError:   true,
@@ -229,7 +230,7 @@ func TestValidateProductionSecurity(t *testing.T) {
 					Domain: "prod.company.com",
 				},
 				Agent: &ports.AgentConfig{
-					SocketPath: "/run/spire/sockets/api.sock",
+					SocketPath: domain.NewSocketPathUnsafe("/run/spire/sockets/api.sock"),
 				},
 			},
 			expectError:   true,
@@ -243,7 +244,7 @@ func TestValidateProductionSecurity(t *testing.T) {
 					Domain: "prod.company.com",
 				},
 				Agent: &ports.AgentConfig{
-					SocketPath: "/home/user/spire.sock",
+					SocketPath: domain.NewSocketPathUnsafe("/home/user/spire.sock"),
 				},
 			},
 			expectError:   true,

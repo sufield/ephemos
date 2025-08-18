@@ -19,7 +19,7 @@ import (
 // SpiffeBundleAdapter adapts SPIFFE workload API to BundleProviderPort.
 // This adapter handles trust bundle fetching and management from SPIFFE sources.
 type SpiffeBundleAdapter struct {
-	socketPath    string
+	socketPath    domain.SocketPath
 	x509Source    *workloadapi.X509Source
 	logger        *slog.Logger
 	
@@ -32,7 +32,7 @@ type SpiffeBundleAdapter struct {
 
 // SpiffeBundleAdapterConfig provides configuration for the adapter.
 type SpiffeBundleAdapterConfig struct {
-	SocketPath string
+	SocketPath domain.SocketPath
 	Logger     *slog.Logger
 }
 
@@ -284,13 +284,15 @@ func (a *SpiffeBundleAdapter) ensureSource(ctx context.Context) error {
 	}
 	
 	// Determine actual socket path to use
-	actualSocketPath := a.socketPath
-	if actualSocketPath == "" {
+	var actualSocketPath string
+	if a.socketPath.IsEmpty() {
 		var found bool
 		actualSocketPath, found = workloadapi.GetDefaultAddress()
 		if !found {
 			actualSocketPath = "unix:///tmp/spire-agent/public/api.sock" // Fallback
 		}
+	} else {
+		actualSocketPath = a.socketPath.WithUnixPrefix()
 	}
 	
 	a.logger.Debug("initializing X509 source", "socket_path", actualSocketPath)

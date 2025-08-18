@@ -68,7 +68,7 @@ type AgentConfig struct {
 	// SocketPath is the path to the identity agent's Unix domain socket.
 	// Must be an absolute path to a valid Unix socket file.
 	// Common default: "/run/sockets/agent.sock"
-	SocketPath string `yaml:"socketPath" validate:"required,abs_path"`
+	SocketPath domain.SocketPath `yaml:"socketPath" validate:"required"`
 }
 
 // CacheConfig contains caching configuration for certificate and trust bundle operations.
@@ -196,6 +196,7 @@ func LoadFromEnvironment() (*Configuration, error) {
 		mapstructure.ComposeDecodeHookFunc(
 			mapstructure.StringToTimeDurationHookFunc(),
 			mapstructure.StringToSliceHookFunc(","),
+			domain.SocketPathDecodeHook(),
 		),
 	)); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal configuration: %w", err)
@@ -225,10 +226,12 @@ func LoadFromEnvironment() (*Configuration, error) {
 	if config.Agent == nil {
 		config.Agent = &AgentConfig{}
 	}
+	
+	// Handle agent socket path from environment variables
 	if socketPath := v.GetString("agent_socket"); socketPath != "" {
-		config.Agent.SocketPath = socketPath
-	} else {
-		config.Agent.SocketPath = v.GetString("agent.socketpath")
+		config.Agent.SocketPath = domain.NewSocketPathUnsafe(socketPath)
+	} else if socketPath := v.GetString("agent.socketpath"); socketPath != "" {
+		config.Agent.SocketPath = domain.NewSocketPathUnsafe(socketPath)
 	}
 
 	// Validate the configuration
@@ -262,7 +265,13 @@ func (c *Configuration) MergeWithEnvironment() error {
 		if c.Agent == nil {
 			c.Agent = &AgentConfig{}
 		}
-		c.Agent.SocketPath = agentSocket
+		// Create SocketPath Value Object from string
+		socketPath, err := domain.NewSocketPath(agentSocket)
+		if err != nil {
+			// For backward compatibility, use unsafe creation if validation fails
+			socketPath = domain.NewSocketPathUnsafe(agentSocket)
+		}
+		c.Agent.SocketPath = socketPath
 	}
 
 	return c.Validate()
@@ -295,8 +304,10 @@ func validateProductionSecurity(config *Configuration) error {
 	}
 
 	// Check agent socket path security
-	if err := validateSocketPath(config.Agent.SocketPath); err != nil {
-		validationErrors = append(validationErrors, err)
+	if config.Agent != nil {
+		if err := validateSocketPath(config.Agent.SocketPath.Value()); err != nil {
+			validationErrors = append(validationErrors, err)
+		}
 	}
 
 	// Use viper for security checks

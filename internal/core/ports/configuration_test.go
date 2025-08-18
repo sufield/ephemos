@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
@@ -22,7 +23,7 @@ func TestConfiguration_Validate(t *testing.T) {
 					Domain: "example.com",
 				},
 				Agent: &ports.AgentConfig{
-					SocketPath: "/tmp/spire-agent/public/api.sock",
+					SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 				},
 			},
 			wantErr: false,
@@ -32,7 +33,7 @@ func TestConfiguration_Validate(t *testing.T) {
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{}, // Empty service config to test validation
 				Agent: &ports.AgentConfig{
-					SocketPath: "/tmp/spire-agent/public/api.sock",
+					SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 				},
 			},
 			wantErr:       true,
@@ -58,7 +59,7 @@ func TestConfiguration_Validate(t *testing.T) {
 					Domain: "example.com",
 				},
 				Agent: &ports.AgentConfig{
-					SocketPath: "/tmp/spire-agent/public/api.sock",
+					SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 				},
 			},
 			wantErr:       true,
@@ -72,7 +73,7 @@ func TestConfiguration_Validate(t *testing.T) {
 					Domain: "",
 				},
 				Agent: &ports.AgentConfig{
-					SocketPath: "/tmp/spire-agent/public/api.sock",
+					SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 				},
 			},
 			wantErr:       false, // Domain is optional
@@ -86,7 +87,7 @@ func TestConfiguration_Validate(t *testing.T) {
 					Domain: "example.com",
 				},
 				Agent: &ports.AgentConfig{
-					SocketPath: "/tmp/spire-agent/public/api.sock",
+					SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 				},
 			},
 			wantErr:       true,
@@ -100,7 +101,7 @@ func TestConfiguration_Validate(t *testing.T) {
 					Domain: "example.com",
 				},
 				Agent: &ports.AgentConfig{
-					SocketPath: "",
+					SocketPath: domain.NewSocketPathUnsafe(""),
 				},
 			},
 			wantErr:       true,
@@ -196,21 +197,21 @@ func TestAgentConfig_Validate(t *testing.T) {
 		{
 			name: "valid config",
 			config: &ports.AgentConfig{
-				SocketPath: "/tmp/spire-agent/public/api.sock",
+				SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 			},
 			wantErr: false,
 		},
 		{
 			name: "empty socket path",
 			config: &ports.AgentConfig{
-				SocketPath: "",
+				SocketPath: domain.NewSocketPathUnsafe(""),
 			},
 			wantErr: true,
 		},
 		{
 			name: "whitespace socket path",
 			config: &ports.AgentConfig{
-				SocketPath: "  /tmp/spire-agent/public/api.sock  ",
+				SocketPath: domain.NewSocketPathUnsafe("  /tmp/spire-agent/public/api.sock  "),
 			},
 			wantErr: false, // Should be trimmed and valid
 		},
@@ -241,7 +242,7 @@ func TestConfiguration_DefaultValues(t *testing.T) {
 			Domain: "example.com",
 		},
 		Agent: &ports.AgentConfig{
-			SocketPath: "/tmp/spire-agent/public/api.sock",
+			SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 		},
 	}
 
@@ -266,7 +267,7 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 					Domain: "example.com",
 				},
 				Agent: &ports.AgentConfig{
-					SocketPath: "/tmp/spire-agent/public/api.sock",
+					SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 				},
 			},
 			wantErr: false, // Should be valid unless there's a length limit
@@ -279,7 +280,7 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 					Domain: "example.com",
 				},
 				Agent: &ports.AgentConfig{
-					SocketPath: "/tmp/spire-agent/public/api.sock",
+					SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 				},
 			},
 			wantErr: true, // Unicode not allowed in service names
@@ -292,7 +293,7 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 					Domain: "example.com",
 				},
 				Agent: &ports.AgentConfig{
-					SocketPath: "/tmp/spire-agent/public/api.sock?query=1",
+					SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock?query=1"),
 				},
 			},
 			wantErr: false, // Path validation may vary
@@ -316,7 +317,7 @@ func BenchmarkConfiguration_Validate(b *testing.B) {
 			Domain: "example.com",
 		},
 		Agent: &ports.AgentConfig{
-			SocketPath: "/tmp/spire-agent/public/api.sock",
+			SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 		},
 	}
 
@@ -352,7 +353,7 @@ func BenchmarkSPIFFEConfig_Validate(b *testing.B) {
 			Name: "test-service",
 		},
 		Agent: &ports.AgentConfig{
-			SocketPath: "/tmp/spire-agent/public/api.sock",
+			SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 		},
 	}
 
