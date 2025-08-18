@@ -3,6 +3,7 @@ package spiffe
 
 import (
 	"context"
+	"crypto/x509"
 	"fmt"
 	"strings"
 
@@ -92,6 +93,35 @@ func (p *Provider) GetTrustBundle() (*domain.TrustBundle, error) {
 	}
 
 	return domain.NewTrustBundle(bundle.X509Authorities())
+}
+
+// GetIdentityDocument fetches the complete identity document with certificate and private key.
+func (p *Provider) GetIdentityDocument() (*domain.IdentityDocument, error) {
+	ctx := context.Background() // Context managed at adapter layer
+	if err := p.ensureSource(ctx); err != nil {
+		return nil, err
+	}
+
+	svid, err := p.x509Source.GetX509SVID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get X509 SVID: %w", err)
+	}
+
+	// Get the trust bundle for validation
+	bundle, err := p.x509Source.GetX509BundleForTrustDomain(svid.ID.TrustDomain())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get trust bundle for validation: %w", err)
+	}
+
+	// Use the first CA certificate from the bundle for validation
+	caCerts := bundle.X509Authorities()
+	var caCert *x509.Certificate
+	if len(caCerts) > 0 {
+		caCert = caCerts[0]
+	}
+
+	// Create identity document from SVID
+	return domain.NewIdentityDocument(svid.Certificates, svid.PrivateKey, caCert)
 }
 
 func (p *Provider) ensureSource(ctx context.Context) error {

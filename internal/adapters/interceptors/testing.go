@@ -39,6 +39,11 @@ func (m *MockIdentityProvider) GetTrustBundle() (*domain.TrustBundle, error) {
 	return nil, nil
 }
 
+// GetIdentityDocument returns a mock identity document (not implemented for testing).
+func (m *MockIdentityProvider) GetIdentityDocument() (*domain.IdentityDocument, error) {
+	return nil, nil
+}
+
 // Close closes the mock provider.
 func (m *MockIdentityProvider) Close() error {
 	return nil

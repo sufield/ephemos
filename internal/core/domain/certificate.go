@@ -10,6 +10,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"strings"
 	"time"
 
@@ -65,7 +66,7 @@ func (c *Certificate) Validate(opts CertValidationOptions) error {
 	if c == nil || c.Cert == nil {
 		return fmt.Errorf("certificate cannot be nil")
 	}
-	if c.PrivateKey == nil {
+	if c.PrivateKey == nil || reflect.ValueOf(c.PrivateKey).IsNil() {
 		return fmt.Errorf("private key cannot be nil")
 	}
 
@@ -240,14 +241,8 @@ func (c *Certificate) ToServiceIdentity() (*ServiceIdentity, error) {
 
 // verifyKeyMatch verifies that the private key matches the certificate's public key
 // with support for multiple key types including RSA, ECDSA, and future algorithms.
+// This method assumes that c.PrivateKey and c.Cert have already been validated to be non-nil.
 func (c *Certificate) verifyKeyMatch() error {
-	if c.PrivateKey == nil {
-		return fmt.Errorf("private key is nil")
-	}
-	if c.Cert == nil {
-		return fmt.Errorf("certificate is nil")
-	}
-
 	privateKeyPublic := c.PrivateKey.Public()
 
 	// First try the modern Equal method (available in Go 1.15+)

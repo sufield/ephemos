@@ -115,6 +115,35 @@ func (p *Provider) GetTrustBundle() (*domain.TrustBundle, error) {
 	return p.bundle, nil
 }
 
+// GetIdentityDocument returns the configured identity document.
+func (p *Provider) GetIdentityDocument() (*domain.IdentityDocument, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if p.closed {
+		return nil, ports.ErrIdentityNotFound
+	}
+
+	// Create identity document from certificate and trust bundle
+	if p.cert == nil {
+		return nil, ports.ErrIdentityNotFound
+	}
+
+	// Get CA certificate from trust bundle for validation
+	var caCert *x509.Certificate
+	if p.bundle != nil {
+		certs := p.bundle.RawCertificates()
+		if len(certs) > 0 {
+			caCert = certs[0]
+		}
+	}
+
+	// Create certificate chain (for in-memory provider, just use single cert)
+	chain := []*x509.Certificate{p.cert.Cert}
+
+	return domain.NewIdentityDocument(chain, p.cert.PrivateKey, caCert)
+}
+
 // Close marks the provider as closed.
 func (p *Provider) Close() error {
 	p.mu.Lock()

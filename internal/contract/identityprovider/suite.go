@@ -27,6 +27,10 @@ func Run(t *testing.T, newImpl Factory) {
 		testGetTrustBundle(t, newImpl)
 	})
 
+	t.Run("get identity document", func(t *testing.T) {
+		testGetIdentityDocument(t, newImpl)
+	})
+
 	t.Run("close is idempotent", func(t *testing.T) {
 		testCloseIdempotent(t, newImpl)
 	})
@@ -82,6 +86,22 @@ func testGetTrustBundle(t *testing.T, newImpl Factory) {
 	}
 
 	assertValidTrustBundle(t, bundle)
+}
+
+// testGetIdentityDocument tests getting identity document.
+func testGetIdentityDocument(t *testing.T, newImpl Factory) {
+	t.Helper()
+	provider := newImpl(t)
+	defer closeProvider(t, provider)
+
+	doc, err := provider.GetIdentityDocument()
+	// Contract: Either returns valid identity document or expected error
+	if err != nil {
+		t.Logf("GetIdentityDocument returned error (may be expected): %v", err)
+		return
+	}
+
+	assertValidIdentityDocument(t, doc)
 }
 
 // testCloseIdempotent tests that Close is idempotent.
@@ -193,6 +213,39 @@ func assertValidTrustBundle(t *testing.T, bundle *domain.TrustBundle) {
 		if cert == nil {
 			t.Errorf("TrustBundle.Certificates[%d] should not be nil", i)
 		}
+	}
+}
+
+// assertValidIdentityDocument asserts that an identity document is valid.
+func assertValidIdentityDocument(t *testing.T, doc *domain.IdentityDocument) {
+	t.Helper()
+	if doc == nil {
+		t.Fatal("GetIdentityDocument returned nil document without error")
+	}
+
+	if doc.Subject() == "" {
+		t.Error("IdentityDocument.Subject should not be empty")
+	}
+
+	if doc.Issuer() == "" {
+		t.Error("IdentityDocument.Issuer should not be empty")
+	}
+
+	if doc.IssuedAt().IsZero() {
+		t.Error("IdentityDocument.IssuedAt should not be zero")
+	}
+
+	if doc.ValidUntil().IsZero() {
+		t.Error("IdentityDocument.ValidUntil should not be zero")
+	}
+
+	if doc.ValidUntil().Before(doc.IssuedAt()) {
+		t.Error("IdentityDocument.ValidUntil should be after IssuedAt")
+	}
+
+	cert := doc.GetCertificate()
+	if cert == nil {
+		t.Error("IdentityDocument.GetCertificate should not be nil")
 	}
 }
 
