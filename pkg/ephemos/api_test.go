@@ -37,7 +37,7 @@ func TestPublicAPI(t *testing.T) {
 	// Note: Service registration is now CLI-only, not part of public API
 
 	// Test Configuration struct
-	if config.Service.Name != "test-service" {
+	if config.Service.Name.Value() != "test-service" {
 		t.Error("Configuration struct not working properly")
 	}
 

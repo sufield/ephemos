@@ -23,7 +23,7 @@ func NewInMemoryProvider() *InMemoryProvider {
 		configs: make(map[string]*ports.Configuration),
 		defaultConfig: &ports.Configuration{
 			Service: ports.ServiceConfig{
-				Name:   "default-service",
+				Name:   domain.NewServiceNameUnsafe("default-service"),
 				Domain: "default.org",
 			},
 			Agent: &ports.AgentConfig{

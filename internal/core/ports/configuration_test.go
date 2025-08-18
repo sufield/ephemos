@@ -19,7 +19,7 @@ func TestConfiguration_Validate(t *testing.T) {
 			name: "valid configuration",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "test-service",
+					Name:   domain.NewServiceNameUnsafe("test-service"),
 					Domain: "example.com",
 				},
 				Agent: &ports.AgentConfig{
@@ -43,7 +43,7 @@ func TestConfiguration_Validate(t *testing.T) {
 			name: "nil SPIFFE config",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "test-service",
+					Name:   domain.NewServiceNameUnsafe("test-service"),
 					Domain: "example.com",
 				},
 				Agent: nil,
@@ -55,7 +55,7 @@ func TestConfiguration_Validate(t *testing.T) {
 			name: "empty service name",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "",
+					Name:   domain.NewServiceNameUnsafe(""),
 					Domain: "example.com",
 				},
 				Agent: &ports.AgentConfig{
@@ -69,7 +69,7 @@ func TestConfiguration_Validate(t *testing.T) {
 			name: "empty service domain",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "test-service",
+					Name:   domain.NewServiceNameUnsafe("test-service"),
 					Domain: "",
 				},
 				Agent: &ports.AgentConfig{
@@ -83,7 +83,7 @@ func TestConfiguration_Validate(t *testing.T) {
 			name: "whitespace only service name",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "   ",
+					Name:   domain.NewServiceNameUnsafe("   "),
 					Domain: "example.com",
 				},
 				Agent: &ports.AgentConfig{
@@ -97,7 +97,7 @@ func TestConfiguration_Validate(t *testing.T) {
 			name: "empty socket path",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "test-service",
+					Name:   domain.NewServiceNameUnsafe("test-service"),
 					Domain: "example.com",
 				},
 				Agent: &ports.AgentConfig{
@@ -135,7 +135,7 @@ func TestServiceConfig_Validate(t *testing.T) {
 		{
 			name: "valid config",
 			config: ports.ServiceConfig{
-				Name:   "test-service",
+				Name:   domain.NewServiceNameUnsafe("test-service"),
 				Domain: "example.com",
 			},
 			wantErr: false,
@@ -143,7 +143,7 @@ func TestServiceConfig_Validate(t *testing.T) {
 		{
 			name: "empty name",
 			config: ports.ServiceConfig{
-				Name:   "",
+				Name:   domain.NewServiceNameUnsafe(""),
 				Domain: "example.com",
 			},
 			wantErr: true,
@@ -151,7 +151,7 @@ func TestServiceConfig_Validate(t *testing.T) {
 		{
 			name: "empty domain",
 			config: ports.ServiceConfig{
-				Name:   "test-service",
+				Name:   domain.NewServiceNameUnsafe("test-service"),
 				Domain: "",
 			},
 			wantErr: false, // Domain is optional
@@ -159,7 +159,7 @@ func TestServiceConfig_Validate(t *testing.T) {
 		{
 			name: "whitespace name",
 			config: ports.ServiceConfig{
-				Name:   "   ",
+				Name:   domain.NewServiceNameUnsafe("   "),
 				Domain: "example.com",
 			},
 			wantErr: true,
@@ -167,7 +167,7 @@ func TestServiceConfig_Validate(t *testing.T) {
 		{
 			name: "whitespace domain",
 			config: ports.ServiceConfig{
-				Name:   "test-service",
+				Name:   domain.NewServiceNameUnsafe("test-service"),
 				Domain: "   ",
 			},
 			wantErr: true,
@@ -222,7 +222,7 @@ func TestAgentConfig_Validate(t *testing.T) {
 			// Test Agent config validation by creating a Configuration with it
 			config := &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name: "test-service",
+					Name: domain.NewServiceNameUnsafe("test-service"),
 				},
 				Agent: tt.config,
 			}
@@ -238,7 +238,7 @@ func TestConfiguration_DefaultValues(t *testing.T) {
 	// Test that configuration provides reasonable defaults where appropriate
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
-			Name:   "test-service",
+			Name:   domain.NewServiceNameUnsafe("test-service"),
 			Domain: "example.com",
 		},
 		Agent: &ports.AgentConfig{
@@ -263,7 +263,7 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 			name: "very long service name",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   strings.Repeat("a", 1000),
+					Name:   domain.NewServiceNameUnsafe(strings.Repeat("a", 1000)),
 					Domain: "example.com",
 				},
 				Agent: &ports.AgentConfig{
@@ -276,7 +276,7 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 			name: "unicode service name",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "测试服务",
+					Name:   domain.NewServiceNameUnsafe("测试服务"),
 					Domain: "example.com",
 				},
 				Agent: &ports.AgentConfig{
@@ -289,7 +289,7 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 			name: "special characters in path",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "test-service",
+					Name:   domain.NewServiceNameUnsafe("test-service"),
 					Domain: "example.com",
 				},
 				Agent: &ports.AgentConfig{
@@ -313,7 +313,7 @@ func TestConfiguration_EdgeCases(t *testing.T) {
 func BenchmarkConfiguration_Validate(b *testing.B) {
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
-			Name:   "test-service",
+			Name:   domain.NewServiceNameUnsafe("test-service"),
 			Domain: "example.com",
 		},
 		Agent: &ports.AgentConfig{
@@ -333,7 +333,7 @@ func BenchmarkConfiguration_Validate(b *testing.B) {
 func BenchmarkServiceConfig_Validate(b *testing.B) {
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
-			Name:   "test-service",
+			Name:   domain.NewServiceNameUnsafe("test-service"),
 			Domain: "example.com",
 		},
 	}
@@ -350,7 +350,7 @@ func BenchmarkServiceConfig_Validate(b *testing.B) {
 func BenchmarkSPIFFEConfig_Validate(b *testing.B) {
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
-			Name: "test-service",
+			Name: domain.NewServiceNameUnsafe("test-service"),
 		},
 		Agent: &ports.AgentConfig{
 			SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),

@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -130,7 +129,7 @@ func IdentityClient(
 }
 
 // Connect establishes a secure connection to a remote service using SPIFFE identities.
-func (c *Client) Connect(ctx context.Context, serviceName, address string) (*ClientConnection, error) {
+func (c *Client) Connect(ctx context.Context, serviceNameStr, addressStr string) (*ClientConnection, error) {
 	// Input validation
 	if ctx == nil {
 		return nil, &errors.ValidationError{
@@ -140,33 +139,25 @@ func (c *Client) Connect(ctx context.Context, serviceName, address string) (*Cli
 		}
 	}
 
-	if strings.TrimSpace(serviceName) == "" {
+	// Use ServiceName value object for validation
+	serviceName, err := domain.NewServiceName(serviceNameStr)
+	if err != nil {
 		return nil, &errors.ValidationError{
 			Field:   "serviceName",
-			Value:   serviceName,
-			Message: "service name cannot be empty or whitespace",
+			Value:   serviceNameStr,
+			Message: fmt.Sprintf("invalid service name: %v", err),
 		}
 	}
 
-	if strings.TrimSpace(address) == "" {
+	// Use ServiceAddress value object for validation
+	address, err := domain.NewServiceAddress(addressStr)
+	if err != nil {
 		return nil, &errors.ValidationError{
 			Field:   "address",
-			Value:   address,
-			Message: "address cannot be empty or whitespace",
+			Value:   addressStr,
+			Message: fmt.Sprintf("invalid service address: %v", err),
 		}
 	}
-
-	// Validate address format (host:port)
-	if _, _, err := net.SplitHostPort(address); err != nil {
-		return nil, &errors.ValidationError{
-			Field:   "address",
-			Value:   address,
-			Message: "address must be in format 'host:port'",
-		}
-	}
-
-	serviceName = strings.TrimSpace(serviceName)
-	address = strings.TrimSpace(address)
 
 	// Thread-safe connection initialization
 	c.mu.Lock()
@@ -180,9 +171,9 @@ func (c *Client) Connect(ctx context.Context, serviceName, address string) (*Cli
 	}
 	c.mu.Unlock()
 
-	domainConn, err := c.domainClient.Connect(serviceName, address)
+	domainConn, err := c.domainClient.Connect(serviceName.Value(), address.Value())
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to service %s at %s: %w", serviceName, address, err)
+		return nil, fmt.Errorf("failed to connect to service %s at %s: %w", serviceName.Value(), address.Value(), err)
 	}
 
 	// Extract the underlying gRPC connection
@@ -192,12 +183,12 @@ func (c *Client) Connect(ctx context.Context, serviceName, address string) (*Cli
 	}
 
 	// Use deterministic, config-driven authorizer
-	authorizer := buildAuthorizer(serviceName, c.trustDomain)
+	authorizer := buildAuthorizer(serviceName.Value(), c.trustDomain)
 	if authorizer == nil {
 		// Fall back to client's configured authorizer if available
 		authorizer = c.authorizer
 		if authorizer == nil {
-			return nil, fmt.Errorf("no authorizer configured for service %s", serviceName)
+			return nil, fmt.Errorf("no authorizer configured for service %s", serviceName.Value())
 		}
 	}
 

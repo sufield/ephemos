@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
@@ -172,14 +173,14 @@ func testInvalidModifications(t *testing.T, baseConfig *ports.Configuration) {
 // modifyServiceNameEmpty returns a config with empty service name.
 func modifyServiceNameEmpty(c *ports.Configuration) *ports.Configuration {
 	modified := *c
-	modified.Service.Name = ""
+	modified.Service.Name = domain.NewServiceNameUnsafe("")
 	return &modified
 }
 
 // modifyServiceNameWhitespace returns a config with whitespace service name.
 func modifyServiceNameWhitespace(c *ports.Configuration) *ports.Configuration {
 	modified := *c
-	modified.Service.Name = "   "
+	modified.Service.Name = domain.NewServiceNameUnsafe("   ")
 	return &modified
 }
 
@@ -191,7 +192,7 @@ func assertValidConfig(t *testing.T, config *ports.Configuration) {
 	}
 
 	// Validate basic config structure
-	if config.Service.Name == "" {
+	if config.Service.Name.IsEmpty() {
 		t.Error("Configuration.Service.Name should not be empty")
 	}
 

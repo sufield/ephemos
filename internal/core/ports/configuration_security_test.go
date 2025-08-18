@@ -137,7 +137,7 @@ func TestMergeWithEnvironment(t *testing.T) {
 	// Create initial configuration
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
-			Name:   "file-service",
+			Name:   domain.NewServiceNameUnsafe("file-service"),
 			Domain: "file.domain.com",
 		},
 		Agent: &ports.AgentConfig{
@@ -171,7 +171,7 @@ func TestValidateProductionSecurity(t *testing.T) {
 			name: "valid production config",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "payment-service",
+					Name:   domain.NewServiceNameUnsafe("payment-service"),
 					Domain: "prod.company.com",
 				},
 				Agent: &ports.AgentConfig{
@@ -184,7 +184,7 @@ func TestValidateProductionSecurity(t *testing.T) {
 			name: "example.org domain",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "payment-service",
+					Name:   domain.NewServiceNameUnsafe("payment-service"),
 					Domain: "example.org",
 				},
 				Agent: &ports.AgentConfig{
@@ -198,7 +198,7 @@ func TestValidateProductionSecurity(t *testing.T) {
 			name: "localhost domain",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "payment-service",
+					Name:   domain.NewServiceNameUnsafe("payment-service"),
 					Domain: "localhost",
 				},
 				Agent: &ports.AgentConfig{
@@ -212,7 +212,7 @@ func TestValidateProductionSecurity(t *testing.T) {
 			name: "example.com domain",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "payment-service",
+					Name:   domain.NewServiceNameUnsafe("payment-service"),
 					Domain: "test.example.com",
 				},
 				Agent: &ports.AgentConfig{
@@ -226,7 +226,7 @@ func TestValidateProductionSecurity(t *testing.T) {
 			name: "demo service name",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "demo-service",
+					Name:   domain.NewServiceNameUnsafe("demo-service"),
 					Domain: "prod.company.com",
 				},
 				Agent: &ports.AgentConfig{
@@ -240,7 +240,7 @@ func TestValidateProductionSecurity(t *testing.T) {
 			name: "insecure socket path",
 			config: &ports.Configuration{
 				Service: ports.ServiceConfig{
-					Name:   "payment-service",
+					Name:   domain.NewServiceNameUnsafe("payment-service"),
 					Domain: "prod.company.com",
 				},
 				Agent: &ports.AgentConfig{

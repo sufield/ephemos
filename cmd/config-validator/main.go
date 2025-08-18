@@ -137,7 +137,7 @@ func runValidator(cmd *cobra.Command, args []string) error {
 		BasicValid:      true,
 		ProductionValid: true,
 		Configuration: &Config{
-			ServiceName: cfg.Service.Name,
+			ServiceName: cfg.Service.Name.Value(),
 			TrustDomain: cfg.Service.Domain,
 		},
 	}
