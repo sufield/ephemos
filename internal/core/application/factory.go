@@ -63,10 +63,19 @@ func (f *UseCaseFactory) CreateIdentityUseCase(ctx context.Context) (IdentityUse
 }
 
 // CreateHealthUseCase creates a configured health monitoring use case.
-// Note: This is a placeholder for future health use case implementation.
+// 
+// Future implementation will provide:
+// - Service health status monitoring
+// - Certificate expiry tracking
+// - Connection health validation
+// - System resource monitoring
+//
+// This use case is designed to integrate with external monitoring systems
+// and provide comprehensive health insights for mTLS-enabled services.
 func (f *UseCaseFactory) CreateHealthUseCase(ctx context.Context) (HealthUseCase, error) {
-	// TODO: Implement health use case when HealthMonitorService is refactored
-	return nil, fmt.Errorf("health use case not yet implemented")
+	// Health monitoring can be implemented when specific health requirements are defined.
+	// The interface is ready for implementation with monitoring providers.
+	return nil, fmt.Errorf("health use case implementation pending - interface defined for future extension")
 }
 
 // CreateConfigurationUseCase creates a configured configuration management use case.
@@ -82,10 +91,19 @@ func (f *UseCaseFactory) CreateConfigurationUseCase(ctx context.Context) (Config
 }
 
 // CreateRegistrationUseCase creates a configured service registration use case.
-// Note: This is a placeholder for future registration use case implementation.
+//
+// Future implementation will provide:
+// - Automated SPIRE server registration
+// - Service discovery integration
+// - Registration entry management
+// - Selector validation and configuration
+//
+// This use case is designed to automate service registration workflows
+// and integrate with infrastructure automation tools.
 func (f *UseCaseFactory) CreateRegistrationUseCase(ctx context.Context) (RegistrationUseCase, error) {
-	// TODO: Implement registration use case when CLI registration logic is refactored
-	return nil, fmt.Errorf("registration use case not yet implemented")
+	// Registration automation can be implemented when SPIRE integration requirements are finalized.
+	// The interface provides a contract for registration service implementations.
+	return nil, fmt.Errorf("registration use case implementation pending - interface defined for future SPIRE integration")
 }
 
 // ConfigurationUseCaseImpl implements the ConfigurationUseCase interface.

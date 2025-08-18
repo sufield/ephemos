@@ -14,7 +14,8 @@ type AuthenticationPolicy struct {
 	AuthorizedClients []spiffeid.ID // For server-side: SPIFFE IDs allowed to connect
 	TrustedServers    []spiffeid.ID // For client-side: SPIFFE IDs this service trusts
 	TrustDomain       TrustDomain   // Trust domain for authorization
-	AllowedSPIFFEIDs  []spiffeid.ID // Specific SPIFFE IDs for precise authorization
+	AllowedSPIFFEIDs  []spiffeid.ID // Specific SPIFFE IDs for precise authorization (deprecated)
+	AllowedIdentities []string      // Specific identity URIs for precise authorization
 	RequireAuth       bool          // Whether authentication is required
 }
 

@@ -2,6 +2,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -115,6 +116,11 @@ type IdentityService struct {
 	bundleCachedAt time.Time
 	cacheTTL       time.Duration
 
+	// Enhanced mTLS connection tracking and enforcement
+	connectionRegistry *MTLSConnectionRegistry
+	enforcementService *MTLSEnforcementService
+	continuityService  *RotationContinuityService
+	
 	mu sync.RWMutex
 }
 
@@ -163,7 +169,7 @@ func NewIdentityService(
 		cacheTTL = time.Duration(config.Service.Cache.TTLMinutes) * time.Minute
 	}
 
-	return &IdentityService{
+	service := &IdentityService{
 		identityProvider:  identityProvider,
 		transportProvider: transportProvider,
 		config:            config,
@@ -171,7 +177,18 @@ func NewIdentityService(
 		validator:         validator,
 		metrics:           metrics,
 		cacheTTL:          cacheTTL,
-	}, nil
+	}
+
+	// Initialize enhanced mTLS components
+	service.connectionRegistry = NewMTLSConnectionRegistry(service)
+	service.enforcementService = NewMTLSEnforcementService(service, service.connectionRegistry)
+	service.continuityService = NewRotationContinuityService(service, transportProvider)
+
+	// Add logging observer for rotation events
+	logObserver := NewLogRotationObserver(slog.Default())
+	service.connectionRegistry.AddRotationObserver(logObserver)
+
+	return service, nil
 }
 
 // CreateServerIdentity creates a server with identity-based authentication.
@@ -603,4 +620,106 @@ func (s *IdentityService) createPolicy(identity *domain.ServiceIdentity) (*domai
 		// Fall back to authentication-only policy
 		return domain.NewAuthenticationPolicy(identity), nil
 	}
+}
+
+// == ENHANCED mTLS CONNECTION MANAGEMENT ==
+
+// EstablishMTLSConnection creates a new managed mTLS connection with full invariant enforcement
+func (s *IdentityService) EstablishMTLSConnection(ctx context.Context, connID string, remoteIdentity *domain.ServiceIdentity) (*MTLSConnection, error) {
+	// Get current certificate and local identity first
+	cert, err := s.getCertificate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get certificate for connection %s: %w", connID, err)
+	}
+
+	s.mu.RLock()
+	localIdentity := s.cachedIdentity
+	s.mu.RUnlock()
+
+	// Establish the connection through the connection manager
+	conn, err := s.connectionRegistry.EstablishConnection(ctx, connID, remoteIdentity, cert, localIdentity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to establish mTLS connection: %w", err)
+	}
+
+	// Validate the connection against all invariants
+	if err := s.enforcementService.ValidateConnection(ctx, connID); err != nil {
+		// Close the connection if it violates invariants
+		s.connectionRegistry.CloseConnection(connID)
+		return nil, fmt.Errorf("connection violates mTLS invariants: %w", err)
+	}
+
+	return conn, nil
+}
+
+// GetMTLSConnection retrieves an active mTLS connection
+func (s *IdentityService) GetMTLSConnection(connID string) (*MTLSConnection, bool) {
+	return s.connectionRegistry.GetConnection(connID)
+}
+
+// ListMTLSConnections returns all active mTLS connections
+func (s *IdentityService) ListMTLSConnections() []*MTLSConnection {
+	return s.connectionRegistry.ListConnections()
+}
+
+// CloseMTLSConnection closes a managed mTLS connection
+func (s *IdentityService) CloseMTLSConnection(connID string) error {
+	return s.connectionRegistry.CloseConnection(connID)
+}
+
+// GetConnectionStats returns statistics about managed connections
+func (s *IdentityService) GetConnectionStats() ConnectionStats {
+	return s.connectionRegistry.GetConnectionStats()
+}
+
+// StartMTLSEnforcement begins enforcing mTLS invariants on all connections
+func (s *IdentityService) StartMTLSEnforcement(ctx context.Context) error {
+	return s.enforcementService.StartEnforcement(ctx)
+}
+
+// GetInvariantStatus returns the current status of all mTLS invariants
+func (s *IdentityService) GetInvariantStatus(ctx context.Context) InvariantStatus {
+	return s.enforcementService.GetInvariantStatus(ctx)
+}
+
+// SetRotationPolicy updates the certificate rotation policy for all connections
+func (s *IdentityService) SetRotationPolicy(policy *RotationPolicy) {
+	s.connectionRegistry.SetRotationPolicy(policy)
+}
+
+// AddRotationObserver adds an observer for certificate rotation events
+func (s *IdentityService) AddRotationObserver(observer RotationObserver) {
+	s.connectionRegistry.AddRotationObserver(observer)
+}
+
+// SetEnforcementPolicy updates the invariant enforcement policy
+func (s *IdentityService) SetEnforcementPolicy(policy *EnforcementPolicy) {
+	s.enforcementService.SetEnforcementPolicy(policy)
+}
+
+// == ROTATION CONTINUITY MANAGEMENT ==
+
+// RotateServerWithContinuity performs server rotation with zero downtime
+func (s *IdentityService) RotateServerWithContinuity(ctx context.Context, serverID string, server ports.ServerPort) error {
+	return s.continuityService.RotateServerWithContinuity(ctx, serverID, server)
+}
+
+// RotateClientWithContinuity performs client rotation with connection continuity  
+func (s *IdentityService) RotateClientWithContinuity(ctx context.Context, clientID string, client ports.ClientPort) error {
+	return s.continuityService.RotateClientWithContinuity(ctx, clientID, client)
+}
+
+// GetActiveRotations returns information about currently active rotations
+func (s *IdentityService) GetActiveRotations() ([]RotationInfo, []RotationInfo) {
+	return s.continuityService.GetActiveRotations()
+}
+
+// GetRotationStats returns statistics about rotation operations
+func (s *IdentityService) GetRotationStats() RotationStats {
+	return s.continuityService.GetRotationStats()
+}
+
+// SetContinuityPolicy updates the rotation continuity policy
+func (s *IdentityService) SetContinuityPolicy(policy *ContinuityPolicy) {
+	s.continuityService.SetContinuityPolicy(policy)
 }
