@@ -306,7 +306,7 @@ func TestDiagnosticInfoStructure(t *testing.T) {
 	// Test that diagnostic info structure is properly initialized
 	now := time.Now()
 	info := &ports.DiagnosticInfo{
-		Component:   "spire-server",
+		Component:   domain.ComponentSpireServer.String(),
 		Version:     "1.8.7",
 		Status:      "running",
 		TrustDomain: domain.MustNewTrustDomain("example.org"),
@@ -314,7 +314,7 @@ func TestDiagnosticInfoStructure(t *testing.T) {
 		Details:     make(map[string]interface{}),
 	}
 
-	assert.Equal(t, "spire-server", info.Component)
+	assert.Equal(t, domain.ComponentSpireServer.String(), info.Component)
 	assert.Equal(t, "1.8.7", info.Version)
 	assert.Equal(t, "running", info.Status)
 	assert.Equal(t, "example.org", info.TrustDomain.String())

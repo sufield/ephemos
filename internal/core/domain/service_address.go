@@ -215,11 +215,13 @@ func (sa ServiceAddress) GetPort() (int, error) {
 			return 0, fmt.Errorf("failed to parse URL: %w", err)
 		}
 		if parsedURL.Port() == "" {
-			// Default ports
-			if parsedURL.Scheme == "https" {
-				return 443, nil
+			// Default ports based on protocol
+			protocol, err := ParseProtocol(parsedURL.Scheme)
+			if err == nil {
+				return protocol.DefaultPort(), nil
 			}
-			return 80, nil
+			// Fallback to HTTP default if protocol parsing fails
+			return ProtocolHTTP.DefaultPort(), nil
 		}
 		return strconv.Atoi(parsedURL.Port())
 	}
@@ -237,13 +239,15 @@ func (sa ServiceAddress) GetPort() (int, error) {
 
 // IsSecure returns true if the address uses a secure protocol (HTTPS).
 func (sa ServiceAddress) IsSecure() bool {
-	return strings.HasPrefix(sa.value, "https://")
+	return strings.HasPrefix(sa.value, ProtocolHTTPS.String()+"://")
 }
 
 // ToSecure converts the address to use HTTPS if it's an HTTP URL.
 func (sa ServiceAddress) ToSecure() ServiceAddress {
-	if strings.HasPrefix(sa.value, "http://") {
-		return ServiceAddress{value: strings.Replace(sa.value, "http://", "https://", 1)}
+	httpPrefix := ProtocolHTTP.String() + "://"
+	if strings.HasPrefix(sa.value, httpPrefix) {
+		httpsPrefix := ProtocolHTTPS.String() + "://"
+		return ServiceAddress{value: strings.Replace(sa.value, httpPrefix, httpsPrefix, 1)}
 	}
 	return sa
 }

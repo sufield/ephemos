@@ -282,14 +282,9 @@ func TestSpireHealthClient_InvalidComponent(t *testing.T) {
 	}
 
 	client, err := NewSpireHealthClient("invalid-component", config)
-	require.NoError(t, err)
-
-	ctx := context.Background()
-
-	// Should fail because no server or agent config
-	_, err = client.CheckLiveness(ctx)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "unsupported component type")
+	require.Error(t, err)
+	assert.Nil(t, client)
+	assert.Contains(t, err.Error(), "invalid component type")
 }
 
 func TestSpireHealthClient_Timeout(t *testing.T) {

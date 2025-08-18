@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
@@ -19,7 +20,7 @@ import (
 type SpireHealthClient struct {
 	config     *ports.HealthConfig
 	httpClient *http.Client
-	component  string
+	component  domain.ComponentType
 }
 
 // NewSpireHealthClient creates a new SPIRE health checker client
@@ -30,6 +31,12 @@ func NewSpireHealthClient(component string, config *ports.HealthConfig) (*SpireH
 
 	if strings.TrimSpace(component) == "" {
 		return nil, fmt.Errorf("component name cannot be empty")
+	}
+
+	// Parse component type from string
+	componentType, err := domain.ParseComponentType(component)
+	if err != nil {
+		return nil, fmt.Errorf("invalid component type: %w", err)
 	}
 
 	// Create HTTP client with appropriate timeout
@@ -49,13 +56,13 @@ func NewSpireHealthClient(component string, config *ports.HealthConfig) (*SpireH
 	return &SpireHealthClient{
 		config:     config,
 		httpClient: httpClient,
-		component:  component,
+		component:  componentType,
 	}, nil
 }
 
 // GetComponentName returns the name of the component being monitored
 func (c *SpireHealthClient) GetComponentName() string {
-	return c.component
+	return c.component.String()
 }
 
 // CheckLiveness verifies if the SPIRE component is alive/running
@@ -68,8 +75,8 @@ func (c *SpireHealthClient) CheckLiveness(ctx context.Context) (*ports.HealthRes
 	var useHTTPS bool
 
 	// Determine configuration based on component type
-	switch strings.ToLower(c.component) {
-	case "spire-server", "server":
+	switch c.component {
+	case domain.ComponentSpireServer, domain.ComponentServer:
 		if c.config.Server == nil {
 			return nil, fmt.Errorf("SPIRE server health config not provided")
 		}
@@ -77,7 +84,7 @@ func (c *SpireHealthClient) CheckLiveness(ctx context.Context) (*ports.HealthRes
 		livePath = c.config.Server.LivePath
 		useHTTPS = c.config.Server.UseHTTPS
 		headers = c.config.Server.Headers
-	case "spire-agent", "agent":
+	case domain.ComponentSpireAgent, domain.ComponentAgent:
 		if c.config.Agent == nil {
 			return nil, fmt.Errorf("SPIRE agent health config not provided")
 		}
@@ -86,7 +93,7 @@ func (c *SpireHealthClient) CheckLiveness(ctx context.Context) (*ports.HealthRes
 		useHTTPS = c.config.Agent.UseHTTPS
 		headers = c.config.Agent.Headers
 	default:
-		return nil, fmt.Errorf("unsupported component type: %s", c.component)
+		return nil, fmt.Errorf("unsupported component type: %s", c.component.String())
 	}
 
 	// Set default path if not configured
@@ -95,11 +102,11 @@ func (c *SpireHealthClient) CheckLiveness(ctx context.Context) (*ports.HealthRes
 	}
 
 	// Build URL
-	scheme := "http"
+	protocol := domain.ProtocolHTTP
 	if useHTTPS {
-		scheme = "https"
+		protocol = domain.ProtocolHTTPS
 	}
-	url := fmt.Sprintf("%s://%s%s", scheme, address, livePath)
+	url := fmt.Sprintf("%s://%s%s", protocol.String(), address, livePath)
 
 	// Perform health check
 	result, err := c.performHealthCheck(ctx, url, "liveness", headers)
@@ -118,8 +125,8 @@ func (c *SpireHealthClient) CheckReadiness(ctx context.Context) (*ports.HealthRe
 	var useHTTPS bool
 
 	// Determine configuration based on component type
-	switch strings.ToLower(c.component) {
-	case "spire-server", "server":
+	switch c.component {
+	case domain.ComponentSpireServer, domain.ComponentServer:
 		if c.config.Server == nil {
 			return nil, fmt.Errorf("SPIRE server health config not provided")
 		}
@@ -127,7 +134,7 @@ func (c *SpireHealthClient) CheckReadiness(ctx context.Context) (*ports.HealthRe
 		readyPath = c.config.Server.ReadyPath
 		useHTTPS = c.config.Server.UseHTTPS
 		headers = c.config.Server.Headers
-	case "spire-agent", "agent":
+	case domain.ComponentSpireAgent, domain.ComponentAgent:
 		if c.config.Agent == nil {
 			return nil, fmt.Errorf("SPIRE agent health config not provided")
 		}
@@ -136,7 +143,7 @@ func (c *SpireHealthClient) CheckReadiness(ctx context.Context) (*ports.HealthRe
 		useHTTPS = c.config.Agent.UseHTTPS
 		headers = c.config.Agent.Headers
 	default:
-		return nil, fmt.Errorf("unsupported component type: %s", c.component)
+		return nil, fmt.Errorf("unsupported component type: %s", c.component.String())
 	}
 
 	// Set default path if not configured
@@ -145,11 +152,11 @@ func (c *SpireHealthClient) CheckReadiness(ctx context.Context) (*ports.HealthRe
 	}
 
 	// Build URL
-	scheme := "http"
+	protocol := domain.ProtocolHTTP
 	if useHTTPS {
-		scheme = "https"
+		protocol = domain.ProtocolHTTPS
 	}
-	url := fmt.Sprintf("%s://%s%s", scheme, address, readyPath)
+	url := fmt.Sprintf("%s://%s%s", protocol.String(), address, readyPath)
 
 	// Perform health check
 	result, err := c.performHealthCheck(ctx, url, "readiness", headers)
@@ -170,7 +177,7 @@ func (c *SpireHealthClient) CheckHealth(ctx context.Context) (*ports.HealthResul
 
 	// Combine results
 	result := &ports.HealthResult{
-		Component:    c.component,
+		Component:    c.component.String(),
 		CheckedAt:    time.Now(),
 		ResponseTime: time.Since(startTime),
 		Details:      make(map[string]interface{}),
@@ -222,7 +229,7 @@ func (c *SpireHealthClient) CheckHealth(ctx context.Context) (*ports.HealthResul
 func (c *SpireHealthClient) CheckServerHealth(ctx context.Context) (*ports.HealthResult, error) {
 	// Temporarily set component to server for this check
 	originalComponent := c.component
-	c.component = "spire-server"
+	c.component = domain.ComponentSpireServer
 	defer func() { c.component = originalComponent }()
 
 	return c.CheckHealth(ctx)
@@ -232,7 +239,7 @@ func (c *SpireHealthClient) CheckServerHealth(ctx context.Context) (*ports.Healt
 func (c *SpireHealthClient) CheckAgentHealth(ctx context.Context) (*ports.HealthResult, error) {
 	// Temporarily set component to agent for this check
 	originalComponent := c.component
-	c.component = "spire-agent"
+	c.component = domain.ComponentSpireAgent
 	defer func() { c.component = originalComponent }()
 
 	return c.CheckHealth(ctx)
@@ -260,7 +267,7 @@ func (c *SpireHealthClient) performHealthCheck(ctx context.Context, url, checkTy
 	if err != nil {
 		return &ports.HealthResult{
 			Status:    ports.HealthStatusUnknown,
-			Component: c.component,
+			Component: c.component.String(),
 			Message:   fmt.Sprintf("Failed to create %s request: %v", checkType, err),
 			CheckedAt: time.Now(),
 			Details: map[string]interface{}{
@@ -283,7 +290,7 @@ func (c *SpireHealthClient) performHealthCheck(ctx context.Context, url, checkTy
 	if err != nil {
 		return &ports.HealthResult{
 			Status:    ports.HealthStatusUnhealthy,
-			Component: c.component,
+			Component: c.component.String(),
 			Message:   fmt.Sprintf("%s check failed: %v", checkType, err),
 			CheckedAt: time.Now(),
 			Details: map[string]interface{}{
@@ -299,7 +306,7 @@ func (c *SpireHealthClient) performHealthCheck(ctx context.Context, url, checkTy
 	bodyText := string(bodyBytes)
 
 	result := &ports.HealthResult{
-		Component: c.component,
+		Component: c.component.String(),
 		CheckedAt: time.Now(),
 		Details: map[string]interface{}{
 			"url":            url,
