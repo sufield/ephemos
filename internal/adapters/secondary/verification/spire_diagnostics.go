@@ -46,13 +46,13 @@ func NewSpireDiagnosticsProvider(config *ports.DiagnosticsConfig) *SpireDiagnost
 // GetServerDiagnostics retrieves SPIRE server diagnostic information
 func (d *SpireDiagnosticsProvider) GetServerDiagnostics(ctx context.Context) (*ports.DiagnosticInfo, error) {
 	info := &ports.DiagnosticInfo{
-		Component:   "spire-server",
+		Component:   domain.ComponentSpireServer.String(),
 		CollectedAt: time.Now(),
 		Details:     make(map[string]interface{}),
 	}
 
 	// Get server version using CLI
-	version, err := d.getComponentVersion(ctx, "spire-server")
+	version, err := d.getComponentVersion(ctx, domain.ComponentSpireServer.String())
 	if err != nil {
 		info.Details["version_error"] = err.Error()
 	} else {
@@ -97,13 +97,13 @@ func (d *SpireDiagnosticsProvider) GetServerDiagnostics(ctx context.Context) (*p
 // GetAgentDiagnostics retrieves SPIRE agent diagnostic information
 func (d *SpireDiagnosticsProvider) GetAgentDiagnostics(ctx context.Context) (*ports.DiagnosticInfo, error) {
 	info := &ports.DiagnosticInfo{
-		Component:   "spire-agent",
+		Component:   domain.ComponentSpireAgent.String(),
 		CollectedAt: time.Now(),
 		Details:     make(map[string]interface{}),
 	}
 
 	// Get agent version
-	version, err := d.getComponentVersion(ctx, "spire-agent")
+	version, err := d.getComponentVersion(ctx, domain.ComponentSpireAgent.String())
 	if err != nil {
 		info.Details["version_error"] = err.Error()
 	} else {
