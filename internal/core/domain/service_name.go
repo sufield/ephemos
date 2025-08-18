@@ -48,8 +48,13 @@ func NewServiceName(name string) (ServiceName, error) {
 		return ServiceName{}, fmt.Errorf("service name cannot contain 'example': use a real service name")
 	}
 	
-	if strings.Contains(strings.ToLower(trimmed), "test") && !strings.HasSuffix(strings.ToLower(trimmed), "-test") {
-		return ServiceName{}, fmt.Errorf("service name should not contain 'test' unless it's a proper test service ending with '-test'")
+	// Allow service names that start with "test-" (like "test-service") or end with "-test"
+	// Reject names that have "test" in the middle without proper separation (like "testingservice")
+	lowerTrimmed := strings.ToLower(trimmed)
+	if strings.Contains(lowerTrimmed, "test") && 
+	   !strings.HasPrefix(lowerTrimmed, "test-") && 
+	   !strings.HasSuffix(lowerTrimmed, "-test") {
+		return ServiceName{}, fmt.Errorf("service name should not contain 'test' unless it starts with 'test-' or ends with '-test'")
 	}
 	
 	return ServiceName{value: trimmed}, nil

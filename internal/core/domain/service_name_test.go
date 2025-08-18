@@ -69,14 +69,19 @@ func TestNewServiceName(t *testing.T) {
 			errorMsg:  "service name cannot contain 'example'",
 		},
 		{
-			name:      "contains test in middle",
-			input:     "testing-service",
+			name:      "contains test in middle without proper separation",
+			input:     "mytestingservice",
 			wantError: true,
 			errorMsg:  "service name should not contain 'test'",
 		},
 		{
 			name:      "valid test service ending",
 			input:     "payment-service-test",
+			wantError: false,
+		},
+		{
+			name:      "valid test service starting",
+			input:     "test-service",
 			wantError: false,
 		},
 	}
