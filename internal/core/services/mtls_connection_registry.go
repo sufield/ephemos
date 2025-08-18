@@ -74,6 +74,31 @@ func (c *MTLSConnection) UpdateRotation(newCert *domain.Certificate) {
 	c.State = ConnectionActive
 }
 
+// DisplaySummary returns a formatted summary of the connection (facade method).
+func (c *MTLSConnection) DisplaySummary() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return fmt.Sprintf("Connection %s (state: %v)\nLocal: %s\nRemote: %s", 
+		c.ID, c.State, c.LocalIdentity.URI(), c.RemoteIdentity.URI())
+}
+
+// IsHealthy returns true if the connection is active and certificate is not expired (facade method).
+func (c *MTLSConnection) IsHealthy() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.State == ConnectionActive && (c.Cert == nil || !c.Cert.IsExpired())
+}
+
+// GetExpiryInfo returns certificate expiration time and whether it's expiring soon (facade method).
+func (c *MTLSConnection) GetExpiryInfo() (time.Time, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.Cert == nil {
+		return time.Time{}, true // Treat nil certificate as expiring
+	}
+	return c.Cert.ExpiresAt(), c.Cert.IsExpiringWithin(time.Hour)
+}
+
 // MTLSConnectionRegistry tracks and maintains active mTLS connections with rotation support
 type MTLSConnectionRegistry struct {
 	identityService *IdentityService

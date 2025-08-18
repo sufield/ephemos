@@ -340,3 +340,18 @@ func (s *ServiceIdentity) Equal(other *ServiceIdentity) bool {
 func (s *ServiceIdentity) String() string {
 	return s.uri
 }
+
+// GetTrustDomain returns the trust domain value object (facade method to hide SPIFFE internals).
+func (s *ServiceIdentity) GetTrustDomain() TrustDomain {
+	return s.trustDomain
+}
+
+// GetTrustDomainString returns the trust domain as a string (facade method to hide SPIFFE internals).
+func (s *ServiceIdentity) GetTrustDomainString() string {
+	return s.trustDomain.String()
+}
+
+// IsMemberOf checks if this identity belongs to the specified trust domain (facade method).
+func (s *ServiceIdentity) IsMemberOf(trustDomain string) bool {
+	return s.trustDomain.String() == trustDomain
+}

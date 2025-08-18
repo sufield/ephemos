@@ -81,8 +81,8 @@ func demonstrateIdentityVerification(ctx context.Context) error {
 		fmt.Printf("   ⚠️  Failed to get current identity: %v\n", err)
 		fmt.Println("   💡 This is expected if not running in a SPIRE workload environment")
 	} else {
-		fmt.Printf("   ✅ Current SPIFFE ID: %s\n", identity.SPIFFEID)
-		fmt.Printf("   ✅ Trust Domain: %s\n", identity.SPIFFEID.TrustDomain())
+		fmt.Printf("   ✅ Current SPIFFE ID: %s\n", identity.GetSPIFFEIDString())
+		fmt.Printf("   ✅ Trust Domain: %s\n", identity.GetTrustDomainString())
 		fmt.Printf("   ✅ Source: %s\n", identity.Source)
 	}
 
@@ -163,7 +163,7 @@ func demonstrateDiagnostics(ctx context.Context) error {
 				fmt.Printf("   ... and %d more entries\n", len(entries)-3)
 				break
 			}
-			fmt.Printf("   📝 Entry %d: %s -> %s\n", i+1, entry.ParentID, entry.SPIFFEID)
+			fmt.Printf("   📝 Entry %d: %s -> %s\n", i+1, entry.GetParentIDString(), entry.GetSPIFFEIDString())
 		}
 	}
 
@@ -204,7 +204,7 @@ func demonstrateComprehensiveMonitoring(ctx context.Context) error {
 	if err != nil {
 		fmt.Printf("      ⚠️  Workload identity unavailable: %v\n", err)
 	} else {
-		fmt.Printf("      ✅ Workload SPIFFE ID: %s\n", identity.SPIFFEID)
+		fmt.Printf("      ✅ Workload SPIFFE ID: %s\n", identity.GetSPIFFEIDString())
 	}
 
 	// Step 2: Check SPIRE infrastructure health

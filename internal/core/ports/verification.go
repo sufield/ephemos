@@ -53,6 +53,21 @@ type IdentityInfo struct {
 	Source string `json:"source"`
 }
 
+// GetTrustDomainString returns the trust domain as a string (facade method to hide SPIFFE internals).
+func (i *IdentityInfo) GetTrustDomainString() string {
+	return i.SPIFFEID.TrustDomain().String()
+}
+
+// GetSPIFFEIDString returns the SPIFFE ID as a string (facade method).
+func (i *IdentityInfo) GetSPIFFEIDString() string {
+	return i.SPIFFEID.String()
+}
+
+// IsMemberOf checks if this identity belongs to the specified trust domain (facade method).
+func (i *IdentityInfo) IsMemberOf(trustDomain string) bool {
+	return i.SPIFFEID.TrustDomain().String() == trustDomain
+}
+
 // DiagnosticInfo contains SPIRE diagnostic information
 type DiagnosticInfo struct {
 	// Component is the SPIRE component being diagnosed (server/agent)
@@ -173,6 +188,16 @@ type RegistrationEntry struct {
 	CreatedAt time.Time `json:"created_at"`
 	// Downstream indicates if this is a downstream entry
 	Downstream bool `json:"downstream"`
+}
+
+// GetSPIFFEIDString returns the SPIFFE ID as a string (facade method).
+func (r *RegistrationEntry) GetSPIFFEIDString() string {
+	return r.SPIFFEID.String()
+}
+
+// GetParentIDString returns the parent ID as a string (facade method).
+func (r *RegistrationEntry) GetParentIDString() string {
+	return r.ParentID.String()
 }
 
 // Agent represents a SPIRE agent

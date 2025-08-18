@@ -261,13 +261,13 @@ func demonstrateSecurityValidation(ctx context.Context, apiServer, authService *
 		}
 		
 		
-		// Validate certificate expiry
-		if time.Now().After(conn.Cert.Cert.NotAfter) {
+		// Validate certificate expiry using new domain method
+		if conn.Cert.IsExpired() {
 			return fmt.Errorf("connection %s has expired certificate", conn.ID)
 		}
 		
 		fmt.Printf("   ✅ Connection %s: valid certificate until %v\n", 
-			conn.ID, conn.Cert.Cert.NotAfter)
+			conn.ID, conn.Cert.ExpiresAt())
 	}
 	
 	// 2. Validate invariant enforcement is working
