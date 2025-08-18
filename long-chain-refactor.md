@@ -1,7 +1,5 @@
 # Long Chain Refactoring Guide
 
-## Executive Summary
-
 This document identifies and provides solutions for long selector chains (`w.x.y.z()`) in the Ephemos codebase that violate the Law of Demeter and leak internal structure across packages. In Go, encapsulation operates at the package level, so cross-package selector chains typically indicate architectural issues.
 
 ## Current Issues Identified
@@ -352,7 +350,6 @@ func (b *ConfigurationBuilder) Build() (*Configuration, error) {
 2. ✅ **ServiceIdentity facade methods** - Hide SPIFFEID internals  
 3. ✅ **Connection information facade** - Consolidate connection display logic
 
-**Estimated Effort:** 1-2 days
 **Risk:** Low - Additive changes only
 
 ### Phase 2: Configuration Refactoring (Medium Risk)
@@ -360,7 +357,6 @@ func (b *ConfigurationBuilder) Build() (*Configuration, error) {
 5. 🔄 **Update transport adapters** - Remove config deep access
 6. 🔄 **Configuration builder pattern** - Improve construction ergonomics
 
-**Estimated Effort:** 3-4 days  
 **Risk:** Medium - Requires constructor changes
 
 ### Phase 3: Interceptor Decoupling (Medium Risk)
@@ -368,7 +364,6 @@ func (b *ConfigurationBuilder) Build() (*Configuration, error) {
 8. 🔄 **Functional options pattern** - Improve construction flexibility
 9. 🔄 **Update factory construction** - Wire new dependencies
 
-**Estimated Effort:** 2-3 days
 **Risk:** Medium - Interface changes
 
 ### Phase 4: Architecture Testing (Low Risk)
@@ -376,7 +371,6 @@ func (b *ConfigurationBuilder) Build() (*Configuration, error) {
 11. 📋 **Cross-package dependency analysis** - Monitor architecture health
 12. 📋 **Documentation updates** - Update architectural decision records
 
-**Estimated Effort:** 1 day
 **Risk:** Low - Testing and documentation
 
 ## Architectural Tests to Prevent Regressions
@@ -444,7 +438,7 @@ func TestVendorTypeIsolation(t *testing.T) {
 3. **Does caller inspect internals for behavior?** → Move behavior to owner
 4. **Is it just data plumbing in same package?** → Might be OK, prefer helpers
 
-## Key Takeaways
+## Takeaways
 
 - **Package-level encapsulation**: Go encapsulates at package boundaries, not class boundaries
 - **"Tell, don't ask"**: Move behavior next to data instead of exposing internals  
