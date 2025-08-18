@@ -16,9 +16,10 @@ import (
 
 // TestIdentityService_CacheMetrics_EdgeCases tests edge cases for cache metrics functionality.
 func TestIdentityService_CacheMetrics_EdgeCases(t *testing.T) {
+	serviceName, _ := domain.NewServiceName("test-service")
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
-			Name:   "test-service",
+			Name:   serviceName,
 			Domain: "example.com",
 		},
 	}
@@ -70,9 +71,10 @@ func TestIdentityService_ConfigurableTTL_EdgeCases(t *testing.T) {
 	mockTransport := &MockTransportProvider{}
 
 	t.Run("default TTL when no cache config", func(t *testing.T) {
+		serviceName, _ := domain.NewServiceName("test-service")
 		config := &ports.Configuration{
 			Service: ports.ServiceConfig{
-				Name:   "test-service",
+				Name:   serviceName,
 				Domain: "example.com",
 				// No Cache config - should use default
 			},
@@ -90,9 +92,10 @@ func TestIdentityService_ConfigurableTTL_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("custom TTL from configuration", func(t *testing.T) {
+		serviceName, _ := domain.NewServiceName("test-service")
 		config := &ports.Configuration{
 			Service: ports.ServiceConfig{
-				Name:   "test-service",
+				Name:   serviceName,
 				Domain: "example.com",
 				Cache: &ports.CacheConfig{
 					TTLMinutes:              15, // Custom TTL
@@ -112,9 +115,10 @@ func TestIdentityService_ConfigurableTTL_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("zero TTL should use default", func(t *testing.T) {
+		serviceName, _ := domain.NewServiceName("test-service")
 		config := &ports.Configuration{
 			Service: ports.ServiceConfig{
-				Name:   "test-service",
+				Name:   serviceName,
 				Domain: "example.com",
 				Cache: &ports.CacheConfig{
 					TTLMinutes: 0, // Zero should trigger default behavior
@@ -135,9 +139,10 @@ func TestIdentityService_ConfigurableTTL_EdgeCases(t *testing.T) {
 
 // TestIdentityService_ThreadSafety_EdgeCases tests edge cases for thread safety.
 func TestIdentityService_ThreadSafety_EdgeCases(t *testing.T) {
+	serviceName, _ := domain.NewServiceName("test-service")
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
-			Name:   "test-service",
+			Name:   serviceName,
 			Domain: "example.com",
 		},
 	}
@@ -238,9 +243,10 @@ func TestIdentityService_ThreadSafety_EdgeCases(t *testing.T) {
 // TestIdentityService_ProactiveRefresh_EdgeCases tests edge cases for proactive refresh functionality.
 func TestIdentityService_ProactiveRefresh_EdgeCases(t *testing.T) {
 	t.Run("refresh threshold larger than TTL", func(t *testing.T) {
+		serviceName, _ := domain.NewServiceName("test-service")
 		config := &ports.Configuration{
 			Service: ports.ServiceConfig{
-				Name:   "test-service",
+				Name:   serviceName,
 				Domain: "example.com",
 				Cache: &ports.CacheConfig{
 					TTLMinutes:              10,
@@ -257,9 +263,10 @@ func TestIdentityService_ProactiveRefresh_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("negative refresh threshold", func(t *testing.T) {
+		serviceName, _ := domain.NewServiceName("test-service")
 		config := &ports.Configuration{
 			Service: ports.ServiceConfig{
-				Name:   "test-service",
+				Name:   serviceName,
 				Domain: "example.com",
 				Cache: &ports.CacheConfig{
 					TTLMinutes:              10,
@@ -291,7 +298,7 @@ func TestIdentityService_ValidationFailures_EdgeCases(t *testing.T) {
 	t.Run("empty service name", func(t *testing.T) {
 		config := &ports.Configuration{
 			Service: ports.ServiceConfig{
-				Name:   "", // Empty name should fail validation
+				Name:   domain.ServiceName{}, // Empty name should fail validation
 				Domain: "example.com",
 			},
 		}
@@ -320,9 +327,10 @@ func TestIdentityService_ValidationFailures_EdgeCases(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
+				serviceName, _ := domain.NewServiceName("test-service")
 				config := &ports.Configuration{
 					Service: ports.ServiceConfig{
-						Name:   "test-service",
+						Name:   serviceName,
 						Domain: "example.com",
 						Cache: &ports.CacheConfig{
 							TTLMinutes: tc.ttlMinutes,
@@ -359,6 +367,10 @@ func (m *MockIdentityProvider) GetTrustBundle() (*domain.TrustBundle, error) {
 	// Return an error to simulate the expected behavior during concurrent testing
 	// This prevents the service from hanging trying to validate nil trust bundles
 	return nil, fmt.Errorf("mock trust bundle error for testing")
+}
+
+func (m *MockIdentityProvider) GetIdentityDocument() (*domain.IdentityDocument, error) {
+	return nil, fmt.Errorf("mock identity document error for testing")
 }
 
 func (m *MockIdentityProvider) Close() error {
