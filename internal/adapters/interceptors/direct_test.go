@@ -359,7 +359,7 @@ func TestRequestIDGeneration(t *testing.T) {
 			fixed := time.Unix(1696000000, 123)
 			config.Clock = func() time.Time { return fixed }
 			config.IDGen = func() string { return "req-1696000000000000123" }
-			interceptor := NewIdentityPropagationInterceptor(config)
+			interceptor := NewIdentityPropagationInterceptorFromConfig(config)
 
 			ctx := context.Background()
 
@@ -386,7 +386,7 @@ func TestRequestIDGeneration_Deterministic(t *testing.T) {
 	config := DefaultIdentityPropagationConfig(&mockIdentityProvider{})
 	config.Clock = func() time.Time { return fixed }
 	config.IDGen = func() string { return "req-1696000000000000123" }
-	ic := NewIdentityPropagationInterceptor(config)
+	ic := NewIdentityPropagationInterceptorFromConfig(config)
 
 	got := ic.getOrGenerateRequestID(context.Background())
 	require.Equal(t, "req-1696000000000000123", got)
@@ -476,7 +476,7 @@ func TestCallChainValidation(t *testing.T) {
 				IdentityProvider:  provider,
 				MaxCallChainDepth: tt.maxDepth,
 			}
-			interceptor := NewIdentityPropagationInterceptor(config)
+			interceptor := NewIdentityPropagationInterceptorFromConfig(config)
 
 			ctx := context.Background()
 			if tt.existingChain != "" {
@@ -745,7 +745,7 @@ func TestIdentityPropagationEdgeCases_Direct(t *testing.T) {
 	}
 
 	config := DefaultIdentityPropagationConfig(provider)
-	interceptor := NewIdentityPropagationInterceptor(config)
+	interceptor := NewIdentityPropagationInterceptorFromConfig(config)
 
 	// Test request ID generation
 	ctx := t.Context()

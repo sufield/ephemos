@@ -261,7 +261,7 @@ func buildIntegrationClientOptions(tc *integrationTestCase, lis *bufconn.Listene
 			identity: domain.NewServiceIdentity("test-client", "example.org"),
 		}
 		identityConfig := DefaultIdentityPropagationConfig(provider)
-		propagationInterceptor := NewIdentityPropagationInterceptor(identityConfig)
+		propagationInterceptor := NewIdentityPropagationInterceptorFromConfig(identityConfig)
 		clientOpts = append(clientOpts, grpc.WithUnaryInterceptor(propagationInterceptor.UnaryClientInterceptor()))
 	}
 

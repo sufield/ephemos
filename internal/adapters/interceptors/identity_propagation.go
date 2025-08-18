@@ -138,36 +138,126 @@ type IdentityPropagationConfig struct {
 
 // IdentityPropagationInterceptor handles identity propagation for outgoing gRPC calls.
 type IdentityPropagationInterceptor struct {
-	config *IdentityPropagationConfig
-	logger *slog.Logger
+	// Direct capability injection (instead of config struct)
+	identityProvider        ports.IdentityProvider  // Direct injection
+	metricsCollector        MetricsCollector        // Direct injection  
+	logger                  *slog.Logger            // Direct injection
+	clock                   Clock                   // Direct injection
+	idGen                   IDGen                   // Direct injection
+	
+	// Configuration flags
+	propagateOriginalCaller bool
+	propagateCallChain      bool
+	maxCallChainDepth       int
+	customHeaders           []string
 }
 
-// NewIdentityPropagationInterceptor creates a new identity propagation interceptor.
-func NewIdentityPropagationInterceptor(config *IdentityPropagationConfig) *IdentityPropagationInterceptor {
-	logger := config.Logger
-	if logger == nil {
-		logger = slog.Default()
+// InterceptorOption is a functional option for configuring the interceptor.
+type InterceptorOption func(*IdentityPropagationInterceptor)
+
+// WithLogger sets the logger for the interceptor.
+func WithLogger(logger *slog.Logger) InterceptorOption {
+	return func(i *IdentityPropagationInterceptor) {
+		i.logger = logger
+	}
+}
+
+// WithMetricsCollector sets the metrics collector for the interceptor.
+func WithMetricsCollector(collector MetricsCollector) InterceptorOption {
+	return func(i *IdentityPropagationInterceptor) {
+		i.metricsCollector = collector
+	}
+}
+
+// WithClock sets the clock function for the interceptor.
+func WithClock(clock Clock) InterceptorOption {
+	return func(i *IdentityPropagationInterceptor) {
+		i.clock = clock
+	}
+}
+
+// WithIDGenerator sets the ID generator function for the interceptor.
+func WithIDGenerator(idGen IDGen) InterceptorOption {
+	return func(i *IdentityPropagationInterceptor) {
+		i.idGen = idGen
+	}
+}
+
+// WithPropagateOriginalCaller enables original caller propagation.
+func WithPropagateOriginalCaller(enabled bool) InterceptorOption {
+	return func(i *IdentityPropagationInterceptor) {
+		i.propagateOriginalCaller = enabled
+	}
+}
+
+// WithPropagateCallChain enables call chain propagation.
+func WithPropagateCallChain(enabled bool) InterceptorOption {
+	return func(i *IdentityPropagationInterceptor) {
+		i.propagateCallChain = enabled
+	}
+}
+
+// WithMaxCallChainDepth sets the maximum call chain depth.
+func WithMaxCallChainDepth(depth int) InterceptorOption {
+	return func(i *IdentityPropagationInterceptor) {
+		i.maxCallChainDepth = depth
+	}
+}
+
+// WithCustomHeaders sets custom headers to propagate.
+func WithCustomHeaders(headers []string) InterceptorOption {
+	return func(i *IdentityPropagationInterceptor) {
+		i.customHeaders = headers
+	}
+}
+
+// NewIdentityPropagationInterceptor creates a new identity propagation interceptor with direct capability injection.
+func NewIdentityPropagationInterceptor(identityProvider ports.IdentityProvider, opts ...InterceptorOption) *IdentityPropagationInterceptor {
+	i := &IdentityPropagationInterceptor{
+		identityProvider:        identityProvider,
+		logger:                  slog.Default(),
+		clock:                   time.Now,
+		idGen:                   defaultIDGen,
+		maxCallChainDepth:       defaultMaxCallChainDepth,
+		propagateOriginalCaller: true,
+		propagateCallChain:      true,
+		customHeaders:           []string{},
 	}
 
-	// Set default max call chain depth
-	if config.MaxCallChainDepth == 0 {
-		config.MaxCallChainDepth = defaultMaxCallChainDepth
+	// Apply options
+	for _, opt := range opts {
+		opt(i)
 	}
 
-	// Set default clock
-	if config.Clock == nil {
-		config.Clock = time.Now
+	return i
+}
+
+// NewIdentityPropagationInterceptorFromConfig creates interceptor from old config (deprecated).
+// This maintains backward compatibility while new code uses direct injection.
+func NewIdentityPropagationInterceptorFromConfig(config *IdentityPropagationConfig) *IdentityPropagationInterceptor {
+	opts := []InterceptorOption{
+		WithPropagateOriginalCaller(config.PropagateOriginalCaller),
+		WithPropagateCallChain(config.PropagateCallChain),
+		WithCustomHeaders(config.CustomHeaders),
 	}
 
-	// Set default ID generator
-	if config.IDGen == nil {
-		config.IDGen = defaultIDGen
+	if config.Logger != nil {
+		opts = append(opts, WithLogger(config.Logger))
+	}
+	if config.MetricsCollector != nil {
+		opts = append(opts, WithMetricsCollector(config.MetricsCollector))
+	}
+	if config.Clock != nil {
+		opts = append(opts, WithClock(config.Clock))
+	}
+	if config.IDGen != nil {
+		opts = append(opts, WithIDGenerator(config.IDGen))
+	}
+	if config.MaxCallChainDepth > 0 {
+		opts = append(opts, WithMaxCallChainDepth(config.MaxCallChainDepth))
 	}
 
-	return &IdentityPropagationInterceptor{
-		config: config,
-		logger: logger,
-	}
+	return NewIdentityPropagationInterceptor(config.IdentityProvider, opts...)
 }
 
 // UnaryClientInterceptor returns a gRPC unary client interceptor for identity propagation.
@@ -186,8 +276,8 @@ func (i *IdentityPropagationInterceptor) UnaryClientInterceptor() grpc.UnaryClie
 			i.logger.Error("Failed to propagate identity",
 				"method", method,
 				"error", err)
-			if i.config.MetricsCollector != nil {
-				i.config.MetricsCollector.RecordPropagationFailure(method, "propagation_error", err)
+			if i.metricsCollector != nil {
+				i.metricsCollector.RecordPropagationFailure(method, "propagation_error", err)
 			}
 			return err
 		}
@@ -213,8 +303,8 @@ func (i *IdentityPropagationInterceptor) StreamClientInterceptor() grpc.StreamCl
 			i.logger.Error("Failed to propagate identity in stream",
 				"method", method,
 				"error", err)
-			if i.config.MetricsCollector != nil {
-				i.config.MetricsCollector.RecordPropagationFailure(method, "stream_propagation_error", err)
+			if i.metricsCollector != nil {
+				i.metricsCollector.RecordPropagationFailure(method, "stream_propagation_error", err)
 			}
 			return nil, err
 		}
@@ -227,7 +317,7 @@ func (i *IdentityPropagationInterceptor) StreamClientInterceptor() grpc.StreamCl
 // propagateIdentity adds identity metadata to the outgoing context.
 func (i *IdentityPropagationInterceptor) propagateIdentity(ctx context.Context, method string) (context.Context, error) {
 	// Get current service identity
-	identity, err := i.config.IdentityProvider.GetServiceIdentity()
+	identity, err := i.identityProvider.GetServiceIdentity()
 	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "get service identity: %v", err)
 	}
@@ -238,20 +328,20 @@ func (i *IdentityPropagationInterceptor) propagateIdentity(ctx context.Context, 
 	// Add current service identity
 	md.Set(MetadataKeyServiceName, identity.Name())
 	md.Set(MetadataKeyTrustDomain, identity.Domain())
-	md.Set(MetadataKeyTimestamp, fmt.Sprintf("%d", i.config.Clock().UnixMilli()))
+	md.Set(MetadataKeyTimestamp, fmt.Sprintf("%d", i.clock().UnixMilli()))
 
 	// Generate or extract request ID
 	requestID := i.getOrGenerateRequestID(ctx)
 	md.Set(MetadataKeyRequestID, requestID)
 
 	// Handle original caller propagation
-	if i.config.PropagateOriginalCaller {
+	if i.propagateOriginalCaller {
 		originalCaller := i.getOriginalCaller(ctx, identity.URI())
 		md.Set(MetadataKeyOriginalCaller, originalCaller)
 	}
 
 	// Handle call chain propagation
-	if i.config.PropagateCallChain {
+	if i.propagateCallChain {
 		callChain, err := i.buildCallChain(ctx, identity.URI())
 		if err != nil {
 			return nil, err
@@ -276,8 +366,8 @@ func (i *IdentityPropagationInterceptor) propagateIdentity(ctx context.Context, 
 		"request_id", requestID)
 
 	// Record metrics if collector is available
-	if i.config.MetricsCollector != nil {
-		i.config.MetricsCollector.RecordPropagationSuccess(method, requestID)
+	if i.metricsCollector != nil {
+		i.metricsCollector.RecordPropagationSuccess(method, requestID)
 	}
 
 	return metadata.NewOutgoingContext(ctx, md), nil
@@ -317,18 +407,18 @@ func (i *IdentityPropagationInterceptor) buildCallChain(ctx context.Context, cur
 	callChain = strings.Split(existingChain[0], chainSep)
 
 	// Validate chain depth limit with enhanced error wrapping
-	if len(callChain) >= i.config.MaxCallChainDepth {
-		if i.config.MetricsCollector != nil {
-			i.config.MetricsCollector.RecordPropagationFailure("depth_limit", "max_depth_exceeded", ErrDepthLimitExceeded)
+	if len(callChain) >= i.maxCallChainDepth {
+		if i.metricsCollector != nil {
+			i.metricsCollector.RecordPropagationFailure("depth_limit", "max_depth_exceeded", ErrDepthLimitExceeded)
 		}
 		return "", fmt.Errorf("chain length %d exceeds max %d: %w",
-			len(callChain), i.config.MaxCallChainDepth, ErrDepthLimitExceeded)
+			len(callChain), i.maxCallChainDepth, ErrDepthLimitExceeded)
 	}
 
 	// Check for circular calls with enhanced error wrapping
 	if err := i.validateNoCycle(callChain, currentIdentity); err != nil {
-		if i.config.MetricsCollector != nil {
-			i.config.MetricsCollector.RecordCircularCallDetected(currentIdentity)
+		if i.metricsCollector != nil {
+			i.metricsCollector.RecordCircularCallDetected(currentIdentity)
 		}
 		return "", fmt.Errorf("circular call detected for identity %s: %w", currentIdentity, err)
 	}
@@ -365,7 +455,7 @@ func (i *IdentityPropagationInterceptor) validateNoCycle(callChain []string, cur
 
 // propagateCustomHeaders copies specified custom headers from incoming to outgoing metadata.
 func (i *IdentityPropagationInterceptor) propagateCustomHeaders(ctx context.Context, outgoingMD metadata.MD) {
-	if len(i.config.CustomHeaders) == 0 {
+	if len(i.customHeaders) == 0 {
 		return
 	}
 
@@ -374,7 +464,7 @@ func (i *IdentityPropagationInterceptor) propagateCustomHeaders(ctx context.Cont
 		return // No incoming metadata to propagate
 	}
 
-	for _, header := range i.config.CustomHeaders {
+	for _, header := range i.customHeaders {
 		normalizedHeader := strings.ToLower(header)
 		if values := incomingMD.Get(normalizedHeader); len(values) > 0 {
 			outgoingMD.Set(normalizedHeader, values...)
@@ -392,7 +482,7 @@ func (i *IdentityPropagationInterceptor) getOrGenerateRequestID(ctx context.Cont
 	}
 
 	// Generate new request ID using injected generator
-	return i.config.IDGen()
+	return i.idGen()
 }
 
 // IdentityPropagationServerInterceptor provides server-side identity extraction from propagated metadata.

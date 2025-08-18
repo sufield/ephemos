@@ -43,7 +43,7 @@ func Example_metricsCollection() {
 	mockMetrics := config.MetricsCollector.(*interceptors.MockMetricsCollector)
 
 	// Create interceptors
-	_ = interceptors.NewIdentityPropagationInterceptor(config)
+	_ = interceptors.NewIdentityPropagationInterceptorFromConfig(config)
 	serverInterceptor := interceptors.NewIdentityPropagationServerInterceptor(nil, mockMetrics)
 
 	// Simulate some operations that would trigger metrics
@@ -74,7 +74,7 @@ func Example_metricsCollection() {
 // ExampleStreamingSupport demonstrates the new streaming interceptor support.
 func Example_streamingSupport() {
 	config := interceptors.TestingConfig()
-	clientInterceptor := interceptors.NewIdentityPropagationInterceptor(config)
+	clientInterceptor := interceptors.NewIdentityPropagationInterceptorFromConfig(config)
 	serverInterceptor := interceptors.NewIdentityPropagationServerInterceptor(nil, nil)
 
 	// Get both unary and streaming interceptors
@@ -100,7 +100,7 @@ func Example_enhancedErrorHandling() {
 	config := interceptors.TestingConfig()
 	config.MaxCallChainDepth = 2 // Very low for demonstration
 
-	interceptor := interceptors.NewIdentityPropagationInterceptor(config)
+	interceptor := interceptors.NewIdentityPropagationInterceptorFromConfig(config)
 
 	// Create context with a chain that's too long
 	md := metadata.New(map[string]string{
