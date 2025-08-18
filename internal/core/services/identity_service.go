@@ -110,11 +110,11 @@ type IdentityService struct {
 	metrics           MetricsReporter         // Metrics reporter (Prometheus or NoOp)
 
 	// Certificate caching for rotation support
-	cachedCert     *domain.Certificate
-	cachedBundle   *domain.TrustBundle
-	certCachedAt   time.Time
-	bundleCachedAt time.Time
-	cacheTTL       time.Duration
+	cachedCert      *domain.Certificate
+	certCacheEntry  *domain.CacheEntry
+	cachedBundle    *domain.TrustBundle
+	bundleCacheEntry *domain.CacheEntry
+	cacheTTL        time.Duration
 
 	// Enhanced mTLS connection tracking and enforcement
 	connectionRegistry *MTLSConnectionRegistry
@@ -291,7 +291,7 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 	defer s.mu.Unlock()
 
 	// Check if cached certificate is still valid and not expiring soon
-	if s.cachedCert != nil && time.Since(s.certCachedAt) < s.cacheTTL {
+	if s.cachedCert != nil && s.certCacheEntry != nil && s.certCacheEntry.IsFresh() {
 		// Validate the cached certificate is not expired
 		if err := s.validateCertificateExpiry(s.cachedCert); err == nil {
 			// Determine proactive refresh threshold from configuration or use default
@@ -352,7 +352,7 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 
 	// Cache the new certificate
 	s.cachedCert = cert
-	s.certCachedAt = time.Now()
+	s.certCacheEntry = domain.NewCacheEntry(s.cacheTTL)
 
 	return cert, nil
 }
@@ -390,7 +390,7 @@ func (s *IdentityService) getTrustBundle() (*domain.TrustBundle, error) {
 	defer s.mu.Unlock()
 
 	// Check if cached trust bundle is still valid
-	if s.cachedBundle != nil && time.Since(s.bundleCachedAt) < s.cacheTTL {
+	if s.cachedBundle != nil && s.bundleCacheEntry != nil && s.bundleCacheEntry.IsFresh() {
 		// Cache hit
 		s.metrics.RecordCacheHit("bundle")
 		return s.cachedBundle, nil
@@ -405,7 +405,7 @@ func (s *IdentityService) getTrustBundle() (*domain.TrustBundle, error) {
 
 	// Cache the new trust bundle
 	s.cachedBundle = bundle
-	s.bundleCachedAt = time.Now()
+	s.bundleCacheEntry = domain.NewCacheEntry(s.cacheTTL)
 
 	return bundle, nil
 }
