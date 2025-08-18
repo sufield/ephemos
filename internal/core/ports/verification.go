@@ -10,6 +10,7 @@ import (
 	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
+	"github.com/sufield/ephemos/internal/core/domain"
 )
 
 // IdentityVerificationResult contains the result of an identity verification
@@ -19,7 +20,7 @@ type IdentityVerificationResult struct {
 	// Identity is the verified SPIFFE ID
 	Identity spiffeid.ID `json:"identity"`
 	// TrustDomain is the trust domain of the identity
-	TrustDomain spiffeid.TrustDomain `json:"trust_domain"`
+	TrustDomain domain.TrustDomain `json:"trust_domain"`
 	// NotBefore is when the identity becomes valid
 	NotBefore time.Time `json:"not_before"`
 	// NotAfter is when the identity expires
@@ -64,7 +65,7 @@ type DiagnosticInfo struct {
 	// Uptime is how long the component has been running
 	Uptime time.Duration `json:"uptime"`
 	// TrustDomain is the configured trust domain
-	TrustDomain spiffeid.TrustDomain `json:"trust_domain"`
+	TrustDomain domain.TrustDomain `json:"trust_domain"`
 	// Entries contains information about registration entries
 	Entries *RegistrationEntryInfo `json:"entries,omitempty"`
 	// Bundles contains information about trust bundles
@@ -100,7 +101,7 @@ type TrustBundleInfo struct {
 // BundleInfo contains trust bundle details
 type BundleInfo struct {
 	// TrustDomain of the bundle
-	TrustDomain spiffeid.TrustDomain `json:"trust_domain"`
+	TrustDomain domain.TrustDomain `json:"trust_domain"`
 	// CertificateCount is the number of certificates in the bundle
 	CertificateCount int `json:"certificate_count"`
 	// LastUpdated is when the bundle was last updated
@@ -144,7 +145,7 @@ type DiagnosticsProviderPort interface {
 	// ListRegistrationEntries lists all registration entries
 	ListRegistrationEntries(ctx context.Context) ([]*RegistrationEntry, error)
 	// ShowTrustBundle displays trust bundle information
-	ShowTrustBundle(ctx context.Context, trustDomain spiffeid.TrustDomain) (*TrustBundleInfo, error)
+	ShowTrustBundle(ctx context.Context, trustDomain domain.TrustDomain) (*TrustBundleInfo, error)
 	// ListAgents lists all connected agents (server only)
 	ListAgents(ctx context.Context) ([]*Agent, error)
 	// GetComponentVersion gets the version of a SPIRE component
@@ -164,7 +165,7 @@ type RegistrationEntry struct {
 	// TTL is the time-to-live for SVIDs issued for this entry
 	TTL int32 `json:"ttl"`
 	// FederatesWith lists trust domains this entry federates with
-	FederatesWith []spiffeid.TrustDomain `json:"federates_with"`
+	FederatesWith []domain.TrustDomain `json:"federates_with"`
 	// DNSNames are DNS SANs for X.509 SVIDs
 	DNSNames []string `json:"dns_names"`
 	// Admin indicates if this is an admin entry
@@ -200,7 +201,7 @@ type VerificationConfig struct {
 	// Timeout for verification operations
 	Timeout time.Duration `json:"timeout"`
 	// TrustDomain to verify against
-	TrustDomain spiffeid.TrustDomain `json:"trust_domain"`
+	TrustDomain domain.TrustDomain `json:"trust_domain"`
 	// AllowedSPIFFEIDs restricts which SPIFFE IDs are accepted
 	AllowedSPIFFEIDs []spiffeid.ID `json:"allowed_spiffe_ids"`
 	// RequireSVID indicates if SVID presence is required

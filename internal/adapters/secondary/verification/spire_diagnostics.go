@@ -13,6 +13,8 @@ import (
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 
+	"github.com/sufield/ephemos/internal/adapters/common"
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
@@ -167,10 +169,10 @@ func (d *SpireDiagnosticsProvider) ListRegistrationEntries(ctx context.Context) 
 			continue // Skip invalid parent IDs
 		}
 
-		var federatesWith []spiffeid.TrustDomain
+		var federatesWith []domain.TrustDomain
 		for _, td := range e.FederatesWith {
-			if domain, err := spiffeid.TrustDomainFromString(td); err == nil {
-				federatesWith = append(federatesWith, domain)
+			if spiffeTD, err := spiffeid.TrustDomainFromString(td); err == nil {
+				federatesWith = append(federatesWith, common.ToCoreTrustDomain(spiffeTD))
 			}
 		}
 
@@ -192,7 +194,12 @@ func (d *SpireDiagnosticsProvider) ListRegistrationEntries(ctx context.Context) 
 }
 
 // ShowTrustBundle displays trust bundle information using SPIRE CLI
-func (d *SpireDiagnosticsProvider) ShowTrustBundle(ctx context.Context, trustDomain spiffeid.TrustDomain) (*ports.TrustBundleInfo, error) {
+func (d *SpireDiagnosticsProvider) ShowTrustBundle(ctx context.Context, trustDomain domain.TrustDomain) (*ports.TrustBundleInfo, error) {
+	// Convert to spiffeid.TrustDomain for SPIRE CLI
+	spiffeTD, err := spiffeid.TrustDomainFromString(trustDomain.String())
+	if err != nil {
+		return nil, fmt.Errorf("invalid trust domain %s: %w", trustDomain, err)
+	}
 	cmd := exec.CommandContext(ctx, "spire-server", "bundle", "show", "-output", "json")
 	if d.config.ServerSocketPath != "" {
 		cmd.Args = append(cmd.Args, "-socketPath", strings.TrimPrefix(d.config.ServerSocketPath, "unix://"))
@@ -213,15 +220,15 @@ func (d *SpireDiagnosticsProvider) ShowTrustBundle(ctx context.Context, trustDom
 	}
 
 	// Parse local bundle
-	if localData, ok := bundles[trustDomain.String()]; ok {
-		if local, err := d.parseBundleData(trustDomain, localData); err == nil {
+	if localData, ok := bundles[spiffeTD.String()]; ok {
+		if local, err := d.parseBundleData(spiffeTD, localData); err == nil {
 			info.Local = local
 		}
 	}
 
 	// Parse federated bundles
 	for td, data := range bundles {
-		if td != trustDomain.String() {
+		if td != spiffeTD.String() {
 			if domain, err := spiffeid.TrustDomainFromString(td); err == nil {
 				if bundle, err := d.parseBundleData(domain, data); err == nil {
 					info.Federated[td] = bundle
@@ -419,7 +426,7 @@ func (d *SpireDiagnosticsProvider) getWorkloadInfo(ctx context.Context, info *po
 		return fmt.Errorf("failed to get SVID: %w", err)
 	}
 
-	info.TrustDomain = svid.ID.TrustDomain()
+	info.TrustDomain = common.ToCoreTrustDomain(svid.ID.TrustDomain())
 	info.Details["workload_spiffe_id"] = svid.ID.String()
 	info.Details["certificate_expires_at"] = svid.Certificates[0].NotAfter
 	info.Details["certificate_serial"] = svid.Certificates[0].SerialNumber.String()
@@ -431,7 +438,7 @@ func (d *SpireDiagnosticsProvider) parseBundleData(trustDomain spiffeid.TrustDom
 	// Parse bundle data from SPIRE CLI output
 	// This is a simplified implementation - actual parsing would depend on CLI output format
 	bundle := &ports.BundleInfo{
-		TrustDomain:      trustDomain,
+		TrustDomain:      common.ToCoreTrustDomain(trustDomain),
 		CertificateCount: 1, // Default assumption
 		LastUpdated:      time.Now(),
 		ExpiresAt:        time.Now().Add(24 * time.Hour), // Default assumption

@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spiffe/go-spiffe/v2/spiffeid"
 
 	"github.com/sufield/ephemos/internal/adapters/secondary/verification"
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
@@ -179,16 +179,20 @@ func runDiagnoseBundles(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create diagnostics provider: %w", err)
 	}
 
-	var trustDomain spiffeid.TrustDomain
+	var trustDomain domain.TrustDomain
 	if len(args) > 0 {
-		td, err := spiffeid.TrustDomainFromString(args[0])
+		td, err := domain.NewTrustDomain(args[0])
 		if err != nil {
 			return fmt.Errorf("invalid trust domain %s: %w", args[0], err)
 		}
 		trustDomain = td
 	} else {
 		// Use default trust domain if available
-		trustDomain = spiffeid.RequireTrustDomainFromString("example.org")
+		td, err := domain.NewTrustDomain("example.org")
+		if err != nil {
+			return fmt.Errorf("invalid default trust domain: %w", err)
+		}
+		trustDomain = td
 	}
 
 	// Show trust bundle

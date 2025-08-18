@@ -14,6 +14,7 @@ import (
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 
+	"github.com/sufield/ephemos/internal/adapters/common"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
@@ -87,7 +88,7 @@ func (v *SpireIdentityVerifier) VerifyIdentity(ctx context.Context, expectedID s
 	result := &ports.IdentityVerificationResult{
 		Valid:        valid,
 		Identity:     svid.ID,
-		TrustDomain:  svid.ID.TrustDomain(),
+		TrustDomain:  common.ToCoreTrustDomain(svid.ID.TrustDomain()),
 		NotBefore:    svid.Certificates[0].NotBefore,
 		NotAfter:     svid.Certificates[0].NotAfter,
 		SerialNumber: svid.Certificates[0].SerialNumber.String(),
@@ -251,7 +252,7 @@ func (v *SpireIdentityVerifier) ValidateConnection(ctx context.Context, targetID
 	result := &ports.IdentityVerificationResult{
 		Valid:        valid,
 		Identity:     peerID,
-		TrustDomain:  peerID.TrustDomain(),
+		TrustDomain:  common.ToCoreTrustDomain(peerID.TrustDomain()),
 		NotBefore:    peerCert.NotBefore,
 		NotAfter:     peerCert.NotAfter,
 		SerialNumber: peerCert.SerialNumber.String(),

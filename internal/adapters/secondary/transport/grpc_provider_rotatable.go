@@ -190,8 +190,8 @@ func (p *RotatableGRPCProvider) determineAuthorizer(policy *domain.Authenticatio
 	}
 
 	// If policy has specific trust domain, use it
-	if policy.TrustDomain != "" {
-		td, err := spiffeid.TrustDomainFromString(policy.TrustDomain)
+	if !policy.TrustDomain.IsZero() {
+		td, err := spiffeid.TrustDomainFromString(policy.TrustDomain.String())
 		if err != nil {
 			// SECURITY: Return error instead of falling back to AuthorizeAny
 			return nil, fmt.Errorf("invalid trust domain in policy %q: %w", policy.TrustDomain, err)

@@ -11,6 +11,7 @@ import (
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 
 	"github.com/sufield/ephemos/internal/adapters/secondary/verification"
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
@@ -52,11 +53,16 @@ func main() {
 
 func demonstrateIdentityVerification(ctx context.Context) error {
 	// Configure identity verification to use SPIRE's Workload API
+	trustDomain, err := domain.NewTrustDomain("example.org")
+	if err != nil {
+		return fmt.Errorf("invalid trust domain: %w", err)
+	}
+	
 	config := &ports.VerificationConfig{
 		WorkloadAPISocket: "unix:///tmp/spire-agent/public/api.sock",
 		Timeout:           30 * time.Second,
 		// Optionally configure allowed trust domains and SPIFFE IDs
-		TrustDomain: spiffeid.RequireTrustDomainFromString("example.org"),
+		TrustDomain: trustDomain,
 	}
 
 	// Create identity verifier using go-spiffe/v2 library
@@ -220,12 +226,16 @@ func demonstrateComprehensiveMonitoring(ctx context.Context) error {
 	// Step 3: Validate trust relationships
 	fmt.Println("      3️⃣  Validating trust relationships...")
 
-	trustDomain := spiffeid.RequireTrustDomainFromString("example.org")
-	bundleInfo, err := provider.ShowTrustBundle(ctx, trustDomain)
+	trustDomainForBundle, err := domain.NewTrustDomain("example.org")
+	if err != nil {
+		fmt.Printf("      ⚠️  Invalid trust domain: %v\n", err)
+		return nil
+	}
+	bundleInfo, err := provider.ShowTrustBundle(ctx, trustDomainForBundle)
 	if err != nil {
 		fmt.Printf("      ⚠️  Trust bundle check failed: %v\n", err)
 	} else {
-		fmt.Printf("      ✅ Trust bundle available for domain: %s\n", trustDomain)
+		fmt.Printf("      ✅ Trust bundle available for domain: %s\n", trustDomainForBundle)
 		if bundleInfo.Local != nil {
 			fmt.Printf("      📋 Local bundle has %d certificates\n", bundleInfo.Local.CertificateCount)
 		}

@@ -14,6 +14,7 @@ import (
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 
 	"github.com/sufield/ephemos/internal/adapters/secondary/verification"
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
@@ -217,7 +218,7 @@ func createIdentityVerifier(cmd *cobra.Command) (*verification.SpireIdentityVeri
 	}
 
 	if trustDomain, _ := cmd.Flags().GetString("trust-domain"); trustDomain != "" {
-		td, err := spiffeid.TrustDomainFromString(trustDomain)
+		td, err := domain.NewTrustDomain(trustDomain)
 		if err != nil {
 			return nil, fmt.Errorf("invalid trust domain %s: %w", trustDomain, err)
 		}
