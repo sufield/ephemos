@@ -81,7 +81,11 @@ func (a *IdentityDocumentAdapter) GetServiceIdentity(ctx context.Context) (*doma
 		"trust_domain", trustDomain,
 		"spiffe_id", svid.ID.String())
 	
-	return domain.NewServiceIdentity(serviceName, trustDomain), nil
+	identity, err := domain.NewServiceIdentityValidated(serviceName, trustDomain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create service identity: %w", err)
+	}
+	return identity, nil
 }
 
 // GetCertificate retrieves the current certificate from SPIFFE.

@@ -236,7 +236,11 @@ func (c *Certificate) ToServiceIdentity() (*ServiceIdentity, error) {
 		return nil, fmt.Errorf("SPIFFE ID path contains invalid double slashes")
 	}
 
-	return NewServiceIdentity(serviceName, trustDomain), nil
+	identity, err := NewServiceIdentityValidated(serviceName, trustDomain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create service identity: %w", err)
+	}
+	return identity, nil
 }
 
 // verifyKeyMatch verifies that the private key matches the certificate's public key

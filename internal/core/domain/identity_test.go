@@ -616,22 +616,29 @@ func TestNewServiceIdentityWithValidation_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			identity, err := domain.NewServiceIdentityWithValidation(tt.serviceName, tt.domain, tt.validate)
+			var identity *domain.ServiceIdentity
+			var err error
+			
+			if tt.validate {
+				identity, err = domain.NewServiceIdentityValidated(tt.serviceName, tt.domain)
+			} else {
+				identity = domain.NewServiceIdentityUnchecked(tt.serviceName, tt.domain)
+			}
 
 			if tt.wantErr {
 				if err == nil {
-					t.Errorf("NewServiceIdentityWithValidation() expected error but got none")
+					t.Errorf("NewServiceIdentityValidated() expected error but got none")
 					return
 				}
 				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("NewServiceIdentityWithValidation() error = %v, want error containing %q", err, tt.errContains)
+					t.Errorf("NewServiceIdentityValidated() error = %v, want error containing %q", err, tt.errContains)
 				}
 			} else {
 				if err != nil {
-					t.Errorf("NewServiceIdentityWithValidation() unexpected error = %v", err)
+					t.Errorf("NewServiceIdentityValidated() unexpected error = %v", err)
 				}
 				if identity == nil {
-					t.Error("NewServiceIdentityWithValidation() returned nil identity")
+					t.Error("NewServiceIdentityValidated() returned nil identity")
 				}
 			}
 		})
