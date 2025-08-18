@@ -134,6 +134,10 @@ func (m *mockIdentityProvider) GetTrustBundle() (*domain.TrustBundle, error) {
 	return nil, assert.AnError
 }
 
+func (m *mockIdentityProvider) GetIdentityDocument() (*domain.IdentityDocument, error) {
+	return nil, assert.AnError
+}
+
 func (m *mockIdentityProvider) Close() error {
 	return nil
 }
