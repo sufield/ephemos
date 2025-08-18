@@ -249,9 +249,7 @@ func TestSourceAdapter(t *testing.T) {
 			Cert:       createMockCert(t, "spiffe://test.example.org/service"),
 			PrivateKey: createMockKey(t),
 		},
-		bundle: &domain.TrustBundle{
-			Certificates: []*x509.Certificate{createMockCACert(t)},
-		},
+		bundle: mustCreateTrustBundle([]*x509.Certificate{createMockCACert(t)}),
 		identity: domain.NewServiceIdentity("test-service", "test.example.org"),
 	}
 
@@ -357,4 +355,13 @@ func createMockCACert(t *testing.T) *x509.Certificate {
 	require.NoError(t, err)
 
 	return cert
+}
+
+// mustCreateTrustBundle creates a trust bundle or panics. For testing only.
+func mustCreateTrustBundle(certs []*x509.Certificate) *domain.TrustBundle {
+	bundle, err := domain.NewTrustBundle(certs)
+	if err != nil {
+		panic("failed to create test trust bundle: " + err.Error())
+	}
+	return bundle
 }

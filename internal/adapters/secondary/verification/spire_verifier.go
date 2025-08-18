@@ -147,15 +147,21 @@ func (v *SpireIdentityVerifier) GetCurrentIdentity(ctx context.Context) (*ports.
 	}
 
 	// Get trust bundle
-	bundle, err := v.source.GetX509BundleForTrustDomain(svid.ID.TrustDomain())
+	x509Bundle, err := v.source.GetX509BundleForTrustDomain(svid.ID.TrustDomain())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get trust bundle: %w", err)
+	}
+
+	// Convert to domain TrustBundle
+	trustBundle, err := common.ToCoreTrustBundle(x509Bundle)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert trust bundle: %w", err)
 	}
 
 	return &ports.IdentityInfo{
 		SPIFFEID:    svid.ID,
 		SVID:        svid,
-		TrustBundle: bundle,
+		TrustBundle: trustBundle,
 		FetchedAt:   time.Now(),
 		Source:      "workload-api",
 	}, nil

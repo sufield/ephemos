@@ -4,6 +4,7 @@ package common
 import (
 	"fmt"
 
+	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/sufield/ephemos/internal/core/domain"
 )
@@ -71,4 +72,36 @@ func ExtractTrustDomainFromString(spiffeIDStr string) (domain.TrustDomain, error
 		return "", fmt.Errorf("invalid SPIFFE ID: %w", err)
 	}
 	return ToCoreTrustDomain(id.TrustDomain()), nil
+}
+
+// ToCoreTrustBundle converts an x509bundle.Bundle to domain.TrustBundle.
+// This enables interaction with SPIFFE bundles while maintaining domain abstraction.
+func ToCoreTrustBundle(external *x509bundle.Bundle) (*domain.TrustBundle, error) {
+	if external == nil {
+		return nil, fmt.Errorf("external bundle is nil")
+	}
+	return domain.NewTrustBundle(external.X509Authorities())
+}
+
+// ToX509Bundle converts a domain.TrustBundle to x509bundle.Bundle.
+// Requires a trust domain to create the SPIFFE bundle.
+func ToX509Bundle(tb *domain.TrustBundle, td domain.TrustDomain) (*x509bundle.Bundle, error) {
+	if tb == nil {
+		return nil, fmt.Errorf("trust bundle is nil")
+	}
+	spiffeTD, err := ToSpiffeTrustDomain(td)
+	if err != nil {
+		return nil, fmt.Errorf("invalid trust domain: %w", err)
+	}
+	return x509bundle.FromX509Authorities(spiffeTD, tb.RawCertificates()), nil
+}
+
+// MustToX509Bundle converts a domain.TrustBundle to x509bundle.Bundle.
+// Panics if conversion fails. Use only when you're certain the inputs are valid.
+func MustToX509Bundle(tb *domain.TrustBundle, td domain.TrustDomain) *x509bundle.Bundle {
+	bundle, err := ToX509Bundle(tb, td)
+	if err != nil {
+		panic(fmt.Sprintf("failed to convert trust bundle for domain %q: %v", td, err))
+	}
+	return bundle
 }

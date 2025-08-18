@@ -156,7 +156,8 @@ func TestClientConnection_CreateBundleSource(t *testing.T) {
 	t.Run("successful bundle source", func(t *testing.T) {
 		t.Parallel()
 		cert, _ := createTestCertificate(t, "spiffe://example.org/test-service")
-		tb := &domain.TrustBundle{Certificates: []*x509.Certificate{cert}}
+		tb, err := domain.NewTrustBundle([]*x509.Certificate{cert})
+		require.NoError(t, err)
 		cc := &ClientConnection{identityService: &MockIdentityService{trustBundle: tb}}
 
 		src, err := cc.createBundleSource()
@@ -172,8 +173,10 @@ func TestClientConnection_CreateBundleSource(t *testing.T) {
 
 	t.Run("empty trust bundle", func(t *testing.T) {
 		t.Parallel()
+		emptyTb, err := domain.NewTrustBundle([]*x509.Certificate{})
+		require.NoError(t, err)
 		cc := &ClientConnection{
-			identityService: &MockIdentityService{trustBundle: &domain.TrustBundle{}},
+			identityService: &MockIdentityService{trustBundle: emptyTb},
 		}
 		src, err := cc.createBundleSource()
 		require.NoError(t, err)
@@ -198,7 +201,8 @@ func TestClientConnection_CreateBundleSource(t *testing.T) {
 func TestClientConnection_SPIFFEAdapters_Together(t *testing.T) {
 	t.Parallel()
 	cert, key := createTestCertificate(t, "spiffe://example.org/test-service")
-	tb := &domain.TrustBundle{Certificates: []*x509.Certificate{cert}}
+	tb, err := domain.NewTrustBundle([]*x509.Certificate{cert})
+	require.NoError(t, err)
 	cc := &ClientConnection{
 		identityService: &MockIdentityService{
 			cert:        &domain.Certificate{Cert: cert, PrivateKey: key},
@@ -225,7 +229,8 @@ func TestClientConnection_CreateBundleSourceForTrustDomain(t *testing.T) {
 	t.Run("enforces trust domain isolation", func(t *testing.T) {
 		t.Parallel()
 		cert, _ := createTestCertificate(t, "spiffe://example.org/test-service")
-		tb := &domain.TrustBundle{Certificates: []*x509.Certificate{cert}}
+		tb, err := domain.NewTrustBundle([]*x509.Certificate{cert})
+		require.NoError(t, err)
 		cc := &ClientConnection{identityService: &MockIdentityService{trustBundle: tb}}
 
 		restrictedTD := mustParseTrustDomain("example.org")

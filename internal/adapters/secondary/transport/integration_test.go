@@ -50,9 +50,7 @@ func TestRotatableProviderIntegration(t *testing.T) {
 				Cert:       createMockCert(t, "spiffe://test.example.org/service"),
 				PrivateKey: createMockKey(t),
 			},
-			bundle: &domain.TrustBundle{
-				Certificates: []*x509.Certificate{createMockCACert(t)},
-			},
+			bundle: mustCreateTrustBundle([]*x509.Certificate{createMockCACert(t)}),
 			identity: domain.NewServiceIdentity("test-service", "test.example.org"),
 		}
 
@@ -77,9 +75,7 @@ func TestRotatableProviderIntegration(t *testing.T) {
 			Cert:       createMockCert(t, "spiffe://test.example.org/service"),
 			PrivateKey: createMockKey(t),
 		}
-		bundle := &domain.TrustBundle{
-			Certificates: []*x509.Certificate{createMockCACert(t)},
-		}
+		bundle := mustCreateTrustBundle([]*x509.Certificate{createMockCACert(t)})
 
 		clientPort, err := staticProvider.CreateClient(cert, bundle, nil)
 		require.NoError(t, err)
@@ -100,9 +96,7 @@ func TestCreateGRPCProviderFactory(t *testing.T) {
 		Cert:       createMockCert(t, "spiffe://test.example.org/service"),
 		PrivateKey: createMockKey(t),
 	}
-	bundle := &domain.TrustBundle{
-		Certificates: []*x509.Certificate{createMockCACert(t)},
-	}
+	bundle := mustCreateTrustBundle([]*x509.Certificate{createMockCACert(t)})
 
 	// Should delegate to the rotatable provider
 	clientPort, err := provider.CreateClient(cert, bundle, nil)
@@ -154,3 +148,4 @@ func TestRotationCapabilityDocumentation(t *testing.T) {
 	t.Log("")
 	t.Log("🎉 Transport provider is fully rotation-capable!")
 }
+
