@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
@@ -308,7 +309,7 @@ func TestDiagnosticInfoStructure(t *testing.T) {
 		Component:   "spire-server",
 		Version:     "1.8.7",
 		Status:      "running",
-		TrustDomain: spiffeid.RequireTrustDomainFromString("example.org"),
+		TrustDomain: domain.MustNewTrustDomain("example.org"),
 		CollectedAt: now,
 		Details:     make(map[string]interface{}),
 	}

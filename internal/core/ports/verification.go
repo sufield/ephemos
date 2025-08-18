@@ -7,7 +7,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/sufield/ephemos/internal/core/domain"
@@ -47,7 +46,7 @@ type IdentityInfo struct {
 	// SVID contains the X.509 SVID
 	SVID *x509svid.SVID `json:"svid"`
 	// TrustBundle contains the trust bundle
-	TrustBundle *x509bundle.Bundle `json:"trust_bundle"`
+	TrustBundle *domain.TrustBundle `json:"trust_bundle"`
 	// FetchedAt is when the identity was fetched
 	FetchedAt time.Time `json:"fetched_at"`
 	// Source indicates where the identity was obtained from

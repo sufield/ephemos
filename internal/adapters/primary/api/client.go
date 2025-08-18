@@ -403,12 +403,12 @@ func (b *bundleSourceAdapter) GetX509BundleForTrustDomain(td spiffeid.TrustDomai
 		return nil, fmt.Errorf("failed to get trust bundle: %w", err)
 	}
 
-	if len(trustBundle.Certificates) == 0 {
+	if trustBundle.IsEmpty() {
 		return nil, fmt.Errorf("trust bundle is empty")
 	}
 
 	// Create bundle for the requested trust domain
-	bundle := x509bundle.FromX509Authorities(td, trustBundle.Certificates)
+	bundle := x509bundle.FromX509Authorities(td, trustBundle.RawCertificates())
 	return bundle, nil
 }
 

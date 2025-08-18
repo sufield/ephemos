@@ -91,9 +91,7 @@ func (p *Provider) GetTrustBundle() (*domain.TrustBundle, error) {
 		return nil, fmt.Errorf("failed to get trust bundle: %w", err)
 	}
 
-	return &domain.TrustBundle{
-		Certificates: bundle.X509Authorities(),
-	}, nil
+	return domain.NewTrustBundle(bundle.X509Authorities())
 }
 
 func (p *Provider) ensureSource(ctx context.Context) error {

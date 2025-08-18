@@ -283,14 +283,16 @@ type staticBundleAdapter struct {
 
 // GetX509BundleForTrustDomain implements x509bundle.Source.
 func (b *staticBundleAdapter) GetX509BundleForTrustDomain(td spiffeid.TrustDomain) (*x509bundle.Bundle, error) {
-	if b.bundle == nil || len(b.bundle.Certificates) == 0 {
+	if b.bundle == nil || b.bundle.IsEmpty() {
 		return nil, fmt.Errorf("no trust bundle available")
 	}
 
 	// Create bundle for the trust domain
 	bundle := x509bundle.New(td)
 	for _, cert := range b.bundle.Certificates {
-		bundle.AddX509Authority(cert)
+		if cert != nil && cert.Cert != nil {
+			bundle.AddX509Authority(cert.Cert)
+		}
 	}
 
 	return bundle, nil
@@ -426,14 +428,16 @@ func (a *SourceAdapter) GetX509BundleForTrustDomain(td spiffeid.TrustDomain) (*x
 		return nil, fmt.Errorf("failed to get trust bundle from provider: %w", err)
 	}
 
-	if trustBundle == nil || len(trustBundle.Certificates) == 0 {
+	if trustBundle == nil || trustBundle.IsEmpty() {
 		return nil, fmt.Errorf("provider returned empty trust bundle")
 	}
 
 	// Create bundle for the trust domain
 	bundle := x509bundle.New(td)
 	for _, cert := range trustBundle.Certificates {
-		bundle.AddX509Authority(cert)
+		if cert != nil && cert.Cert != nil {
+			bundle.AddX509Authority(cert.Cert)
+		}
 	}
 
 	// Update cache with TTL

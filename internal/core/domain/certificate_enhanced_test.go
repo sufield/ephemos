@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/sufield/ephemos/internal/core/domain"
 )
 
@@ -231,7 +233,7 @@ func TestNewTrustBundleWithValidation_EdgeCases(t *testing.T) {
 			certs:       []*x509.Certificate{nil},
 			validate:    true,
 			wantErr:     true,
-			errContains: "certificate at index 0 is nil",
+			errContains: "root CA certificate cannot be nil",
 		},
 		{
 			name:     "nil certificate without validation - allowed",
@@ -450,9 +452,16 @@ func TestTrustBundle_CreateCertPool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bundle := &domain.TrustBundle{
-				Certificates: tt.certs,
+			var bundle *domain.TrustBundle
+			var err error
+			
+			// Use non-validating constructor for test cases with empty or nil certs
+			if tt.name == "empty bundle" || tt.name == "bundle with nil certificate" {
+				bundle, err = domain.NewTrustBundleWithValidation(tt.certs, false)
+			} else {
+				bundle, err = domain.NewTrustBundle(tt.certs)
 			}
+			require.NoError(t, err)
 
 			pool := bundle.CreateCertPool()
 

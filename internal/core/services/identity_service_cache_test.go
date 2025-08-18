@@ -248,9 +248,8 @@ func TestConcurrentCacheAccess(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	trustBundle := &domain.TrustBundle{
-		Certificates: []*x509.Certificate{rootCert.Cert},
-	}
+	trustBundle, err := domain.NewTrustBundle([]*x509.Certificate{rootCert.Cert})
+	require.NoError(t, err)
 
 	// Setup mock to return certificate and trust bundle
 	mockProvider.On("GetCertificate").Return(cert, nil)

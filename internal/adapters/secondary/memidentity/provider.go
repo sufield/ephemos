@@ -59,9 +59,7 @@ func New() *Provider {
 			PrivateKey: &fakePrivateKey{}, // Now properly implements crypto.Signer
 			Chain:      []*x509.Certificate{},
 		},
-		bundle: &domain.TrustBundle{
-			Certificates: []*x509.Certificate{fakeCACert},
-		},
+		bundle: mustCreateTrustBundle([]*x509.Certificate{fakeCACert}),
 	}
 }
 
@@ -123,4 +121,13 @@ func (p *Provider) Close() error {
 	defer p.mu.Unlock()
 	p.closed = true
 	return nil
+}
+
+// mustCreateTrustBundle creates a trust bundle or panics. For testing only.
+func mustCreateTrustBundle(certs []*x509.Certificate) *domain.TrustBundle {
+	bundle, err := domain.NewTrustBundle(certs)
+	if err != nil {
+		panic("failed to create test trust bundle: " + err.Error())
+	}
+	return bundle
 }
