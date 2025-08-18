@@ -116,8 +116,8 @@ type IdentityService struct {
 	bundleCachedAt time.Time
 	cacheTTL       time.Duration
 
-	// Enhanced mTLS connection management
-	connectionManager  *MTLSConnectionManager
+	// Enhanced mTLS connection tracking and enforcement
+	connectionRegistry *MTLSConnectionRegistry
 	enforcementService *MTLSEnforcementService
 	continuityService  *RotationContinuityService
 	
@@ -180,13 +180,13 @@ func NewIdentityService(
 	}
 
 	// Initialize enhanced mTLS components
-	service.connectionManager = NewMTLSConnectionManager(service)
-	service.enforcementService = NewMTLSEnforcementService(service, service.connectionManager)
+	service.connectionRegistry = NewMTLSConnectionRegistry(service)
+	service.enforcementService = NewMTLSEnforcementService(service, service.connectionRegistry)
 	service.continuityService = NewRotationContinuityService(service, transportProvider)
 
 	// Add logging observer for rotation events
 	logObserver := NewLogRotationObserver(slog.Default())
-	service.connectionManager.AddRotationObserver(logObserver)
+	service.connectionRegistry.AddRotationObserver(logObserver)
 
 	return service, nil
 }
@@ -637,7 +637,7 @@ func (s *IdentityService) EstablishMTLSConnection(ctx context.Context, connID st
 	s.mu.RUnlock()
 
 	// Establish the connection through the connection manager
-	conn, err := s.connectionManager.EstablishConnection(ctx, connID, remoteIdentity, cert, localIdentity)
+	conn, err := s.connectionRegistry.EstablishConnection(ctx, connID, remoteIdentity, cert, localIdentity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to establish mTLS connection: %w", err)
 	}
@@ -645,7 +645,7 @@ func (s *IdentityService) EstablishMTLSConnection(ctx context.Context, connID st
 	// Validate the connection against all invariants
 	if err := s.enforcementService.ValidateConnection(ctx, connID); err != nil {
 		// Close the connection if it violates invariants
-		s.connectionManager.CloseConnection(connID)
+		s.connectionRegistry.CloseConnection(connID)
 		return nil, fmt.Errorf("connection violates mTLS invariants: %w", err)
 	}
 
@@ -654,22 +654,22 @@ func (s *IdentityService) EstablishMTLSConnection(ctx context.Context, connID st
 
 // GetMTLSConnection retrieves an active mTLS connection
 func (s *IdentityService) GetMTLSConnection(connID string) (*MTLSConnection, bool) {
-	return s.connectionManager.GetConnection(connID)
+	return s.connectionRegistry.GetConnection(connID)
 }
 
 // ListMTLSConnections returns all active mTLS connections
 func (s *IdentityService) ListMTLSConnections() []*MTLSConnection {
-	return s.connectionManager.ListConnections()
+	return s.connectionRegistry.ListConnections()
 }
 
 // CloseMTLSConnection closes a managed mTLS connection
 func (s *IdentityService) CloseMTLSConnection(connID string) error {
-	return s.connectionManager.CloseConnection(connID)
+	return s.connectionRegistry.CloseConnection(connID)
 }
 
 // GetConnectionStats returns statistics about managed connections
 func (s *IdentityService) GetConnectionStats() ConnectionStats {
-	return s.connectionManager.GetConnectionStats()
+	return s.connectionRegistry.GetConnectionStats()
 }
 
 // StartMTLSEnforcement begins enforcing mTLS invariants on all connections
@@ -684,12 +684,12 @@ func (s *IdentityService) GetInvariantStatus(ctx context.Context) InvariantStatu
 
 // SetRotationPolicy updates the certificate rotation policy for all connections
 func (s *IdentityService) SetRotationPolicy(policy *RotationPolicy) {
-	s.connectionManager.SetRotationPolicy(policy)
+	s.connectionRegistry.SetRotationPolicy(policy)
 }
 
 // AddRotationObserver adds an observer for certificate rotation events
 func (s *IdentityService) AddRotationObserver(observer RotationObserver) {
-	s.connectionManager.AddRotationObserver(observer)
+	s.connectionRegistry.AddRotationObserver(observer)
 }
 
 // SetEnforcementPolicy updates the invariant enforcement policy

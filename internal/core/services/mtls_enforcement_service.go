@@ -23,12 +23,12 @@ type MTLSInvariant interface {
 
 // MTLSEnforcementService enforces mTLS invariants across all service communication
 type MTLSEnforcementService struct {
-	identityService   *IdentityService
-	connectionManager *MTLSConnectionManager
-	invariants        []MTLSInvariant
-	policy            *EnforcementPolicy
-	logger            *slog.Logger
-	mu                sync.RWMutex
+	identityService    *IdentityService
+	connectionRegistry *MTLSConnectionRegistry
+	invariants         []MTLSInvariant
+	policy             *EnforcementPolicy
+	logger             *slog.Logger
+	mu                 sync.RWMutex
 }
 
 // EnforcementPolicy defines how invariants are enforced
@@ -82,14 +82,14 @@ func DefaultEnforcementPolicy() *EnforcementPolicy {
 // NewMTLSEnforcementService creates a new mTLS enforcement service
 func NewMTLSEnforcementService(
 	identityService *IdentityService,
-	connectionManager *MTLSConnectionManager,
+	connectionRegistry *MTLSConnectionRegistry,
 ) *MTLSEnforcementService {
 	service := &MTLSEnforcementService{
-		identityService:   identityService,
-		connectionManager: connectionManager,
-		invariants:        make([]MTLSInvariant, 0),
-		policy:            DefaultEnforcementPolicy(),
-		logger:            slog.Default(),
+		identityService:    identityService,
+		connectionRegistry: connectionRegistry,
+		invariants:         make([]MTLSInvariant, 0),
+		policy:             DefaultEnforcementPolicy(),
+		logger:             slog.Default(),
 	}
 
 	// Add default invariants
@@ -153,7 +153,7 @@ func (s *MTLSEnforcementService) invariantCheckingLoop(ctx context.Context) {
 
 // checkAllInvariants checks all invariants against all connections
 func (s *MTLSEnforcementService) checkAllInvariants(ctx context.Context) {
-	connections := s.connectionManager.ListConnections()
+	connections := s.connectionRegistry.ListConnections()
 	if len(connections) == 0 {
 		return
 	}
@@ -203,7 +203,7 @@ func (s *MTLSEnforcementService) handleViolations(ctx context.Context, violation
 
 			switch policy.ViolationAction {
 			case ActionCloseConnection:
-				if err := s.connectionManager.CloseConnection(connID); err != nil {
+				if err := s.connectionRegistry.CloseConnection(connID); err != nil {
 					s.logger.Error("failed to close violating connection",
 						"connection_id", connID,
 						"error", err,
@@ -243,7 +243,7 @@ func (s *MTLSEnforcementService) handleViolations(ctx context.Context, violation
 
 // ValidateConnection validates all invariants for a specific connection
 func (s *MTLSEnforcementService) ValidateConnection(ctx context.Context, connID string) error {
-	conn, exists := s.connectionManager.GetConnection(connID)
+	conn, exists := s.connectionRegistry.GetConnection(connID)
 	if !exists {
 		return fmt.Errorf("connection %s not found", connID)
 	}
@@ -278,7 +278,7 @@ func (s *MTLSEnforcementService) GetInvariantStatus(ctx context.Context) Invaria
 	copy(invariants, s.invariants)
 	s.mu.RUnlock()
 
-	connections := s.connectionManager.ListConnections()
+	connections := s.connectionRegistry.ListConnections()
 	
 	status := InvariantStatus{
 		TotalInvariants:   len(invariants),

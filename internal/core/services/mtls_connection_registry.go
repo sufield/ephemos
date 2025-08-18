@@ -74,8 +74,8 @@ func (c *MTLSConnection) UpdateRotation(newCert *domain.Certificate) {
 	c.State = ConnectionActive
 }
 
-// MTLSConnectionManager manages active mTLS connections with rotation support
-type MTLSConnectionManager struct {
+// MTLSConnectionRegistry tracks and maintains active mTLS connections with rotation support
+type MTLSConnectionRegistry struct {
 	identityService *IdentityService
 	connections     map[string]*MTLSConnection
 	rotationPolicy  *RotationPolicy
@@ -113,9 +113,9 @@ type RotationObserver interface {
 	OnRotationFailed(connID string, err error)
 }
 
-// NewMTLSConnectionManager creates a new connection manager with rotation support
-func NewMTLSConnectionManager(identityService *IdentityService) *MTLSConnectionManager {
-	return &MTLSConnectionManager{
+// NewMTLSConnectionRegistry creates a new connection registry with rotation support
+func NewMTLSConnectionRegistry(identityService *IdentityService) *MTLSConnectionRegistry {
+	return &MTLSConnectionRegistry{
 		identityService: identityService,
 		connections:     make(map[string]*MTLSConnection),
 		rotationPolicy:  DefaultRotationPolicy(),
@@ -125,21 +125,21 @@ func NewMTLSConnectionManager(identityService *IdentityService) *MTLSConnectionM
 }
 
 // SetRotationPolicy updates the rotation policy
-func (m *MTLSConnectionManager) SetRotationPolicy(policy *RotationPolicy) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.rotationPolicy = policy
+func (r *MTLSConnectionRegistry) SetRotationPolicy(policy *RotationPolicy) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.rotationPolicy = policy
 }
 
 // AddRotationObserver adds an observer for rotation events
-func (m *MTLSConnectionManager) AddRotationObserver(observer RotationObserver) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.observers = append(m.observers, observer)
+func (r *MTLSConnectionRegistry) AddRotationObserver(observer RotationObserver) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.observers = append(r.observers, observer)
 }
 
 // EstablishConnection creates a new mTLS connection with the given parameters
-func (m *MTLSConnectionManager) EstablishConnection(ctx context.Context, connID string, remoteIdentity *domain.ServiceIdentity, cert *domain.Certificate, localIdentity *domain.ServiceIdentity) (*MTLSConnection, error) {
+func (r *MTLSConnectionRegistry) EstablishConnection(ctx context.Context, connID string, remoteIdentity *domain.ServiceIdentity, cert *domain.Certificate, localIdentity *domain.ServiceIdentity) (*MTLSConnection, error) {
 
 	// Create connection
 	conn := &MTLSConnection{
@@ -153,11 +153,11 @@ func (m *MTLSConnectionManager) EstablishConnection(ctx context.Context, connID 
 	}
 
 	// Register connection
-	m.mu.Lock()
-	m.connections[connID] = conn
-	m.mu.Unlock()
+	r.mu.Lock()
+	r.connections[connID] = conn
+	r.mu.Unlock()
 
-	m.logger.Info("mTLS connection established",
+	r.logger.Info("mTLS connection established",
 		"connection_id", connID,
 		"local_identity", localIdentity.Name(),
 		"remote_identity", remoteIdentity.Name(),
@@ -165,43 +165,43 @@ func (m *MTLSConnectionManager) EstablishConnection(ctx context.Context, connID 
 	)
 
 	// Start rotation monitoring for this connection
-	go m.monitorConnectionForRotation(ctx, connID)
+	go r.monitorConnectionForRotation(ctx, connID)
 
 	return conn, nil
 }
 
 // GetConnection retrieves an active connection by ID
-func (m *MTLSConnectionManager) GetConnection(connID string) (*MTLSConnection, bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	conn, exists := m.connections[connID]
+func (r *MTLSConnectionRegistry) GetConnection(connID string) (*MTLSConnection, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	conn, exists := r.connections[connID]
 	return conn, exists
 }
 
 // ListConnections returns all active connections
-func (m *MTLSConnectionManager) ListConnections() []*MTLSConnection {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+func (r *MTLSConnectionRegistry) ListConnections() []*MTLSConnection {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	
-	connections := make([]*MTLSConnection, 0, len(m.connections))
-	for _, conn := range m.connections {
+	connections := make([]*MTLSConnection, 0, len(r.connections))
+	for _, conn := range r.connections {
 		connections = append(connections, conn)
 	}
 	return connections
 }
 
 // CloseConnection closes and removes a connection
-func (m *MTLSConnectionManager) CloseConnection(connID string) error {
-	m.mu.Lock()
-	conn, exists := m.connections[connID]
+func (r *MTLSConnectionRegistry) CloseConnection(connID string) error {
+	r.mu.Lock()
+	conn, exists := r.connections[connID]
 	if exists {
 		conn.SetState(ConnectionClosed)
-		delete(m.connections, connID)
+		delete(r.connections, connID)
 	}
-	m.mu.Unlock()
+	r.mu.Unlock()
 
 	if exists {
-		m.logger.Info("mTLS connection closed",
+		r.logger.Info("mTLS connection closed",
 			"connection_id", connID,
 			"local_identity", conn.LocalIdentity.Name(),
 			"remote_identity", conn.RemoteIdentity.Name(),
@@ -212,7 +212,7 @@ func (m *MTLSConnectionManager) CloseConnection(connID string) error {
 }
 
 // monitorConnectionForRotation monitors a connection for rotation needs
-func (m *MTLSConnectionManager) monitorConnectionForRotation(ctx context.Context, connID string) {
+func (r *MTLSConnectionRegistry) monitorConnectionForRotation(ctx context.Context, connID string) {
 	ticker := time.NewTicker(time.Minute) // Check every minute
 	defer ticker.Stop()
 
@@ -221,8 +221,8 @@ func (m *MTLSConnectionManager) monitorConnectionForRotation(ctx context.Context
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := m.checkAndRotateConnection(ctx, connID); err != nil {
-				m.logger.Error("connection rotation check failed",
+			if err := r.checkAndRotateConnection(ctx, connID); err != nil {
+				r.logger.Error("connection rotation check failed",
 					"connection_id", connID,
 					"error", err,
 				)
@@ -232,28 +232,28 @@ func (m *MTLSConnectionManager) monitorConnectionForRotation(ctx context.Context
 }
 
 // checkAndRotateConnection checks if a connection needs rotation and performs it
-func (m *MTLSConnectionManager) checkAndRotateConnection(ctx context.Context, connID string) error {
-	m.mu.RLock()
-	conn, exists := m.connections[connID]
-	policy := m.rotationPolicy
-	m.mu.RUnlock()
+func (r *MTLSConnectionRegistry) checkAndRotateConnection(ctx context.Context, connID string) error {
+	r.mu.RLock()
+	conn, exists := r.connections[connID]
+	policy := r.rotationPolicy
+	r.mu.RUnlock()
 
 	if !exists || conn.GetState() == ConnectionClosed {
 		return nil // Connection no longer exists or is closed
 	}
 
 	// Check if rotation is needed
-	rotationReason := m.determineRotationReason(conn, policy)
+	rotationReason := r.determineRotationReason(conn, policy)
 	if rotationReason == "" {
 		return nil // No rotation needed
 	}
 
 	// Perform rotation
-	return m.rotateConnection(ctx, connID, rotationReason)
+	return r.rotateConnection(ctx, connID, rotationReason)
 }
 
 // determineRotationReason checks if rotation is needed and returns the reason
-func (m *MTLSConnectionManager) determineRotationReason(conn *MTLSConnection, policy *RotationPolicy) string {
+func (r *MTLSConnectionRegistry) determineRotationReason(conn *MTLSConnection, policy *RotationPolicy) string {
 	now := time.Now()
 	
 	// Check if certificate is expiring soon
@@ -278,10 +278,10 @@ func (m *MTLSConnectionManager) determineRotationReason(conn *MTLSConnection, po
 }
 
 // rotateConnection performs the actual certificate rotation for a connection
-func (m *MTLSConnectionManager) rotateConnection(ctx context.Context, connID, reason string) error {
-	m.mu.Lock()
-	conn, exists := m.connections[connID]
-	m.mu.Unlock()
+func (r *MTLSConnectionRegistry) rotateConnection(ctx context.Context, connID, reason string) error {
+	r.mu.Lock()
+	conn, exists := r.connections[connID]
+	r.mu.Unlock()
 
 	if !exists {
 		return fmt.Errorf("connection %s not found", connID)
@@ -291,9 +291,9 @@ func (m *MTLSConnectionManager) rotateConnection(ctx context.Context, connID, re
 	conn.SetState(ConnectionRotating)
 
 	// Notify observers
-	m.notifyRotationStarted(connID, reason)
+	r.notifyRotationStarted(connID, reason)
 
-	m.logger.Info("starting certificate rotation",
+	r.logger.Info("starting certificate rotation",
 		"connection_id", connID,
 		"reason", reason,
 		"local_identity", conn.LocalIdentity.Name(),
@@ -301,17 +301,17 @@ func (m *MTLSConnectionManager) rotateConnection(ctx context.Context, connID, re
 	)
 
 	// Get new certificate
-	newCert, err := m.identityService.GetCertificate()
+	newCert, err := r.identityService.GetCertificate()
 	if err != nil {
 		conn.SetState(ConnectionFailed)
-		m.notifyRotationFailed(connID, err)
+		r.notifyRotationFailed(connID, err)
 		return fmt.Errorf("failed to get new certificate for rotation: %w", err)
 	}
 
 	// Validate new certificate
-	if err := m.identityService.ValidateServiceIdentity(newCert); err != nil {
+	if err := r.identityService.ValidateServiceIdentity(newCert); err != nil {
 		conn.SetState(ConnectionFailed)
-		m.notifyRotationFailed(connID, err)
+		r.notifyRotationFailed(connID, err)
 		return fmt.Errorf("new certificate validation failed: %w", err)
 	}
 
@@ -321,9 +321,9 @@ func (m *MTLSConnectionManager) rotateConnection(ctx context.Context, connID, re
 	conn.UpdateRotation(newCert)
 
 	// Notify observers
-	m.notifyRotationCompleted(connID, oldCert, newCert)
+	r.notifyRotationCompleted(connID, oldCert, newCert)
 
-	m.logger.Info("certificate rotation completed successfully",
+	r.logger.Info("certificate rotation completed successfully",
 		"connection_id", connID,
 		"reason", reason,
 		"old_cert_expires", oldCert.Cert.NotAfter,
@@ -336,11 +336,11 @@ func (m *MTLSConnectionManager) rotateConnection(ctx context.Context, connID, re
 }
 
 // notifyRotationStarted notifies observers that rotation has started
-func (m *MTLSConnectionManager) notifyRotationStarted(connID, reason string) {
-	m.mu.RLock()
-	observers := make([]RotationObserver, len(m.observers))
-	copy(observers, m.observers)
-	m.mu.RUnlock()
+func (r *MTLSConnectionRegistry) notifyRotationStarted(connID, reason string) {
+	r.mu.RLock()
+	observers := make([]RotationObserver, len(r.observers))
+	copy(observers, r.observers)
+	r.mu.RUnlock()
 
 	for _, observer := range observers {
 		observer.OnRotationStarted(connID, reason)
@@ -348,11 +348,11 @@ func (m *MTLSConnectionManager) notifyRotationStarted(connID, reason string) {
 }
 
 // notifyRotationCompleted notifies observers that rotation has completed
-func (m *MTLSConnectionManager) notifyRotationCompleted(connID string, oldCert, newCert *domain.Certificate) {
-	m.mu.RLock()
-	observers := make([]RotationObserver, len(m.observers))
-	copy(observers, m.observers)
-	m.mu.RUnlock()
+func (r *MTLSConnectionRegistry) notifyRotationCompleted(connID string, oldCert, newCert *domain.Certificate) {
+	r.mu.RLock()
+	observers := make([]RotationObserver, len(r.observers))
+	copy(observers, r.observers)
+	r.mu.RUnlock()
 
 	for _, observer := range observers {
 		observer.OnRotationCompleted(connID, oldCert, newCert)
@@ -360,11 +360,11 @@ func (m *MTLSConnectionManager) notifyRotationCompleted(connID string, oldCert, 
 }
 
 // notifyRotationFailed notifies observers that rotation has failed
-func (m *MTLSConnectionManager) notifyRotationFailed(connID string, err error) {
-	m.mu.RLock()
-	observers := make([]RotationObserver, len(m.observers))
-	copy(observers, m.observers)
-	m.mu.RUnlock()
+func (r *MTLSConnectionRegistry) notifyRotationFailed(connID string, err error) {
+	r.mu.RLock()
+	observers := make([]RotationObserver, len(r.observers))
+	copy(observers, r.observers)
+	r.mu.RUnlock()
 
 	for _, observer := range observers {
 		observer.OnRotationFailed(connID, err)
@@ -372,16 +372,16 @@ func (m *MTLSConnectionManager) notifyRotationFailed(connID string, err error) {
 }
 
 // GetConnectionStats returns statistics about managed connections
-func (m *MTLSConnectionManager) GetConnectionStats() ConnectionStats {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+func (r *MTLSConnectionRegistry) GetConnectionStats() ConnectionStats {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
 	stats := ConnectionStats{
-		TotalConnections: len(m.connections),
+		TotalConnections: len(r.connections),
 		StateCount:       make(map[ConnectionState]int),
 	}
 
-	for _, conn := range m.connections {
+	for _, conn := range r.connections {
 		state := conn.GetState()
 		stats.StateCount[state]++
 		
