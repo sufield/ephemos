@@ -214,8 +214,8 @@ func (s *IdentityService) CreateServerIdentity() (ports.ServerPort, error) {
 	}
 
 	// Explicitly validate certificate as described in architecture documentation
-	if err := s.ValidateServiceIdentity(cert); err != nil {
-		return nil, fmt.Errorf("certificate validation failed for service %s: %w", identity.Name(), err)
+	if validationErr := s.ValidateServiceIdentity(cert); validationErr != nil {
+		return nil, fmt.Errorf("certificate validation failed for service %s: %w", identity.Name(), validationErr)
 	}
 
 	trustBundle, err := s.getTrustBundle()
@@ -251,8 +251,8 @@ func (s *IdentityService) CreateClientIdentity() (ports.ClientPort, error) {
 	}
 
 	// Explicitly validate certificate as described in architecture documentation
-	if err := s.ValidateServiceIdentity(cert); err != nil {
-		return nil, fmt.Errorf("certificate validation failed for service %s: %w", identity.Name(), err)
+	if validationErr := s.ValidateServiceIdentity(cert); validationErr != nil {
+		return nil, fmt.Errorf("certificate validation failed for service %s: %w", identity.Name(), validationErr)
 	}
 
 	trustBundle, err := s.getTrustBundle()

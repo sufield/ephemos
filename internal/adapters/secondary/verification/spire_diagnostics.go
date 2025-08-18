@@ -60,8 +60,8 @@ func (d *SpireDiagnosticsProvider) GetServerDiagnostics(ctx context.Context) (*p
 	}
 
 	// Get server configuration and status
-	if err := d.getServerStatus(ctx, info); err != nil {
-		info.Details["status_error"] = err.Error()
+	if statusErr := d.getServerStatus(ctx, info); statusErr != nil {
+		info.Details["status_error"] = statusErr.Error()
 		info.Status = "error"
 	} else {
 		info.Status = "running"

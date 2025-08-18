@@ -278,8 +278,8 @@ func createValidTestCertificate(t *testing.T, spiffeID string) (*x509.Certificat
 	
 	// Add SPIFFE URI SAN
 	if spiffeID != "" {
-		spiffeURI, err := url.Parse(spiffeID)
-		require.NoError(t, err)
+		spiffeURI, parseErr := url.Parse(spiffeID)
+		require.NoError(t, parseErr)
 		template.URIs = []*url.URL{spiffeURI}
 	}
 	
@@ -310,8 +310,8 @@ func createValidTestCertificateSignedBy(t *testing.T, spiffeID string, caCert *x
 	
 	// Add SPIFFE URI SAN
 	if spiffeID != "" {
-		spiffeURI, err := url.Parse(spiffeID)
-		require.NoError(t, err)
+		spiffeURI, parseErr := url.Parse(spiffeID)
+		require.NoError(t, parseErr)
 		template.URIs = []*url.URL{spiffeURI}
 	}
 	

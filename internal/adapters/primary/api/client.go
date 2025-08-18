@@ -162,10 +162,10 @@ func (c *Client) Connect(ctx context.Context, serviceNameStr, addressStr string)
 	// Thread-safe connection initialization
 	c.mu.Lock()
 	if c.domainClient == nil {
-		client, err := c.identityService.CreateClientIdentity()
-		if err != nil {
+		client, clientErr := c.identityService.CreateClientIdentity()
+		if clientErr != nil {
 			c.mu.Unlock()
-			return nil, fmt.Errorf("failed to create client identity: %w", err)
+			return nil, fmt.Errorf("failed to create client identity: %w", clientErr)
 		}
 		c.domainClient = client
 	}

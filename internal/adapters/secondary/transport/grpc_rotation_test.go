@@ -222,22 +222,22 @@ func TestGRPCProviderRotation(t *testing.T) {
 
 	// Helper function to test connection and get certificate serial
 	testConnection := func() (int64, error) {
-		clientPort, err := clientProvider.CreateClient(nil, nil, nil)
-		if err != nil {
-			return 0, err
+		clientPort, clientErr := clientProvider.CreateClient(nil, nil, nil)
+		if clientErr != nil {
+			return 0, clientErr
 		}
 		defer clientPort.Close()
 
-		conn, err := clientPort.Connect("test-service", listener.Addr().String())
-		if err != nil {
-			return 0, err
+		conn, connErr := clientPort.Connect("test-service", listener.Addr().String())
+		if connErr != nil {
+			return 0, connErr
 		}
 		defer conn.Close()
 
 		// For testing, we'll use the source directly to get the serial
-		svid, err := clientSource.GetX509SVID()
-		if err != nil {
-			return 0, err
+		svid, svidErr := clientSource.GetX509SVID()
+		if svidErr != nil {
+			return 0, svidErr
 		}
 
 		return svid.Certificates[0].SerialNumber.Int64(), nil
