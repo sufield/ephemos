@@ -335,7 +335,7 @@ func (c *Certificate) verifyWithTrustBundle(trustBundle *TrustBundle) error {
 }
 
 // DefaultCertValidator provides the standard certificate validation implementation.
-// It implements the CertValidatorPort interface from the ports package.
+// It implements the ports.CertValidatorPort interface from the ports package.
 type DefaultCertValidator struct{}
 
 // Validate delegates to the Certificate's Validate method.
