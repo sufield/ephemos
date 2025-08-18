@@ -13,6 +13,7 @@ spiffe://test\.example\.com/.*
 spiffe://test\.com/.*
 spiffe://test\.local/.*
 spiffe://other\.com/.*
+spiffe://different\.org/.*
 spiffe://localhost/.*
 
 # Production SPIFFE patterns in documentation (these are examples, not real secrets)
