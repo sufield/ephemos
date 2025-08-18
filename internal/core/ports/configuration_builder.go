@@ -44,19 +44,23 @@ func (b *ConfigurationBuilder) WithTrustDomain(domain string) *ConfigurationBuil
 
 // WithCacheTTL sets the cache TTL in minutes.
 func (b *ConfigurationBuilder) WithCacheTTL(minutes int) *ConfigurationBuilder {
-	if b.config.Service.Cache == nil {
-		b.config.Service.Cache = &CacheConfig{}
+	// Extract intermediate to avoid deep selector chains
+	service := &b.config.Service
+	if service.Cache == nil {
+		service.Cache = &CacheConfig{}
 	}
-	b.config.Service.Cache.TTLMinutes = minutes
+	service.Cache.TTLMinutes = minutes
 	return b
 }
 
 // WithCacheRefresh sets the proactive refresh time in minutes.
 func (b *ConfigurationBuilder) WithCacheRefresh(minutes int) *ConfigurationBuilder {
-	if b.config.Service.Cache == nil {
-		b.config.Service.Cache = &CacheConfig{}
+	// Extract intermediate to avoid deep selector chains
+	service := &b.config.Service
+	if service.Cache == nil {
+		service.Cache = &CacheConfig{}
 	}
-	b.config.Service.Cache.ProactiveRefreshMinutes = minutes
+	service.Cache.ProactiveRefreshMinutes = minutes
 	return b
 }
 
@@ -87,7 +91,9 @@ func (b *ConfigurationBuilder) WithTrustedServers(servers []string) *Configurati
 // Build constructs and validates the final configuration.
 func (b *ConfigurationBuilder) Build() (*Configuration, error) {
 	// Validate required fields
-	if b.config.Service.Name.Value() == "" {
+	// Extract intermediate to avoid deep selector chains
+	service := &b.config.Service
+	if service.Name.Value() == "" {
 		return nil, fmt.Errorf("service name is required")
 	}
 	

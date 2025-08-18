@@ -296,8 +296,10 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 		if err := s.validateCertificateExpiry(s.cachedCert); err == nil {
 			// Determine proactive refresh threshold from configuration or use default
 			refreshThreshold := 10 * time.Minute // Default: 10 minutes before expiry
-			if s.config.Service.Cache != nil && s.config.Service.Cache.ProactiveRefreshMinutes > 0 {
-				refreshThreshold = time.Duration(s.config.Service.Cache.ProactiveRefreshMinutes) * time.Minute
+			// Extract intermediates to avoid deep selector chains
+			service := s.config.Service
+			if service.Cache != nil && service.Cache.ProactiveRefreshMinutes > 0 {
+				refreshThreshold = time.Duration(service.Cache.ProactiveRefreshMinutes) * time.Minute
 			}
 
 			// Proactive refresh if certificate expires soon
