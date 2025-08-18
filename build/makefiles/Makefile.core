@@ -23,7 +23,7 @@ CONFIG_VALIDATOR_BINARY := config-validator
 # PHONY targets - all targets that don't create files
 .PHONY: all build test clean deps fmt lint help setup \
         check-deps install-deps install-deps-sudo benchmark fmt-only core-help version show-build-info \
-        arch-test arch-guard fuzz fuzz-build
+        arch-test arch-guard fuzz fuzz-build check-shadowing install-shadow quality-checks
 
 # Default target
 all: build
@@ -75,6 +75,26 @@ fmt-only:
 	@./scripts/build/lint-format-only.sh
 	@echo "Formatting completed!"
 
+# Check for variable shadowing
+check-shadowing:
+	@./scripts/check-shadowing.sh
+
+# Install shadow analyzer tool
+install-shadow:
+	@echo "Installing Go shadow analyzer..."
+	go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest
+	@echo "Shadow analyzer installed!"
+
+# Run architecture tests
+arch-test:
+	@echo "Running architecture tests..."
+	go test ./internal/arch/ -v
+	@echo "Architecture tests completed!"
+
+# Comprehensive quality checks
+quality-checks: test arch-test check-shadowing lint
+	@echo "✅ All quality checks passed!"
+
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
@@ -117,6 +137,12 @@ core-help:
 	@echo "  make fmt            - Format code"
 	@echo "  make fmt-only       - Format code only (no validation)"
 	@echo "  make lint           - Lint code"
+	@echo ""
+	@echo "Code quality targets:"
+	@echo "  make check-shadowing - Check for variable shadowing"
+	@echo "  make install-shadow  - Install shadow analyzer tool"
+	@echo "  make arch-test       - Run architecture constraint tests"
+	@echo "  make quality-checks  - Run all quality checks (tests + lint + arch + shadowing)"
 	@echo ""
 	@echo "Information targets:"
 	@echo "  make version        - Show version"
