@@ -80,7 +80,7 @@ func WorkloadServer(
 	return &Server{
 		identityService: identityService,
 		configProvider:  configProvider,
-		serviceName:     cfg.Service.Name,
+		serviceName:     cfg.Service.Name.Value(),
 	}, nil
 }
 

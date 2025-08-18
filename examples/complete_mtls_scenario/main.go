@@ -80,7 +80,7 @@ func setupServices(ctx context.Context) (*services.IdentityService, *services.Id
 	
 	apiServerConfig := &ports.Configuration{
 		Service: ports.ServiceConfig{
-			Name:   "api-server",
+			Name:   domain.NewServiceNameUnsafe("api-server"),
 			Domain: "production.company.com",
 			// Configure authorized clients for server-side authorization
 			AuthorizedClients: []string{
@@ -111,7 +111,7 @@ func setupServices(ctx context.Context) (*services.IdentityService, *services.Id
 	
 	authServiceConfig := &ports.Configuration{
 		Service: ports.ServiceConfig{
-			Name:   "auth-service",
+			Name:   domain.NewServiceNameUnsafe("auth-service"),
 			Domain: "production.company.com",
 			AuthorizedClients: []string{
 				"spiffe://production.company.com/api-server",

@@ -148,7 +148,7 @@ func NewIdentityService(
 	}
 
 	// Create and validate identity during initialization
-	identity := domain.NewServiceIdentity(config.Service.Name, config.Service.Domain)
+	identity := domain.NewServiceIdentity(config.Service.Name.Value(), config.Service.Domain)
 	if err := identity.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid service identity: %w", err)
 	}

@@ -42,7 +42,7 @@ type ServiceConfig struct {
 	// Name is the unique identifier for this service.
 	// Required field, must be non-empty and contain only valid service name characters.
 	// Used for SPIFFE ID generation and service discovery.
-	Name string `yaml:"name" validate:"required,min=1,max=50,service_name"`
+	Name domain.ServiceName `yaml:"name" validate:"required"`
 
 	// Domain is the trust domain for this service.
 	// Optional field that defaults to the SPIRE trust domain if not specified.
@@ -197,13 +197,21 @@ func LoadFromEnvironment() (*Configuration, error) {
 			mapstructure.StringToTimeDurationHookFunc(),
 			mapstructure.StringToSliceHookFunc(","),
 			domain.SocketPathDecodeHook(),
+			domain.ServiceNameDecodeHook(),
 		),
 	)); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal configuration: %w", err)
 	}
 
 	// Manual mapping for specific fields due to naming conventions
-	config.Service.Name = v.GetString("service_name")
+	serviceNameStr := v.GetString("service_name")
+	if serviceNameStr != "" {
+		serviceName, err := domain.NewServiceName(serviceNameStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid service name from environment: %w", err)
+		}
+		config.Service.Name = serviceName
+	}
 	config.Service.Domain = v.GetString("trust_domain")
 	if config.Service.Domain == "" {
 		config.Service.Domain = v.GetString("service.domain")
@@ -251,7 +259,11 @@ func (c *Configuration) MergeWithEnvironment() error {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Override service name if set via environment
-	if serviceName := v.GetString("service_name"); serviceName != "" {
+	if serviceNameStr := v.GetString("service_name"); serviceNameStr != "" {
+		serviceName, err := domain.NewServiceName(serviceNameStr)
+		if err != nil {
+			return fmt.Errorf("invalid service name from environment: %w", err)
+		}
 		c.Service.Name = serviceName
 	}
 
@@ -299,7 +311,7 @@ func validateProductionSecurity(config *Configuration) error {
 	}
 
 	// Check service name
-	if err := validateProductionServiceName(config.Service.Name); err != nil {
+	if err := validateProductionServiceName(config.Service.Name.Value()); err != nil {
 		validationErrors = append(validationErrors, err)
 	}
 

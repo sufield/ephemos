@@ -97,8 +97,8 @@ func (p *FileProvider) GetDefaultConfiguration(_ context.Context) *ports.Configu
 
 	return &ports.Configuration{
 		Service: ports.ServiceConfig{
-			Name:   "ephemos-service", // Default service name
-			Domain: "",                // Empty domain uses SPIRE trust domain
+			Name:   domain.NewServiceNameUnsafe("ephemos-service"), // Default service name
+			Domain: "",                                           // Empty domain uses SPIRE trust domain
 		},
 		Agent: &ports.AgentConfig{
 			SocketPath: domain.NewSocketPathUnsafe("/run/sockets/agent.sock"), // Standard agent socket path
