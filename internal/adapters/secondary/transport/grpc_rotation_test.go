@@ -24,6 +24,25 @@ import (
 	"github.com/sufield/ephemos/internal/core/domain"
 )
 
+// mockTrustProvider is a mock implementation for testing
+type mockTrustProvider struct{}
+
+func (m *mockTrustProvider) GetTrustDomain() (string, error) {
+	return "test.example.org", nil
+}
+
+func (m *mockTrustProvider) CreateDefaultAuthorizer() (tlsconfig.Authorizer, error) {
+	return tlsconfig.AuthorizeAny(), nil
+}
+
+func (m *mockTrustProvider) IsConfigured() bool {
+	return true
+}
+
+func (m *mockTrustProvider) ShouldSkipCertificateValidation() bool {
+	return false // Always use secure validation in tests
+}
+
 // TestRotatableSource implements both x509svid.Source and x509bundle.Source for testing
 type TestRotatableSource struct {
 	mu            sync.RWMutex
@@ -175,7 +194,7 @@ func TestGRPCProviderRotation(t *testing.T) {
 	serverSource := NewTestRotatableSource(t, "spiffe://test.example.org/server")
 
 	// Create provider with sources
-	provider := NewRotatableGRPCProvider(nil)
+	provider := NewRotatableGRPCProvider(&mockTrustProvider{})
 	provider.SetSources(serverSource, serverSource, tlsconfig.AuthorizeAny())
 
 	// Create server
@@ -198,7 +217,7 @@ func TestGRPCProviderRotation(t *testing.T) {
 	defer serverPort.Stop()
 
 	// Create client provider
-	clientProvider := NewRotatableGRPCProvider(nil)
+	clientProvider := NewRotatableGRPCProvider(&mockTrustProvider{})
 	clientProvider.SetSources(clientSource, clientSource, tlsconfig.AuthorizeAny())
 
 	// Helper function to test connection and get certificate serial
