@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/sufield/ephemos/internal/core/domain"
-	"github.com/sufield/ephemos/internal/core/ports"
 )
 
 const testTrustDomain = "example.org"
@@ -68,14 +67,13 @@ func TestNewIdentityPropagationInterceptor(t *testing.T) {
 		t.Errorf("Expected default MaxCallChainDepth 10, got: %d", interceptor.maxCallChainDepth)
 	}
 
-	// Test backward compatible constructor
-	config := &IdentityPropagationConfig{
-		IdentityProvider: provider,
-		Logger:           slog.Default(),
-	}
-	legacyInterceptor := NewIdentityPropagationInterceptorFromConfig(config)
-	if legacyInterceptor == nil {
-		t.Fatal("NewIdentityPropagationInterceptorFromConfig returned nil")
+	// Test with options
+	interceptorWithOptions := NewIdentityPropagationInterceptor(
+		provider,
+		WithLogger(slog.Default()),
+	)
+	if interceptorWithOptions == nil {
+		t.Fatal("NewIdentityPropagationInterceptor with options returned nil")
 	}
 }
 
@@ -89,14 +87,10 @@ func TestNewIdentityPropagationInterceptor_WithNilLogger(t *testing.T) {
 		t.Error("Logger should be set to default when none provided")
 	}
 
-	// Test backward compatibility
-	config := &IdentityPropagationConfig{
-		IdentityProvider: provider,
-		Logger:           nil,
-	}
-	legacyInterceptor := NewIdentityPropagationInterceptorFromConfig(config)
-	if legacyInterceptor.logger == nil {
-		t.Error("Logger should be set to default when nil provided in config")
+	// Test that constructor without logger option still sets default
+	interceptorNoLogger := NewIdentityPropagationInterceptor(provider)
+	if interceptorNoLogger.logger == nil {
+		t.Error("Logger should be set to default when none provided")
 	}
 }
 
@@ -569,26 +563,26 @@ func TestGetOrGenerateRequestID(t *testing.T) {
 	})
 }
 
-func TestDefaultIdentityPropagationConfig(t *testing.T) {
+func TestInterceptorDefaults(t *testing.T) {
 	provider := &mockIdentityProvider{}
-	config := DefaultIdentityPropagationConfig(ports.IdentityProvider(provider))
+	interceptor := NewIdentityPropagationInterceptor(provider)
 
-	if config.IdentityProvider != provider {
+	if interceptor.identityProvider != provider {
 		t.Error("Identity provider not set correctly")
 	}
-	if !config.PropagateOriginalCaller {
-		t.Error("Expected PropagateOriginalCaller to be true")
+	if !interceptor.propagateOriginalCaller {
+		t.Error("Expected propagateOriginalCaller to be true by default")
 	}
-	if !config.PropagateCallChain {
-		t.Error("Expected PropagateCallChain to be true")
+	if !interceptor.propagateCallChain {
+		t.Error("Expected propagateCallChain to be true by default")
 	}
-	if config.MaxCallChainDepth != 10 {
-		t.Errorf("Expected MaxCallChainDepth 10, got: %d", config.MaxCallChainDepth)
+	if interceptor.maxCallChainDepth != 10 {
+		t.Errorf("Expected maxCallChainDepth 10, got: %d", interceptor.maxCallChainDepth)
 	}
-	if len(config.CustomHeaders) != 0 {
-		t.Error("Expected empty CustomHeaders by default")
+	if len(interceptor.customHeaders) != 0 {
+		t.Error("Expected empty customHeaders by default")
 	}
-	if config.Logger == nil {
+	if interceptor.logger == nil {
 		t.Error("Expected default logger")
 	}
 }

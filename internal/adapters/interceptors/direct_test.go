@@ -354,12 +354,13 @@ func TestRequestIDGeneration(t *testing.T) {
 			t.Parallel()
 
 			provider := &mockIdentityProvider{}
-			config := DefaultIdentityPropagationConfig(provider)
 			// Inject deterministic clock and IDGen for testing
 			fixed := time.Unix(1696000000, 123)
-			config.Clock = func() time.Time { return fixed }
-			config.IDGen = func() string { return "req-1696000000000000123" }
-			interceptor := NewIdentityPropagationInterceptorFromConfig(config)
+			interceptor := NewIdentityPropagationInterceptor(
+				provider,
+				WithClock(func() time.Time { return fixed }),
+				WithIDGenerator(func() string { return "req-1696000000000000123" }),
+			)
 
 			ctx := context.Background()
 
@@ -383,10 +384,11 @@ func TestRequestIDGeneration_Deterministic(t *testing.T) {
 	t.Parallel()
 
 	fixed := time.Unix(1_696_000_000, 123) // example
-	config := DefaultIdentityPropagationConfig(&mockIdentityProvider{})
-	config.Clock = func() time.Time { return fixed }
-	config.IDGen = func() string { return "req-1696000000000000123" }
-	ic := NewIdentityPropagationInterceptorFromConfig(config)
+	ic := NewIdentityPropagationInterceptor(
+		&mockIdentityProvider{},
+		WithClock(func() time.Time { return fixed }),
+		WithIDGenerator(func() string { return "req-1696000000000000123" }),
+	)
 
 	got := ic.getOrGenerateRequestID(context.Background())
 	require.Equal(t, "req-1696000000000000123", got)
@@ -472,11 +474,10 @@ func TestCallChainValidation(t *testing.T) {
 			t.Parallel()
 
 			provider := &mockIdentityProvider{}
-			config := &IdentityPropagationConfig{
-				IdentityProvider:  provider,
-				MaxCallChainDepth: tt.maxDepth,
-			}
-			interceptor := NewIdentityPropagationInterceptorFromConfig(config)
+			interceptor := NewIdentityPropagationInterceptor(
+				provider,
+				WithMaxCallChainDepth(tt.maxDepth),
+			)
 
 			ctx := context.Background()
 			if tt.existingChain != "" {
@@ -744,8 +745,7 @@ func TestIdentityPropagationEdgeCases_Direct(t *testing.T) {
 		identity: domain.NewServiceIdentity("test-service", "test.com"),
 	}
 
-	config := DefaultIdentityPropagationConfig(provider)
-	interceptor := NewIdentityPropagationInterceptorFromConfig(config)
+	interceptor := NewIdentityPropagationInterceptor(provider)
 
 	// Test request ID generation
 	ctx := t.Context()
@@ -772,7 +772,7 @@ func TestIdentityPropagationEdgeCases_Direct(t *testing.T) {
 	})
 	ctx = metadata.NewIncomingContext(ctx, md)
 
-	config.MaxCallChainDepth = 10
+	// Default max depth is 10, so this should fail
 	_, err = interceptor.buildCallChain(ctx, "spiffe://test.com/newservice")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "depth limit exceeded")
@@ -800,14 +800,14 @@ func TestAdditionalCoverageTests_Direct(t *testing.T) {
 	authInterceptor := NewAuthInterceptor(authConfig)
 	assert.NotNil(t, authInterceptor)
 
-	// Test identity propagation config defaults
+	// Test identity propagation interceptor defaults
 	provider := &mockIdentityProvider{}
-	identityConfig := DefaultIdentityPropagationConfig(provider)
-	assert.NotNil(t, identityConfig)
-	assert.Equal(t, provider, identityConfig.IdentityProvider)
-	assert.True(t, identityConfig.PropagateOriginalCaller)
-	assert.True(t, identityConfig.PropagateCallChain)
-	assert.Equal(t, 10, identityConfig.MaxCallChainDepth)
+	identityInterceptor := NewIdentityPropagationInterceptor(provider)
+	assert.NotNil(t, identityInterceptor)
+	assert.Equal(t, provider, identityInterceptor.identityProvider)
+	assert.True(t, identityInterceptor.propagateOriginalCaller)
+	assert.True(t, identityInterceptor.propagateCallChain)
+	assert.Equal(t, 10, identityInterceptor.maxCallChainDepth)
 
 }
 

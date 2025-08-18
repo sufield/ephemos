@@ -16,14 +16,13 @@
 //
 // Example usage:
 //
-//	config := &IdentityPropagationConfig{
-//		IdentityProvider: myIdentityProvider,
-//		PropagateOriginalCaller: true,
-//		PropagateCallChain: true,
-//		MaxCallChainDepth: 10,
-//	}
-//	clientInterceptor := NewIdentityPropagationInterceptor(config)
-//	serverInterceptor := NewIdentityPropagationServerInterceptor(nil)
+//	clientInterceptor := NewIdentityPropagationInterceptor(
+//		myIdentityProvider,
+//		WithPropagateOriginalCaller(true),
+//		WithPropagateCallChain(true),
+//		WithMaxCallChainDepth(10),
+//	)
+//	serverInterceptor := NewIdentityPropagationServerInterceptor(nil, nil)
 //
 //	// Use with gRPC client
 //	conn, err := grpc.Dial(address,
@@ -106,35 +105,6 @@ const (
 	MetadataKeyTimestamp = "x-ephemos-timestamp"
 )
 
-// IdentityPropagationConfig configures identity propagation behavior.
-type IdentityPropagationConfig struct {
-	// IdentityProvider to get current service identity
-	IdentityProvider ports.IdentityProvider
-
-	// PropagateOriginalCaller forwards the original caller identity
-	PropagateOriginalCaller bool
-
-	// PropagateCallChain builds and forwards the call chain
-	PropagateCallChain bool
-
-	// MaxCallChainDepth limits the depth of call chain to prevent loops
-	MaxCallChainDepth int
-
-	// CustomHeaders are additional headers to propagate
-	CustomHeaders []string
-
-	// Logger for propagation events
-	Logger *slog.Logger
-
-	// Clock for time generation (nil => time.Now)
-	Clock Clock
-
-	// IDGen for request ID generation (nil => defaultIDGen)
-	IDGen IDGen
-
-	// MetricsCollector for observability (nil => no metrics)
-	MetricsCollector MetricsCollector
-}
 
 // IdentityPropagationInterceptor handles identity propagation for outgoing gRPC calls.
 type IdentityPropagationInterceptor struct {
@@ -230,34 +200,6 @@ func NewIdentityPropagationInterceptor(identityProvider ports.IdentityProvider, 
 	}
 
 	return i
-}
-
-// NewIdentityPropagationInterceptorFromConfig creates interceptor from old config (deprecated).
-// This maintains backward compatibility while new code uses direct injection.
-func NewIdentityPropagationInterceptorFromConfig(config *IdentityPropagationConfig) *IdentityPropagationInterceptor {
-	opts := []InterceptorOption{
-		WithPropagateOriginalCaller(config.PropagateOriginalCaller),
-		WithPropagateCallChain(config.PropagateCallChain),
-		WithCustomHeaders(config.CustomHeaders),
-	}
-
-	if config.Logger != nil {
-		opts = append(opts, WithLogger(config.Logger))
-	}
-	if config.MetricsCollector != nil {
-		opts = append(opts, WithMetricsCollector(config.MetricsCollector))
-	}
-	if config.Clock != nil {
-		opts = append(opts, WithClock(config.Clock))
-	}
-	if config.IDGen != nil {
-		opts = append(opts, WithIDGenerator(config.IDGen))
-	}
-	if config.MaxCallChainDepth > 0 {
-		opts = append(opts, WithMaxCallChainDepth(config.MaxCallChainDepth))
-	}
-
-	return NewIdentityPropagationInterceptor(config.IdentityProvider, opts...)
 }
 
 // UnaryClientInterceptor returns a gRPC unary client interceptor for identity propagation.
@@ -662,16 +604,3 @@ func (w *wrappedServerStream) Context() context.Context {
 	return w.ctx
 }
 
-// DefaultIdentityPropagationConfig returns a default identity propagation configuration.
-func DefaultIdentityPropagationConfig(identityProvider ports.IdentityProvider) *IdentityPropagationConfig {
-	return &IdentityPropagationConfig{
-		IdentityProvider:        identityProvider,
-		PropagateOriginalCaller: true,
-		PropagateCallChain:      true,
-		MaxCallChainDepth:       defaultMaxCallChainDepth,
-		CustomHeaders:           []string{},
-		Logger:                  slog.Default(),
-		Clock:                   time.Now,
-		IDGen:                   defaultIDGen,
-	}
-}

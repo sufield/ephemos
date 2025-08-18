@@ -123,24 +123,8 @@ func (m *MockMetricsCollector) RecordCircularCallDetected(identity string) {
 	m.CircularCallDetections = append(m.CircularCallDetections, identity)
 }
 
-// TestingConfig creates a complete configuration for testing with all features enabled.
-// Deprecated: Use NewTestingInterceptor() instead for new code.
-func TestingConfig() *IdentityPropagationConfig {
-	return &IdentityPropagationConfig{
-		IdentityProvider:        NewMockIdentityProvider(),
-		PropagateOriginalCaller: true,
-		PropagateCallChain:      true,
-		MaxCallChainDepth:       5, // Lower for testing
-		CustomHeaders:           []string{"x-test-header", "x-trace-id"},
-		Logger:                  slog.Default(),
-		Clock:                   func() time.Time { return time.Unix(1640995200, 0) }, // Fixed time for testing
-		IDGen:                   func() string { return "test-req-123" },              // Fixed ID for testing
-		MetricsCollector:        NewMockMetricsCollector(),
-	}
-}
 
 // NewTestingInterceptor creates a complete interceptor for testing with all features enabled.
-// This uses the new direct injection pattern.
 func NewTestingInterceptor() *IdentityPropagationInterceptor {
 	return NewIdentityPropagationInterceptor(
 		NewMockIdentityProvider(),
@@ -176,35 +160,3 @@ func ExtractMetrics(collector *MockMetricsCollector) (int, int, int) {
 		len(collector.ExtractionSuccesses)
 }
 
-// NewProductionInterceptor creates an interceptor with production defaults.
-// This is the recommended way to create interceptors in application code.
-func NewProductionInterceptor(identityProvider interface{}) *IdentityPropagationInterceptor {
-	// Convert the generic identity provider interface
-	var provider MockIdentityProvider
-	if ip, ok := identityProvider.(*MockIdentityProvider); ok {
-		provider = *ip
-	} else {
-		// For now, create a default one - in real code, this would be properly injected
-		provider = *NewMockIdentityProvider()
-	}
-	
-	return NewIdentityPropagationInterceptor(
-		&provider,
-		// Production defaults - no options needed as constructor sets good defaults
-	)
-}
-
-// NewInterceptorWithMetrics creates an interceptor with metrics collection enabled.
-func NewInterceptorWithMetrics(identityProvider interface{}, metricsCollector MetricsCollector) *IdentityPropagationInterceptor {
-	var provider MockIdentityProvider
-	if ip, ok := identityProvider.(*MockIdentityProvider); ok {
-		provider = *ip
-	} else {
-		provider = *NewMockIdentityProvider()
-	}
-	
-	return NewIdentityPropagationInterceptor(
-		&provider,
-		WithMetricsCollector(metricsCollector),
-	)
-}
