@@ -56,20 +56,20 @@ func (p *FileProvider) LoadConfiguration(ctx context.Context, path string) (*por
 	// Use Viper for multi-format configuration loading
 	v := viper.New()
 	v.SetConfigFile(cleanPath)
-	
+
 	// Also read from environment (env vars take precedence)
 	v.SetEnvPrefix("EPHEMOS")
 	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	
+
 	// Set defaults
 	p.setConfigDefaults(v)
-	
+
 	// Read the config file
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
 	}
-	
+
 	// Unmarshal configuration
 	var config ports.Configuration
 	if err := v.Unmarshal(&config, viper.DecodeHook(
@@ -80,12 +80,12 @@ func (p *FileProvider) LoadConfiguration(ctx context.Context, path string) (*por
 	)); err != nil {
 		return nil, fmt.Errorf("failed to parse config file %s: %w", path, err)
 	}
-	
+
 	// Validate the loaded configuration
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration in file %s: %w", path, err)
 	}
-	
+
 	return &config, nil
 }
 

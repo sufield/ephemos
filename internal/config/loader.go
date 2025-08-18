@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-
 // Environment variable names for configuration.
 const (
 	EnvServiceName   = "EPHEMOS_SERVICE_NAME"
@@ -49,21 +48,21 @@ type TLSConfig struct {
 // LoadFromEnvironment creates a configuration from environment variables.
 func LoadFromEnvironment() (*Configuration, error) {
 	v := viper.New()
-	
+
 	// Configure viper for environment variables
 	v.SetEnvPrefix("EPHEMOS")
 	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	
+
 	// Set defaults
 	setConfigDefaults(v)
-	
+
 	// Unmarshal configuration
 	var config Configuration
 	if err := v.Unmarshal(&config); err != nil {
 		return nil, err
 	}
-	
+
 	return &config, nil
 }
 
@@ -86,7 +85,7 @@ func LoadFromTOML(ctx context.Context, path string) (*Configuration, error) {
 // Supports YAML, JSON, and TOML formats.
 func LoadFromFile(ctx context.Context, path string, configType string) (*Configuration, error) {
 	v := viper.New()
-	
+
 	// Configure viper for file loading
 	if configType != "" {
 		v.SetConfigFile(path)
@@ -95,27 +94,27 @@ func LoadFromFile(ctx context.Context, path string, configType string) (*Configu
 		// Auto-detect format from file extension
 		v.SetConfigFile(path)
 	}
-	
+
 	// Also read from environment (env vars take precedence)
 	v.SetEnvPrefix("EPHEMOS")
 	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	
+
 	// Set defaults
 	setConfigDefaults(v)
-	
+
 	// Read the config file
 	if err := v.ReadInConfig(); err != nil {
 		// If file loading fails, fall back to environment loading
 		return LoadFromEnvironment()
 	}
-	
+
 	// Unmarshal configuration
 	var config Configuration
 	if err := v.Unmarshal(&config); err != nil {
 		return nil, err
 	}
-	
+
 	return &config, nil
 }
 

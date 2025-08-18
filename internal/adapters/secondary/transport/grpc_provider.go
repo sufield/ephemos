@@ -89,7 +89,7 @@ func (c *grpcClient) Connect(serviceName, address string) (ports.ConnectionPort,
 // isNetworkError checks if the error is network-related using modern error handling.
 func isNetworkError(err error) bool {
 	// Use errors.Is for syscall errors (Go 1.13+ best practice)
-	if errors.Is(err, syscall.ECONNREFUSED) || 
+	if errors.Is(err, syscall.ECONNREFUSED) ||
 		errors.Is(err, syscall.ENETUNREACH) ||
 		errors.Is(err, syscall.ETIMEDOUT) {
 		return true
@@ -327,4 +327,3 @@ func (c *grpcConnection) Close() error {
 
 	return nil
 }
-

@@ -102,6 +102,9 @@ func init() {
 	verifyCmd.PersistentFlags().String("trust-domain", "", "Expected trust domain")
 	verifyCmd.PersistentFlags().StringSlice("allowed-ids", []string{}, "Allowed SPIFFE IDs")
 
+	// Add flag validation - socket paths should be file paths
+	verifyCmd.MarkPersistentFlagFilename("socket")
+
 	// Add completions for common values
 	verifyCmd.RegisterFlagCompletionFunc("trust-domain", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{
@@ -253,7 +256,7 @@ func getOutputOptions(cmd *cobra.Command) outputOptions {
 	format, _ := cmd.Flags().GetString("format")
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	noEmoji, _ := cmd.Flags().GetBool("no-emoji")
-	
+
 	return outputOptions{
 		Format:  format,
 		Quiet:   quiet,

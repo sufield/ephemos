@@ -143,7 +143,7 @@ func CreateTestContext(ctx context.Context) context.Context {
 		RequestID:         "test-req-456",
 		Timestamp:         1640995200000,
 	}
-	
+
 	return context.WithValue(ctx, propagatedIdentityKey, identity)
 }
 

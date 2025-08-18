@@ -77,20 +77,19 @@ type IDGen func() string
 type MetricsCollector interface {
 	// RecordPropagationSuccess records successful identity propagation
 	RecordPropagationSuccess(method string, requestID string)
-	
+
 	// RecordPropagationFailure records failed identity propagation
 	RecordPropagationFailure(method string, reason string, err error)
-	
+
 	// RecordExtractionSuccess records successful identity extraction
 	RecordExtractionSuccess(method string, requestID string)
-	
+
 	// RecordCallChainDepth records call chain depth for monitoring
 	RecordCallChainDepth(depth int)
-	
+
 	// RecordCircularCallDetected records detection of circular calls
 	RecordCircularCallDetected(identity string)
 }
-
 
 const (
 	// MetadataKeyOriginalCaller is the metadata key for original caller identity.
@@ -132,7 +131,7 @@ type IdentityPropagationConfig struct {
 
 	// IDGen for request ID generation (nil => defaultIDGen)
 	IDGen IDGen
-	
+
 	// MetricsCollector for observability (nil => no metrics)
 	MetricsCollector MetricsCollector
 }
@@ -275,7 +274,7 @@ func (i *IdentityPropagationInterceptor) propagateIdentity(ctx context.Context, 
 		"method", method,
 		"service", identity.Name(),
 		"request_id", requestID)
-	
+
 	// Record metrics if collector is available
 	if i.config.MetricsCollector != nil {
 		i.config.MetricsCollector.RecordPropagationSuccess(method, requestID)
@@ -322,7 +321,7 @@ func (i *IdentityPropagationInterceptor) buildCallChain(ctx context.Context, cur
 		if i.config.MetricsCollector != nil {
 			i.config.MetricsCollector.RecordPropagationFailure("depth_limit", "max_depth_exceeded", ErrDepthLimitExceeded)
 		}
-		return "", fmt.Errorf("chain length %d exceeds max %d: %w", 
+		return "", fmt.Errorf("chain length %d exceeds max %d: %w",
 			len(callChain), i.config.MaxCallChainDepth, ErrDepthLimitExceeded)
 	}
 
@@ -357,7 +356,7 @@ func (i *IdentityPropagationInterceptor) buildCallChain(ctx context.Context, cur
 func (i *IdentityPropagationInterceptor) validateNoCycle(callChain []string, currentIdentity string) error {
 	for i, service := range callChain {
 		if service == currentIdentity {
-			return fmt.Errorf("service %s already exists at position %d in chain: %w", 
+			return fmt.Errorf("service %s already exists at position %d in chain: %w",
 				currentIdentity, i, ErrCircularCall)
 		}
 	}
@@ -391,7 +390,6 @@ func (i *IdentityPropagationInterceptor) getOrGenerateRequestID(ctx context.Cont
 			return requestID[0]
 		}
 	}
-
 
 	// Generate new request ID using injected generator
 	return i.config.IDGen()
@@ -440,7 +438,7 @@ func (i *IdentityPropagationServerInterceptor) StreamServerInterceptor() grpc.St
 	) error {
 		// Extract and add identity information to context
 		enrichedCtx := i.extractIdentityMetadata(ss.Context(), info.FullMethod)
-		
+
 		// Wrap the server stream with the enriched context
 		wrappedStream := &wrappedServerStream{
 			ServerStream: ss,
@@ -498,7 +496,7 @@ func (i *IdentityPropagationServerInterceptor) extractIdentityMetadata(ctx conte
 			"request_id", identity.RequestID,
 			"caller_service", identity.CallerService,
 			"call_chain", identity.CallChain)
-			
+
 		// Record metrics if collector is available
 		if i.metrics != nil {
 			i.metrics.RecordExtractionSuccess(method, identity.RequestID)
@@ -540,19 +538,19 @@ const (
 type PropagatedIdentity struct {
 	// OriginalCaller is the first service in the call chain
 	OriginalCaller string `json:"original_caller,omitempty"`
-	
+
 	// CallChain is the complete chain of services in the call path
 	CallChain string `json:"call_chain,omitempty"`
-	
+
 	// CallerTrustDomain is the trust domain of the immediate caller
 	CallerTrustDomain string `json:"caller_trust_domain,omitempty"`
-	
+
 	// CallerService is the name of the immediate caller service
 	CallerService string `json:"caller_service,omitempty"`
-	
+
 	// RequestID is the unique identifier for this request
 	RequestID string `json:"request_id,omitempty"`
-	
+
 	// Timestamp is the Unix millisecond timestamp when the request was initiated
 	Timestamp int64 `json:"timestamp,omitempty"`
 }

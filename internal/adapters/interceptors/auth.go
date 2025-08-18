@@ -190,7 +190,6 @@ func (a *AuthInterceptor) extractIdentityFromCertificate(cert *x509.Certificate)
 	}, nil
 }
 
-
 // authorizeIdentity performs authorization checks on the authenticated identity.
 func (a *AuthInterceptor) authorizeIdentity(identity *AuthenticatedIdentity, _ string) error {
 	// Check allowed/denied services with early returns (guard clauses)

@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -35,7 +37,8 @@ var diagnoseServerCmd = &cobra.Command{
 	Short: "Get SPIRE server diagnostics using built-in CLI tools",
 	Long: `Get comprehensive SPIRE server diagnostic information using SPIRE's
 built-in CLI commands and health endpoints.`,
-	RunE: runDiagnoseServer,
+	PreRunE: validateDiagnoseEnvironment,
+	RunE:    runDiagnoseServer,
 }
 
 var diagnoseAgentCmd = &cobra.Command{
@@ -43,7 +46,8 @@ var diagnoseAgentCmd = &cobra.Command{
 	Short: "Get SPIRE agent diagnostics using built-in CLI tools",
 	Long: `Get comprehensive SPIRE agent diagnostic information using SPIRE's
 built-in CLI commands and Workload API.`,
-	RunE: runDiagnoseAgent,
+	PreRunE: validateDiagnoseEnvironment,
+	RunE:    runDiagnoseAgent,
 }
 
 var diagnoseEntriesCmd = &cobra.Command{
@@ -80,8 +84,11 @@ built-in -version flag.
 Example:
   ephemos diagnose version spire-server
   ephemos diagnose version spire-agent`,
-	Args: cobra.ExactArgs(1),
-	RunE: runDiagnoseVersion,
+	Args:       cobra.ExactArgs(1),
+	ValidArgs:  []string{"spire-server", "spire-agent"},
+	ArgAliases: []string{"server", "agent"},
+	PreRunE:    validateComponentArg,
+	RunE:       runDiagnoseVersion,
 }
 
 func init() {
@@ -92,6 +99,13 @@ func init() {
 	diagnoseCmd.PersistentFlags().Duration("timeout", 30*time.Second, "Diagnostics timeout")
 	diagnoseCmd.PersistentFlags().Bool("use-api", false, "Use server API instead of CLI commands")
 	diagnoseCmd.PersistentFlags().String("api-token", "", "Server API token for authentication")
+
+	// Create flag dependencies and mutual exclusions
+	diagnoseCmd.MarkFlagsMutuallyExclusive("server-socket", "server-address")
+	diagnoseCmd.MarkFlagsRequiredTogether("use-api", "api-token")
+
+	// When using API, server-address is required
+	diagnoseCmd.MarkFlagsRequiredTogether("use-api", "server-address")
 
 	// Add subcommands
 	diagnoseCmd.AddCommand(diagnoseServerCmd)
@@ -460,4 +474,68 @@ func outputAgentsText(agents []*ports.Agent, quiet, noEmoji bool) error {
 	}
 
 	return nil
+}
+
+// validateDiagnoseEnvironment validates that SPIRE components are accessible for diagnostics
+func validateDiagnoseEnvironment(cmd *cobra.Command, args []string) error {
+	useAPI, _ := cmd.Flags().GetBool("use-api")
+
+	if useAPI {
+		// When using API, ensure we have required credentials
+		apiToken, _ := cmd.Flags().GetString("api-token")
+		if apiToken == "" {
+			return fmt.Errorf("API token is required when using --use-api flag")
+		}
+
+		serverAddress, _ := cmd.Flags().GetString("server-address")
+		if serverAddress == "" {
+			return fmt.Errorf("server address is required when using --use-api flag")
+		}
+	} else {
+		// When using CLI commands, check if they're available
+		if _, err := exec.LookPath("spire-server"); err != nil {
+			return fmt.Errorf("spire-server CLI not found in PATH: %w", err)
+		}
+		if _, err := exec.LookPath("spire-agent"); err != nil {
+			return fmt.Errorf("spire-agent CLI not found in PATH: %w", err)
+		}
+	}
+
+	// Validate socket paths format if provided
+	if serverSocket, _ := cmd.Flags().GetString("server-socket"); serverSocket != "" {
+		if !strings.HasPrefix(serverSocket, "unix://") && !strings.HasPrefix(serverSocket, "/") {
+			return fmt.Errorf("server socket path must be absolute or start with unix://")
+		}
+	}
+
+	if agentSocket, _ := cmd.Flags().GetString("agent-socket"); agentSocket != "" {
+		if !strings.HasPrefix(agentSocket, "unix://") && !strings.HasPrefix(agentSocket, "/") {
+			return fmt.Errorf("agent socket path must be absolute or start with unix://")
+		}
+	}
+
+	return nil
+}
+
+// validateComponentArg validates the component argument for version command
+func validateComponentArg(cmd *cobra.Command, args []string) error {
+	// First run common environment validation
+	if err := validateDiagnoseEnvironment(cmd, args); err != nil {
+		return err
+	}
+
+	if len(args) == 0 {
+		return fmt.Errorf("component argument is required")
+	}
+
+	component := args[0]
+	validComponents := []string{"spire-server", "spire-agent", "server", "agent"}
+
+	for _, valid := range validComponents {
+		if component == valid {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid component %s: must be one of %v", component, validComponents)
 }

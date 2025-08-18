@@ -39,7 +39,6 @@ type ConnectionPort interface {
 	Close() error
 }
 
-
 // ServiceRegistrarPort abstracts service registration without framework dependencies.
 type ServiceRegistrarPort interface {
 	// Register registers the service with the provided server

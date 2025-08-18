@@ -282,7 +282,6 @@ func (m *mockServiceRegistrar) Register(server interface{}) {
 	// Mock registration - do nothing
 }
 
-
 type mockIdentityProvider struct {
 	cert     *domain.Certificate
 	bundle   *domain.TrustBundle

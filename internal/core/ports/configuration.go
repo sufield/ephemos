@@ -139,7 +139,6 @@ func (c *Configuration) validateCacheConstraints() error {
 	return nil
 }
 
-
 // ConfigurationProvider defines the interface for loading and providing configurations.
 type ConfigurationProvider interface {
 	// LoadConfiguration loads configuration from the specified file path.
@@ -170,18 +169,18 @@ const (
 // This is the most secure way to configure Ephemos in production.
 func LoadFromEnvironment() (*Configuration, error) {
 	v := viper.New()
-	
+
 	// Configure viper for environment variables
 	v.SetEnvPrefix("EPHEMOS")
 	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	
+
 	// Set defaults
 	v.SetDefault("service.domain", "default.local")
 	v.SetDefault("agent.socketpath", "/run/sockets/agent.sock")
 	v.SetDefault("service.cache.ttl_minutes", 30)
 	v.SetDefault("service.cache.proactive_refresh_minutes", 10)
-	
+
 	// Required: Service Name
 	if !v.IsSet("service_name") {
 		return nil, &errors.ValidationError{
@@ -190,7 +189,7 @@ func LoadFromEnvironment() (*Configuration, error) {
 			Message: "service name is required via environment variable",
 		}
 	}
-	
+
 	// Unmarshal configuration
 	var config Configuration
 	if err := v.Unmarshal(&config, viper.DecodeHook(
@@ -201,14 +200,14 @@ func LoadFromEnvironment() (*Configuration, error) {
 	)); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal configuration: %w", err)
 	}
-	
+
 	// Manual mapping for specific fields due to naming conventions
 	config.Service.Name = v.GetString("service_name")
 	config.Service.Domain = v.GetString("trust_domain")
 	if config.Service.Domain == "" {
 		config.Service.Domain = v.GetString("service.domain")
 	}
-	
+
 	// Initialize cache config if needed
 	if v.IsSet("cache_ttl_minutes") || v.IsSet("cache_refresh_minutes") {
 		if config.Service.Cache == nil {
@@ -221,7 +220,7 @@ func LoadFromEnvironment() (*Configuration, error) {
 			config.Service.Cache.ProactiveRefreshMinutes = v.GetInt("cache_refresh_minutes")
 		}
 	}
-	
+
 	// Initialize agent config if needed
 	if config.Agent == nil {
 		config.Agent = &AgentConfig{}
@@ -231,12 +230,12 @@ func LoadFromEnvironment() (*Configuration, error) {
 	} else {
 		config.Agent.SocketPath = v.GetString("agent.socketpath")
 	}
-	
+
 	// Validate the configuration
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("environment configuration validation failed: %w", err)
 	}
-	
+
 	return &config, nil
 }
 
@@ -247,17 +246,17 @@ func (c *Configuration) MergeWithEnvironment() error {
 	v.SetEnvPrefix("EPHEMOS")
 	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	
+
 	// Override service name if set via environment
 	if serviceName := v.GetString("service_name"); serviceName != "" {
 		c.Service.Name = serviceName
 	}
-	
+
 	// Override trust domain if set via environment
 	if trustDomain := v.GetString("trust_domain"); trustDomain != "" {
 		c.Service.Domain = trustDomain
 	}
-	
+
 	// Override agent socket path if set via environment
 	if agentSocket := v.GetString("agent_socket"); agentSocket != "" {
 		if c.Agent == nil {
@@ -265,7 +264,7 @@ func (c *Configuration) MergeWithEnvironment() error {
 		}
 		c.Agent.SocketPath = agentSocket
 	}
-	
+
 	return c.Validate()
 }
 
@@ -305,7 +304,7 @@ func validateProductionSecurity(config *Configuration) error {
 	v.SetEnvPrefix("EPHEMOS")
 	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	
+
 	// Check for insecure certificate validation setting
 	if v.GetBool("insecure_skip_verify") {
 		validationErrors = append(validationErrors, errors.ErrInsecureSkipVerify)
@@ -403,4 +402,3 @@ func GetBoolEnv(key string, defaultValue bool) bool {
 	v.SetDefault(key, defaultValue)
 	return v.GetBool(key)
 }
-
