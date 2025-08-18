@@ -36,6 +36,10 @@ func (m *mockIdentityProvider) GetTrustBundle() (*domain.TrustBundle, error) {
 	return nil, errors.New("not implemented")
 }
 
+func (m *mockIdentityProvider) GetIdentityDocument() (*domain.IdentityDocument, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (m *mockIdentityProvider) Close() error {
 	return nil
 }

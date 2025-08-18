@@ -23,5 +23,6 @@ type IdentityProvider interface {
 	GetServiceIdentity() (*domain.ServiceIdentity, error)
 	GetCertificate() (*domain.Certificate, error)
 	GetTrustBundle() (*domain.TrustBundle, error)
+	GetIdentityDocument() (*domain.IdentityDocument, error)
 	Close() error
 }
