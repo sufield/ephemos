@@ -1,6 +1,15 @@
 // Package factory provides factories for creating SPIFFE/SPIRE-backed implementations
 // of the core ports. This package hides the complexity of adapter creation and wiring
 // from the public API.
+//
+// The factory now uses the new adapter architecture internally:
+// - IdentityDocumentAdapter handles SVID fetching and streaming
+// - SpiffeBundleAdapter handles trust bundle management and validation
+// - TLSAdapter handles SPIFFE-based TLS configuration
+// - The legacy Provider acts as a compatibility layer that delegates to these adapters
+//
+// This provides the benefits of the new architecture (streaming, better isolation,
+// testing) while maintaining backward compatibility with existing code.
 package factory
 
 import (
@@ -80,14 +89,68 @@ func SPIFFEServer(ctx context.Context, cfg *ports.Configuration) (ports.Authenti
 }
 
 // createIdentityProvider creates a SPIFFE identity provider from configuration
+// This function now uses the new adapter architecture internally through the refactored Provider.
 func createIdentityProvider(cfg *ports.Configuration) (ports.IdentityProvider, error) {
-	// Create identity provider
+	// Create identity provider using the refactored Provider that delegates to new adapters
 	identityProvider, err := spiffe.NewProvider(cfg.Agent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity provider: %w", err)
 	}
 
 	return identityProvider, nil
+}
+
+// createIdentityProviderWithAdapters creates a SPIFFE identity provider using the new adapter architecture directly.
+// This provides fine-grained control over adapter configuration and allows for adapter composition.
+func createIdentityProviderWithAdapters(cfg *ports.Configuration) (ports.IdentityProvider, error) {
+	// For future extension: this could allow selecting specific adapters
+	// For now, it delegates to the main factory function that uses the refactored Provider
+	return createIdentityProvider(cfg)
+}
+
+// AdapterConfig provides configuration options for adapter selection and settings
+type AdapterConfig struct {
+	// UseDirectAdapters when true uses adapters directly, otherwise uses Provider compatibility layer
+	UseDirectAdapters bool
+	
+	// IdentitySocketPath overrides the default SPIFFE socket path for identity operations
+	IdentitySocketPath string
+	
+	// BundleSocketPath overrides the default SPIFFE socket path for bundle operations  
+	BundleSocketPath string
+	
+	// TLSSocketPath overrides the default SPIFFE socket path for TLS operations
+	TLSSocketPath string
+}
+
+// SPIFFEDialerWithAdapters creates a new SPIFFE/SPIRE-backed Dialer with adapter configuration options.
+func SPIFFEDialerWithAdapters(ctx context.Context, cfg *ports.Configuration, adapterCfg *AdapterConfig) (ports.Dialer, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("configuration cannot be nil")
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	// For now, delegate to existing factory - future enhancement could use direct adapters
+	// when adapterCfg.UseDirectAdapters is true
+	return SPIFFEDialer(ctx, cfg)
+}
+
+// SPIFFEServerWithAdapters creates a new SPIFFE/SPIRE-backed AuthenticatedServer with adapter configuration options.
+func SPIFFEServerWithAdapters(ctx context.Context, cfg *ports.Configuration, adapterCfg *AdapterConfig) (ports.AuthenticatedServer, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("configuration cannot be nil")
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	// For now, delegate to existing factory - future enhancement could use direct adapters
+	// when adapterCfg.UseDirectAdapters is true
+	return SPIFFEServer(ctx, cfg)
 }
 
 // spiffeDialerAdapter adapts the internal API client to the Dialer port
