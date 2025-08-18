@@ -17,14 +17,14 @@ import (
 // TLSAdapter provides SPIFFE-based TLS configuration.
 // This adapter creates TLS configurations using SPIFFE identities and trust bundles.
 type TLSAdapter struct {
-	socketPath string
+	socketPath domain.SocketPath
 	x509Source *workloadapi.X509Source
 	logger     *slog.Logger
 }
 
 // TLSAdapterConfig provides configuration for the TLS adapter.
 type TLSAdapterConfig struct {
-	SocketPath string
+	SocketPath domain.SocketPath
 	Logger     *slog.Logger
 }
 
@@ -241,13 +241,15 @@ func (a *TLSAdapter) ensureSource(ctx context.Context) error {
 	}
 	
 	// Determine actual socket path to use
-	actualSocketPath := a.socketPath
-	if actualSocketPath == "" {
+	var actualSocketPath string
+	if a.socketPath.IsEmpty() {
 		var found bool
 		actualSocketPath, found = workloadapi.GetDefaultAddress()
 		if !found {
 			actualSocketPath = "unix:///tmp/spire-agent/public/api.sock" // Fallback
 		}
+	} else {
+		actualSocketPath = a.socketPath.WithUnixPrefix()
 	}
 	
 	a.logger.Debug("initializing X509 source", "socket_path", actualSocketPath)

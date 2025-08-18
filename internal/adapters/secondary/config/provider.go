@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
@@ -100,7 +101,7 @@ func (p *FileProvider) GetDefaultConfiguration(_ context.Context) *ports.Configu
 			Domain: "",                // Empty domain uses SPIRE trust domain
 		},
 		Agent: &ports.AgentConfig{
-			SocketPath: "/run/sockets/agent.sock", // Standard agent socket path
+			SocketPath: domain.NewSocketPathUnsafe("/run/sockets/agent.sock"), // Standard agent socket path
 		},
 	}
 }

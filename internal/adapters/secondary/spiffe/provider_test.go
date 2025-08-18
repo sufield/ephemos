@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/sufield/ephemos/internal/adapters/secondary/spiffe"
+	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
@@ -21,14 +22,14 @@ func TestNewProvider(t *testing.T) {
 		{
 			name: "empty socket path",
 			config: &ports.AgentConfig{
-				SocketPath: "",
+				SocketPath: domain.NewSocketPathUnsafe(""),
 			},
 			wantErr: false, // Constructor doesn't validate, just sets the path
 		},
 		{
 			name: "valid config",
 			config: &ports.AgentConfig{
-				SocketPath: "/tmp/spire-agent/public/api.sock",
+				SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 			},
 			wantErr: false,
 		},
@@ -62,14 +63,14 @@ func TestSPIFFEProvider_SocketPath(t *testing.T) {
 		{
 			name: "custom socket path",
 			config: &ports.AgentConfig{
-				SocketPath: "/custom/path/api.sock",
+				SocketPath: domain.NewSocketPathUnsafe("/custom/path/api.sock"),
 			},
 			expectPath: "/custom/path/api.sock",
 		},
 		{
 			name: "empty socket path",
 			config: &ports.AgentConfig{
-				SocketPath: "",
+				SocketPath: domain.NewSocketPathUnsafe(""),
 			},
 			expectPath: "",
 		},
@@ -93,7 +94,7 @@ func TestSPIFFEProvider_SocketPath(t *testing.T) {
 func TestSPIFFEProvider_Close(t *testing.T) {
 	// Test that Close doesn't panic when called on an uninitialized provider
 	provider, err := spiffe.NewProvider(&ports.AgentConfig{
-		SocketPath: "/tmp/spire-agent/public/api.sock",
+		SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 	})
 	if err != nil {
 		t.Fatalf("spiffe.NewProvider() failed: %v", err)
@@ -114,7 +115,7 @@ func TestSPIFFEProvider_Close(t *testing.T) {
 
 func TestSPIFFEProvider_GetX509Source(t *testing.T) {
 	provider, err := spiffe.NewProvider(&ports.AgentConfig{
-		SocketPath: "/tmp/spire-agent/public/api.sock",
+		SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 	})
 	if err != nil {
 		t.Fatalf("spiffe.NewProvider() failed: %v", err)
@@ -163,7 +164,7 @@ func TestSPIFFEProvider_SocketPathValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := &ports.AgentConfig{
-				SocketPath: tt.socketPath,
+				SocketPath: domain.NewSocketPathUnsafe(tt.socketPath),
 			}
 
 			provider, err := spiffe.NewProvider(config)
@@ -180,7 +181,7 @@ func TestSPIFFEProvider_SocketPathValidation(t *testing.T) {
 
 func BenchmarkNewProvider(b *testing.B) {
 	config := &ports.AgentConfig{
-		SocketPath: "/tmp/spire-agent/public/api.sock",
+		SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 	}
 
 	b.ResetTimer()

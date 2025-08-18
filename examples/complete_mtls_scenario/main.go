@@ -94,7 +94,7 @@ func setupServices(ctx context.Context) (*services.IdentityService, *services.Id
 			},
 		},
 		Agent: &ports.AgentConfig{
-			SocketPath: "/tmp/spire-agent/public/api.sock",
+			SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 		},
 	}
 
@@ -118,7 +118,7 @@ func setupServices(ctx context.Context) (*services.IdentityService, *services.Id
 			},
 		},
 		Agent: &ports.AgentConfig{
-			SocketPath: "/tmp/spire-agent/public/api.sock",
+			SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
 		},
 	}
 
