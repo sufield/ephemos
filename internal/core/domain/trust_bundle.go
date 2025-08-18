@@ -171,19 +171,9 @@ func (tb *TrustBundle) Count() int {
 	return len(tb.Certificates)
 }
 
-// TrustBundleProvider defines an interface for dynamic trust bundle access.
-// This supports SVID rotation scenarios where trust bundles may change over time.
-type TrustBundleProvider interface {
-	// GetTrustBundle returns the current trust bundle.
-	// Implementations should return the most up-to-date bundle.
-	GetTrustBundle() (*TrustBundle, error)
-
-	// CreateCertPool creates a cert pool from the current trust bundle.
-	// This is a convenience method that calls GetTrustBundle().CreateCertPool().
-	CreateCertPool() (*x509.CertPool, error)
-}
 
 // StaticTrustBundleProvider provides a static trust bundle (for testing/simple cases).
+// It implements the ports.TrustBundleProvider interface from the ports package.
 type StaticTrustBundleProvider struct {
 	bundle *TrustBundle
 }
