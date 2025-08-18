@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/sufield/ephemos/internal/core/adapters"
 	"github.com/sufield/ephemos/internal/core/domain"
 )
 
@@ -153,7 +154,7 @@ func TestCertificateValidateWithOptions(t *testing.T) {
 
 // TestDefaultCertValidator tests the DefaultCertValidator implementation
 func TestDefaultCertValidator(t *testing.T) {
-	validator := &domain.DefaultCertValidator{}
+	validator := adapters.NewDefaultCertValidator()
 
 	// Create a test certificate
 	key, err := rsa.GenerateKey(rand.Reader, 2048)

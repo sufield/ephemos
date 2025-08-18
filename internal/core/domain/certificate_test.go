@@ -14,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/sufield/ephemos/internal/core/adapters"
 	"github.com/sufield/ephemos/internal/core/domain"
 )
 
@@ -490,14 +491,14 @@ func TestStaticTrustBundleProvider(t *testing.T) {
 	}
 
 	t.Run("NewStaticTrustBundleProvider", func(t *testing.T) {
-		provider := domain.NewStaticTrustBundleProvider(bundle)
+		provider := adapters.NewStaticTrustBundleProvider(bundle)
 		if provider == nil {
 			t.Error("NewStaticTrustBundleProvider() returned nil")
 		}
 	})
 
 	t.Run("GetTrustBundle", func(t *testing.T) {
-		provider := domain.NewStaticTrustBundleProvider(bundle)
+		provider := adapters.NewStaticTrustBundleProvider(bundle)
 
 		retrievedBundle, err := provider.GetTrustBundle()
 		if err != nil {
@@ -511,7 +512,7 @@ func TestStaticTrustBundleProvider(t *testing.T) {
 	})
 
 	t.Run("GetTrustBundle with nil bundle", func(t *testing.T) {
-		provider := domain.NewStaticTrustBundleProvider(nil)
+		provider := adapters.NewStaticTrustBundleProvider(nil)
 
 		_, err := provider.GetTrustBundle()
 		if err == nil {
@@ -523,7 +524,7 @@ func TestStaticTrustBundleProvider(t *testing.T) {
 	})
 
 	t.Run("CreateCertPool", func(t *testing.T) {
-		provider := domain.NewStaticTrustBundleProvider(bundle)
+		provider := adapters.NewStaticTrustBundleProvider(bundle)
 
 		pool, err := provider.CreateCertPool()
 		if err != nil {
@@ -537,7 +538,7 @@ func TestStaticTrustBundleProvider(t *testing.T) {
 	})
 
 	t.Run("CreateCertPool with nil bundle", func(t *testing.T) {
-		provider := domain.NewStaticTrustBundleProvider(nil)
+		provider := adapters.NewStaticTrustBundleProvider(nil)
 
 		_, err := provider.CreateCertPool()
 		if err == nil {

@@ -334,14 +334,3 @@ func (c *Certificate) verifyWithTrustBundle(trustBundle *TrustBundle) error {
 	return nil
 }
 
-// DefaultCertValidator provides the standard certificate validation implementation.
-// It implements the ports.CertValidatorPort interface from the ports package.
-type DefaultCertValidator struct{}
-
-// Validate delegates to the Certificate's Validate method.
-func (v *DefaultCertValidator) Validate(cert *Certificate, opts CertValidationOptions) error {
-	if cert == nil {
-		return fmt.Errorf("certificate is nil")
-	}
-	return cert.Validate(opts)
-}

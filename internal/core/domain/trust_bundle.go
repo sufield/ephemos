@@ -171,31 +171,3 @@ func (tb *TrustBundle) Count() int {
 	return len(tb.Certificates)
 }
 
-
-// StaticTrustBundleProvider provides a static trust bundle (for testing/simple cases).
-// It implements the ports.TrustBundleProvider interface from the ports package.
-type StaticTrustBundleProvider struct {
-	bundle *TrustBundle
-}
-
-// NewStaticTrustBundleProvider creates a provider with a fixed trust bundle.
-func NewStaticTrustBundleProvider(bundle *TrustBundle) *StaticTrustBundleProvider {
-	return &StaticTrustBundleProvider{bundle: bundle}
-}
-
-// GetTrustBundle returns the static trust bundle.
-func (p *StaticTrustBundleProvider) GetTrustBundle() (*TrustBundle, error) {
-	if p.bundle == nil {
-		return nil, fmt.Errorf("no trust bundle configured")
-	}
-	return p.bundle, nil
-}
-
-// CreateCertPool creates a cert pool from the static trust bundle.
-func (p *StaticTrustBundleProvider) CreateCertPool() (*x509.CertPool, error) {
-	bundle, err := p.GetTrustBundle()
-	if err != nil {
-		return nil, err
-	}
-	return bundle.CreateCertPool(), nil
-}

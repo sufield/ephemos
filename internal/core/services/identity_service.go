@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sufield/ephemos/internal/core/adapters"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/errors"
 	"github.com/sufield/ephemos/internal/core/ports"
@@ -148,7 +149,7 @@ func NewIdentityService(
 
 	// Use default validator if none provided
 	if validator == nil {
-		validator = &domain.DefaultCertValidator{}
+		validator = adapters.NewDefaultCertValidator()
 	}
 
 	// Use NoOp metrics if none provided
