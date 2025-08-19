@@ -15,7 +15,7 @@ type ServerPort interface {
 	// RegisterService registers a service with the server
 	RegisterService(serviceRegistrar ServiceRegistrarPort) error
 	// Start begins listening on the provided listener
-	Start(listener NetworkListener) error
+	Start(listener NetworkListenerPort) error
 	// Stop gracefully shuts down the server
 	Stop() error
 }
