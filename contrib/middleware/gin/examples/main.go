@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/sufield/ephemos/pkg/ephemos"
 	ginmiddleware "github.com/sufield/ephemos/contrib/middleware/gin"
 )
 
@@ -51,7 +51,7 @@ func main() {
 	// Configure SPIFFE identity middleware
 	identityConfig := &ginmiddleware.IdentityConfig{
 		ConfigPath:        getConfigPath(),
-		RequireClientCert: false, // Optional for demo - allows testing without mTLS
+		RequireClientCert: true, // Enable mTLS for proper SPIFFE authentication
 		TrustDomains:      []string{"example.org", "prod.company.com"},
 		Logger:            logger,
 	}
@@ -137,14 +137,27 @@ func main() {
 		})
 	}
 
-	// Create server with TLS configuration for SPIFFE
+	// Create ephemos identity service for SPIFFE TLS
+	identityService, err := ephemos.NewFromEnvironment()
+	if err != nil {
+		logger.Error("Failed to create identity service", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	defer identityService.Close()
+
+	// Create SPIFFE mTLS server configuration using go-spiffe SDK
+	// Using AuthorizeAny() for authentication only - authorization is out of scope
+	tlsConfig, err := ephemos.NewServerTLSConfig(identityService, ephemos.AuthorizeAny())
+	if err != nil {
+		logger.Error("Failed to create TLS config", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	// Create server with SPIFFE mTLS configuration
 	server := &http.Server{
-		Addr:    ":8443",
-		Handler: r,
-		TLSConfig: &tls.Config{
-			ClientAuth: tls.RequestClientCert, // Request but don't require client certs
-			MinVersion: tls.VersionTLS12,
-		},
+		Addr:         ":8443",
+		Handler:      r,
+		TLSConfig:    tlsConfig,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
