@@ -94,7 +94,7 @@ ephemos/
 
 ## Key Technologies
 
-- **Language**: Go 1.21+
+- **Language**: Go 1.24+
 - **Build System**: Bazel 7.4.1+
 - **CI/CD**: GitHub Actions + Act (local testing)
 - **Security**: SPIFFE/SPIRE identity framework

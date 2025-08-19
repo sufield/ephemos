@@ -111,7 +111,7 @@ jobs:
   build:
     strategy:
       matrix:
-        go-version: ['1.23', '1.24']
+        go-version: ['1.24']
     steps:
     - uses: actions/checkout@v4
     - uses: ./.github/actions/setup-go

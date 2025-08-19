@@ -55,7 +55,7 @@ sudo apt update
 sudo apt install -y wget curl git build-essential protobuf-compiler
 ```
 
-### Go 1.24.5 (if not already installed)
+### Go 1.24+ (if not already installed)
 ```bash
 wget https://go.dev/dl/go1.24.5.linux-amd64.tar.gz
 sudo rm -rf /usr/local/go
@@ -318,7 +318,7 @@ Before submitting changes:
 ## Requirements Summary
 
 - **OS**: Ubuntu 24 (optimized, but works on other Linux distros)
-- **Go**: 1.23+ (1.24.5+ recommended)
+- **Go**: 1.24+ (1.24.5+ recommended)
 - **System tools**: git, make, curl, wget, build-essential
 - **Optional**: golangci-lint, gosec, govulncheck for development
 

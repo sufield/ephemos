@@ -75,7 +75,7 @@ Ephemos provides two main capabilities for SPIRE integration:
 ### Prerequisites
 
 1. **SPIRE Infrastructure**: A running SPIRE server and agent
-2. **Go Environment**: Go 1.21 or later
+2. **Go Environment**: Go 1.24 or later
 3. **Socket Access**: Permissions to access SPIRE sockets
 
 ### Basic Usage
