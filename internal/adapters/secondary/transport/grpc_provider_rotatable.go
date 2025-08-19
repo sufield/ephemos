@@ -69,36 +69,13 @@ func (p *RotatableGRPCProvider) CreateClient(cert *domain.Certificate, bundle *d
 		}, nil
 	}
 
-	// If sources are set, use them for rotation capability
-	if p.svidSource != nil && p.bundleSource != nil {
-		tlsConfig := p.createRotatableClientTLSConfig()
-		return &grpcClient{
-			tlsConfig: tlsConfig,
-			policy:    policy,
-		}, nil
+	// Require SPIFFE sources to be properly configured - no fallback patterns
+	if p.svidSource == nil || p.bundleSource == nil {
+		return nil, fmt.Errorf("SPIFFE sources must be properly configured: svidSource=%v, bundleSource=%v", 
+			p.svidSource != nil, p.bundleSource != nil)
 	}
 
-	// INPUT VALIDATION: For fallback mode, ensure cert and bundle are provided
-	if cert == nil {
-		return nil, fmt.Errorf("certificate required when sources are not configured")
-	}
-	if bundle == nil {
-		return nil, fmt.Errorf("trust bundle required when sources are not configured")
-	}
-
-	// Fallback: create source adapters from provided cert/bundle
-	svidAdapter := &staticSVIDAdapter{cert: cert}
-	bundleAdapter := &staticBundleAdapter{bundle: bundle}
-
-	// Determine authorizer based on policy
-	auth, err := p.determineAuthorizer(policy)
-	if err != nil {
-		return nil, fmt.Errorf("failed to determine authorizer: %w", err)
-	}
-
-	// Use tlsconfig for proper SPIFFE handling
-	tlsConfig := tlsconfig.MTLSClientConfig(svidAdapter, bundleAdapter, auth)
-
+	tlsConfig := p.createRotatableClientTLSConfig()
 	return &grpcClient{
 		tlsConfig: tlsConfig,
 		policy:    policy,
@@ -119,36 +96,13 @@ func (p *RotatableGRPCProvider) CreateServer(cert *domain.Certificate, bundle *d
 		}, nil
 	}
 
-	// If sources are set, use them for rotation capability
-	if p.svidSource != nil && p.bundleSource != nil {
-		tlsConfig := p.createRotatableServerTLSConfig()
-		return &grpcServer{
-			tlsConfig: tlsConfig,
-			policy:    policy,
-		}, nil
+	// Require SPIFFE sources to be properly configured - no fallback patterns
+	if p.svidSource == nil || p.bundleSource == nil {
+		return nil, fmt.Errorf("SPIFFE sources must be properly configured: svidSource=%v, bundleSource=%v", 
+			p.svidSource != nil, p.bundleSource != nil)
 	}
 
-	// INPUT VALIDATION: For fallback mode, ensure cert and bundle are provided
-	if cert == nil {
-		return nil, fmt.Errorf("certificate required when sources are not configured")
-	}
-	if bundle == nil {
-		return nil, fmt.Errorf("trust bundle required when sources are not configured")
-	}
-
-	// Fallback: create source adapters from provided cert/bundle
-	svidAdapter := &staticSVIDAdapter{cert: cert}
-	bundleAdapter := &staticBundleAdapter{bundle: bundle}
-
-	// Determine authorizer based on policy
-	auth, err := p.determineAuthorizer(policy)
-	if err != nil {
-		return nil, fmt.Errorf("failed to determine authorizer: %w", err)
-	}
-
-	// Use tlsconfig for proper SPIFFE handling
-	tlsConfig := tlsconfig.MTLSServerConfig(svidAdapter, bundleAdapter, auth)
-
+	tlsConfig := p.createRotatableServerTLSConfig()
 	return &grpcServer{
 		tlsConfig: tlsConfig,
 		policy:    policy,
@@ -199,11 +153,7 @@ func (p *RotatableGRPCProvider) determineAuthorizer(policy *domain.Authenticatio
 		return tlsconfig.AuthorizeMemberOf(td), nil
 	}
 
-	// If policy has specific SPIFFE IDs, use them
-	if len(policy.AllowedSPIFFEIDs) > 0 {
-		// AllowedSPIFFEIDs is already a slice of spiffeid.ID, no parsing needed
-		return tlsconfig.AuthorizeOneOf(policy.AllowedSPIFFEIDs...), nil
-	}
+	// Authentication-only scope: no specific SPIFFE ID authorization
 
 	// Use secure default instead of AuthorizeAny for empty policy
 	return p.createSecureDefaultAuthorizer(), nil
@@ -234,68 +184,6 @@ func (p *RotatableGRPCProvider) Close() error {
 	return nil
 }
 
-// staticSVIDAdapter adapts a static certificate to x509svid.Source interface.
-// This is used as a fallback when sources are not available.
-type staticSVIDAdapter struct {
-	cert *domain.Certificate
-}
-
-// GetX509SVID implements x509svid.Source.
-func (s *staticSVIDAdapter) GetX509SVID() (*x509svid.SVID, error) {
-	if s.cert == nil || s.cert.Cert == nil {
-		return nil, fmt.Errorf("no certificate available")
-	}
-
-	// Extract SPIFFE ID from certificate
-	var spiffeID spiffeid.ID
-	for _, uri := range s.cert.Cert.URIs {
-		if uri.Scheme == "spiffe" {
-			var err error
-			spiffeID, err = spiffeid.FromURI(uri)
-			if err != nil {
-				return nil, fmt.Errorf("invalid SPIFFE ID in certificate: %w", err)
-			}
-			break
-		}
-	}
-
-	if spiffeID.IsZero() {
-		return nil, fmt.Errorf("no SPIFFE ID found in certificate")
-	}
-
-	// Build certificate chain
-	certs := []*x509.Certificate{s.cert.Cert}
-	certs = append(certs, s.cert.Chain...)
-
-	return &x509svid.SVID{
-		ID:           spiffeID,
-		Certificates: certs,
-		PrivateKey:   s.cert.PrivateKey,
-	}, nil
-}
-
-// staticBundleAdapter adapts a static trust bundle to x509bundle.Source interface.
-// This is used as a fallback when sources are not available.
-type staticBundleAdapter struct {
-	bundle *domain.TrustBundle
-}
-
-// GetX509BundleForTrustDomain implements x509bundle.Source.
-func (b *staticBundleAdapter) GetX509BundleForTrustDomain(td spiffeid.TrustDomain) (*x509bundle.Bundle, error) {
-	if b.bundle == nil || b.bundle.IsEmpty() {
-		return nil, fmt.Errorf("no trust bundle available")
-	}
-
-	// Create bundle for the trust domain
-	bundle := x509bundle.New(td)
-	for _, cert := range b.bundle.Certificates {
-		if cert != nil && cert.Cert != nil {
-			bundle.AddX509Authority(cert.Cert)
-		}
-	}
-
-	return bundle, nil
-}
 
 // IdentityProvider defines the interface for identity providers that can supply certificates and trust bundles.
 // This interface ensures compile-time safety and clear API contracts.
@@ -474,57 +362,24 @@ func (a *SourceAdapter) SetCacheTTL(ttl time.Duration) {
 	}
 }
 
-// extractSPIFFEID extracts SPIFFE ID from certificate with improved fallback handling.
-// This method implements better fallback order and supports additional SAN types.
+// extractSPIFFEID extracts SPIFFE ID from certificate using only proper SPIFFE URIs.
+// No fallback patterns - fails fast if proper SPIFFE identity is not available.
 func (a *SourceAdapter) extractSPIFFEID(cert *domain.Certificate) (spiffeid.ID, error) {
-	// Strategy 1: Try to get SPIFFE ID from service identity first (most reliable)
-	// This ensures we always try the configured identity before certificate parsing
-	identity, err := a.provider.GetServiceIdentity()
-	if err == nil && identity != nil {
-		// Construct SPIFFE ID from identity
-		td, err := spiffeid.TrustDomainFromString(identity.Domain())
-		if err == nil {
-			spiffeID, err := spiffeid.FromSegments(td, identity.Name())
-			if err == nil && !spiffeID.IsZero() {
-				return spiffeID, nil
-			}
-		}
-	}
-
-	// Strategy 2: Extract SPIFFE ID from certificate URI SAN
+	// Extract SPIFFE ID from certificate URI SAN - the only valid source
 	for _, uri := range cert.Cert.URIs {
 		if uri.Scheme == "spiffe" {
 			spiffeID, err := spiffeid.FromURI(uri)
 			if err != nil {
-				// Log but don't fail - try other URIs
-				continue
+				return spiffeid.ID{}, fmt.Errorf("invalid SPIFFE URI in certificate: %w", err)
 			}
-			if !spiffeID.IsZero() {
-				return spiffeID, nil
+			if spiffeID.IsZero() {
+				return spiffeid.ID{}, fmt.Errorf("empty SPIFFE ID in certificate URI")
 			}
+			return spiffeID, nil
 		}
 	}
 
-	// Strategy 3: Support for DNS-based identities (if applicable)
-	// This is useful when SPIFFE URIs are not available but DNS names are present
-	for _, dnsName := range cert.Cert.DNSNames {
-		// Check if DNS name follows SPIFFE-like patterns
-		if len(dnsName) > 0 {
-			// For future extension - could map DNS names to SPIFFE IDs
-			// based on organizational policies
-			// Example: service.prod.company.com -> spiffe://prod.company.com/service
-		}
-	}
-
-	// Strategy 4: Fallback to subject common name
-	if cert.Cert.Subject.CommonName != "" {
-		// This is a last resort and should be used carefully
-		// Only if we can derive meaningful SPIFFE ID from CN
-		// Example: CN=service -> spiffe://domain/service (if domain known)
-	}
-
-	return spiffeid.ID{}, fmt.Errorf("no valid SPIFFE ID found in certificate or identity - URI SANs: %d, DNS SANs: %d, identity available: %t",
-		len(cert.Cert.URIs), len(cert.Cert.DNSNames), identity != nil)
+	return spiffeid.ID{}, fmt.Errorf("no valid SPIFFE URI found in certificate - proper SPIFFE certificates must contain URI SANs with spiffe:// scheme")
 }
 
 // buildCertificateChain builds a certificate chain while preventing duplication.

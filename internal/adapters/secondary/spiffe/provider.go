@@ -23,13 +23,13 @@ type Provider struct {
 
 // NewProvider creates a provider using the new adapter architecture.
 func NewProvider(config *ports.AgentConfig) (*Provider, error) {
-	var socketPath domain.SocketPath
-	if config != nil {
-		socketPath = config.SocketPath
-	} else {
-		// For nil config, use default path without unix:// prefix to match tests
-		socketPath = domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock")
+	if config == nil {
+		return nil, fmt.Errorf("agent configuration must be provided - no fallback patterns allowed")
 	}
+	if config.SocketPath.IsEmpty() {
+		return nil, fmt.Errorf("SPIFFE socket path must be explicitly configured in agent config - no fallback patterns allowed")
+	}
+	socketPath := config.SocketPath
 	
 	logger := slog.Default()
 	

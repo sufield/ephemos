@@ -217,11 +217,10 @@ func (sa ServiceAddress) GetPort() (int, error) {
 		if parsedURL.Port() == "" {
 			// Default ports based on protocol
 			protocol, err := ParseProtocol(parsedURL.Scheme)
-			if err == nil {
-				return protocol.DefaultPort(), nil
+			if err != nil {
+				return 0, fmt.Errorf("failed to parse protocol %q - explicit port required: %w", parsedURL.Scheme, err)
 			}
-			// Fallback to HTTP default if protocol parsing fails
-			return ProtocolHTTP.DefaultPort(), nil
+			return protocol.DefaultPort(), nil
 		}
 		return strconv.Atoi(parsedURL.Port())
 	}

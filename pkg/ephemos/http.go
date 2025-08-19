@@ -15,6 +15,16 @@ import (
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 )
 
+// Authorizer validates peer certificates during mTLS handshake.
+// This is needed for HTTP authentication functionality.
+type Authorizer = tlsconfig.Authorizer
+
+// AuthorizeAny returns an Authorizer that accepts any valid SPIFFE certificate.
+// This provides basic SPIFFE identity validation for authentication.
+func AuthorizeAny() Authorizer {
+	return tlsconfig.AuthorizeAny()
+}
+
 // HTTPClientConfig configures an HTTP client with SPIFFE mTLS.
 type HTTPClientConfig struct {
 	// IdentityService provides certificates and trust bundles.

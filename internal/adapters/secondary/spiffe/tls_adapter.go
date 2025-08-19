@@ -160,62 +160,23 @@ func (a *TLSAdapter) GetTLSAuthorizer(policy *domain.AuthenticationPolicy) (tlsc
 // createAuthorizer creates a SPIFFE TLS authorizer from authentication policy.
 func (a *TLSAdapter) createAuthorizer(policy *domain.AuthenticationPolicy) (tlsconfig.Authorizer, error) {
 	if policy == nil {
-		a.logger.Debug("no policy provided, using AuthorizeAny")
+		a.logger.Debug("no policy provided, using AuthorizeAny for SPIFFE identity validation")
 		return tlsconfig.AuthorizeAny(), nil
 	}
 	
-	// Check for specific allowed SPIFFE IDs
-	if len(policy.AllowedSPIFFEIDs) > 0 {
-		if len(policy.AllowedSPIFFEIDs) == 1 {
-			a.logger.Debug("authorizing single SPIFFE ID",
-				"spiffe_id", policy.AllowedSPIFFEIDs[0].String())
-			return tlsconfig.AuthorizeID(policy.AllowedSPIFFEIDs[0]), nil
-		} else {
-			a.logger.Debug("authorizing multiple SPIFFE IDs",
-				"count", len(policy.AllowedSPIFFEIDs))
-			return tlsconfig.AuthorizeOneOf(policy.AllowedSPIFFEIDs...), nil
-		}
-	}
-	
-	// Check for trust domain authorization
+	// Authentication-only: authorize based on trust domain membership
 	if !policy.TrustDomain.IsZero() {
 		td, err := spiffeid.TrustDomainFromString(policy.TrustDomain.String())
 		if err != nil {
 			return nil, fmt.Errorf("invalid trust domain in policy: %w", err)
 		}
-		a.logger.Debug("authorizing trust domain members",
+		a.logger.Debug("authorizing trust domain members for authentication",
 			"trust_domain", td.String())
 		return tlsconfig.AuthorizeMemberOf(td), nil
 	}
 	
-	// Check for authorized clients (server-side)
-	if len(policy.AuthorizedClients) > 0 {
-		if len(policy.AuthorizedClients) == 1 {
-			a.logger.Debug("authorizing single authorized client",
-				"client", policy.AuthorizedClients[0].String())
-			return tlsconfig.AuthorizeID(policy.AuthorizedClients[0]), nil
-		} else {
-			a.logger.Debug("authorizing multiple authorized clients",
-				"count", len(policy.AuthorizedClients))
-			return tlsconfig.AuthorizeOneOf(policy.AuthorizedClients...), nil
-		}
-	}
-	
-	// Check for trusted servers (client-side)
-	if len(policy.TrustedServers) > 0 {
-		if len(policy.TrustedServers) == 1 {
-			a.logger.Debug("authorizing single trusted server",
-				"server", policy.TrustedServers[0].String())
-			return tlsconfig.AuthorizeID(policy.TrustedServers[0]), nil
-		} else {
-			a.logger.Debug("authorizing multiple trusted servers",
-				"count", len(policy.TrustedServers))
-			return tlsconfig.AuthorizeOneOf(policy.TrustedServers...), nil
-		}
-	}
-	
-	// Default to any member
-	a.logger.Debug("no specific authorization rules, using AuthorizeAny")
+	// Default: validate any valid SPIFFE identity (authentication-only)
+	a.logger.Debug("using SPIFFE identity validation (authentication-only)")
 	return tlsconfig.AuthorizeAny(), nil
 }
 
@@ -240,17 +201,11 @@ func (a *TLSAdapter) ensureSource(ctx context.Context) error {
 		return nil
 	}
 	
-	// Determine actual socket path to use
-	var actualSocketPath string
+	// Require explicit socket path configuration - no fallback patterns
 	if a.socketPath.IsEmpty() {
-		var found bool
-		actualSocketPath, found = workloadapi.GetDefaultAddress()
-		if !found {
-			actualSocketPath = "unix:///tmp/spire-agent/public/api.sock" // Fallback
-		}
-	} else {
-		actualSocketPath = a.socketPath.WithUnixPrefix()
+		return fmt.Errorf("SPIFFE socket path must be explicitly configured - no fallback patterns allowed")
 	}
+	actualSocketPath := a.socketPath.WithUnixPrefix()
 	
 	a.logger.Debug("initializing X509 source", "socket_path", actualSocketPath)
 	
