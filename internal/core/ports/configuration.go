@@ -49,15 +49,6 @@ type ServiceConfig struct {
 	// Must be a valid domain name format if provided.
 	Domain string `yaml:"domain,omitempty" validate:"omitempty,domain"`
 
-	// AuthorizedClients is a list of SPIFFE IDs that are authorized to connect to this service.
-	// Used for server-side authorization enforcement.
-	// If empty, all clients from the same trust domain are authorized.
-	AuthorizedClients []string `yaml:"authorized_clients,omitempty" validate:"omitempty,dive,spiffe_id"`
-
-	// TrustedServers is a list of SPIFFE IDs that this service trusts as servers.
-	// Used for client-side authorization when connecting to services.
-	// If empty, all servers from the same trust domain are trusted.
-	TrustedServers []string `yaml:"trusted_servers,omitempty" validate:"omitempty,dive,spiffe_id"`
 
 	// Cache contains caching configuration for certificate and trust bundle operations.
 	Cache *CacheConfig `yaml:"cache,omitempty"`
@@ -343,12 +334,6 @@ func validateProductionSecurity(config *Configuration) error {
 		validationErrors = append(validationErrors, errors.ErrVerboseLogging)
 	}
 
-	// Check authorized clients for wildcards
-	for _, client := range config.Service.AuthorizedClients {
-		if strings.Contains(client, "*") {
-			validationErrors = append(validationErrors, fmt.Errorf("%w: %s", errors.ErrWildcardClients, client))
-		}
-	}
 
 	if len(validationErrors) > 0 {
 		return errors.NewProductionValidationError(validationErrors...)
