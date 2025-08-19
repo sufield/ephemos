@@ -72,7 +72,6 @@ func getDefaultConfig() *ArchConfig {
 		},
 		CoreDirs: []string{
 			"internal/core",
-			"internal/adapters/interceptors",
 			"pkg/ephemos",
 		},
 		AllowedExternalDeps: []string{

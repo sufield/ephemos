@@ -56,11 +56,6 @@ func (p *Printer) Lock(msg string) {
 	p.line(p.out, "🔒", msg)
 }
 
-// Warn prints a warning message
-func (p *Printer) Warn(msg string) {
-	p.line(p.err, "⚠️", msg)
-}
-
 // Error prints an error message
 func (p *Printer) Error(msg string) {
 	p.line(p.err, "❌", msg)
@@ -125,30 +120,6 @@ func (p *Printer) Cycle(msg string) {
 		return
 	}
 	p.line(p.out, "🔄", msg)
-}
-
-// Book prints a documentation-related message
-func (p *Printer) Book(msg string) {
-	if p.quiet {
-		return
-	}
-	p.line(p.out, "📚", msg)
-}
-
-// Shield prints a security shield message
-func (p *Printer) Shield(msg string) {
-	if p.quiet {
-		return
-	}
-	p.line(p.out, "🛡️", msg)
-}
-
-// Key prints a key/credential message
-func (p *Printer) Key(msg string) {
-	if p.quiet {
-		return
-	}
-	p.line(p.out, "🔐", msg)
 }
 
 // Bullet prints a bullet point

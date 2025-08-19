@@ -1,409 +1,377 @@
 # SPIRE Identity Verification and Diagnostics CLI Examples
 
-This document provides examples of using Ephemos CLI commands for SPIRE identity verification and diagnostics. These commands leverage SPIRE's built-in capabilities rather than implementing custom verification logic.
+This document provides examples of using **SPIRE's built-in CLI commands** for identity verification and diagnostics. Ephemos leverages SPIRE's native capabilities rather than implementing a custom CLI.
+
+> **Note**: Ephemos does not provide its own CLI for SPIRE operations. All identity verification and diagnostics should be done using SPIRE's native `spire-server` and `spire-agent` CLI tools.
+
+## Prerequisites
+
+Ensure you have SPIRE CLI tools installed:
+- `spire-server` - SPIRE Server CLI
+- `spire-agent` - SPIRE Agent CLI
 
 ## Identity Verification Commands
 
 ### 1. Verify Current Workload Identity
 
-Get the current workload identity from SPIRE using the Workload API:
+Get the current workload identity from SPIRE using the Agent API:
 
 ```bash
-# Get current identity with text output
-ephemos verify current
+# Show current agent SVID
+spire-agent api fetch x509 \
+    -socketPath /run/spire/sockets/agent.sock
 
-# Get current identity with JSON output
-ephemos verify current --format json
-
-# Use custom Workload API socket
-ephemos verify current --socket unix:///custom/spire-agent/api.sock
+# Show current agent SVID in JSON format
+spire-agent api fetch x509 \
+    -socketPath /run/spire/sockets/agent.sock \
+    -write /dev/stdout
 ```
 
 Example output:
 ```
-🆔 Current Identity
-SPIFFE ID: spiffe://example.org/my-service
-Trust Domain: example.org
-Source: workload-api
-Fetched At: 2024-01-15T10:30:00Z
-Has SVID: true
-Has Trust Bundle: true
-Certificate Expires: 2024-01-15T11:30:00Z
-Certificate Serial: 123456789
+Received 1 svid after 0.001s
+
+SPIFFE ID:        spiffe://example.org/my-service
+SVID Valid After:  2024-01-15 09:30:00 +0000 UTC
+SVID Valid Until:  2024-01-15 11:30:00 +0000 UTC
+CA #1 Valid After:  2024-01-14 00:00:00 +0000 UTC
+CA #1 Valid Until:  2024-01-16 00:00:00 +0000 UTC
 ```
 
-### 2. Verify Specific SPIFFE Identity
+### 2. Validate JWT SVID
 
-Verify that the current workload identity matches an expected SPIFFE ID:
+Fetch and validate JWT SVIDs:
 
 ```bash
-# Verify identity matches expected SPIFFE ID
-ephemos verify identity spiffe://example.org/my-service
+# Fetch JWT SVID for a specific audience
+spire-agent api fetch jwt \
+    -socketPath /run/spire/sockets/agent.sock \
+    -audience backend-service
 
-# Verify with custom trust domain validation
-ephemos verify identity spiffe://example.org/my-service \
-    --trust-domain example.org
+# Validate a JWT token
+spire-agent api validate jwt \
+    -socketPath /run/spire/sockets/agent.sock \
+    -svid "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..." \
+    -audience backend-service
+```
 
-# Verify with allowed SPIFFE IDs restriction
-ephemos verify identity spiffe://example.org/my-service \
-    --allowed-ids spiffe://example.org/my-service,spiffe://example.org/backup-service
+### 3. Health Check
 
-# JSON output for automation
-ephemos verify identity spiffe://example.org/my-service --format json
+Check the health status of SPIRE components:
+
+```bash
+# Check agent health
+spire-agent healthcheck \
+    -socketPath /run/spire/sockets/agent.sock
+
+# Check server health  
+spire-server healthcheck \
+    -socketPath /run/spire/sockets/registration.sock
+```
+
+## SPIRE Server Diagnostics Commands
+
+### 1. List Registration Entries
+
+List all registration entries:
+
+```bash
+# List all entries
+spire-server entry show \
+    -socketPath /run/spire/sockets/registration.sock
+
+# List entries for a specific SPIFFE ID
+spire-server entry show \
+    -socketPath /run/spire/sockets/registration.sock \
+    -spiffeID spiffe://example.org/my-service
+
+# List entries with specific selector
+spire-server entry show \
+    -socketPath /run/spire/sockets/registration.sock \
+    -selector unix:uid:1000
+
+# Output in JSON format
+spire-server entry show \
+    -socketPath /run/spire/sockets/registration.sock \
+    -output json
 ```
 
 Example output:
 ```
-✅ Identity Verification
-Identity: spiffe://example.org/my-service
-Trust Domain: example.org
-Valid: true
-Message: Identity verification successful
-Verified At: 2024-01-15T10:30:00Z
-Not Before: 2024-01-15T09:30:00Z
-Not After: 2024-01-15T11:30:00Z
-Serial Number: 123456789
-Key Usage: [DigitalSignature KeyEncipherment]
+Found 2 entries
+Entry ID         : 12345678-1234-5678-1234-567812345678
+SPIFFE ID        : spiffe://example.org/my-service
+Parent ID        : spiffe://example.org/spire/agent/k8s_psat/cluster/demo/node/node1
+Revision         : 0
+TTL              : default
+Selector         : k8s:ns:default
+Selector         : k8s:sa:my-service
 ```
 
-### 3. Validate mTLS Connection
+### 2. Show Trust Bundle
 
-Validate a mutual TLS connection to another service with SPIFFE identity verification:
+Display trust bundle information:
 
 ```bash
-# Validate connection to another service
-ephemos verify connection spiffe://example.org/backend-service localhost:8080
+# Show bundle for the trust domain
+spire-server bundle show \
+    -socketPath /run/spire/sockets/registration.sock
 
-# Validate connection with custom timeout
-ephemos verify connection spiffe://example.org/backend-service localhost:8080 \
-    --timeout 10s
+# Show bundle in JSON format
+spire-server bundle show \
+    -socketPath /run/spire/sockets/registration.sock \
+    -format json
 
-# Validate with custom socket
-ephemos verify connection spiffe://example.org/backend-service localhost:8080 \
-    --socket unix:///custom/spire-agent/api.sock
+# Show federated bundles
+spire-server bundle list \
+    -socketPath /run/spire/sockets/registration.sock \
+    -format spiffe
 ```
 
-Example output:
-```
-✅ Identity Verification
-Identity: spiffe://example.org/backend-service
-Trust Domain: example.org
-Valid: true
-Message: Successfully validated connection to spiffe://example.org/backend-service
-Verified At: 2024-01-15T10:30:00Z
-Certificate Expires: 2024-01-15T11:30:00Z
-TLS Version: TLS 1.3
-Cipher Suite: TLS_AES_256_GCM_SHA384
-```
+### 3. List Agents
 
-### 4. Refresh Workload Identity
-
-Force a refresh of the workload identity from SPIRE:
-
-```bash
-# Refresh identity
-ephemos verify refresh
-
-# Refresh with JSON output
-ephemos verify refresh --format json
-```
-
-## SPIRE Diagnostics Commands
-
-### 1. Server Diagnostics
-
-Get comprehensive SPIRE server diagnostic information:
-
-```bash
-# Get server diagnostics using default socket
-ephemos diagnose server
-
-# Get server diagnostics with custom socket
-ephemos diagnose server --server-socket unix:///custom/spire-server/api.sock
-
-# Use server API instead of CLI commands
-ephemos diagnose server --use-api --server-address https://spire-server:8081 \
-    --api-token "bearer-token"
-
-# JSON output for monitoring systems
-ephemos diagnose server --format json
-```
-
-Example output:
-```
-🔍 spire-server Diagnostics
-Version: 1.8.7
-Status: running
-Trust Domain: example.org
-Collected At: 2024-01-15T10:30:00Z
-
-Registration Entries:
-  Total: 25
-  Recent: 3
-  By Selector:
-    unix: 15
-    docker: 8
-    k8s: 2
-
-Agents:
-  Total: 5
-  Active: 4
-  Inactive: 1
-  Banned: 0
-
-Details:
-  healthcheck: Server is healthy
-```
-
-### 2. Agent Diagnostics
-
-Get comprehensive SPIRE agent diagnostic information:
-
-```bash
-# Get agent diagnostics
-ephemos diagnose agent
-
-# Get agent diagnostics with custom sockets
-ephemos diagnose agent \
-    --agent-socket unix:///custom/spire-agent/api.sock
-
-# JSON output
-ephemos diagnose agent --format json
-```
-
-Example output:
-```
-🔍 spire-agent Diagnostics
-Version: 1.8.7
-Status: running
-Trust Domain: example.org
-Collected At: 2024-01-15T10:30:00Z
-
-Details:
-  healthcheck: Agent is healthy
-  workload_spiffe_id: spiffe://example.org/my-service
-  certificate_expires_at: 2024-01-15T11:30:00Z
-  certificate_serial: 123456789
-```
-
-### 3. List Registration Entries
-
-List all registration entries using SPIRE CLI:
-
-```bash
-# List all registration entries
-ephemos diagnose entries
-
-# List with custom server socket
-ephemos diagnose entries --server-socket unix:///custom/spire-server/api.sock
-
-# JSON output for processing
-ephemos diagnose entries --format json
-```
-
-Example output:
-```
-📋 Registration Entries (25 total)
-
-1. ID: entry-12345
-   SPIFFE ID: spiffe://example.org/web-service
-   Parent ID: spiffe://example.org/spire/agent/node
-   Selectors: [unix:uid:1000 docker:label:app:web]
-   TTL: 3600s
-   Admin: false
-   Created: 2024-01-15T09:00:00Z
-
-2. ID: entry-23456
-   SPIFFE ID: spiffe://example.org/database
-   Parent ID: spiffe://example.org/spire/agent/node
-   Selectors: [unix:uid:1001 k8s:sa:database]
-   TTL: 7200s
-   Admin: false
-   Created: 2024-01-15T08:30:00Z
-...
-```
-
-### 4. Show Trust Bundle Information
-
-Display trust bundle information using SPIRE CLI:
-
-```bash
-# Show trust bundle for default domain
-ephemos diagnose bundles
-
-# Show trust bundle for specific domain
-ephemos diagnose bundles example.org
-
-# JSON output
-ephemos diagnose bundles example.org --format json
-```
-
-Example output:
-```
-🔐 Trust Bundle Information
-
-Local Bundle:
-  Trust Domain: example.org
-  Certificate Count: 2
-  Last Updated: 2024-01-15T10:00:00Z
-  Expires At: 2024-01-16T10:00:00Z
-
-Federated Bundles:
-  partner.org:
-    Certificate Count: 1
-    Last Updated: 2024-01-15T09:30:00Z
-    Expires At: 2024-01-16T09:30:00Z
-```
-
-### 5. List Connected Agents
-
-List all connected SPIRE agents:
+List all registered agents:
 
 ```bash
 # List all agents
-ephemos diagnose agents
+spire-server agent list \
+    -socketPath /run/spire/sockets/registration.sock
 
-# List with custom server socket
-ephemos diagnose agents --server-socket unix:///custom/spire-server/api.sock
+# Show specific agent
+spire-server agent show \
+    -socketPath /run/spire/sockets/registration.sock \
+    -spiffeID spiffe://example.org/spire/agent/k8s_psat/cluster/demo/node/node1
 
-# JSON output
-ephemos diagnose agents --format json
+# Output in JSON format
+spire-server agent list \
+    -socketPath /run/spire/sockets/registration.sock \
+    -output json
 ```
 
 Example output:
 ```
-🤖 SPIRE Agents (5 total)
+Found 3 agents:
 
-1. ID: spiffe://example.org/spire/agent/node-1
-   Attestation Type: node
-   Serial Number: agent-cert-123
-   Expires At: 2024-01-16T10:30:00Z
-   Banned: false
-   Can Reattest: true
-   Selectors: [node:hostname:node-1]
-
-2. ID: spiffe://example.org/spire/agent/node-2
-   Attestation Type: node
-   Serial Number: agent-cert-456
-   Expires At: 2024-01-16T10:45:00Z
-   Banned: false
-   Can Reattest: true
-   Selectors: [node:hostname:node-2]
-...
+SPIFFE ID         : spiffe://example.org/spire/agent/k8s_psat/cluster/demo/node/node1
+Attestation type  : k8s_psat
+Expiration time   : 2024-01-16 10:30:00 +0000 UTC
+Serial number     : 123456789
+Can re-attest     : true
 ```
 
-### 6. Get Component Versions
+### 4. Create Registration Entry
 
-Get the version of SPIRE components:
+Register a new workload:
 
 ```bash
-# Get server version
-ephemos diagnose version spire-server
-
-# Get agent version
-ephemos diagnose version spire-agent
-
-# JSON output
-ephemos diagnose version spire-server --format json
+# Create a new registration entry
+spire-server entry create \
+    -socketPath /run/spire/sockets/registration.sock \
+    -spiffeID spiffe://example.org/new-service \
+    -parentID spiffe://example.org/spire/agent/k8s_psat/cluster/demo/node/node1 \
+    -selector k8s:ns:default \
+    -selector k8s:sa:new-service \
+    -ttl 3600
 ```
 
-Example output:
-```
-spire-server version: 1.8.7
-```
+### 5. Delete Registration Entry
 
-## Global Options
-
-All commands support these global options:
-
-- `--format`: Output format (`text` or `json`)
-- `--quiet`: Suppress non-essential output
-- `--no-emoji`: Disable emoji in output (useful for logs)
-- `--timeout`: Global timeout for operations (default: 30s)
-
-## Integration with Monitoring Systems
-
-### Prometheus Integration
-
-Use JSON output with monitoring systems:
+Delete a registration entry:
 
 ```bash
-# Script for Prometheus metrics collection
-#!/bin/bash
-
-# Get server health
-ephemos diagnose server --format json --quiet > /tmp/spire-server.json
-
-# Get agent health
-ephemos diagnose agent --format json --quiet > /tmp/spire-agent.json
-
-# Process JSON and expose metrics
-python3 process_spire_metrics.py
+# Delete by entry ID
+spire-server entry delete \
+    -socketPath /run/spire/sockets/registration.sock \
+    -entryID 12345678-1234-5678-1234-567812345678
 ```
 
-### Automation Scripts
+## SPIRE Agent Diagnostics Commands
 
-Example automation script:
+### 1. Show Agent SVID
+
+Display the agent's own SVID:
+
+```bash
+# Show agent SVID
+spire-agent api fetch x509 \
+    -socketPath /run/spire/sockets/agent.sock \
+    -silent
+```
+
+### 2. List Cached Entries
+
+Show entries cached by the agent:
+
+```bash
+# This information is available through debug endpoints
+# when the agent is started with appropriate configuration
+curl http://localhost:8080/debug/entries
+```
+
+## Automation Scripts
+
+### Health Check Script
+
+Example script for monitoring SPIRE health:
 
 ```bash
 #!/bin/bash
 
-echo "Running SPIRE infrastructure health check..."
+# check_spire_health.sh - Monitor SPIRE infrastructure health
 
-# Check server
-if ephemos diagnose server --quiet; then
+AGENT_SOCKET="${SPIRE_AGENT_SOCKET:-/run/spire/sockets/agent.sock}"
+SERVER_SOCKET="${SPIRE_SERVER_SOCKET:-/run/spire/sockets/registration.sock}"
+
+echo "Checking SPIRE infrastructure health..."
+
+# Check server health
+if spire-server healthcheck -socketPath "$SERVER_SOCKET" >/dev/null 2>&1; then
     echo "✅ SPIRE server is healthy"
 else
     echo "❌ SPIRE server check failed"
     exit 1
 fi
 
-# Check agent
-if ephemos diagnose agent --quiet; then
+# Check agent health
+if spire-agent healthcheck -socketPath "$AGENT_SOCKET" >/dev/null 2>&1; then
     echo "✅ SPIRE agent is healthy"
 else
     echo "❌ SPIRE agent check failed"
     exit 1
 fi
 
-# Verify our identity
-if ephemos verify current --quiet; then
-    echo "✅ Workload identity is available"
+# Verify workload API is accessible
+if spire-agent api fetch x509 -socketPath "$AGENT_SOCKET" -silent >/dev/null 2>&1; then
+    echo "✅ Workload API is accessible"
 else
-    echo "❌ Workload identity check failed"
+    echo "❌ Workload API check failed"
     exit 1
 fi
 
-echo "🎉 All SPIRE infrastructure checks passed!"
+echo "🎉 All SPIRE health checks passed!"
+```
+
+### Identity Verification Script
+
+Example script to verify workload identity:
+
+```bash
+#!/bin/bash
+
+# verify_identity.sh - Verify workload has expected SPIFFE ID
+
+EXPECTED_SPIFFE_ID="${1:-spiffe://example.org/my-service}"
+AGENT_SOCKET="${SPIRE_AGENT_SOCKET:-/run/spire/sockets/agent.sock}"
+
+echo "Verifying workload identity..."
+
+# Fetch current SVID
+CURRENT_ID=$(spire-agent api fetch x509 -socketPath "$AGENT_SOCKET" -silent | \
+    grep "SPIFFE ID:" | awk '{print $3}')
+
+if [ "$CURRENT_ID" = "$EXPECTED_SPIFFE_ID" ]; then
+    echo "✅ Identity verified: $CURRENT_ID"
+    exit 0
+else
+    echo "❌ Identity mismatch!"
+    echo "   Expected: $EXPECTED_SPIFFE_ID"
+    echo "   Got: $CURRENT_ID"
+    exit 1
+fi
+```
+
+## Integration with Monitoring Systems
+
+### Prometheus Metrics Collection
+
+SPIRE Server and Agent expose Prometheus metrics:
+
+```yaml
+# prometheus.yml configuration
+scrape_configs:
+  - job_name: 'spire-server'
+    static_configs:
+      - targets: ['localhost:8088']
+    
+  - job_name: 'spire-agent'
+    static_configs:
+      - targets: ['localhost:8089']
+```
+
+### JSON Output for Automation
+
+Most SPIRE commands support JSON output for automation:
+
+```bash
+# Get entries in JSON for processing
+spire-server entry show \
+    -socketPath /run/spire/sockets/registration.sock \
+    -output json | jq '.entries[] | select(.spiffe_id | contains("my-service"))'
+
+# Get agent list in JSON
+spire-server agent list \
+    -socketPath /run/spire/sockets/registration.sock \
+    -output json | jq '.agents[] | {id: .id.trust_domain, expires: .x509svid_expires_at}'
+```
+
+## Ephemos Configuration Validation
+
+While Ephemos doesn't provide identity verification CLI, it does provide a configuration validator:
+
+```bash
+# Validate Ephemos configuration
+./config-validator --config ephemos.yaml --production
+
+# Validate using environment variables only
+./config-validator --env-only --production
+
+# Output in JSON format
+./config-validator --config ephemos.yaml --format json
 ```
 
 ## Security Considerations
 
-1. **Socket Permissions**: Ensure proper file permissions on SPIRE sockets
-2. **Network Access**: Validate network connectivity for connection tests
-3. **Timeouts**: Set appropriate timeouts for production environments
-4. **Authentication**: Use API tokens when accessing SPIRE server APIs
-5. **Logging**: Be careful not to log sensitive identity information
+1. **Socket Permissions**: Ensure proper file permissions on SPIRE sockets (typically 0660)
+2. **Socket Paths**: Use absolute paths for socket locations
+3. **mTLS**: All SPIRE communications use mTLS by default
+4. **Logging**: Avoid logging sensitive information like private keys
+5. **Access Control**: Restrict access to SPIRE server admin socket
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Socket Not Found**: Check SPIRE agent/server is running and socket path is correct
-2. **Permission Denied**: Ensure process has access to SPIRE sockets
-3. **Connection Timeout**: Verify network connectivity and increase timeout
-4. **Identity Not Available**: Confirm workload is registered in SPIRE
-5. **CLI Command Failed**: Check SPIRE CLI tools are installed and accessible
+1. **Permission Denied on Socket**
+   ```bash
+   # Check socket permissions
+   ls -la /run/spire/sockets/
+   # Add user to spire group if needed
+   sudo usermod -a -G spire $USER
+   ```
 
-### Debug Mode
+2. **Socket Not Found**
+   ```bash
+   # Verify SPIRE is running
+   systemctl status spire-agent
+   systemctl status spire-server
+   ```
 
-Enable verbose output for troubleshooting:
+3. **No SVID Available**
+   ```bash
+   # Check if workload is registered
+   spire-server entry show -socketPath /run/spire/sockets/registration.sock
+   ```
 
-```bash
-# Run with verbose output
-ephemos --timeout 60s verify current --format json
+4. **Connection Refused**
+   ```bash
+   # Check if services are listening
+   ss -tlnp | grep spire
+   netstat -tlnp | grep spire
+   ```
 
-# Check logs for additional information
-journalctl -u spire-agent -f
-journalctl -u spire-server -f
-```
+## Additional Resources
+
+- [SPIRE Documentation](https://spiffe.io/docs/latest/spire/)
+- [SPIRE CLI Reference](https://spiffe.io/docs/latest/spire/using/spire_cli/)
+- [SPIFFE Specifications](https://spiffe.io/docs/latest/spiffe/)
+- [Ephemos Configuration Guide](../../docs/configuration.md)

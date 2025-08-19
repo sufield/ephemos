@@ -5,7 +5,6 @@ go 1.24
 require (
 	github.com/go-playground/validator/v10 v10.27.0
 	github.com/go-viper/mapstructure/v2 v2.4.0
-	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.23.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
@@ -13,6 +12,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/tools v0.36.0
 	google.golang.org/grpc v1.74.2
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -51,5 +51,4 @@ require (
 	golang.org/x/text v0.28.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250528174236-200df99c418a // indirect
 	google.golang.org/protobuf v1.36.7 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
