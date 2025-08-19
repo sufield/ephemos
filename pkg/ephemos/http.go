@@ -25,6 +25,26 @@ func AuthorizeAny() Authorizer {
 	return tlsconfig.AuthorizeAny()
 }
 
+// AuthorizeID returns an Authorizer that accepts only the specified SPIFFE ID.
+// This provides strict identity-based authorization.
+func AuthorizeID(id string) (Authorizer, error) {
+	spiffeID, err := spiffeid.FromString(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid SPIFFE ID %q: %w", id, err)
+	}
+	return tlsconfig.AuthorizeID(spiffeID), nil
+}
+
+// AuthorizeMemberOf returns an Authorizer that accepts any member of the specified trust domain.
+// This provides trust domain-based authorization.
+func AuthorizeMemberOf(trustDomain string) (Authorizer, error) {
+	td, err := spiffeid.TrustDomainFromString(trustDomain)
+	if err != nil {
+		return nil, fmt.Errorf("invalid trust domain %q: %w", trustDomain, err)
+	}
+	return tlsconfig.AuthorizeMemberOf(td), nil
+}
+
 // HTTPClientConfig configures an HTTP client with SPIFFE mTLS.
 type HTTPClientConfig struct {
 	// IdentityService provides certificates and trust bundles.
@@ -312,4 +332,49 @@ func NewHTTPTransport(config *HTTPTransportConfig) (*http.Transport, error) {
 	}
 
 	return transport, nil
+}
+
+// NewServerTLSConfig creates a TLS configuration for HTTPS servers with SPIFFE mTLS.
+// This enables servers to authenticate clients using SPIFFE identities.
+//
+// Example:
+//
+//	tlsConfig, err := ephemos.NewServerTLSConfig(
+//	    identityService,
+//	    ephemos.AuthorizeMemberOf("prod.company.com"),
+//	)
+//	if err != nil {
+//	    return err
+//	}
+//	server := &http.Server{
+//	    Addr:      ":8443",
+//	    Handler:   router,
+//	    TLSConfig: tlsConfig,
+//	}
+//	server.ListenAndServeTLS("", "")
+func NewServerTLSConfig(identityService IdentityService, authorizer Authorizer) (*tls.Config, error) {
+	if identityService == nil {
+		return nil, fmt.Errorf("identity service is required")
+	}
+
+	// Set default authorizer if none provided
+	if authorizer == nil {
+		authorizer = AuthorizeAny()
+	}
+
+	// Create SVID source adapter
+	svidSource := &svidSourceAdapter{identityService: identityService}
+
+	// Create bundle source adapter (no trust domain restriction for server)
+	bundleSource := &bundleSourceAdapter{
+		identityService: identityService,
+	}
+
+	// Use go-spiffe to create mTLS server config
+	tlsConfig := tlsconfig.MTLSServerConfig(svidSource, bundleSource, authorizer)
+
+	// Ensure TLS 1.3 minimum
+	tlsConfig.MinVersion = tls.VersionTLS13
+
+	return tlsConfig, nil
 }

@@ -168,28 +168,36 @@ spiffeID.String()                  // URI representation
 - ✅ Domain layer still uses `ServiceIdentity` for business logic compatibility
 - ✅ All identity validation now uses battle-tested SDK methods
 
-## 7. TLS Configuration
+## 7. TLS Configuration ✅ COMPLETED
 
-### Current Custom Code
-**Files:** Various TLS setup code across adapters
-- Custom mTLS configuration
-- Custom peer verification
+### Previous Custom Code
+**Files:** Contrib examples in `contrib/middleware/gin/` and `contrib/middleware/chi/` - **UPDATED**
+- Manual TLS configuration with `tls.Config{}`
+- Custom cipher suites and version settings
+- File-based certificate loading
 
-### go-spiffe SDK Alternative
+### Replaced With go-spiffe SDK
 ```go
-import "github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+// Main codebase already uses go-spiffe SDK properly:
+// internal/adapters/secondary/spiffe/tls_adapter.go
+tlsConfig := tlsconfig.MTLSServerConfig(a.x509Source, a.x509Source, authorizer)
+tlsConfig := tlsconfig.MTLSClientConfig(a.x509Source, a.x509Source, authorizer)
 
-// For server:
-tlsConfig := tlsconfig.MTLSServerConfig(source, source, tlsconfig.AuthorizeAny())
+// pkg/ephemos/http.go (already implemented)
+tlsConfig := tlsconfig.MTLSClientConfig(svidSource, bundleSource, authorizer)
 
-// For client:
-tlsConfig := tlsconfig.MTLSClientConfig(source, source, tlsconfig.AuthorizeID(serverID))
+// Added new server TLS configuration:
+func NewServerTLSConfig(identityService IdentityService, authorizer Authorizer) (*tls.Config, error)
 ```
 
-### Benefits
-- Remove custom TLS configuration logic
-- Built-in rotation support
-- Automatic mTLS setup
+### Changes Made
+- ✅ **Main codebase already using SDK correctly** - TLS adapters, transport providers, HTTP client all use `tlsconfig.MTLSServerConfig()` and `tlsconfig.MTLSClientConfig()`
+- ✅ **Added server TLS helper** - `ephemos.NewServerTLSConfig()` for HTTPS servers
+- ✅ **Added authorizer helpers** - `ephemos.AuthorizeID()`, `ephemos.AuthorizeMemberOf()`, `ephemos.AuthorizeAny()`
+- ✅ **Updated contrib examples** - Gin and Chi examples now use `ephemos.NewServerTLSConfig()` with proper SPIFFE mTLS
+- ✅ **Enabled proper mTLS** - Examples now require client certificates (`RequireClientCert: true`)
+- ✅ **Removed manual TLS config** - Replaced manual `tls.Config{}` setup with SDK-based configuration
+- ✅ **All TLS operations now use battle-tested go-spiffe SDK implementations**
 
 ## 8. Workload API Client Management
 
