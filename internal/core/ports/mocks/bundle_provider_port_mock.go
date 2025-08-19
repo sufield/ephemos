@@ -5,6 +5,8 @@ package mocks
 import (
 	"context"
 
+	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/stretchr/testify/mock"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
@@ -19,24 +21,24 @@ type MockBundleProviderPort struct {
 var _ ports.BundleProviderPort = (*MockBundleProviderPort)(nil)
 
 // GetTrustBundle mocks the GetTrustBundle method.
-func (m *MockBundleProviderPort) GetTrustBundle(ctx context.Context) (*domain.TrustBundle, error) {
+func (m *MockBundleProviderPort) GetTrustBundle(ctx context.Context) (*x509bundle.Bundle, error) {
 	args := m.Called(ctx)
 
-	var r0 *domain.TrustBundle
+	var r0 *x509bundle.Bundle
 	if args.Get(0) != nil {
-		r0 = args.Get(0).(*domain.TrustBundle)
+		r0 = args.Get(0).(*x509bundle.Bundle)
 	}
 
 	return r0, args.Error(1)
 }
 
 // GetTrustBundleForDomain mocks the GetTrustBundleForDomain method.
-func (m *MockBundleProviderPort) GetTrustBundleForDomain(ctx context.Context, trustDomain domain.TrustDomain) (*domain.TrustBundle, error) {
+func (m *MockBundleProviderPort) GetTrustBundleForDomain(ctx context.Context, trustDomain spiffeid.TrustDomain) (*x509bundle.Bundle, error) {
 	args := m.Called(ctx, trustDomain)
 
-	var r0 *domain.TrustBundle
+	var r0 *x509bundle.Bundle
 	if args.Get(0) != nil {
-		r0 = args.Get(0).(*domain.TrustBundle)
+		r0 = args.Get(0).(*x509bundle.Bundle)
 	}
 
 	return r0, args.Error(1)
@@ -49,12 +51,12 @@ func (m *MockBundleProviderPort) RefreshTrustBundle(ctx context.Context) error {
 }
 
 // WatchTrustBundleChanges mocks the WatchTrustBundleChanges method.
-func (m *MockBundleProviderPort) WatchTrustBundleChanges(ctx context.Context) (<-chan *domain.TrustBundle, error) {
+func (m *MockBundleProviderPort) WatchTrustBundleChanges(ctx context.Context) (<-chan *x509bundle.Bundle, error) {
 	args := m.Called(ctx)
 
-	var r0 <-chan *domain.TrustBundle
+	var r0 <-chan *x509bundle.Bundle
 	if args.Get(0) != nil {
-		r0 = args.Get(0).(<-chan *domain.TrustBundle)
+		r0 = args.Get(0).(<-chan *x509bundle.Bundle)
 	}
 
 	return r0, args.Error(1)

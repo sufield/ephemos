@@ -5,6 +5,7 @@ package identityprovider
 import (
 	"testing"
 
+	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
@@ -199,21 +200,26 @@ func assertValidCertificate(t *testing.T, cert *domain.Certificate) {
 	}
 }
 
-// assertValidTrustBundle asserts that a trust bundle is valid.
-func assertValidTrustBundle(t *testing.T, bundle *domain.TrustBundle) {
+// assertValidTrustBundle asserts that an x509bundle.Bundle is valid.
+func assertValidTrustBundle(t *testing.T, bundle *x509bundle.Bundle) {
 	t.Helper()
 	if bundle == nil {
 		t.Fatal("GetTrustBundle returned nil bundle without error")
 	}
 
-	if len(bundle.Certificates) == 0 {
-		t.Error("TrustBundle.Certificates should not be empty")
+	authorities := bundle.X509Authorities()
+	if len(authorities) == 0 {
+		t.Error("Bundle.X509Authorities should not be empty")
 	}
 
-	for i, cert := range bundle.Certificates {
+	for i, cert := range authorities {
 		if cert == nil {
-			t.Errorf("TrustBundle.Certificates[%d] should not be nil", i)
+			t.Errorf("Bundle.X509Authorities[%d] should not be nil", i)
 		}
+	}
+
+	if bundle.TrustDomain().String() == "" {
+		t.Error("Bundle.TrustDomain should not be empty")
 	}
 }
 

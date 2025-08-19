@@ -108,28 +108,31 @@ type IdentityProviderPort interface {
 - ✅ Removed dependency on custom `IdentityDocument` wrapper
 - ✅ All identity operations now use battle-tested SDK types
 
-## 5. Trust Bundle Management
+## 5. Trust Bundle Management ✅ COMPLETED
 
-### Current Custom Code
-**File:** `internal/core/domain/trust_bundle.go`
-- **Lines:** ~380 lines
-- **Methods:** Custom merge, validation, certificate management
+### Previous Custom Code
+**File:** `internal/core/domain/trust_bundle.go` - **FILE DEPRECATED**
+- **Lines:** ~380 lines - Custom certificate management, validation, merging
+- **Methods:** `NewTrustBundle()`, `ValidateCertificateChain()`, `Merge()`, etc.
 
-### go-spiffe SDK Alternative
+### Replaced With go-spiffe SDK
 ```go
-import "github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
-
-// Replace with x509bundle.Bundle methods:
-bundle.HasX509Authority(cert)
-bundle.AddX509Authority(cert)
-bundle.RemoveX509Authority(cert)
-bundleSet.Merge(otherSet)
+// Interface changes: Replace domain.TrustBundle with x509bundle.Bundle
+type BundleProviderPort interface {
+    GetTrustBundle(ctx context.Context) (*x509bundle.Bundle, error)
+    GetTrustBundleForDomain(ctx context.Context, td spiffeid.TrustDomain) (*x509bundle.Bundle, error)
+    WatchTrustBundleChanges(ctx context.Context) (<-chan *x509bundle.Bundle, error)
+}
 ```
 
-### Benefits
-- Remove custom certificate deduplication logic
-- Built-in bundle merging and management
-- Automatic handling of bundle updates
+### Changes Made
+- ✅ Replaced internal `BundleProviderPort` to use `x509bundle.Bundle` directly
+- ✅ Updated `TrustBundleProvider` interface to return SDK bundles
+- ✅ Updated SPIFFE bundle adapter to return bundles from workload API directly
+- ✅ Updated memory provider to create `x509bundle.Bundle` for testing
+- ✅ Removed custom certificate validation - now uses standard `crypto/x509` with bundle authorities
+- ✅ Trust bundle watching now streams `x509bundle.Bundle` objects
+- ✅ All trust operations now use battle-tested SDK bundle management
 
 ## 6. Service Identity Validation
 

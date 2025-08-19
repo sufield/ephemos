@@ -27,7 +27,7 @@ type SpiffeBundleAdapter struct {
 	mu            sync.RWMutex
 	currentBundle *x509bundle.Set
 	watchCancel   context.CancelFunc
-	watcherChan   chan *domain.TrustBundle
+	watcherChan   chan *x509bundle.Bundle
 }
 
 // SpiffeBundleAdapterConfig provides configuration for the adapter.
@@ -49,12 +49,12 @@ func NewSpiffeBundleAdapter(config SpiffeBundleAdapterConfig) (*SpiffeBundleAdap
 	return &SpiffeBundleAdapter{
 		socketPath:  socketPath,
 		logger:      logger,
-		watcherChan: make(chan *domain.TrustBundle, 10), // Buffer for updates
+		watcherChan: make(chan *x509bundle.Bundle, 10), // Buffer for updates
 	}, nil
 }
 
-// GetTrustBundle retrieves the current trust bundle from SPIFFE.
-func (a *SpiffeBundleAdapter) GetTrustBundle(ctx context.Context) (*domain.TrustBundle, error) {
+// GetTrustBundle retrieves the current trust bundle from SPIFFE using SDK directly.
+func (a *SpiffeBundleAdapter) GetTrustBundle(ctx context.Context) (*x509bundle.Bundle, error) {
 	a.logger.Debug("fetching trust bundle from SPIFFE")
 
 	if err := a.ensureSource(ctx); err != nil {
@@ -67,30 +67,21 @@ func (a *SpiffeBundleAdapter) GetTrustBundle(ctx context.Context) (*domain.Trust
 		return nil, fmt.Errorf("failed to get X509 SVID for trust domain: %w", err)
 	}
 
-	// Get bundle for the SVID's trust domain
+	// Get bundle for the SVID's trust domain - return SDK bundle directly
 	bundle, err := a.x509Source.GetX509BundleForTrustDomain(svid.ID.TrustDomain())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get trust bundle: %w", err)
 	}
 
-	// Note: X509Source doesn't expose bundle sets, so we don't cache them
-	// Each call will fetch fresh from the source
-
-	// Convert to domain trust bundle
-	domainBundle, err := domain.NewTrustBundle(bundle.X509Authorities())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create domain trust bundle: %w", err)
-	}
-
 	a.logger.Debug("trust bundle retrieved",
 		"trust_domain", svid.ID.TrustDomain().String(),
-		"ca_count", domainBundle.Count())
+		"ca_count", len(bundle.X509Authorities()))
 
-	return domainBundle, nil
+	return bundle, nil
 }
 
 // GetTrustBundleForDomain retrieves a trust bundle for a specific trust domain.
-func (a *SpiffeBundleAdapter) GetTrustBundleForDomain(ctx context.Context, trustDomain domain.TrustDomain) (*domain.TrustBundle, error) {
+func (a *SpiffeBundleAdapter) GetTrustBundleForDomain(ctx context.Context, trustDomain spiffeid.TrustDomain) (*x509bundle.Bundle, error) {
 	a.logger.Debug("fetching trust bundle for specific domain",
 		"trust_domain", trustDomain.String())
 
@@ -98,29 +89,17 @@ func (a *SpiffeBundleAdapter) GetTrustBundleForDomain(ctx context.Context, trust
 		return nil, fmt.Errorf("failed to ensure X509 source: %w", err)
 	}
 
-	// Parse trust domain
-	td, err := spiffeid.TrustDomainFromString(trustDomain.String())
+	// Get bundle for specific trust domain - return SDK bundle directly
+	bundle, err := a.x509Source.GetX509BundleForTrustDomain(trustDomain)
 	if err != nil {
-		return nil, fmt.Errorf("invalid trust domain %q: %w", trustDomain, err)
-	}
-
-	// Get bundle for specific trust domain
-	bundle, err := a.x509Source.GetX509BundleForTrustDomain(td)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get trust bundle for domain %s: %w", td, err)
-	}
-
-	// Convert to domain trust bundle
-	domainBundle, err := domain.NewTrustBundle(bundle.X509Authorities())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create domain trust bundle: %w", err)
+		return nil, fmt.Errorf("failed to get trust bundle for domain %s: %w", trustDomain, err)
 	}
 
 	a.logger.Debug("trust bundle retrieved for domain",
-		"trust_domain", td.String(),
-		"ca_count", domainBundle.Count())
+		"trust_domain", trustDomain.String(),
+		"ca_count", len(bundle.X509Authorities()))
 
-	return domainBundle, nil
+	return bundle, nil
 }
 
 // RefreshTrustBundle triggers a refresh of the trust bundle.
@@ -142,7 +121,7 @@ func (a *SpiffeBundleAdapter) RefreshTrustBundle(ctx context.Context) error {
 
 // WatchTrustBundleChanges returns a channel that receives trust bundle updates.
 // This uses SPIFFE Workload API's streaming updates for automatic rotation.
-func (a *SpiffeBundleAdapter) WatchTrustBundleChanges(ctx context.Context) (<-chan *domain.TrustBundle, error) {
+func (a *SpiffeBundleAdapter) WatchTrustBundleChanges(ctx context.Context) (<-chan *x509bundle.Bundle, error) {
 	a.logger.Info("starting trust bundle change watcher")
 
 	if err := a.ensureSource(ctx); err != nil {
@@ -198,18 +177,11 @@ func (a *SpiffeBundleAdapter) watchForBundleUpdates(ctx context.Context) {
 
 			// Note: We don't cache bundle sets since X509Source doesn't expose them
 
-			// Convert to domain trust bundle
-			domainBundle, err := domain.NewTrustBundle(bundle.X509Authorities())
-			if err != nil {
-				a.logger.Error("failed to create domain trust bundle from update", "error", err)
-				continue
-			}
-
-			// Send update to channel (non-blocking)
+			// Send bundle update to channel (non-blocking) - use SDK bundle directly
 			select {
-			case a.watcherChan <- domainBundle:
+			case a.watcherChan <- bundle:
 				a.logger.Info("trust bundle update sent",
-					"ca_count", domainBundle.Count())
+					"ca_count", len(bundle.X509Authorities()))
 			default:
 				a.logger.Warn("trust bundle update channel full, dropping update")
 			}
@@ -236,12 +208,25 @@ func (a *SpiffeBundleAdapter) ValidateCertificateAgainstBundle(ctx context.Conte
 		return fmt.Errorf("certificate has no X.509 certificate")
 	}
 
-	// Create certificate chain for validation
-	chain := []*x509.Certificate{cert.Cert}
-	chain = append(chain, cert.Chain...)
+	// Create certificate pool from trust bundle for validation
+	pool := x509.NewCertPool()
+	for _, ca := range trustBundle.X509Authorities() {
+		pool.AddCert(ca)
+	}
 
-	// Validate the chain against the trust bundle
-	if err := trustBundle.ValidateCertificateChain(chain); err != nil {
+	// Validate the certificate chain using standard Go crypto/x509 validation
+	opts := x509.VerifyOptions{
+		Roots:         pool,
+		Intermediates: x509.NewCertPool(),
+	}
+	
+	// Add intermediate certificates to verify options
+	for _, intermediate := range cert.Chain {
+		opts.Intermediates.AddCert(intermediate)
+	}
+
+	// Perform validation
+	if _, err := cert.Cert.Verify(opts); err != nil {
 		return fmt.Errorf("certificate validation failed: %w", err)
 	}
 

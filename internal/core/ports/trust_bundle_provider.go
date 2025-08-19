@@ -6,7 +6,7 @@ package ports
 import (
 	"crypto/x509"
 
-	"github.com/sufield/ephemos/internal/core/domain"
+	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
 )
 
 // TrustBundleProvider defines an interface for dynamic trust bundle access.
@@ -20,7 +20,7 @@ import (
 // Implementations should ensure thread-safety as this interface may be called
 // concurrently from multiple goroutines during TLS handshakes and certificate validation.
 type TrustBundleProvider interface {
-	// GetTrustBundle returns the current trust bundle.
+	// GetTrustBundle returns the current trust bundle using go-spiffe SDK.
 	// Implementations should return the most up-to-date bundle available.
 	//
 	// This method may be called frequently during TLS operations, so implementations
@@ -28,15 +28,15 @@ type TrustBundleProvider interface {
 	// when trust bundles are rotated.
 	//
 	// Returns:
-	//   - A TrustBundle containing the current set of trust anchors
+	//   - An x509bundle.Bundle containing the current set of trust anchors
 	//   - An error if the trust bundle cannot be retrieved
-	GetTrustBundle() (*domain.TrustBundle, error)
+	GetTrustBundle() (*x509bundle.Bundle, error)
 
 	// CreateCertPool creates a cert pool from the current trust bundle.
-	// This is a convenience method that calls GetTrustBundle().CreateCertPool().
+	// This is a convenience method that gets the bundle and creates a cert pool.
 	//
 	// This method provides a direct way to get an x509.CertPool for use with
-	// standard Go TLS operations without exposing the internal TrustBundle structure
+	// standard Go TLS operations without exposing the internal bundle structure
 	// to adapters that only need the cert pool.
 	//
 	// Returns:

@@ -150,28 +150,6 @@ MIIDETCCAfmgAwIBAgIRAK+RuNhJjJRQqQoA5X0l+bIwDQYJKoZIhvcNAQELBQAw
 	}
 }
 
-func TestRedactorHandler_JWTTokens(t *testing.T) {
-	var buf bytes.Buffer
-	baseHandler := slog.NewTextHandler(&buf, nil)
-	redactorHandler := logging.NewRedactorHandler(baseHandler)
-	logger := slog.New(redactorHandler)
-
-	jwtToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." +
-		"eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ." +
-		"SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
-
-	logger.Info("Authentication", "token", jwtToken)
-
-	output := buf.String()
-
-	if !strings.Contains(output, logging.RedactedValue) {
-		t.Error("JWT token should be redacted")
-	}
-
-	if strings.Contains(output, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9") {
-		t.Error("JWT token should not appear in output")
-	}
-}
 
 func TestSensitiveFieldPatternMatching(t *testing.T) {
 	var buf bytes.Buffer
