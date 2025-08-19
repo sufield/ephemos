@@ -153,11 +153,11 @@ func NewServiceIdentityFromSPIFFEID(id spiffeid.ID) *ServiceIdentity {
 		panic(fmt.Sprintf("NewServiceIdentityFromSPIFFEID failed: invalid trust domain in SPIFFE ID %q: %v", id.String(), err))
 	}
 
-	// Extract path from already-validated SPIFFE ID
-	spiffePath := NewSPIFFEPathFromID(id)
+	// Extract service name directly from SPIFFE ID path (already validated)
+	serviceName := extractServiceNameFromPath(id.Path())
 
 	return &ServiceIdentity{
-		name:        spiffePath.ToServiceName(),
+		name:        serviceName,
 		trustDomain: trustDomain,
 		uri:         id.String(),
 	}
@@ -286,4 +286,23 @@ func (s *ServiceIdentity) GetTrustDomainString() string {
 // IsMemberOf checks if this identity belongs to the specified trust domain (facade method).
 func (s *ServiceIdentity) IsMemberOf(trustDomain string) bool {
 	return s.trustDomain.String() == trustDomain
+}
+
+// extractServiceNameFromPath extracts the service name from a SPIFFE ID path.
+// For example, "/service/payment-processor" returns "payment-processor".
+// Returns empty string if the path doesn't contain a service name.
+func extractServiceNameFromPath(path string) string {
+	if path == "" || path == "/" {
+		return ""
+	}
+
+	// Remove leading slash and split by '/'
+	cleanPath := strings.TrimPrefix(path, "/")
+	segments := strings.Split(cleanPath, "/")
+
+	if len(segments) == 0 {
+		return ""
+	}
+
+	return segments[len(segments)-1]
 }
