@@ -1,8 +1,9 @@
 package domain_test
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"math/big"
@@ -258,7 +259,7 @@ func createValidCACert(t *testing.T) *x509.Certificate {
 	t.Helper()
 	
 	// Generate a private key
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	
 	// Create certificate template for CA
@@ -297,7 +298,7 @@ func createValidLeafCert(t *testing.T) *x509.Certificate {
 	t.Helper()
 	
 	// Generate a private key
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	
 	// Create certificate template for leaf certificate (not CA)

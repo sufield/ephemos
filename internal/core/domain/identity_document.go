@@ -3,7 +3,6 @@ package domain
 
 import (
 	"crypto"
-	"crypto/ecdsa"
 	"crypto/x509"
 	"fmt"
 	"time"
@@ -320,15 +319,10 @@ func (doc *IdentityDocument) RequiresPrivateKey() bool {
 }
 
 // SupportsKeyType returns true if the given private key type is supported.
+// This method expresses domain intent rather than mechanical type assertions.
 func (doc *IdentityDocument) SupportsKeyType(key crypto.Signer) bool {
-	switch key.(type) {
-	case *ecdsa.PrivateKey:
-		return true
-	default:
-		// For now, we primarily support ECDSA keys as they are the most common in SPIFFE
-		// This can be extended to support RSA and Ed25519 keys as needed
-		return false
-	}
+	// For MVP, we only support ECDSA keys as they are the standard for SPIFFE
+	return SupportsKeyType(key)
 }
 
 // String returns a string representation of the identity document for debugging.

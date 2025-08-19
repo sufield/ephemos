@@ -1,8 +1,9 @@
 package domain_test
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"math/big"
@@ -18,8 +19,8 @@ import (
 
 // TestCertificateValidateWithOptions tests the new Validate method with options
 func TestCertificateValidateWithOptions(t *testing.T) {
-	// Create a test certificate with SPIFFE ID
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	// Create a test certificate with SPIFFE ID using ECDSA (SPIFFE standard)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 
 	spiffeURI, err := url.Parse("spiffe://example.com/service")
@@ -157,7 +158,7 @@ func TestDefaultCertValidator(t *testing.T) {
 	validator := adapters.NewDefaultCertValidator()
 
 	// Create a test certificate
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 
 	spiffeURI, err := url.Parse("spiffe://example.com/service")
@@ -209,7 +210,7 @@ func TestDefaultCertValidator(t *testing.T) {
 
 // TestValidateWithEmptyOptions tests that Validate works with empty options
 func TestValidateWithEmptyOptions(t *testing.T) {
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 
 	template := &x509.Certificate{

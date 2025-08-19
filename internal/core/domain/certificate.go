@@ -272,22 +272,21 @@ func (c *Certificate) ToServiceIdentity() (*ServiceIdentity, error) {
 }
 
 // verifyKeyMatch verifies that the private key matches the certificate's public key.
-// Requires Go 1.24+ - uses modern Equal method for all key types.
-// This method assumes that c.PrivateKey and c.Cert have already been validated to be non-nil.
+// This method expresses domain intent rather than mechanical key comparison operations.
+// It assumes that c.PrivateKey and c.Cert have already been validated to be non-nil.
 func (c *Certificate) verifyKeyMatch() error {
-	privateKeyPublic := c.PrivateKey.Public()
-
-	// Use the modern Equal method (available since Go 1.15, required in Go 1.24+)
-	switch pubKey := c.Cert.PublicKey.(type) {
-	case interface{ Equal(interface{}) bool }:
-		if !pubKey.Equal(privateKeyPublic) {
-			return fmt.Errorf("private key does not match certificate public key")
-		}
-		return nil
-	default:
-		// All standard Go crypto key types support Equal method in Go 1.24+
-		return fmt.Errorf("unsupported public key type %T - Go 1.24+ required", c.Cert.PublicKey)
+	// Extract public key from private key with domain validation
+	privateKeyPublic, err := ExtractPublicKeyFromSigner(c.PrivateKey)
+	if err != nil {
+		return fmt.Errorf("failed to extract public key from private key: %w", err)
 	}
+
+	// Validate that the key pair matches using domain intent
+	if err := ValidateKeyPairMatching(c.Cert.PublicKey, privateKeyPublic); err != nil {
+		return fmt.Errorf("certificate key validation failed: %w", err)
+	}
+
+	return nil
 }
 
 // verifyWithTrustBundle verifies the certificate chain against a trust bundle.
