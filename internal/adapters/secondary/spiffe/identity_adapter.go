@@ -39,7 +39,7 @@ type IdentityDocumentAdapterConfig struct {
 // NewIdentityDocumentAdapter creates a new SPIFFE identity document adapter.
 func NewIdentityDocumentAdapter(config IdentityDocumentAdapterConfig) (*IdentityDocumentAdapter, error) {
 	socketPath := config.SocketPath
-	// Note: We preserve empty socket paths as-is for backward compatibility
+	// Note: Empty socket paths will cause errors in connection logic (fail-fast behavior)
 	// The actual connection logic will handle defaults when needed
 	
 	logger := config.Logger

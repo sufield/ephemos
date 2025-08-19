@@ -39,8 +39,7 @@ type SpiffeBundleAdapterConfig struct {
 // NewSpiffeBundleAdapter creates a new SPIFFE trust bundle adapter.
 func NewSpiffeBundleAdapter(config SpiffeBundleAdapterConfig) (*SpiffeBundleAdapter, error) {
 	socketPath := config.SocketPath
-	// Note: We preserve empty socket paths as-is for backward compatibility
-	// The actual connection logic will handle defaults when needed
+	// Note: Empty socket paths will cause errors in connection logic (fail-fast behavior)
 	
 	logger := config.Logger
 	if logger == nil {

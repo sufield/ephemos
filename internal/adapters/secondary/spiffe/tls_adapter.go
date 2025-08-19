@@ -31,7 +31,7 @@ type TLSAdapterConfig struct {
 // NewTLSAdapter creates a new SPIFFE TLS adapter.
 func NewTLSAdapter(config TLSAdapterConfig) (*TLSAdapter, error) {
 	socketPath := config.SocketPath
-	// Note: We preserve empty socket paths as-is for backward compatibility
+	// Note: Empty socket paths will cause errors in connection logic (fail-fast behavior)
 	// The actual connection logic will handle defaults when needed
 	
 	logger := config.Logger
