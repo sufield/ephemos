@@ -56,26 +56,32 @@ spiffeID.Path()                          // Direct path extraction
 - ✅ Direct path extraction using `spiffeID.Path()`
 - ✅ Simple helper function `extractServiceNameFromPath()` for business logic
 
-## 3. Certificate Chain Validation
+## 3. Certificate Chain Validation ✅ COMPLETED
 
-### Current Custom Code
-**File:** `internal/core/domain/certificate.go`
-- **Lines:** ~100+ lines in validation methods
-- **Methods:** `validateChainOrder()`, `verifyKeyMatch()`, `verifyWithTrustBundle()`
+### Previous Custom Code
+**File:** `internal/core/domain/certificate.go` - **METHODS REMOVED**
+- `validateChainOrder()` (~50 lines) - Custom chain order and signature verification
+- `verifyKeyMatch()` (~15 lines) - Custom private key matching
+- `verifyWithTrustBundle()` (~35 lines) - Custom trust bundle verification
 
-### go-spiffe SDK Alternative
+### Replaced With go-spiffe SDK
 ```go
-import "github.com/spiffe/go-spiffe/v2/svid/x509svid"
+import (
+    "github.com/spiffe/go-spiffe/v2/svid/x509svid"
+    "github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
+)
 
-// Replace custom chain validation with:
-svid, err := x509svid.ParseAndVerify(certChain, bundleSource)
-// Handles all chain validation, key matching, and trust verification
+// Certificate validation now uses SDK:
+spiffeID, _, err := x509svid.ParseAndVerify(certChainDER, bundleSource)
+// Handles: chain order, signature verification, trust verification, expiry
 ```
 
-### Benefits
-- Remove complex cryptographic validation code
-- Automatic handling of chain order verification
-- Built-in expiry and validity checks
+### Changes Made
+- ✅ Replaced `Validate()` method to use `x509svid.ParseAndVerify()`
+- ✅ Removed ~100 lines of custom cryptographic validation code
+- ✅ Added helper methods to convert TrustBundle to x509bundle.Source
+- ✅ Maintained private key validation (not handled by SDK)
+- ✅ Comprehensive validation now uses battle-tested SDK implementation
 
 ## 4. Identity Document Creation
 
