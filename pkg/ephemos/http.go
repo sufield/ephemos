@@ -25,25 +25,6 @@ func AuthorizeAny() Authorizer {
 	return tlsconfig.AuthorizeAny()
 }
 
-// AuthorizeID returns an Authorizer that accepts only the specified SPIFFE ID.
-// This provides strict identity-based authorization.
-func AuthorizeID(id string) (Authorizer, error) {
-	spiffeID, err := spiffeid.FromString(id)
-	if err != nil {
-		return nil, fmt.Errorf("invalid SPIFFE ID %q: %w", id, err)
-	}
-	return tlsconfig.AuthorizeID(spiffeID), nil
-}
-
-// AuthorizeMemberOf returns an Authorizer that accepts any member of the specified trust domain.
-// This provides trust domain-based authorization.
-func AuthorizeMemberOf(trustDomain string) (Authorizer, error) {
-	td, err := spiffeid.TrustDomainFromString(trustDomain)
-	if err != nil {
-		return nil, fmt.Errorf("invalid trust domain %q: %w", trustDomain, err)
-	}
-	return tlsconfig.AuthorizeMemberOf(td), nil
-}
 
 // HTTPClientConfig configures an HTTP client with SPIFFE mTLS.
 type HTTPClientConfig struct {
@@ -336,12 +317,13 @@ func NewHTTPTransport(config *HTTPTransportConfig) (*http.Transport, error) {
 
 // NewServerTLSConfig creates a TLS configuration for HTTPS servers with SPIFFE mTLS.
 // This enables servers to authenticate clients using SPIFFE identities.
+// Note: This is for authentication only. Authorization is out of scope.
 //
 // Example:
 //
 //	tlsConfig, err := ephemos.NewServerTLSConfig(
 //	    identityService,
-//	    ephemos.AuthorizeMemberOf("prod.company.com"),
+//	    ephemos.AuthorizeAny(), // Accept any valid SPIFFE identity
 //	)
 //	if err != nil {
 //	    return err

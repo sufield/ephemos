@@ -192,11 +192,11 @@ func NewServerTLSConfig(identityService IdentityService, authorizer Authorizer) 
 
 ### Changes Made
 - ✅ **Main codebase already using SDK correctly** - TLS adapters, transport providers, HTTP client all use `tlsconfig.MTLSServerConfig()` and `tlsconfig.MTLSClientConfig()`
-- ✅ **Added server TLS helper** - `ephemos.NewServerTLSConfig()` for HTTPS servers
-- ✅ **Added authorizer helpers** - `ephemos.AuthorizeID()`, `ephemos.AuthorizeMemberOf()`, `ephemos.AuthorizeAny()`
+- ✅ **Added server TLS helper** - `ephemos.NewServerTLSConfig()` for HTTPS servers with SPIFFE authentication
 - ✅ **Updated contrib examples** - Gin and Chi examples now use `ephemos.NewServerTLSConfig()` with proper SPIFFE mTLS
 - ✅ **Enabled proper mTLS** - Examples now require client certificates (`RequireClientCert: true`)
 - ✅ **Removed manual TLS config** - Replaced manual `tls.Config{}` setup with SDK-based configuration
+- ✅ **Authentication only** - Uses `AuthorizeAny()` to validate SPIFFE identities (authorization is out of scope)
 - ✅ **All TLS operations now use battle-tested go-spiffe SDK implementations**
 
 ## 8. Workload API Client Management

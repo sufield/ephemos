@@ -205,12 +205,8 @@ func createTLSConfig() (*tls.Config, error) {
 	}
 
 	// Create SPIFFE mTLS server configuration using go-spiffe SDK
-	authorizer, err := ephemos.AuthorizeMemberOf("example.org")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create authorizer: %w", err)
-	}
-	
-	tlsConfig, err := ephemos.NewServerTLSConfig(identityService, authorizer)
+	// Using AuthorizeAny() for authentication only - authorization is out of scope
+	tlsConfig, err := ephemos.NewServerTLSConfig(identityService, ephemos.AuthorizeAny())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TLS config: %w", err)
 	}
