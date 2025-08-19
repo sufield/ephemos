@@ -49,6 +49,7 @@ package ephemos
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"sync"
@@ -81,7 +82,7 @@ type Client interface {
 
 // clientConn is the minimal behavior we need from the internal connection.
 type clientConn interface {
-	HTTPClient() (*http.Client, error)
+	HTTPClient() (ports.HTTPClient, error)
 	Close() error
 }
 
@@ -108,7 +109,13 @@ func (c *clientConnectionImpl) HTTPClient() (*http.Client, error) {
 		return nil, ErrNoSPIFFEAuth
 	}
 
-	return c.conn.HTTPClient()
+	portClient, err := c.conn.HTTPClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert ports.HTTPClient back to *http.Client for public API
+	return newHTTPClientFromPort(portClient), nil
 }
 
 // Close closes the connection and releases resources.
@@ -362,7 +369,9 @@ func (s *serverWrapper) ListenAndServe(ctx context.Context) error {
 		defer cancel()
 	}
 
-	return impl.Serve(serverCtx, listener)
+	// Wrap net.Listener in NetworkListener for the port interface
+	networkListener := &networkListenerAdapter{listener: listener}
+	return impl.Serve(serverCtx, networkListener)
 }
 
 func (s *serverWrapper) Close() error {
@@ -388,7 +397,19 @@ func (s *serverWrapper) Addr() net.Addr {
 		return nil
 	}
 
-	return s.impl.Addr()
+	// Convert string address back to net.Addr for public API compatibility
+	addrStr := s.impl.Addr()
+	if addrStr == "" {
+		return nil
+	}
+	
+	// Parse the address string back to net.TCPAddr
+	// This is a simple conversion - could be enhanced for other address types
+	addr, err := net.ResolveTCPAddr("tcp", addrStr)
+	if err != nil {
+		return nil // Return nil if address can't be parsed
+	}
+	return addr
 }
 
 // loadClientConfig loads configuration from client options
@@ -425,4 +446,75 @@ func loadServerConfig(opts *serverOpts) (*ports.Configuration, error) {
 	}
 
 	return nil, fmt.Errorf("no configuration provided")
+}
+
+// newHTTPClientFromPort creates an *http.Client that delegates to a ports.HTTPClient.
+// This allows the public API to maintain its *http.Client interface while using 
+// the abstracted ports internally.
+func newHTTPClientFromPort(portClient ports.HTTPClient) *http.Client {
+	return &http.Client{
+		Transport: &portClientTransport{portClient: portClient},
+	}
+}
+
+// portClientTransport implements http.RoundTripper by delegating to ports.HTTPClient.
+type portClientTransport struct {
+	portClient ports.HTTPClient
+}
+
+func (t *portClientTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Convert http.Request to ports.HTTPRequest
+	headers := make(map[string][]string)
+	for key, values := range req.Header {
+		headers[key] = values
+	}
+
+	portReq := &ports.HTTPRequest{
+		Method:  req.Method,
+		URL:     req.URL.String(),
+		Headers: headers,
+		Body:    req.Body,
+	}
+
+	// Execute request via ports.HTTPClient
+	portResp, err := t.portClient.Do(req.Context(), portReq)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert ports.HTTPResponse back to http.Response
+	httpResp := &http.Response{
+		StatusCode: portResp.StatusCode,
+		Header:     make(http.Header),
+		Body:       portResp.Body,
+		Request:    req,
+	}
+
+	// Copy headers back
+	for key, values := range portResp.Headers {
+		httpResp.Header[key] = values
+	}
+
+	return httpResp, nil
+}
+
+// networkListenerAdapter adapts net.Listener to ports.NetworkListener.
+type networkListenerAdapter struct {
+	listener net.Listener
+}
+
+func (a *networkListenerAdapter) Accept() (io.ReadWriteCloser, error) {
+	conn, err := a.listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
+func (a *networkListenerAdapter) Addr() string {
+	return a.listener.Addr().String()
+}
+
+func (a *networkListenerAdapter) Close() error {
+	return a.listener.Close()
 }

@@ -5,8 +5,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
-	"net"
 	"time"
 
 	"github.com/sufield/ephemos/internal/adapters/secondary/memidentity"
@@ -347,7 +347,7 @@ func (m *mockTransportProvider) CreateClient(
 type mockServer struct{}
 
 func (m *mockServer) RegisterService(_ ports.ServiceRegistrarPort) error { return nil }
-func (m *mockServer) Start(_ net.Listener) error                         { return nil }
+func (m *mockServer) Start(_ ports.NetworkListener) error { return nil }
 func (m *mockServer) Stop() error                                        { return nil }
 
 type mockClient struct{}
@@ -360,5 +360,5 @@ func (m *mockClient) Close() error { return nil }
 type mockConnection struct{}
 
 func (m *mockConnection) GetClientConnection() interface{} { return nil }
-func (m *mockConnection) AsNetConn() net.Conn              { return nil }
+func (m *mockConnection) AsReadWriteCloser() io.ReadWriteCloser { return nil }
 func (m *mockConnection) Close() error                     { return nil }

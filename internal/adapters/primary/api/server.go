@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"sync"
@@ -140,7 +141,9 @@ func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
 
 	errCh := make(chan error, 1)
 
-	go func() { errCh <- s.domainServer.Start(listener) }()
+	// Wrap net.Listener to implement ports.NetworkListener
+	netListener := &networkListenerAdapter{listener: listener}
+	go func() { errCh <- s.domainServer.Start(netListener) }()
 
 	select {
 	case <-ctx.Done():
@@ -184,4 +187,25 @@ func (a *serviceRegistrarAdapter) Register(server interface{}) {
 	if grpcServer, ok := server.(grpc.ServiceRegistrar); ok {
 		a.registrar.Register(grpcServer)
 	}
+}
+
+// networkListenerAdapter adapts net.Listener to ports.NetworkListener.
+type networkListenerAdapter struct {
+	listener net.Listener
+}
+
+func (a *networkListenerAdapter) Accept() (io.ReadWriteCloser, error) {
+	conn, err := a.listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
+func (a *networkListenerAdapter) Addr() string {
+	return a.listener.Addr().String()
+}
+
+func (a *networkListenerAdapter) Close() error {
+	return a.listener.Close()
 }

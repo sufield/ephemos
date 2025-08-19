@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"sync"
@@ -216,10 +217,17 @@ func (s *grpcServer) initializeServer() error {
 }
 
 // Start starts the gRPC server on the provided listener.
-func (s *grpcServer) Start(listener net.Listener) error {
+func (s *grpcServer) Start(listener ports.NetworkListener) error {
 	// Validate inputs first (without lock)
 	if listener == nil {
 		return fmt.Errorf("listener cannot be nil")
+	}
+
+	// gRPC server needs a net.Listener, so we need to reverse-adapt
+	// For now, we'll use a simple approach where NetworkListener is expected to wrap net.Listener
+	netListener, err := extractNetListener(listener)
+	if err != nil {
+		return fmt.Errorf("failed to extract net.Listener: %w", err)
 	}
 
 	// Acquire lock for state checks and updates
@@ -247,7 +255,7 @@ func (s *grpcServer) Start(listener net.Listener) error {
 	s.mu.Unlock()
 
 	// Start serving (this call blocks until server stops)
-	err := s.server.Serve(listener)
+	err = s.server.Serve(netListener)
 
 	// Mark as not serving when we return
 	s.mu.Lock()
@@ -293,11 +301,11 @@ func (c *grpcConnection) GetClientConnection() interface{} {
 	return c.conn
 }
 
-// AsNetConn safely converts the connection to a net.Conn if possible.
-// gRPC connections are not net.Conn instances, so this returns nil.
-func (c *grpcConnection) AsNetConn() net.Conn {
-	// gRPC ClientConn is not a net.Conn - it manages multiple HTTP/2 streams
-	// Return nil to indicate this connection type doesn't support net.Conn interface
+// AsReadWriteCloser safely converts the connection to io.ReadWriteCloser if possible.
+// gRPC connections are not ReadWriteCloser instances, so this returns nil.
+func (c *grpcConnection) AsReadWriteCloser() io.ReadWriteCloser {
+	// gRPC ClientConn is not a ReadWriteCloser - it manages multiple HTTP/2 streams
+	// Return nil to indicate this connection type doesn't support ReadWriteCloser interface
 	return nil
 }
 
@@ -326,4 +334,34 @@ func (c *grpcConnection) Close() error {
 	}
 
 	return nil
+}
+
+// networkListenerAdapter adapts net.Listener to ports.NetworkListener.
+type networkListenerAdapter struct {
+	listener net.Listener
+}
+
+func (a *networkListenerAdapter) Accept() (io.ReadWriteCloser, error) {
+	conn, err := a.listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
+func (a *networkListenerAdapter) Addr() string {
+	return a.listener.Addr().String()
+}
+
+func (a *networkListenerAdapter) Close() error {
+	return a.listener.Close()
+}
+
+// extractNetListener extracts the underlying net.Listener from a NetworkListener.
+// This is needed because gRPC server requires net.Listener interface.
+func extractNetListener(listener ports.NetworkListener) (net.Listener, error) {
+	if adapter, ok := listener.(*networkListenerAdapter); ok {
+		return adapter.listener, nil
+	}
+	return nil, fmt.Errorf("NetworkListener must be a networkListenerAdapter to work with gRPC server")
 }
