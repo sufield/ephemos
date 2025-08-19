@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/sufield/ephemos/internal/core/adapters"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/errors"
@@ -105,7 +106,7 @@ type IdentityService struct {
 	identityProvider  ports.IdentityProvider
 	transportProvider ports.TransportProvider
 	config            *ports.Configuration
-	cachedIdentity    *domain.ServiceIdentity
+	cachedIdentity    spiffeid.ID
 	validator         ports.CertValidatorPort // Certificate validator
 	metrics           MetricsReporter         // Metrics reporter (Prometheus or NoOp)
 
@@ -156,9 +157,10 @@ func NewIdentityService(
 	if serviceConfig.Domain == "" {
 		return nil, fmt.Errorf("service domain is required")
 	}
-	identity := domain.NewServiceIdentity(serviceConfig.Name.Value(), serviceConfig.Domain)
-	if err := identity.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid service identity: %w", err)
+	// Get service identity from provider using SDK
+	identity, err := identityProvider.GetServiceIdentity()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service identity: %w", err)
 	}
 
 	// Use default validator if none provided
@@ -210,17 +212,17 @@ func (s *IdentityService) CreateServerIdentity() (ports.ServerPort, error) {
 
 	cert, err := s.getCertificate()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get certificate for service %s: %w", identity.Name(), err)
+		return nil, fmt.Errorf("failed to get certificate for service %s: %w", identity.Path()[1:], err)
 	}
 
 	// Explicitly validate certificate as described in architecture documentation
 	if validationErr := s.ValidateServiceIdentity(cert); validationErr != nil {
-		return nil, fmt.Errorf("certificate validation failed for service %s: %w", identity.Name(), validationErr)
+		return nil, fmt.Errorf("certificate validation failed for service %s: %w", identity.Path()[1:], validationErr)
 	}
 
 	trustBundle, err := s.getTrustBundle()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get trust bundle for service %s: %w", identity.Name(), err)
+		return nil, fmt.Errorf("failed to get trust bundle for service %s: %w", identity.Path()[1:], err)
 	}
 
 	// Create authentication policy with authorization based on configuration
@@ -231,7 +233,7 @@ func (s *IdentityService) CreateServerIdentity() (ports.ServerPort, error) {
 
 	server, err := s.transportProvider.CreateServer(cert, trustBundle, policy)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create server transport for service %s: %w", identity.Name(), err)
+		return nil, fmt.Errorf("failed to create server transport for service %s: %w", identity.Path()[1:], err)
 	}
 
 	return server, nil
@@ -247,17 +249,17 @@ func (s *IdentityService) CreateClientIdentity() (ports.ClientPort, error) {
 
 	cert, err := s.getCertificate()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get certificate for service %s: %w", identity.Name(), err)
+		return nil, fmt.Errorf("failed to get certificate for service %s: %w", identity.Path()[1:], err)
 	}
 
 	// Explicitly validate certificate as described in architecture documentation
 	if validationErr := s.ValidateServiceIdentity(cert); validationErr != nil {
-		return nil, fmt.Errorf("certificate validation failed for service %s: %w", identity.Name(), validationErr)
+		return nil, fmt.Errorf("certificate validation failed for service %s: %w", identity.Path()[1:], validationErr)
 	}
 
 	trustBundle, err := s.getTrustBundle()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get trust bundle for service %s: %w", identity.Name(), err)
+		return nil, fmt.Errorf("failed to get trust bundle for service %s: %w", identity.Path()[1:], err)
 	}
 
 	// Create authentication policy with authorization based on configuration
@@ -268,7 +270,7 @@ func (s *IdentityService) CreateClientIdentity() (ports.ClientPort, error) {
 
 	client, err := s.transportProvider.CreateClient(cert, trustBundle, policy)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create client transport for service %s: %w", identity.Name(), err)
+		return nil, fmt.Errorf("failed to create client transport for service %s: %w", identity.Path()[1:], err)
 	}
 
 	return client, nil
@@ -315,7 +317,7 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 			// This aligns with SPIFFE short-lived cert best practices
 			if s.cachedCert.IsExpiringWithin(refreshThreshold) {
 				slog.Info("Proactively refreshing certificate expiring soon",
-					"service_name", s.cachedIdentity.Name(),
+					"service_name", s.cachedIdentity.Path()[1:],
 					"cert_expires_at", s.cachedCert.ExpiresAt(),
 					"refresh_threshold", refreshThreshold.String(),
 					"expires_in", s.cachedCert.TimeToExpiry().String(),
@@ -340,7 +342,7 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 	refreshStart := time.Now()
 	cert, err := s.fetchCertificateWithRetry()
 	if err != nil {
-		return nil, fmt.Errorf("identity provider failed for service %s: %w", s.cachedIdentity.Name(), err)
+		return nil, fmt.Errorf("identity provider failed for service %s: %w", s.cachedIdentity.Path()[1:], err)
 	}
 	refreshDuration := time.Since(refreshStart).Seconds()
 
@@ -357,7 +359,7 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 
 	// Update certificate expiry metric
 	if cert != nil && cert.Cert != nil {
-		s.metrics.UpdateCertExpiry(s.cachedIdentity.Name(), float64(cert.Cert.NotAfter.Unix()))
+		s.metrics.UpdateCertExpiry(s.cachedIdentity.Path()[1:], float64(cert.Cert.NotAfter.Unix()))
 	}
 
 	// Cache the new certificate
@@ -410,7 +412,7 @@ func (s *IdentityService) getTrustBundle() (*domain.TrustBundle, error) {
 	s.metrics.RecordCacheMiss("bundle")
 	bundle, err := s.fetchTrustBundleWithRetry()
 	if err != nil {
-		return nil, fmt.Errorf("trust bundle provider failed for service %s: %w", s.cachedIdentity.Name(), err)
+		return nil, fmt.Errorf("trust bundle provider failed for service %s: %w", s.cachedIdentity.Path()[1:], err)
 	}
 
 	// Cache the new trust bundle
@@ -461,8 +463,10 @@ func (s *IdentityService) ValidateServiceIdentity(cert *domain.Certificate) erro
 	s.mu.RUnlock()
 
 	// Configure validation options
+	// Convert spiffeid.ID to domain.ServiceIdentity for validation
+	expectedServiceIdentity := domain.NewServiceIdentity(expectedIdentity.Path()[1:], expectedIdentity.TrustDomain().String())
 	opts := domain.CertValidationOptions{
-		ExpectedIdentity: expectedIdentity,
+		ExpectedIdentity: expectedServiceIdentity,
 		WarningThreshold: time.Hour,      // Warn when certificate expires within 1 hour
 		TrustBundle:      trustBundle,    // Use cached trust bundle if available
 		SkipExpiry:       false,          // Always check expiry in production
@@ -472,13 +476,13 @@ func (s *IdentityService) ValidateServiceIdentity(cert *domain.Certificate) erro
 
 	// Use centralized validator
 	if err := s.validator.Validate(cert, opts); err != nil {
-		return fmt.Errorf("certificate validation failed for service %s: %w", expectedIdentity.Name(), err)
+		return fmt.Errorf("certificate validation failed for service %s: %w", expectedIdentity.Path()[1:], err)
 	}
 
 	// Log successful validation for observability
 	if spiffeID, err := cert.ToSPIFFEID(); err == nil {
 		slog.Debug("Certificate SPIFFE ID validation successful",
-			"service_name", expectedIdentity.Name(),
+			"service_name", expectedIdentity.Path()[1:],
 			"spiffe_id", spiffeID.String(),
 			"trust_domain", spiffeID.TrustDomain().String(),
 			"path", spiffeID.Path(),
@@ -493,7 +497,7 @@ func (s *IdentityService) ValidateServiceIdentity(cert *domain.Certificate) erro
 func (s *IdentityService) validateCertificateChain(cert *domain.Certificate) error {
 	// Get service name and identity with proper locking for thread safety
 	s.mu.RLock()
-	serviceName := s.cachedIdentity.Name()
+	serviceName := s.cachedIdentity.Path()[1:] // Remove leading slash from path
 	identity := s.cachedIdentity
 	s.mu.RUnlock()
 
@@ -504,8 +508,10 @@ func (s *IdentityService) validateCertificateChain(cert *domain.Certificate) err
 	}
 
 	// Use centralized validation with comprehensive options
+	// Convert spiffeid.ID to domain.ServiceIdentity for validation
+	serviceIdentity := domain.NewServiceIdentity(identity.Path()[1:], identity.TrustDomain().String())
 	opts := domain.CertValidationOptions{
-		ExpectedIdentity: identity,         // Verify SPIFFE ID matches our identity
+		ExpectedIdentity: serviceIdentity,  // Verify SPIFFE ID matches our identity
 		WarningThreshold: 30 * time.Minute, // Warn if expires within 30 minutes
 		TrustBundle:      trustBundle,      // Verify chain against trust bundle
 		SkipExpiry:       false,            // Always check expiry in production
@@ -534,7 +540,7 @@ func (s *IdentityService) validateCertificateChain(cert *domain.Certificate) err
 func (s *IdentityService) fetchCertificateWithRetry() (*domain.Certificate, error) {
 	// Get service name with proper locking for thread safety
 	s.mu.RLock()
-	serviceName := s.cachedIdentity.Name()
+	serviceName := s.cachedIdentity.Path()[1:] // Remove leading slash from path
 	s.mu.RUnlock()
 
 	maxRetries := 3
@@ -577,7 +583,7 @@ func (s *IdentityService) fetchCertificateWithRetry() (*domain.Certificate, erro
 func (s *IdentityService) fetchTrustBundleWithRetry() (*domain.TrustBundle, error) {
 	// Get service name with proper locking for thread safety
 	s.mu.RLock()
-	serviceName := s.cachedIdentity.Name()
+	serviceName := s.cachedIdentity.Path()[1:] // Remove leading slash from path
 	s.mu.RUnlock()
 
 	maxRetries := 3
@@ -585,9 +591,14 @@ func (s *IdentityService) fetchTrustBundleWithRetry() (*domain.TrustBundle, erro
 
 	var lastErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		bundle, err := s.identityProvider.GetTrustBundle()
+		sdkBundle, err := s.identityProvider.GetTrustBundle()
 		if err == nil {
-			return bundle, nil
+			// Convert x509bundle.Bundle to domain.TrustBundle
+			domainBundle, err := domain.NewTrustBundle(sdkBundle.X509Authorities())
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert SDK bundle to domain bundle: %w", err)
+			}
+			return domainBundle, nil
 		}
 
 		lastErr = err
@@ -617,9 +628,11 @@ func (s *IdentityService) fetchTrustBundleWithRetry() (*domain.TrustBundle, erro
 
 // createPolicy creates an authentication policy based on the service configuration.
 // It consolidates the policy creation logic that was duplicated between CreateServerIdentity and CreateClientIdentity.
-func (s *IdentityService) createPolicy(identity *domain.ServiceIdentity) (*domain.AuthenticationPolicy, error) {
+func (s *IdentityService) createPolicy(identity spiffeid.ID) (*domain.AuthenticationPolicy, error) {
+	// Convert spiffeid.ID to domain.ServiceIdentity for policy creation
+	serviceIdentity := domain.NewServiceIdentity(identity.Path()[1:], identity.TrustDomain().String())
 	// Create authentication-only policy for identity verification
-	return domain.NewAuthenticationPolicy(identity), nil
+	return domain.NewAuthenticationPolicy(serviceIdentity), nil
 }
 
 // == ENHANCED mTLS CONNECTION MANAGEMENT ==
@@ -633,8 +646,11 @@ func (s *IdentityService) EstablishMTLSConnection(ctx context.Context, connID st
 	}
 
 	s.mu.RLock()
-	localIdentity := s.cachedIdentity
+	localIdentityID := s.cachedIdentity
 	s.mu.RUnlock()
+
+	// Convert spiffeid.ID to domain.ServiceIdentity for connection registry
+	localIdentity := domain.NewServiceIdentity(localIdentityID.Path()[1:], localIdentityID.TrustDomain().String())
 
 	// Establish the connection through the connection manager
 	conn, err := s.connectionRegistry.EstablishConnection(ctx, connID, remoteIdentity, cert, localIdentity)

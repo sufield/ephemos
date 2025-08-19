@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/sufield/ephemos/internal/core/domain"
 )
@@ -22,7 +23,7 @@ type ServiceIdentityProvider interface {
 // IdentityProvider provides identities without context dependencies in core.
 // Context management is handled at the adapter layer.
 type IdentityProvider interface {
-	GetServiceIdentity() (*domain.ServiceIdentity, error)
+	GetServiceIdentity() (spiffeid.ID, error)
 	GetCertificate() (*domain.Certificate, error)
 	GetTrustBundle() (*x509bundle.Bundle, error)
 	GetSVID() (*x509svid.SVID, error)

@@ -5,6 +5,7 @@ package mocks
 import (
 	"context"
 
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/stretchr/testify/mock"
 	"github.com/sufield/ephemos/internal/core/domain"
@@ -20,12 +21,12 @@ type MockIdentityProviderPort struct {
 var _ ports.IdentityProviderPort = (*MockIdentityProviderPort)(nil)
 
 // GetServiceIdentity mocks the GetServiceIdentity method.
-func (m *MockIdentityProviderPort) GetServiceIdentity(ctx context.Context) (*domain.ServiceIdentity, error) {
+func (m *MockIdentityProviderPort) GetServiceIdentity(ctx context.Context) (spiffeid.ID, error) {
 	args := m.Called(ctx)
 
-	var r0 *domain.ServiceIdentity
+	var r0 spiffeid.ID
 	if args.Get(0) != nil {
-		r0 = args.Get(0).(*domain.ServiceIdentity)
+		r0 = args.Get(0).(spiffeid.ID)
 	}
 
 	return r0, args.Error(1)

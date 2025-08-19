@@ -267,8 +267,8 @@ func (i *IdentityPropagationInterceptor) propagateIdentity(ctx context.Context, 
 	md := metadata.MD{}
 
 	// Add current service identity
-	md.Set(MetadataKeyServiceName, identity.Name())
-	md.Set(MetadataKeyTrustDomain, identity.Domain())
+	md.Set(MetadataKeyServiceName, identity.Path()[1:]) // Remove leading slash from path
+	md.Set(MetadataKeyTrustDomain, identity.TrustDomain().String())
 	md.Set(MetadataKeyTimestamp, fmt.Sprintf("%d", i.clock().UnixMilli()))
 
 	// Generate or extract request ID
@@ -277,13 +277,13 @@ func (i *IdentityPropagationInterceptor) propagateIdentity(ctx context.Context, 
 
 	// Handle original caller propagation
 	if i.propagateOriginalCaller {
-		originalCaller := i.getOriginalCaller(ctx, identity.URI())
+		originalCaller := i.getOriginalCaller(ctx, identity.String())
 		md.Set(MetadataKeyOriginalCaller, originalCaller)
 	}
 
 	// Handle call chain propagation
 	if i.propagateCallChain {
-		callChain, err := i.buildCallChain(ctx, identity.URI())
+		callChain, err := i.buildCallChain(ctx, identity.String())
 		if err != nil {
 			return nil, err
 		}
@@ -303,7 +303,7 @@ func (i *IdentityPropagationInterceptor) propagateIdentity(ctx context.Context, 
 
 	i.logger.Debug("Identity propagated",
 		"method", method,
-		"service", identity.Name(),
+		"service", identity.Path()[1:], // Remove leading slash from path
 		"request_id", requestID)
 
 	// Record metrics if collector is available

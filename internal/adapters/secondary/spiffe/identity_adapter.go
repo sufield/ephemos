@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 
@@ -53,17 +54,17 @@ func NewIdentityDocumentAdapter(config IdentityDocumentAdapterConfig) (*Identity
 	}, nil
 }
 
-// GetServiceIdentity retrieves the current service identity from SPIFFE.
-func (a *IdentityDocumentAdapter) GetServiceIdentity(ctx context.Context) (*domain.ServiceIdentity, error) {
+// GetServiceIdentity retrieves the current service identity from SPIFFE using SDK directly.
+func (a *IdentityDocumentAdapter) GetServiceIdentity(ctx context.Context) (spiffeid.ID, error) {
 	a.logger.Debug("fetching service identity from SPIFFE")
 
 	if err := a.ensureSource(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ensure X509 source: %w", err)
+		return spiffeid.ID{}, fmt.Errorf("failed to ensure X509 source: %w", err)
 	}
 
 	svid, err := a.x509Source.GetX509SVID()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get X509 SVID: %w", err)
+		return spiffeid.ID{}, fmt.Errorf("failed to get X509 SVID: %w", err)
 	}
 
 	// Store current SVID
@@ -71,20 +72,13 @@ func (a *IdentityDocumentAdapter) GetServiceIdentity(ctx context.Context) (*doma
 	a.currentSVID = svid
 	a.mu.Unlock()
 
-	// Extract service name from SPIFFE ID path
-	serviceName := a.extractServiceName(svid.ID.Path())
-	trustDomain := svid.ID.TrustDomain().String()
-
 	a.logger.Debug("service identity retrieved",
-		"service", serviceName,
-		"trust_domain", trustDomain,
-		"spiffe_id", svid.ID.String())
+		"spiffe_id", svid.ID.String(),
+		"trust_domain", svid.ID.TrustDomain().String(),
+		"path", svid.ID.Path())
 
-	identity, err := domain.NewServiceIdentityValidated(serviceName, trustDomain)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create service identity: %w", err)
-	}
-	return identity, nil
+	// Return the SPIFFE ID directly from the SDK
+	return svid.ID, nil
 }
 
 // GetCertificate retrieves the current certificate from SPIFFE.

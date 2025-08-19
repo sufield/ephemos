@@ -83,16 +83,26 @@ func (p *Provider) WithCertificate(cert *domain.Certificate) *Provider {
 	return p
 }
 
-// GetServiceIdentity returns the configured service identity.
-func (p *Provider) GetServiceIdentity() (*domain.ServiceIdentity, error) {
+// GetServiceIdentity returns the configured service identity as spiffeid.ID.
+func (p *Provider) GetServiceIdentity() (spiffeid.ID, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	if p.closed {
-		return nil, ports.ErrIdentityNotFound
+		return spiffeid.ID{}, ports.ErrIdentityNotFound
 	}
 
-	return p.identity, nil
+	// Create SPIFFE ID from stored identity
+	spiffeID, err := spiffeid.FromURI(&url.URL{
+		Scheme: "spiffe",
+		Host:   p.identity.Domain(),
+		Path:   "/" + p.identity.Name(),
+	})
+	if err != nil {
+		return spiffeid.ID{}, err
+	}
+
+	return spiffeID, nil
 }
 
 // GetCertificate returns the configured certificate.

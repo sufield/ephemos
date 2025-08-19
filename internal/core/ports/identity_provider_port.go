@@ -19,13 +19,13 @@ import (
 //
 // Implementations must be thread-safe as they may be called concurrently.
 type IdentityProviderPort interface {
-	// GetServiceIdentity retrieves the current service identity.
+	// GetServiceIdentity retrieves the current service identity using go-spiffe SDK.
 	// The identity includes the service name and trust domain.
 	//
 	// Returns:
-	//   - A ServiceIdentity containing the service's SPIFFE identity information
+	//   - A spiffeid.ID containing the service's SPIFFE identity information
 	//   - An error if the identity cannot be retrieved
-	GetServiceIdentity(ctx context.Context) (*domain.ServiceIdentity, error)
+	GetServiceIdentity(ctx context.Context) (spiffeid.ID, error)
 
 	// GetCertificate retrieves the current service certificate.
 	// The certificate includes the private key and certificate chain.
