@@ -5,6 +5,7 @@ package identityprovider
 import (
 	"testing"
 
+	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
@@ -27,8 +28,8 @@ func Run(t *testing.T, newImpl Factory) {
 		testGetTrustBundle(t, newImpl)
 	})
 
-	t.Run("get identity document", func(t *testing.T) {
-		testGetIdentityDocument(t, newImpl)
+	t.Run("get SVID", func(t *testing.T) {
+		testGetSVID(t, newImpl)
 	})
 
 	t.Run("close is idempotent", func(t *testing.T) {
@@ -88,20 +89,20 @@ func testGetTrustBundle(t *testing.T, newImpl Factory) {
 	assertValidTrustBundle(t, bundle)
 }
 
-// testGetIdentityDocument tests getting identity document.
-func testGetIdentityDocument(t *testing.T, newImpl Factory) {
+// testGetSVID tests getting SVID.
+func testGetSVID(t *testing.T, newImpl Factory) {
 	t.Helper()
 	provider := newImpl(t)
 	defer closeProvider(t, provider)
 
-	doc, err := provider.GetIdentityDocument()
-	// Contract: Either returns valid identity document or expected error
+	svid, err := provider.GetSVID()
+	// Contract: Either returns valid SVID or expected error
 	if err != nil {
-		t.Logf("GetIdentityDocument returned error (may be expected): %v", err)
+		t.Logf("GetSVID returned error (may be expected): %v", err)
 		return
 	}
 
-	assertValidIdentityDocument(t, doc)
+	assertValidSVID(t, svid)
 }
 
 // testCloseIdempotent tests that Close is idempotent.
@@ -216,36 +217,38 @@ func assertValidTrustBundle(t *testing.T, bundle *domain.TrustBundle) {
 	}
 }
 
-// assertValidIdentityDocument asserts that an identity document is valid.
-func assertValidIdentityDocument(t *testing.T, doc *domain.IdentityDocument) {
+// assertValidSVID asserts that an SVID is valid.
+func assertValidSVID(t *testing.T, svid *x509svid.SVID) {
 	t.Helper()
-	if doc == nil {
-		t.Fatal("GetIdentityDocument returned nil document without error")
+	if svid == nil {
+		t.Fatal("GetSVID returned nil SVID without error")
 	}
 
-	if doc.Subject() == "" {
-		t.Error("IdentityDocument.Subject should not be empty")
+	if svid.ID.String() == "" {
+		t.Error("SVID.ID should not be empty")
 	}
 
-	if doc.Issuer() == "" {
-		t.Error("IdentityDocument.Issuer should not be empty")
+	if len(svid.Certificates) == 0 {
+		t.Error("SVID.Certificates should not be empty")
 	}
 
-	if doc.IssuedAt().IsZero() {
-		t.Error("IdentityDocument.IssuedAt should not be zero")
+	if svid.PrivateKey == nil {
+		t.Error("SVID.PrivateKey should not be nil")
 	}
 
-	if doc.ValidUntil().IsZero() {
-		t.Error("IdentityDocument.ValidUntil should not be zero")
-	}
+	if len(svid.Certificates) > 0 {
+		cert := svid.Certificates[0]
+		if cert.NotBefore.IsZero() {
+			t.Error("SVID certificate NotBefore should not be zero")
+		}
 
-	if doc.ValidUntil().Before(doc.IssuedAt()) {
-		t.Error("IdentityDocument.ValidUntil should be after IssuedAt")
-	}
+		if cert.NotAfter.IsZero() {
+			t.Error("SVID certificate NotAfter should not be zero")
+		}
 
-	cert := doc.GetCertificate()
-	if cert == nil {
-		t.Error("IdentityDocument.GetCertificate should not be nil")
+		if cert.NotAfter.Before(cert.NotBefore) {
+			t.Error("SVID certificate NotAfter should be after NotBefore")
+		}
 	}
 }
 

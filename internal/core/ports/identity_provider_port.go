@@ -4,6 +4,7 @@ package ports
 import (
 	"context"
 
+	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/sufield/ephemos/internal/core/domain"
 )
 
@@ -32,13 +33,13 @@ type IdentityProviderPort interface {
 	//   - An error if the certificate cannot be retrieved
 	GetCertificate(ctx context.Context) (*domain.Certificate, error)
 
-	// GetIdentityDocument retrieves the complete identity document.
-	// The document encapsulates certificate-based identity with metadata.
+	// GetSVID retrieves the complete SPIFFE SVID using go-spiffe SDK.
+	// The SVID contains certificates, private key, and SPIFFE ID.
 	//
 	// Returns:
-	//   - An IdentityDocument containing the complete identity information
-	//   - An error if the identity document cannot be retrieved
-	GetIdentityDocument(ctx context.Context) (*domain.IdentityDocument, error)
+	//   - An x509svid.SVID containing the complete identity information
+	//   - An error if the SVID cannot be retrieved
+	GetSVID(ctx context.Context) (*x509svid.SVID, error)
 
 	// RefreshIdentity triggers a refresh of the identity credentials.
 	// This may involve fetching new certificates from the identity provider.
@@ -51,9 +52,9 @@ type IdentityProviderPort interface {
 	// when the identity is updated (e.g., certificate rotation).
 	//
 	// Returns:
-	//   - A channel that receives identity update events
+	//   - A channel that receives SVID update events
 	//   - An error if watching cannot be established
-	WatchIdentityChanges(ctx context.Context) (<-chan *domain.IdentityDocument, error)
+	WatchIdentityChanges(ctx context.Context) (<-chan *x509svid.SVID, error)
 
 	// Close releases any resources held by the provider.
 	Close() error

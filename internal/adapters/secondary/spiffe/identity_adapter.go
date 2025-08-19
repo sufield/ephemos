@@ -3,7 +3,6 @@ package spiffe
 
 import (
 	"context"
-	"crypto/x509"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -27,7 +26,7 @@ type IdentityDocumentAdapter struct {
 	mu          sync.RWMutex
 	currentSVID *x509svid.SVID
 	watchCancel context.CancelFunc
-	watcherChan chan *domain.IdentityDocument
+	watcherChan chan *x509svid.SVID
 }
 
 // IdentityDocumentAdapterConfig provides configuration for the adapter.
@@ -50,7 +49,7 @@ func NewIdentityDocumentAdapter(config IdentityDocumentAdapterConfig) (*Identity
 	return &IdentityDocumentAdapter{
 		socketPath:  socketPath,
 		logger:      logger,
-		watcherChan: make(chan *domain.IdentityDocument, 10), // Buffer for updates
+		watcherChan: make(chan *x509svid.SVID, 10), // Buffer for updates
 	}, nil
 }
 
@@ -127,9 +126,9 @@ func (a *IdentityDocumentAdapter) GetCertificate(ctx context.Context) (*domain.C
 	return cert, nil
 }
 
-// GetIdentityDocument retrieves the complete identity document from SPIFFE.
-func (a *IdentityDocumentAdapter) GetIdentityDocument(ctx context.Context) (*domain.IdentityDocument, error) {
-	a.logger.Debug("fetching identity document from SPIFFE")
+// GetSVID retrieves the complete SPIFFE SVID directly from the SDK.
+func (a *IdentityDocumentAdapter) GetSVID(ctx context.Context) (*x509svid.SVID, error) {
+	a.logger.Debug("fetching SVID from SPIFFE")
 
 	if err := a.ensureSource(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ensure X509 source: %w", err)
@@ -145,30 +144,11 @@ func (a *IdentityDocumentAdapter) GetIdentityDocument(ctx context.Context) (*dom
 	a.currentSVID = svid
 	a.mu.Unlock()
 
-	// Get trust bundle for validation
-	bundle, err := a.x509Source.GetX509BundleForTrustDomain(svid.ID.TrustDomain())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get trust bundle: %w", err)
-	}
+	a.logger.Debug("SVID retrieved",
+		"expires_at", svid.Certificates[0].NotAfter,
+		"spiffe_id", svid.ID.String())
 
-	// Use first CA from bundle for validation
-	var caCert *x509.Certificate
-	caCerts := bundle.X509Authorities()
-	if len(caCerts) > 0 {
-		caCert = caCerts[0]
-	}
-
-	// Create identity document
-	doc, err := domain.NewIdentityDocument(svid.Certificates, svid.PrivateKey, caCert)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create identity document: %w", err)
-	}
-
-	a.logger.Debug("identity document retrieved",
-		"expires_at", doc.ValidUntil(),
-		"subject", doc.Subject())
-
-	return doc, nil
+	return svid, nil
 }
 
 // RefreshIdentity triggers a refresh of the identity credentials.
@@ -209,9 +189,9 @@ func (a *IdentityDocumentAdapter) RefreshIdentity(ctx context.Context) error {
 	return nil
 }
 
-// WatchIdentityChanges returns a channel that receives identity updates.
+// WatchIdentityChanges returns a channel that receives SVID updates.
 // This uses SPIFFE Workload API's streaming updates for automatic rotation.
-func (a *IdentityDocumentAdapter) WatchIdentityChanges(ctx context.Context) (<-chan *domain.IdentityDocument, error) {
+func (a *IdentityDocumentAdapter) WatchIdentityChanges(ctx context.Context) (<-chan *x509svid.SVID, error) {
 	a.logger.Info("starting identity change watcher")
 
 	if err := a.ensureSource(ctx); err != nil {
@@ -263,34 +243,14 @@ func (a *IdentityDocumentAdapter) watchForUpdates(ctx context.Context) {
 			a.currentSVID = svid
 			a.mu.Unlock()
 
-			// Get trust bundle for validation
-			bundle, err := a.x509Source.GetX509BundleForTrustDomain(svid.ID.TrustDomain())
-			if err != nil {
-				a.logger.Error("failed to get trust bundle for updated SVID", "error", err)
-				continue
-			}
-
-			// Create identity document
-			var caCert *x509.Certificate
-			caCerts := bundle.X509Authorities()
-			if len(caCerts) > 0 {
-				caCert = caCerts[0]
-			}
-
-			doc, err := domain.NewIdentityDocument(svid.Certificates, svid.PrivateKey, caCert)
-			if err != nil {
-				a.logger.Error("failed to create identity document from update", "error", err)
-				continue
-			}
-
-			// Send update to channel (non-blocking)
+			// Send SVID update to channel (non-blocking)
 			select {
-			case a.watcherChan <- doc:
-				a.logger.Info("identity update sent",
-					"expires_at", doc.ValidUntil(),
-					"subject", doc.Subject())
+			case a.watcherChan <- svid:
+				a.logger.Info("SVID update sent",
+					"expires_at", svid.Certificates[0].NotAfter,
+					"spiffe_id", svid.ID.String())
 			default:
-				a.logger.Warn("identity update channel full, dropping update")
+				a.logger.Warn("SVID update channel full, dropping update")
 			}
 		}
 	}

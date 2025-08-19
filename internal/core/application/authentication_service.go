@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
@@ -68,31 +69,32 @@ func NewAuthenticationService(config AuthenticationServiceConfig) (*Authenticati
 	}, nil
 }
 
-// GetValidatedIdentity retrieves and validates the current service identity.
-// This method enforces invariants before returning the identity to ensure it's valid and trusted.
-func (s *AuthenticationService) GetValidatedIdentity(ctx context.Context) (*domain.IdentityDocument, error) {
-	s.logger.Debug("retrieving validated identity")
+// GetValidatedSVID retrieves and validates the current service SVID.
+// This method enforces invariants before returning the SVID to ensure it's valid and trusted.
+func (s *AuthenticationService) GetValidatedSVID(ctx context.Context) (*x509svid.SVID, error) {
+	s.logger.Debug("retrieving validated SVID")
 
-	// Get identity document from provider
-	identityDoc, err := s.identityProvider.GetIdentityDocument(ctx)
+	// Get SVID from provider
+	svid, err := s.identityProvider.GetSVID(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get identity document: %w", err)
+		return nil, fmt.Errorf("failed to get SVID: %w", err)
 	}
 
-	// Enforce invariant: identity document must not be nil
-	if identityDoc == nil {
-		return nil, fmt.Errorf("identity provider returned nil identity document")
+	// Enforce invariant: SVID must not be nil
+	if svid == nil {
+		return nil, fmt.Errorf("identity provider returned nil SVID")
 	}
 
-	// Enforce invariant: identity document must be valid
-	if err := identityDoc.Validate(); err != nil {
-		return nil, fmt.Errorf("identity document validation failed: %w", err)
+	// Enforce invariant: SVID must have certificates
+	if len(svid.Certificates) == 0 {
+		return nil, fmt.Errorf("SVID has no certificates")
 	}
 
 	// Check if identity is expiring soon
-	if identityDoc.IsExpiringSoon(s.expiryThreshold) {
-		s.logger.Warn("identity document is expiring soon",
-			"expires_at", identityDoc.ValidUntil(),
+	expiresAt := svid.Certificates[0].NotAfter
+	if time.Until(expiresAt) < s.expiryThreshold {
+		s.logger.Warn("SVID is expiring soon",
+			"expires_at", expiresAt,
 			"threshold", s.expiryThreshold)
 
 		// Attempt to refresh the identity
@@ -101,9 +103,9 @@ func (s *AuthenticationService) GetValidatedIdentity(ctx context.Context) (*doma
 			// Continue with existing identity if refresh fails
 		} else {
 			// Get the refreshed identity
-			identityDoc, err = s.identityProvider.GetIdentityDocument(ctx)
+			svid, err = s.identityProvider.GetSVID(ctx)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get refreshed identity document: %w", err)
+				return nil, fmt.Errorf("failed to get refreshed SVID: %w", err)
 			}
 		}
 	}
@@ -114,16 +116,29 @@ func (s *AuthenticationService) GetValidatedIdentity(ctx context.Context) (*doma
 		return nil, fmt.Errorf("failed to get trust bundle: %w", err)
 	}
 
-	// Validate identity against trust bundle
-	if err := identityDoc.ValidateAgainstBundle(trustBundle); err != nil {
-		return nil, fmt.Errorf("identity validation against trust bundle failed: %w", err)
+	// Create domain certificate for validation
+	cert, err := domain.NewCertificate(
+		svid.Certificates[0],
+		svid.PrivateKey,
+		svid.Certificates[1:],
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create certificate from SVID: %w", err)
 	}
 
-	s.logger.Debug("successfully retrieved and validated identity",
-		"subject", identityDoc.Subject(),
-		"valid_until", identityDoc.ValidUntil())
+	// Validate certificate against trust bundle
+	if err := s.bundleProvider.ValidateCertificateAgainstBundle(ctx, cert); err != nil {
+		return nil, fmt.Errorf("SVID validation against trust bundle failed: %w", err)
+	}
+	
+	// Use trustBundle to avoid unused variable warning
+	_ = trustBundle
 
-	return identityDoc, nil
+	s.logger.Debug("successfully retrieved and validated SVID",
+		"spiffe_id", svid.ID.String(),
+		"valid_until", expiresAt)
+
+	return svid, nil
 }
 
 // CreateAuthenticatedConnection creates a connection with proper authentication.
@@ -131,16 +146,20 @@ func (s *AuthenticationService) GetValidatedIdentity(ctx context.Context) (*doma
 func (s *AuthenticationService) CreateAuthenticatedConnection(ctx context.Context, targetService string) (*AuthenticatedConnection, error) {
 	s.logger.Debug("creating authenticated connection", "target", targetService)
 
-	// Get validated identity
-	identityDoc, err := s.GetValidatedIdentity(ctx)
+	// Get validated SVID
+	svid, err := s.GetValidatedSVID(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get validated identity: %w", err)
+		return nil, fmt.Errorf("failed to get validated SVID: %w", err)
 	}
 
-	// Get certificate from identity document
-	cert := identityDoc.GetCertificate()
-	if cert == nil {
-		return nil, fmt.Errorf("identity document has no certificate")
+	// Create certificate from SVID
+	cert, err := domain.NewCertificate(
+		svid.Certificates[0],
+		svid.PrivateKey,
+		svid.Certificates[1:],
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create certificate from SVID: %w", err)
 	}
 
 	// Get trust bundle for the target's domain
@@ -283,7 +302,7 @@ func (s *AuthenticationService) extractTrustDomain(serviceIdentifier string) (do
 	// Parse as SPIFFE ID to extract trust domain
 	namespace, err := domain.NewIdentityNamespaceFromString(serviceIdentifier)
 	if err != nil {
-		return domain.TrustDomain(""), fmt.Errorf("failed to parse service identifier: %w", err)
+		return domain.TrustDomain{}, fmt.Errorf("failed to parse service identifier: %w", err)
 	}
 
 	return namespace.GetTrustDomain(), nil
