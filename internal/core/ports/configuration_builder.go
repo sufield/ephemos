@@ -73,17 +73,6 @@ func (b *ConfigurationBuilder) WithAgentSocket(socketPath string) *Configuration
 	return b
 }
 
-// WithAuthorizedClients sets the authorized client SPIFFE IDs.
-func (b *ConfigurationBuilder) WithAuthorizedClients(clients []string) *ConfigurationBuilder {
-	b.config.Service.AuthorizedClients = clients
-	return b
-}
-
-// WithTrustedServers sets the trusted server SPIFFE IDs.
-func (b *ConfigurationBuilder) WithTrustedServers(servers []string) *ConfigurationBuilder {
-	b.config.Service.TrustedServers = servers
-	return b
-}
 
 // Note: InsecureSkipVerify is controlled via environment variables
 // and is not part of the standard configuration structure for security reasons.

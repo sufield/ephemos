@@ -618,20 +618,8 @@ func (s *IdentityService) fetchTrustBundleWithRetry() (*domain.TrustBundle, erro
 // createPolicy creates an authentication policy based on the service configuration.
 // It consolidates the policy creation logic that was duplicated between CreateServerIdentity and CreateClientIdentity.
 func (s *IdentityService) createPolicy(identity *domain.ServiceIdentity) (*domain.AuthenticationPolicy, error) {
-	// Create authentication policy with authorization based on configuration
-	// Extract intermediate to avoid deep selector chains
-	serviceConfig := s.config.Service
-	if len(serviceConfig.AuthorizedClients) > 0 || len(serviceConfig.TrustedServers) > 0 {
-		// Use authorization policy when rules are configured
-		policy, err := domain.NewAuthorizationPolicy(identity, serviceConfig.AuthorizedClients, serviceConfig.TrustedServers)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create authorization policy: %w", err)
-		}
-		return policy, nil
-	} else {
-		// Fall back to authentication-only policy
-		return domain.NewAuthenticationPolicy(identity), nil
-	}
+	// Create authentication-only policy for identity verification
+	return domain.NewAuthenticationPolicy(identity), nil
 }
 
 // == ENHANCED mTLS CONNECTION MANAGEMENT ==
