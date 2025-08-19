@@ -8,11 +8,11 @@ import (
 func TestNewCacheEntry(t *testing.T) {
 	ttl := 5 * time.Minute
 	entry := NewCacheEntry(ttl)
-	
+
 	if entry.TTL() != ttl {
 		t.Errorf("Expected TTL %v, got %v", ttl, entry.TTL())
 	}
-	
+
 	// Check that fetchedAt is recent (within 1 second)
 	now := time.Now()
 	if now.Sub(entry.FetchedAt()) > time.Second {
@@ -24,11 +24,11 @@ func TestNewCacheEntryAt(t *testing.T) {
 	fetchedAt := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
 	ttl := 10 * time.Minute
 	entry := NewCacheEntryAt(fetchedAt, ttl)
-	
+
 	if entry.FetchedAt() != fetchedAt {
 		t.Errorf("Expected fetchedAt %v, got %v", fetchedAt, entry.FetchedAt())
 	}
-	
+
 	if entry.TTL() != ttl {
 		t.Errorf("Expected TTL %v, got %v", ttl, entry.TTL())
 	}
@@ -105,7 +105,7 @@ func TestCacheEntry_ExpiresAt(t *testing.T) {
 	fetchedAt := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
 	ttl := 10 * time.Minute
 	entry := NewCacheEntryAt(fetchedAt, ttl)
-	
+
 	expected := time.Date(2023, 1, 1, 12, 10, 0, 0, time.UTC)
 	if entry.ExpiresAt() != expected {
 		t.Errorf("Expected ExpiresAt %v, got %v", expected, entry.ExpiresAt())
@@ -116,10 +116,10 @@ func TestCacheEntry_Age(t *testing.T) {
 	fetchedAt := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
 	ttl := 10 * time.Minute
 	entry := NewCacheEntryAt(fetchedAt, ttl)
-	
+
 	checkAt := time.Date(2023, 1, 1, 12, 7, 0, 0, time.UTC) // 7 minutes later
 	expectedAge := 7 * time.Minute
-	
+
 	if entry.AgeAt(checkAt) != expectedAge {
 		t.Errorf("Expected age %v, got %v", expectedAge, entry.AgeAt(checkAt))
 	}
@@ -138,7 +138,7 @@ func TestCacheEntry_RemainingTTL(t *testing.T) {
 			fetchedAt: time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
 			ttl:       10 * time.Minute,
 			checkAt:   time.Date(2023, 1, 1, 12, 3, 0, 0, time.UTC), // 3 minutes later
-			want:      7 * time.Minute, // 10 - 3 = 7 minutes remaining
+			want:      7 * time.Minute,                              // 10 - 3 = 7 minutes remaining
 		},
 		{
 			name:      "expired entry returns zero",
@@ -171,15 +171,15 @@ func TestCacheEntry_Refresh(t *testing.T) {
 	originalFetchedAt := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
 	ttl := 10 * time.Minute
 	entry := NewCacheEntryAt(originalFetchedAt, ttl)
-	
+
 	// Refresh to a new time
 	newFetchedAt := time.Date(2023, 1, 1, 12, 30, 0, 0, time.UTC)
 	entry.RefreshAt(newFetchedAt)
-	
+
 	if entry.FetchedAt() != newFetchedAt {
 		t.Errorf("Expected fetchedAt to be refreshed to %v, got %v", newFetchedAt, entry.FetchedAt())
 	}
-	
+
 	// TTL should remain the same
 	if entry.TTL() != ttl {
 		t.Errorf("Expected TTL to remain %v, got %v", ttl, entry.TTL())
@@ -194,7 +194,7 @@ func TestCacheEntry_EdgeCases(t *testing.T) {
 			t.Error("Entry with negative TTL should not be fresh")
 		}
 	})
-	
+
 	t.Run("zero TTL", func(t *testing.T) {
 		entry := NewCacheEntry(0)
 		// Zero TTL should make entry immediately expired

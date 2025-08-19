@@ -52,17 +52,17 @@ func NewTrustBundleWithValidation(rawCerts []*x509.Certificate, validate bool) (
 			certs = append(certs, &RootCACertificate{Cert: rawCert})
 		}
 	}
-	
+
 	tb := &TrustBundle{
 		Certificates: certs,
 	}
-	
+
 	if validate {
 		if err := tb.Validate(); err != nil {
 			return nil, fmt.Errorf("trust bundle validation failed: %w", err)
 		}
 	}
-	
+
 	return tb, nil
 }
 
@@ -76,7 +76,7 @@ func (tb *TrustBundle) Validate() error {
 
 	// Track certificate uniqueness by public key
 	seen := make(map[string]struct{})
-	
+
 	for i, ca := range tb.Certificates {
 		if ca == nil || ca.Cert == nil {
 			return fmt.Errorf("certificate at index %d is nil", i)
@@ -143,7 +143,7 @@ func (tb *TrustBundle) ContainsCertificate(cert *x509.Certificate) bool {
 }
 
 // CreateCertPool creates a new x509.CertPool from the trust bundle certificates.
-// This creates a fresh pool each time to support dynamic reloading scenarios 
+// This creates a fresh pool each time to support dynamic reloading scenarios
 // where trust bundles change.
 // Note: This is a boundary method for adapter use.
 func (tb *TrustBundle) CreateCertPool() *x509.CertPool {
@@ -181,15 +181,15 @@ func (tb *TrustBundle) ValidateAgainstBundle(other *TrustBundle) error {
 	if other == nil {
 		return fmt.Errorf("comparison trust bundle cannot be nil")
 	}
-	
+
 	if tb.IsEmpty() {
 		return fmt.Errorf("cannot validate empty trust bundle")
 	}
-	
+
 	if other.IsEmpty() {
 		return fmt.Errorf("comparison trust bundle is empty")
 	}
-	
+
 	// Check if any certificates in this bundle are present in the other bundle
 	hasCommonCert := false
 	for _, cert := range tb.Certificates {
@@ -200,11 +200,11 @@ func (tb *TrustBundle) ValidateAgainstBundle(other *TrustBundle) error {
 			}
 		}
 	}
-	
+
 	if !hasCommonCert {
 		return fmt.Errorf("no common certificates found between trust bundles")
 	}
-	
+
 	return nil
 }
 
@@ -214,36 +214,36 @@ func (tb *TrustBundle) ValidateCertificateChain(chain []*x509.Certificate) error
 	if len(chain) == 0 {
 		return fmt.Errorf("certificate chain cannot be empty")
 	}
-	
+
 	if tb.IsEmpty() {
 		return fmt.Errorf("cannot validate against empty trust bundle")
 	}
-	
+
 	leafCert := chain[0]
-	
+
 	// Create cert pool from trust bundle
 	roots := tb.CreateCertPool()
-	
+
 	// Setup verification options
 	opts := x509.VerifyOptions{
 		Roots:         roots,
 		Intermediates: x509.NewCertPool(),
 		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 	}
-	
+
 	// Add intermediate certificates to the pool if present
 	if len(chain) > 1 {
 		for _, intermediate := range chain[1:] {
 			opts.Intermediates.AddCert(intermediate)
 		}
 	}
-	
+
 	// Perform cryptographic verification
 	_, err := leafCert.Verify(opts)
 	if err != nil {
 		return fmt.Errorf("certificate chain validation failed: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -252,7 +252,7 @@ func (tb *TrustBundle) ValidateIdentityDocument(doc *IdentityDocument) error {
 	if doc == nil {
 		return fmt.Errorf("identity document cannot be nil")
 	}
-	
+
 	// Use the identity document's built-in validation method
 	return doc.ValidateAgainstBundle(tb)
 }
@@ -263,9 +263,9 @@ func (tb *TrustBundle) ContainsTrustDomain(trustDomain TrustDomain) bool {
 	if trustDomain.IsZero() {
 		return false
 	}
-	
+
 	trustDomainStr := trustDomain.String()
-	
+
 	for _, ca := range tb.Certificates {
 		if ca != nil && ca.Cert != nil {
 			// Check if the certificate subject contains the trust domain
@@ -274,7 +274,7 @@ func (tb *TrustBundle) ContainsTrustDomain(trustDomain TrustDomain) bool {
 			if contains(subject, trustDomainStr) {
 				return true
 			}
-			
+
 			// Also check URI SANs for SPIFFE URIs
 			for _, uri := range ca.Cert.URIs {
 				if uri.Scheme == "spiffe" && uri.Host == trustDomainStr {
@@ -283,7 +283,7 @@ func (tb *TrustBundle) ContainsTrustDomain(trustDomain TrustDomain) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -292,7 +292,7 @@ func (tb *TrustBundle) ContainsTrustDomain(trustDomain TrustDomain) bool {
 func (tb *TrustBundle) GetTrustDomains() []TrustDomain {
 	var trustDomains []TrustDomain
 	seen := make(map[string]bool)
-	
+
 	for _, ca := range tb.Certificates {
 		if ca != nil && ca.Cert != nil {
 			// Check URI SANs for SPIFFE URIs
@@ -308,7 +308,7 @@ func (tb *TrustBundle) GetTrustDomains() []TrustDomain {
 			}
 		}
 	}
-	
+
 	return trustDomains
 }
 
@@ -318,11 +318,11 @@ func (tb *TrustBundle) MergeBundles(other *TrustBundle) (*TrustBundle, error) {
 	if other == nil {
 		return nil, fmt.Errorf("cannot merge with nil trust bundle")
 	}
-	
+
 	// Collect all unique certificates
 	seen := make(map[string]*x509.Certificate)
 	var allCerts []*x509.Certificate
-	
+
 	// Add certificates from this bundle
 	for _, ca := range tb.Certificates {
 		if ca != nil && ca.Cert != nil {
@@ -333,7 +333,7 @@ func (tb *TrustBundle) MergeBundles(other *TrustBundle) (*TrustBundle, error) {
 			}
 		}
 	}
-	
+
 	// Add certificates from other bundle
 	for _, ca := range other.Certificates {
 		if ca != nil && ca.Cert != nil {
@@ -344,7 +344,7 @@ func (tb *TrustBundle) MergeBundles(other *TrustBundle) (*TrustBundle, error) {
 			}
 		}
 	}
-	
+
 	// Create new bundle with merged certificates
 	return NewTrustBundle(allCerts)
 }
@@ -363,12 +363,12 @@ func (tb *TrustBundle) getX509Certificates() []*x509.Certificate {
 
 // contains is a helper function to check if a string contains a substring (case-insensitive).
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && 
-		   (s == substr || 
-		    len(s) > len(substr) && 
-		    (s[:len(substr)] == substr || 
-		     s[len(s)-len(substr):] == substr || 
-		     indexContains(s, substr) >= 0))
+	return len(s) >= len(substr) &&
+		(s == substr ||
+			len(s) > len(substr) &&
+				(s[:len(substr)] == substr ||
+					s[len(s)-len(substr):] == substr ||
+					indexContains(s, substr) >= 0))
 }
 
 // indexContains is a helper to find substring in string.
@@ -380,4 +380,3 @@ func indexContains(s, substr string) int {
 	}
 	return -1
 }
-

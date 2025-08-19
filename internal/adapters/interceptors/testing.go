@@ -123,7 +123,6 @@ func (m *MockMetricsCollector) RecordCircularCallDetected(identity string) {
 	m.CircularCallDetections = append(m.CircularCallDetections, identity)
 }
 
-
 // NewTestingInterceptor creates a complete interceptor for testing with all features enabled.
 func NewTestingInterceptor() *IdentityPropagationInterceptor {
 	return NewIdentityPropagationInterceptor(
@@ -131,8 +130,8 @@ func NewTestingInterceptor() *IdentityPropagationInterceptor {
 		WithLogger(slog.Default()),
 		WithMetricsCollector(NewMockMetricsCollector()),
 		WithClock(func() time.Time { return time.Unix(1640995200, 0) }), // Fixed time for testing
-		WithIDGenerator(func() string { return "test-req-123" }),         // Fixed ID for testing
-		WithMaxCallChainDepth(5), // Lower for testing
+		WithIDGenerator(func() string { return "test-req-123" }),        // Fixed ID for testing
+		WithMaxCallChainDepth(5),                                        // Lower for testing
 		WithCustomHeaders([]string{"x-test-header", "x-trace-id"}),
 		WithPropagateOriginalCaller(true),
 		WithPropagateCallChain(true),
@@ -159,4 +158,3 @@ func ExtractMetrics(collector *MockMetricsCollector) (int, int, int) {
 		len(collector.PropagationFailures),
 		len(collector.ExtractionSuccesses)
 }
-

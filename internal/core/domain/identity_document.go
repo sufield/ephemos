@@ -14,15 +14,15 @@ import (
 type IdentityDocument struct {
 	// Core credential components
 	certificate *Certificate
-	
+
 	// Metadata
-	issuedAt    time.Time
-	validUntil  time.Time
-	
+	issuedAt   time.Time
+	validUntil time.Time
+
 	// Optional fields for rich identity information
-	subject     string
-	issuer      string
-	
+	subject string
+	issuer  string
+
 	// Internal state
 	validated   bool
 	lastChecked time.Time
@@ -33,7 +33,7 @@ type IdentityDocumentConfig struct {
 	CertChain  []*x509.Certificate
 	PrivateKey crypto.Signer
 	CACert     *x509.Certificate
-	
+
 	// Optional metadata
 	Subject string
 	Issuer  string
@@ -45,23 +45,23 @@ func NewIdentityDocument(certChain []*x509.Certificate, privateKey crypto.Signer
 	if len(certChain) == 0 {
 		return nil, fmt.Errorf("certificate chain cannot be empty")
 	}
-	
+
 	if privateKey == nil {
 		return nil, fmt.Errorf("private key cannot be nil")
 	}
-	
+
 	leafCert := certChain[0]
 	var intermediateCerts []*x509.Certificate
 	if len(certChain) > 1 {
 		intermediateCerts = certChain[1:]
 	}
-	
+
 	// Create and validate the certificate using our domain Certificate entity
 	certificate, err := NewCertificate(leafCert, privateKey, intermediateCerts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate: %w", err)
 	}
-	
+
 	// Validate the certificate chain if CA is provided
 	if ca != nil {
 		// Create a trust bundle with the CA for validation
@@ -69,23 +69,23 @@ func NewIdentityDocument(certChain []*x509.Certificate, privateKey crypto.Signer
 		if err != nil {
 			return nil, fmt.Errorf("failed to create trust bundle for validation: %w", err)
 		}
-		
+
 		// Validate against the trust bundle
 		opts := CertValidationOptions{
 			TrustBundle: trustBundle,
 		}
-		
+
 		if err := certificate.Validate(opts); err != nil {
 			return nil, fmt.Errorf("certificate chain validation failed: %w", err)
 		}
 	}
-	
+
 	// Extract metadata from the leaf certificate
 	subject := leafCert.Subject.String()
 	issuer := leafCert.Issuer.String()
-	
+
 	now := time.Now()
-	
+
 	return &IdentityDocument{
 		certificate: certificate,
 		issuedAt:    leafCert.NotBefore,
@@ -107,17 +107,17 @@ func NewIdentityDocumentFromCertificate(cert *Certificate) (*IdentityDocument, e
 	if cert == nil {
 		return nil, fmt.Errorf("certificate cannot be nil")
 	}
-	
+
 	// Validate the certificate first
 	if err := cert.Validate(CertValidationOptions{}); err != nil {
 		return nil, fmt.Errorf("certificate validation failed: %w", err)
 	}
-	
+
 	subject := cert.Cert.Subject.String()
 	issuer := cert.Cert.Issuer.String()
-	
+
 	now := time.Now()
-	
+
 	return &IdentityDocument{
 		certificate: cert,
 		issuedAt:    cert.Cert.NotBefore,
@@ -147,7 +147,7 @@ func (doc *IdentityDocument) GetCertificateChain() []*x509.Certificate {
 	if doc.certificate == nil {
 		return nil
 	}
-	
+
 	chain := []*x509.Certificate{doc.certificate.Cert}
 	chain = append(chain, doc.certificate.Chain...)
 	return chain
@@ -166,12 +166,12 @@ func (doc *IdentityDocument) GetIdentityNamespace() (IdentityNamespace, error) {
 	if doc.certificate == nil {
 		return IdentityNamespace{}, fmt.Errorf("certificate is nil")
 	}
-	
+
 	spiffeID, err := doc.certificate.ToSPIFFEID()
 	if err != nil {
 		return IdentityNamespace{}, fmt.Errorf("failed to extract SPIFFE ID: %w", err)
 	}
-	
+
 	return NewIdentityNamespaceFromString(spiffeID.String())
 }
 
@@ -181,7 +181,7 @@ func (doc *IdentityDocument) GetTrustDomain() (TrustDomain, error) {
 	if err != nil {
 		return TrustDomain(""), fmt.Errorf("failed to get identity namespace: %w", err)
 	}
-	
+
 	return namespace.GetTrustDomain(), nil
 }
 
@@ -190,7 +190,7 @@ func (doc *IdentityDocument) GetServiceIdentity() (*ServiceIdentity, error) {
 	if doc.certificate == nil {
 		return nil, fmt.Errorf("certificate is nil")
 	}
-	
+
 	return doc.certificate.ToServiceIdentity()
 }
 
@@ -212,17 +212,17 @@ func (doc *IdentityDocument) IsValid(now time.Time) bool {
 	if doc.certificate == nil {
 		return false
 	}
-	
+
 	// Check expiration
 	if doc.IsExpired(now) {
 		return false
 	}
-	
+
 	// Check if it's not yet valid
 	if now.Before(doc.issuedAt) {
 		return false
 	}
-	
+
 	return doc.validated
 }
 
@@ -231,20 +231,20 @@ func (doc *IdentityDocument) ValidateAgainstBundle(bundle *TrustBundle) error {
 	if doc.certificate == nil {
 		return fmt.Errorf("certificate is nil")
 	}
-	
+
 	if bundle == nil {
 		return fmt.Errorf("trust bundle cannot be nil")
 	}
-	
+
 	// Validate using certificate validation with trust bundle
 	opts := CertValidationOptions{
 		TrustBundle: bundle,
 	}
-	
+
 	if err := doc.certificate.Validate(opts); err != nil {
 		return fmt.Errorf("trust bundle validation failed: %w", err)
 	}
-	
+
 	doc.validated = true
 	doc.lastChecked = time.Now()
 	return nil
@@ -255,28 +255,28 @@ func (doc *IdentityDocument) Validate() error {
 	if doc.certificate == nil {
 		return fmt.Errorf("certificate cannot be nil")
 	}
-	
+
 	// Validate the underlying certificate
 	if err := doc.certificate.Validate(CertValidationOptions{}); err != nil {
 		return fmt.Errorf("certificate validation failed: %w", err)
 	}
-	
+
 	// Check that the certificate has a SPIFFE ID
 	_, err := doc.certificate.ToSPIFFEID()
 	if err != nil {
 		return fmt.Errorf("certificate does not contain a valid SPIFFE ID: %w", err)
 	}
-	
+
 	// Validate time bounds
 	now := time.Now()
 	if now.Before(doc.issuedAt) {
 		return fmt.Errorf("identity document is not yet valid (issued at: %v)", doc.issuedAt)
 	}
-	
+
 	if now.After(doc.validUntil) {
 		return fmt.Errorf("identity document has expired (valid until: %v)", doc.validUntil)
 	}
-	
+
 	doc.validated = true
 	doc.lastChecked = now
 	return nil
@@ -330,12 +330,12 @@ func (doc *IdentityDocument) String() string {
 	if doc.certificate == nil {
 		return "IdentityDocument{empty}"
 	}
-	
+
 	spiffeID, err := doc.certificate.ToSPIFFEID()
 	if err != nil {
 		return fmt.Sprintf("IdentityDocument{invalid: %v}", err)
 	}
-	
-	return fmt.Sprintf("IdentityDocument{ID:%s, ValidUntil:%s, Subject:%s}", 
+
+	return fmt.Sprintf("IdentityDocument{ID:%s, ValidUntil:%s, Subject:%s}",
 		spiffeID.String(), doc.validUntil.Format(time.RFC3339), doc.subject)
 }

@@ -11,13 +11,13 @@ import (
 type HealthStatus struct {
 	// Overall indicates if the service is healthy overall
 	Overall bool
-	
+
 	// Components contains health status for individual components
 	Components map[string]ComponentHealth
-	
+
 	// LastUpdated indicates when this status was last updated
 	LastUpdated time.Time
-	
+
 	// Message provides a human-readable status message
 	Message string
 }
@@ -26,13 +26,13 @@ type HealthStatus struct {
 type ComponentHealth struct {
 	// Healthy indicates if this component is healthy
 	Healthy bool
-	
+
 	// LastCheck indicates when this component was last checked
 	LastCheck time.Time
-	
+
 	// ErrorMessage contains error details if unhealthy
 	ErrorMessage string
-	
+
 	// Metadata contains additional component-specific information
 	Metadata map[string]interface{}
 }
@@ -51,7 +51,7 @@ func NewHealthStatus() *HealthStatus {
 func (h *HealthStatus) AddComponent(name string, health ComponentHealth) {
 	h.Components[name] = health
 	h.LastUpdated = time.Now()
-	
+
 	// Update overall health based on component health
 	h.updateOverallHealth()
 }
@@ -71,14 +71,14 @@ func (h *HealthStatus) GetComponentHealth(name string) (ComponentHealth, bool) {
 func (h *HealthStatus) updateOverallHealth() {
 	h.Overall = true
 	unhealthyCount := 0
-	
+
 	for _, component := range h.Components {
 		if !component.Healthy {
 			h.Overall = false
 			unhealthyCount++
 		}
 	}
-	
+
 	// Update message based on health status
 	if h.Overall {
 		h.Message = "All components are healthy"
@@ -92,19 +92,19 @@ func (h *HealthStatus) updateOverallHealth() {
 type RegistrationStatus struct {
 	// Registered indicates if the service is registered with SPIRE
 	Registered bool
-	
+
 	// SPIFFEID contains the service's SPIFFE ID if registered
 	SPIFFEID string
-	
+
 	// Selectors contains the service selectors used for registration
 	Selectors []string
-	
+
 	// RegisteredAt indicates when the service was registered
 	RegisteredAt time.Time
-	
+
 	// ExpiresAt indicates when the registration expires
 	ExpiresAt time.Time
-	
+
 	// ErrorMessage contains error details if registration failed
 	ErrorMessage string
 }

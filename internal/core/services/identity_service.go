@@ -110,17 +110,17 @@ type IdentityService struct {
 	metrics           MetricsReporter         // Metrics reporter (Prometheus or NoOp)
 
 	// Certificate caching for rotation support
-	cachedCert      *domain.Certificate
-	certCacheEntry  *domain.CacheEntry
-	cachedBundle    *domain.TrustBundle
+	cachedCert       *domain.Certificate
+	certCacheEntry   *domain.CacheEntry
+	cachedBundle     *domain.TrustBundle
 	bundleCacheEntry *domain.CacheEntry
-	cacheTTL        time.Duration
+	cacheTTL         time.Duration
 
 	// Enhanced mTLS connection tracking and enforcement
 	connectionRegistry *MTLSConnectionRegistry
 	enforcementService *MTLSEnforcementService
 	continuityService  *RotationContinuityService
-	
+
 	mu sync.RWMutex
 }
 
@@ -372,10 +372,10 @@ func (s *IdentityService) getCertificate() (*domain.Certificate, error) {
 func (s *IdentityService) validateCertificateExpiry(cert *domain.Certificate) error {
 	// Use centralized validation with minimal options for quick expiry check
 	opts := domain.CertValidationOptions{
-		SkipChainVerify: true,  // Skip chain verification for performance
+		SkipChainVerify: true, // Skip chain verification for performance
 		// Other checks like expiry and basic structure are still performed
 	}
-	
+
 	// Use centralized validator for consistency
 	return s.validator.Validate(cert, opts)
 }
@@ -464,10 +464,10 @@ func (s *IdentityService) ValidateServiceIdentity(cert *domain.Certificate) erro
 	opts := domain.CertValidationOptions{
 		ExpectedIdentity: expectedIdentity,
 		WarningThreshold: time.Hour,      // Warn when certificate expires within 1 hour
-		TrustBundle:      trustBundle,     // Use cached trust bundle if available
-		SkipExpiry:       false,           // Always check expiry in production
-		SkipChainVerify:  false,           // Always verify chain in production
-		Logger:           slog.Default(),  // Use default logger for warnings
+		TrustBundle:      trustBundle,    // Use cached trust bundle if available
+		SkipExpiry:       false,          // Always check expiry in production
+		SkipChainVerify:  false,          // Always verify chain in production
+		Logger:           slog.Default(), // Use default logger for warnings
 	}
 
 	// Use centralized validator
@@ -704,7 +704,7 @@ func (s *IdentityService) RotateServerWithContinuity(ctx context.Context, server
 	return s.continuityService.RotateServerWithContinuity(ctx, serverID, server)
 }
 
-// RotateClientWithContinuity performs client rotation with connection continuity  
+// RotateClientWithContinuity performs client rotation with connection continuity
 func (s *IdentityService) RotateClientWithContinuity(ctx context.Context, clientID string, client ports.ClientPort) error {
 	return s.continuityService.RotateClientWithContinuity(ctx, clientID, client)
 }

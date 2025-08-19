@@ -22,7 +22,7 @@ func TestNewTrustBundle(t *testing.T) {
 	t.Run("valid single certificate", func(t *testing.T) {
 		t.Parallel()
 		cert := createValidCACert(t)
-		
+
 		bundle, err := domain.NewTrustBundle([]*x509.Certificate{cert})
 		require.NoError(t, err)
 		assert.NotNil(t, bundle)
@@ -34,7 +34,7 @@ func TestNewTrustBundle(t *testing.T) {
 		t.Parallel()
 		cert1 := createValidCACert(t)
 		cert2 := createValidCACert(t)
-		
+
 		bundle, err := domain.NewTrustBundle([]*x509.Certificate{cert1, cert2})
 		require.NoError(t, err)
 		assert.NotNil(t, bundle)
@@ -61,7 +61,7 @@ func TestNewTrustBundle(t *testing.T) {
 		t.Parallel()
 		cert1 := createValidCACert(t)
 		cert2 := createValidCACert(t)
-		
+
 		bundle, err := domain.NewTrustBundle([]*x509.Certificate{cert1, nil, cert2, nil})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "root CA certificate cannot be nil")
@@ -103,7 +103,7 @@ func TestTrustBundle_Count(t *testing.T) {
 		cert1 := createValidCACert(t)
 		cert2 := createValidCACert(t)
 		cert3 := createValidCACert(t)
-		
+
 		bundle, err := domain.NewTrustBundle([]*x509.Certificate{cert1, cert2, cert3})
 		require.NoError(t, err)
 		assert.Equal(t, 3, bundle.Count())
@@ -117,10 +117,10 @@ func TestTrustBundle_RawCertificates(t *testing.T) {
 		t.Parallel()
 		cert1 := createValidCACert(t)
 		cert2 := createValidCACert(t)
-		
+
 		bundle, err := domain.NewTrustBundle([]*x509.Certificate{cert1, cert2})
 		require.NoError(t, err)
-		
+
 		rawCerts := bundle.RawCertificates()
 		require.Len(t, rawCerts, 2)
 		assert.Equal(t, cert1, rawCerts[0])
@@ -131,7 +131,7 @@ func TestTrustBundle_RawCertificates(t *testing.T) {
 		t.Parallel()
 		bundle, err := domain.NewTrustBundleWithValidation([]*x509.Certificate{}, false)
 		require.NoError(t, err)
-		
+
 		rawCerts := bundle.RawCertificates()
 		assert.Len(t, rawCerts, 0)
 		assert.NotNil(t, rawCerts) // Should return empty slice, not nil
@@ -145,19 +145,19 @@ func TestTrustBundle_CreateCertPoolNew(t *testing.T) {
 		t.Parallel()
 		cert1 := createValidCACert(t)
 		cert2 := createValidCACert(t)
-		
+
 		bundle, err := domain.NewTrustBundle([]*x509.Certificate{cert1, cert2})
 		require.NoError(t, err)
-		
+
 		pool := bundle.CreateCertPool()
 		require.NotNil(t, pool)
-		
+
 		// Verify certificates are in the pool by checking if they verify against themselves
 		// This is a simple way to test the pool contains our certificates
 		roots := x509.NewCertPool()
 		roots.AddCert(cert1)
 		roots.AddCert(cert2)
-		
+
 		// The pool should contain our certificates (indirect verification)
 		assert.NotNil(t, pool)
 	})
@@ -166,7 +166,7 @@ func TestTrustBundle_CreateCertPoolNew(t *testing.T) {
 		t.Parallel()
 		bundle, err := domain.NewTrustBundleWithValidation([]*x509.Certificate{}, false)
 		require.NoError(t, err)
-		
+
 		pool := bundle.CreateCertPool()
 		assert.NotNil(t, pool) // Should still create a pool, just empty
 	})
@@ -174,11 +174,11 @@ func TestTrustBundle_CreateCertPoolNew(t *testing.T) {
 	t.Run("skips nil certificates in pool", func(t *testing.T) {
 		t.Parallel()
 		cert := createValidCACert(t)
-		
+
 		// Create bundle with valid cert
 		bundle, err := domain.NewTrustBundle([]*x509.Certificate{cert})
 		require.NoError(t, err)
-		
+
 		// Should create pool successfully even if there were nil certs (filtered out in constructor)
 		pool := bundle.CreateCertPool()
 		assert.NotNil(t, pool)
@@ -191,10 +191,10 @@ func TestTrustBundle_Validate(t *testing.T) {
 	t.Run("validates CA certificates correctly", func(t *testing.T) {
 		t.Parallel()
 		caCert := createValidCACert(t)
-		
+
 		bundle, err := domain.NewTrustBundle([]*x509.Certificate{caCert})
 		require.NoError(t, err)
-		
+
 		err = bundle.Validate()
 		assert.NoError(t, err)
 	})
@@ -202,10 +202,10 @@ func TestTrustBundle_Validate(t *testing.T) {
 	t.Run("rejects non-CA certificates", func(t *testing.T) {
 		t.Parallel()
 		nonCACert := createValidLeafCert(t)
-		
+
 		bundle, err := domain.NewTrustBundleWithValidation([]*x509.Certificate{nonCACert}, false)
 		require.NoError(t, err)
-		
+
 		err = bundle.Validate()
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "is not a CA certificate")
@@ -215,7 +215,7 @@ func TestTrustBundle_Validate(t *testing.T) {
 		t.Parallel()
 		bundle, err := domain.NewTrustBundleWithValidation([]*x509.Certificate{}, false)
 		require.NoError(t, err)
-		
+
 		err = bundle.Validate()
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "trust bundle cannot be empty")
@@ -225,10 +225,10 @@ func TestTrustBundle_Validate(t *testing.T) {
 		t.Parallel()
 		caCert := createValidCACert(t)
 		leafCert := createValidLeafCert(t)
-		
+
 		bundle, err := domain.NewTrustBundleWithValidation([]*x509.Certificate{caCert, leafCert}, false)
 		require.NoError(t, err)
-		
+
 		err = bundle.Validate()
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "is not a CA certificate")
@@ -241,7 +241,7 @@ func TestRootCACertificate(t *testing.T) {
 	t.Run("wraps x509 certificate correctly", func(t *testing.T) {
 		t.Parallel()
 		cert := createValidCACert(t)
-		
+
 		rootCA := &domain.RootCACertificate{Cert: cert}
 		assert.Equal(t, cert, rootCA.Cert)
 	})
@@ -257,11 +257,11 @@ func TestRootCACertificate(t *testing.T) {
 
 func createValidCACert(t *testing.T) *x509.Certificate {
 	t.Helper()
-	
+
 	// Generate a private key
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
-	
+
 	// Create certificate template for CA
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
@@ -282,25 +282,25 @@ func createValidCACert(t *testing.T) *x509.Certificate {
 		MaxPathLen:            0,
 		MaxPathLenZero:        true,
 	}
-	
+
 	// Create the certificate
 	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
 	require.NoError(t, err)
-	
+
 	// Parse the certificate
 	cert, err := x509.ParseCertificate(certDER)
 	require.NoError(t, err)
-	
+
 	return cert
 }
 
 func createValidLeafCert(t *testing.T) *x509.Certificate {
 	t.Helper()
-	
+
 	// Generate a private key
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
-	
+
 	// Create certificate template for leaf certificate (not CA)
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(2),
@@ -319,14 +319,14 @@ func createValidLeafCert(t *testing.T) *x509.Certificate {
 		BasicConstraintsValid: true,
 		IsCA:                  false, // This is a leaf certificate
 	}
-	
+
 	// Create the certificate (self-signed for testing)
 	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
 	require.NoError(t, err)
-	
+
 	// Parse the certificate
 	cert, err := x509.ParseCertificate(certDER)
 	require.NoError(t, err)
-	
+
 	return cert
 }

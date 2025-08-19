@@ -313,4 +313,3 @@ func (c *Certificate) verifyWithTrustBundle(trustBundle *TrustBundle) error {
 
 	return nil
 }
-

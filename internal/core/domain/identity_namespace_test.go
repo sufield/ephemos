@@ -394,10 +394,10 @@ func TestIdentityNamespace_MustConstructors(t *testing.T) {
 func TestIdentityNamespace_EdgeCases(t *testing.T) {
 	t.Run("maximum length validation", func(t *testing.T) {
 		trustDomain := domain.MustNewTrustDomain("example.org")
-		
+
 		// Create a very long path that would exceed SPIFFE ID length limit
 		longPath := "/" + strings.Repeat("a", 2000)
-		
+
 		_, err := domain.NewIdentityNamespace(trustDomain, longPath)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "exceeds maximum length")
@@ -405,7 +405,7 @@ func TestIdentityNamespace_EdgeCases(t *testing.T) {
 
 	t.Run("path validation edge cases", func(t *testing.T) {
 		trustDomain := domain.MustNewTrustDomain("example.org")
-		
+
 		invalidPaths := []struct {
 			path        string
 			errContains string

@@ -13,10 +13,10 @@ import (
 // UseCaseFactory creates configured use case implementations.
 // This factory encapsulates the complexity of use case setup and dependency injection.
 type UseCaseFactory struct {
-	config                 *ports.Configuration
-	identityProvider       ports.IdentityProvider
-	transportProvider      ports.TransportProvider
-	configurationProvider  ports.ConfigurationProvider
+	config                *ports.Configuration
+	identityProvider      ports.IdentityProvider
+	transportProvider     ports.TransportProvider
+	configurationProvider ports.ConfigurationProvider
 }
 
 // NewUseCaseFactory creates a new use case factory with the required dependencies.
@@ -63,7 +63,7 @@ func (f *UseCaseFactory) CreateIdentityUseCase(ctx context.Context) (IdentityUse
 }
 
 // CreateHealthUseCase creates a configured health monitoring use case.
-// 
+//
 // Future implementation will provide:
 // - Service health status monitoring
 // - Certificate expiry tracking
@@ -83,7 +83,7 @@ func (f *UseCaseFactory) CreateConfigurationUseCase(ctx context.Context) (Config
 	if f.configurationProvider == nil {
 		return nil, fmt.Errorf("configuration provider is required for configuration use case")
 	}
-	
+
 	return &ConfigurationUseCaseImpl{
 		provider: f.configurationProvider,
 		config:   f.config,

@@ -24,39 +24,39 @@ var serviceNamePattern = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z
 // Returns an error if the service name is invalid.
 func NewServiceName(name string) (ServiceName, error) {
 	trimmed := strings.TrimSpace(name)
-	
+
 	if trimmed == "" {
 		return ServiceName{}, fmt.Errorf("service name cannot be empty or whitespace-only")
 	}
-	
+
 	// Length limits based on common practices and SPIFFE ID constraints
 	if len(trimmed) > 100 {
 		return ServiceName{}, fmt.Errorf("service name too long: maximum 100 characters, got %d", len(trimmed))
 	}
-	
+
 	if len(trimmed) < 1 {
 		return ServiceName{}, fmt.Errorf("service name too short: minimum 1 character")
 	}
-	
+
 	// Check for valid characters and pattern
 	if !serviceNamePattern.MatchString(trimmed) {
 		return ServiceName{}, fmt.Errorf("service name contains invalid characters: must contain only alphanumeric characters, hyphens, underscores, and dots, and must start/end with alphanumeric characters")
 	}
-	
+
 	// Additional domain-specific rules
 	if strings.Contains(strings.ToLower(trimmed), "example") {
 		return ServiceName{}, fmt.Errorf("service name cannot contain 'example': use a real service name")
 	}
-	
+
 	// Allow service names that start with "test-" (like "test-service") or end with "-test"
 	// Reject names that have "test" in the middle without proper separation (like "testingservice")
 	lowerTrimmed := strings.ToLower(trimmed)
-	if strings.Contains(lowerTrimmed, "test") && 
-	   !strings.HasPrefix(lowerTrimmed, "test-") && 
-	   !strings.HasSuffix(lowerTrimmed, "-test") {
+	if strings.Contains(lowerTrimmed, "test") &&
+		!strings.HasPrefix(lowerTrimmed, "test-") &&
+		!strings.HasSuffix(lowerTrimmed, "-test") {
 		return ServiceName{}, fmt.Errorf("service name should not contain 'test' unless it starts with 'test-' or ends with '-test'")
 	}
-	
+
 	return ServiceName{value: trimmed}, nil
 }
 
@@ -120,19 +120,19 @@ func (sn ServiceName) IsValidForProduction() error {
 	if sn.Contains("demo") {
 		return fmt.Errorf("service name contains 'demo': not suitable for production")
 	}
-	
+
 	if sn.Contains("example") {
 		return fmt.Errorf("service name contains 'example': not suitable for production")
 	}
-	
+
 	if sn.Contains("localhost") {
 		return fmt.Errorf("service name contains 'localhost': not suitable for production")
 	}
-	
+
 	if strings.HasSuffix(strings.ToLower(sn.value), "-test") {
 		return fmt.Errorf("service name ends with '-test': not suitable for production")
 	}
-	
+
 	return nil
 }
 
@@ -147,19 +147,19 @@ func ServiceNameDecodeHook() mapstructure.DecodeHookFunc {
 		if t != reflect.TypeOf(ServiceName{}) {
 			return data, nil
 		}
-		
+
 		// Convert string to ServiceName using the validated constructor
 		str, ok := data.(string)
 		if !ok {
 			return data, nil
 		}
-		
+
 		serviceName, err := NewServiceName(str)
 		if err != nil {
 			// For configuration loading, we want to fail fast on invalid service names
 			return nil, fmt.Errorf("invalid service name %q: %w", str, err)
 		}
-		
+
 		return serviceName, nil
 	}
 }

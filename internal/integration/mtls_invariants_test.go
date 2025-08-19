@@ -23,39 +23,39 @@ func TestMTLSInvariantEnforcement(t *testing.T) {
 	t.Run("CompleteInvariantFlow", func(t *testing.T) {
 		// Setup identity service with mTLS components
 		identityService := testSetupMTLSIdentityService(t)
-		
+
 		// Test connection establishment with invariant checks
 		testEstablishConnectionWithInvariants(ctx, t, identityService)
-		
+
 		// Test invariant enforcement during connection lifecycle
 		testConnectionLifecycleInvariants(ctx, t, identityService)
-		
+
 		// Test invariant violations are detected
 		testInvariantViolationDetection(ctx, t, identityService)
 	})
 
 	t.Run("RotationContinuityFlow", func(t *testing.T) {
 		identityService := testSetupMTLSIdentityService(t)
-		
+
 		// Test server rotation with continuity
 		testServerRotationContinuity(ctx, t, identityService)
-		
-		// Test client rotation with continuity  
+
+		// Test client rotation with continuity
 		testClientRotationContinuity(ctx, t, identityService)
-		
+
 		// Test concurrent rotations
 		testConcurrentRotations(ctx, t, identityService)
 	})
 
 	t.Run("InvariantStatusAndMetrics", func(t *testing.T) {
 		identityService := testSetupMTLSIdentityService(t)
-		
+
 		// Test invariant status reporting
 		testInvariantStatusReporting(ctx, t, identityService)
-		
+
 		// Test connection statistics
 		testConnectionStatistics(ctx, t, identityService)
-		
+
 		// Test enforcement policy configuration
 		testEnforcementPolicyConfiguration(ctx, t, identityService)
 	})
@@ -63,7 +63,7 @@ func TestMTLSInvariantEnforcement(t *testing.T) {
 
 func testSetupMTLSIdentityService(t *testing.T) *services.IdentityService {
 	t.Helper()
-	
+
 	// Create service identity
 	identity := domain.NewServiceIdentity("mtls-test-service", "test.example.org")
 	if err := identity.Validate(); err != nil {
@@ -72,7 +72,7 @@ func testSetupMTLSIdentityService(t *testing.T) *services.IdentityService {
 
 	// Setup identity provider
 	provider := memidentity.New().WithIdentity(identity)
-	
+
 	// Setup configuration
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
@@ -104,19 +104,19 @@ func testEstablishConnectionWithInvariants(ctx context.Context, t *testing.T, id
 
 	// Create remote identity for connection
 	remoteIdentity := domain.NewServiceIdentity("remote-service", "test.example.org")
-	
+
 	// Establish mTLS connection with full invariant enforcement
 	conn, err := identityService.EstablishMTLSConnection(ctx, "test-conn-1", remoteIdentity)
 	if err != nil {
 		t.Fatalf("Failed to establish mTLS connection: %v", err)
 	}
-	
+
 	// Verify connection exists and is active
 	retrievedConn, exists := identityService.GetMTLSConnection("test-conn-1")
 	if !exists {
 		t.Fatal("Connection not found after establishment")
 	}
-	
+
 	if retrievedConn.ID != conn.ID {
 		t.Errorf("Connection ID mismatch: expected %s, got %s", conn.ID, retrievedConn.ID)
 	}
@@ -134,7 +134,7 @@ func testConnectionLifecycleInvariants(ctx context.Context, t *testing.T, identi
 	t.Helper()
 
 	remoteIdentity := domain.NewServiceIdentity("lifecycle-service", "test.example.org")
-	
+
 	// Start mTLS enforcement
 	if err := identityService.StartMTLSEnforcement(ctx); err != nil {
 		t.Fatalf("Failed to start mTLS enforcement: %v", err)
@@ -155,7 +155,7 @@ func testConnectionLifecycleInvariants(ctx context.Context, t *testing.T, identi
 	if status.TotalConnections != 1 {
 		t.Errorf("Expected 1 connection in status, got %d", status.TotalConnections)
 	}
-	
+
 	if status.TotalInvariants == 0 {
 		t.Error("No invariants registered")
 	}
@@ -163,12 +163,12 @@ func testConnectionLifecycleInvariants(ctx context.Context, t *testing.T, identi
 	// Verify all default invariants are present
 	expectedInvariants := []string{
 		"certificate_validity",
-		"mutual_authentication", 
+		"mutual_authentication",
 		"trust_domain_validation",
 		"certificate_rotation",
 		"identity_matching",
 	}
-	
+
 	for _, expectedInvariant := range expectedInvariants {
 		if _, exists := status.InvariantResults[expectedInvariant]; !exists {
 			t.Errorf("Expected invariant %s not found in status", expectedInvariant)
@@ -188,7 +188,7 @@ func testInvariantViolationDetection(ctx context.Context, t *testing.T, identity
 
 	// Create connection that will have invariant violations
 	remoteIdentity := domain.NewServiceIdentity("violation-service", "test.example.org")
-	
+
 	conn, err := identityService.EstablishMTLSConnection(ctx, "violation-conn", remoteIdentity)
 	if err != nil {
 		t.Fatalf("Failed to establish connection: %v", err)
@@ -215,7 +215,7 @@ func testInvariantViolationDetection(ctx context.Context, t *testing.T, identity
 	// Check for violations (some violations may be expected with mock components)
 	status := identityService.GetInvariantStatus(ctx)
 	t.Logf("✅ Invariant violation detection tested with %d invariants", len(status.InvariantResults))
-	
+
 	// Clean up
 	identityService.CloseMTLSConnection("violation-conn")
 }
@@ -323,7 +323,7 @@ func testInvariantStatusReporting(ctx context.Context, t *testing.T, identitySer
 
 	// Get initial status
 	status := identityService.GetInvariantStatus(ctx)
-	
+
 	// Verify status structure
 	if status.TotalInvariants == 0 {
 		t.Error("No invariants found in status")
@@ -430,29 +430,29 @@ func TestRotationObserverPattern(t *testing.T) {
 
 	t.Run("RotationEventObserver", func(t *testing.T) {
 		identityService := testSetupMTLSIdentityService(t)
-		
+
 		// Create a test observer
 		observer := &testRotationObserver{
 			events: make([]string, 0),
 		}
-		
+
 		// Add observer
 		identityService.AddRotationObserver(observer)
-		
+
 		// Perform rotation to trigger events
 		server, err := identityService.CreateServerIdentity()
 		if err != nil {
 			t.Fatalf("Failed to create server: %v", err)
 		}
-		
+
 		err = identityService.RotateServerWithContinuity(ctx, "observer-test-server", server)
 		if err != nil {
 			t.Fatalf("Server rotation failed: %v", err)
 		}
-		
+
 		// Wait for potential events
 		time.Sleep(100 * time.Millisecond)
-		
+
 		// Check if observer received events
 		if len(observer.events) > 0 {
 			t.Logf("✅ Observer received %d rotation events:", len(observer.events))
@@ -495,10 +495,10 @@ func TestEndToEndScenarios(t *testing.T) {
 
 		// Test inter-service connections
 		testInterServiceConnections(ctx, t, apiServerService, authServiceService, dbProxyService)
-		
+
 		// Test rotation coordination
 		testCoordinatedRotations(ctx, t, apiServerService, authServiceService)
-		
+
 		// Test invariant enforcement across services
 		testCrossServiceInvariants(ctx, t, apiServerService, authServiceService, dbProxyService)
 	})
@@ -509,7 +509,7 @@ func testSetupNamedMTLSService(t *testing.T, serviceName, trustDomain string) *s
 
 	identity := domain.NewServiceIdentity(serviceName, trustDomain)
 	provider := memidentity.New().WithIdentity(identity)
-	
+
 	config := &ports.Configuration{
 		Service: ports.ServiceConfig{
 			Name:   serviceName,
@@ -636,11 +636,10 @@ func testCrossServiceInvariants(ctx context.Context, t *testing.T, services ...*
 		totalInvariants += status.TotalInvariants
 		totalConnections += status.TotalConnections
 
-		t.Logf("Service %d: %d invariants, %d connections", 
+		t.Logf("Service %d: %d invariants, %d connections",
 			i+1, status.TotalInvariants, status.TotalConnections)
 	}
 
 	t.Logf("✅ Cross-service invariants: %d total invariants across %d services",
 		totalInvariants, len(services))
 }
-

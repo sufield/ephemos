@@ -32,8 +32,9 @@ func NewDefaultCertValidator() ports.CertValidatorPort {
 // rules remain in the domain layer while providing a port-compliant interface.
 //
 // Parameters:
-//   cert: The certificate to validate (must not be nil)
-//   opts: Validation options for controlling validation behavior
+//
+//	cert: The certificate to validate (must not be nil)
+//	opts: Validation options for controlling validation behavior
 //
 // Returns an error if validation fails, nil if the certificate is valid.
 func (v *DefaultCertValidator) Validate(cert *domain.Certificate, opts domain.CertValidationOptions) error {

@@ -44,15 +44,15 @@ func KeysMatch(certPublicKey, privateKeyPublic interface{}) bool {
 	// Both keys must be ECDSA for SPIFFE
 	ecdsaCertKey, ok1 := certPublicKey.(*ecdsa.PublicKey)
 	ecdsaPrivKey, ok2 := privateKeyPublic.(*ecdsa.PublicKey)
-	
+
 	if !ok1 || !ok2 {
 		return false
 	}
-	
+
 	// Compare ECDSA public key components: curve and coordinates (X, Y)
 	return ecdsaCertKey.Curve == ecdsaPrivKey.Curve &&
-		   ecdsaCertKey.X.Cmp(ecdsaPrivKey.X) == 0 &&
-		   ecdsaCertKey.Y.Cmp(ecdsaPrivKey.Y) == 0
+		ecdsaCertKey.X.Cmp(ecdsaPrivKey.X) == 0 &&
+		ecdsaCertKey.Y.Cmp(ecdsaPrivKey.Y) == 0
 }
 
 // ValidateSignerKeyType validates that a crypto.Signer is ECDSA.

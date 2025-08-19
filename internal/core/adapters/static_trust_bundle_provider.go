@@ -28,7 +28,8 @@ type StaticTrustBundleProvider struct {
 // and provides a clear factory method for creating static trust bundle providers.
 //
 // Parameters:
-//   bundle: The trust bundle to use for all requests (can be nil, but GetTrustBundle will error)
+//
+//	bundle: The trust bundle to use for all requests (can be nil, but GetTrustBundle will error)
 //
 // Returns a TrustBundleProvider that always returns the same trust bundle.
 func NewStaticTrustBundleProvider(bundle *domain.TrustBundle) ports.TrustBundleProvider {

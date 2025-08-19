@@ -89,7 +89,7 @@ func TestNewServiceName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := NewServiceName(tt.input)
-			
+
 			if tt.wantError {
 				if err == nil {
 					t.Errorf("NewServiceName(%q) expected error, got nil", tt.input)
@@ -254,7 +254,7 @@ func TestServiceNameProductionValidation(t *testing.T) {
 
 // Helper function to check if a string contains a substring
 func containsSubstring(s, substr string) bool {
-	return len(s) >= len(substr) && (len(substr) == 0 || (len(s) > 0 && s[len(s)-len(substr):] == substr) || 
+	return len(s) >= len(substr) && (len(substr) == 0 || (len(s) > 0 && s[len(s)-len(substr):] == substr) ||
 		(len(s) >= len(substr) && s[:len(substr)] == substr) ||
 		(len(s) > len(substr) && containsInMiddle(s, substr)))
 }

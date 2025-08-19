@@ -114,7 +114,7 @@ func (td *TrustDomain) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return err
 	}
-	
+
 	// Allow empty for optional fields
 	if s == "" {
 		*td = TrustDomain("")
@@ -147,7 +147,7 @@ func ParseFromSPIFFEID(spiffeID string) (TrustDomain, error) {
 
 	// Remove spiffe:// prefix
 	remainder := strings.TrimPrefix(spiffeID, "spiffe://")
-	
+
 	// Find the trust domain (everything before the first '/')
 	parts := strings.SplitN(remainder, "/", 2)
 	if len(parts) == 0 || parts[0] == "" {

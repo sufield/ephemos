@@ -456,7 +456,7 @@ func TestTrustBundle_CreateCertPool(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var bundle *domain.TrustBundle
 			var err error
-			
+
 			// Use non-validating constructor for test cases with empty or nil certs
 			if tt.name == "empty bundle" || tt.name == "bundle with nil certificate" {
 				bundle, err = domain.NewTrustBundleWithValidation(tt.certs, false)

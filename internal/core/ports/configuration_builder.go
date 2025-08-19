@@ -73,7 +73,6 @@ func (b *ConfigurationBuilder) WithAgentSocket(socketPath string) *Configuration
 	return b
 }
 
-
 // Note: InsecureSkipVerify is controlled via environment variables
 // and is not part of the standard configuration structure for security reasons.
 
@@ -85,7 +84,7 @@ func (b *ConfigurationBuilder) Build() (*Configuration, error) {
 	if service.Name.Value() == "" {
 		return nil, fmt.Errorf("service name is required")
 	}
-	
+
 	if b.config.Service.Domain == "" {
 		return nil, fmt.Errorf("trust domain is required")
 	}

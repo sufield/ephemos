@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	
+
 	"github.com/sufield/ephemos/internal/core/adapters"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
@@ -113,7 +113,7 @@ func TestIdentityUseCaseImpl(t *testing.T) {
 
 	useCase := NewIdentityUseCase(identityService)
 	assert.NotNil(t, useCase)
-	
+
 	// Basic smoke test - just ensure the use case wrapper works
 	assert.NotNil(t, useCase)
 }
