@@ -7,38 +7,38 @@ import (
 	"context"
 )
 
-// Dialer provides authenticated connection establishment capabilities.
+// DialerPort provides authenticated connection establishment capabilities.
 // Implementations handle the underlying authentication protocol (e.g., SPIFFE/SPIRE).
-type Dialer interface {
+type DialerPort interface {
 	// Connect establishes an authenticated connection to the specified service.
 	// The serviceName is used for identity verification and authorization.
 	// The address specifies where to connect (host:port format).
-	Connect(ctx context.Context, serviceName, address string) (Conn, error)
+	Connect(ctx context.Context, serviceName, address string) (ConnPort, error)
 
 	// Close releases any resources held by the dialer.
 	// Must be safe to call multiple times.
 	Close() error
 }
 
-// Conn represents an authenticated connection to a service.
+// ConnPort represents an authenticated connection to a service.
 // Provides access to protocol-specific clients (HTTP, gRPC, etc.).
-type Conn interface {
+type ConnPort interface {
 	// HTTPClient returns an HTTP client configured for this authenticated connection.
 	// The client will automatically include authentication credentials in requests.
-	HTTPClient() (HTTPClient, error)
+	HTTPClient() (HTTPClientPort, error)
 
 	// Close closes the connection and releases associated resources.
 	// Must be safe to call multiple times.
 	Close() error
 }
 
-// AuthenticatedServer provides authenticated server hosting capabilities.
+// AuthenticatedServerPort provides authenticated server hosting capabilities.
 // Implementations handle the underlying authentication protocol (e.g., SPIFFE/SPIRE).
-type AuthenticatedServer interface {
+type AuthenticatedServerPort interface {
 	// Serve starts serving requests on the provided listener.
 	// The server will automatically verify client authentication.
 	// Blocks until the context is cancelled or an error occurs.
-	Serve(ctx context.Context, listener NetworkListener) error
+	Serve(ctx context.Context, listener NetworkListenerPort) error
 
 	// Close gracefully shuts down the server.
 	// Must be safe to call multiple times.

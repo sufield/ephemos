@@ -10,30 +10,63 @@ import (
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
+// TrustDomainCapability provides access to trust domain configuration.
+type TrustDomainCapability interface {
+	GetServiceDomain() string
+	ShouldSkipCertificateValidation() bool
+}
+
 // TrustDomainAdapter provides trust domain capabilities by adapting from configuration.
 // This adapter encapsulates configuration access and provides a clean interface.
 type TrustDomainAdapter struct {
+	capability TrustDomainCapability
+}
+
+// configCapability implements TrustDomainCapability for ports.Configuration
+type configCapability struct {
 	config *ports.Configuration
+}
+
+func (c *configCapability) GetServiceDomain() string {
+	if c.config == nil {
+		return ""
+	}
+	return c.config.Service.Domain
+}
+
+func (c *configCapability) ShouldSkipCertificateValidation() bool {
+	if c.config == nil {
+		return false
+	}
+	return c.config.ShouldSkipCertificateValidation()
 }
 
 // NewTrustDomainAdapter creates a new trust domain adapter from configuration.
 func NewTrustDomainAdapter(config *ports.Configuration) *TrustDomainAdapter {
 	return &TrustDomainAdapter{
-		config: config,
+		capability: &configCapability{config: config},
+	}
+}
+
+// NewTrustDomainAdapterWithCapability creates a new trust domain adapter with injected capability.
+func NewTrustDomainAdapterWithCapability(capability TrustDomainCapability) *TrustDomainAdapter {
+	return &TrustDomainAdapter{
+		capability: capability,
 	}
 }
 
 // GetTrustDomain returns the configured trust domain as a string.
 func (t *TrustDomainAdapter) GetTrustDomain() (string, error) {
-	if t.config == nil {
-		return "", fmt.Errorf("configuration is nil")
+	if t.capability == nil {
+		return "", fmt.Errorf("capability is nil")
 	}
 
-	if t.config.Service.Domain == "" {
+	domain := t.capability.GetServiceDomain()
+	if domain == "" {
 		return "", fmt.Errorf("trust domain not configured")
 	}
 
-	return t.config.Service.Domain, nil
+	return domain, nil
 }
 
 // CreateDefaultAuthorizer creates a secure default authorizer for the trust domain.
@@ -56,24 +89,25 @@ func (t *TrustDomainAdapter) CreateDefaultAuthorizer() (tlsconfig.Authorizer, er
 
 // IsConfigured returns true if a trust domain has been properly configured.
 func (t *TrustDomainAdapter) IsConfigured() bool {
-	if t.config == nil {
+	if t.capability == nil {
 		return false
 	}
 
 	// Check if trust domain is set and valid
-	if t.config.Service.Domain == "" {
+	domain := t.capability.GetServiceDomain()
+	if domain == "" {
 		return false
 	}
 
 	// Validate trust domain format
-	_, err := spiffeid.TrustDomainFromString(t.config.Service.Domain)
+	_, err := spiffeid.TrustDomainFromString(domain)
 	return err == nil
 }
 
 // ShouldSkipCertificateValidation returns true if certificate validation should be skipped (development only).
 func (t *TrustDomainAdapter) ShouldSkipCertificateValidation() bool {
-	if t.config == nil {
+	if t.capability == nil {
 		return false
 	}
-	return t.config.ShouldSkipCertificateValidation()
+	return t.capability.ShouldSkipCertificateValidation()
 }

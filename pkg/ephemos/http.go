@@ -16,13 +16,24 @@ import (
 )
 
 // Authorizer validates peer certificates during mTLS handshake.
-// This is needed for HTTP authentication functionality.
-type Authorizer = tlsconfig.Authorizer
+// This interface abstracts away vendor-specific authorization logic.
+type Authorizer interface {
+	Authorize(certificates []*x509.Certificate) error
+}
+
+// authorizerAdapter adapts tlsconfig.Authorizer to our public interface
+type authorizerAdapter struct {
+	authorizer tlsconfig.Authorizer
+}
+
+func (a *authorizerAdapter) Authorize(certificates []*x509.Certificate) error {
+	return a.authorizer(certificates)
+}
 
 // AuthorizeAny returns an Authorizer that accepts any valid SPIFFE certificate.
 // This provides basic SPIFFE identity validation for authentication.
 func AuthorizeAny() Authorizer {
-	return tlsconfig.AuthorizeAny()
+	return &authorizerAdapter{authorizer: tlsconfig.AuthorizeAny()}
 }
 
 
@@ -142,13 +153,14 @@ func NewTLSConfig(identityService IdentityService, authorizer Authorizer, trustD
 	// Create bundle source adapter
 	var bundleSource x509bundle.Source
 	if trustDomain != "" {
-		td, err := spiffeid.TrustDomainFromString(trustDomain)
+		// Validate trust domain format by parsing it
+		_, err := spiffeid.TrustDomainFromString(trustDomain)
 		if err != nil {
 			return nil, fmt.Errorf("invalid trust domain %q: %w", trustDomain, err)
 		}
 		bundleSource = &bundleSourceAdapter{
 			identityService:       identityService,
-			restrictedTrustDomain: td,
+			restrictedTrustDomain: trustDomain,
 		}
 	} else {
 		bundleSource = &bundleSourceAdapter{
@@ -163,6 +175,27 @@ func NewTLSConfig(identityService IdentityService, authorizer Authorizer, trustD
 	tlsConfig.MinVersion = tls.VersionTLS13
 
 	return tlsConfig, nil
+}
+
+// svidWrapper wraps x509svid.SVID to avoid exposing vendor types
+type svidWrapper struct {
+	certificates []*x509.Certificate
+	privateKey   crypto.Signer
+	spiffeID     string
+}
+
+// toX509SVID converts the wrapper to x509svid.SVID for internal use
+func (w *svidWrapper) toX509SVID() (*x509svid.SVID, error) {
+	id, err := spiffeid.FromString(w.spiffeID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid SPIFFE ID: %w", err)
+	}
+	
+	return &x509svid.SVID{
+		ID:           id,
+		Certificates: w.certificates,
+		PrivateKey:   w.privateKey,
+	}, nil
 }
 
 // svidSourceAdapter adapts IdentityService to x509svid.Source
@@ -193,28 +226,32 @@ func (s *svidSourceAdapter) GetX509SVID() (*x509svid.SVID, error) {
 	}
 
 	// Extract SPIFFE ID from certificate
-	spiffeID, err := extractSPIFFEIDFromCert(cert.Cert)
+	spiffeIDStr, err := extractSPIFFEIDStringFromCert(cert.Cert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract SPIFFE ID: %w", err)
 	}
 
-	return &x509svid.SVID{
-		ID:           spiffeID,
-		Certificates: certChain,
-		PrivateKey:   signer,
-	}, nil
+	// Create wrapper first to avoid exposing vendor types
+	wrapper := &svidWrapper{
+		certificates: certChain,
+		privateKey:   signer,
+		spiffeID:     spiffeIDStr,
+	}
+
+	// Convert to vendor type for internal use
+	return wrapper.toX509SVID()
 }
 
 // bundleSourceAdapter adapts IdentityService to x509bundle.Source
 type bundleSourceAdapter struct {
 	identityService       IdentityService
-	restrictedTrustDomain spiffeid.TrustDomain
+	restrictedTrustDomain string
 }
 
 // GetX509BundleForTrustDomain implements x509bundle.Source
 func (b *bundleSourceAdapter) GetX509BundleForTrustDomain(td spiffeid.TrustDomain) (*x509bundle.Bundle, error) {
 	// Enforce trust domain restriction if configured
-	if !b.restrictedTrustDomain.IsZero() && td != b.restrictedTrustDomain {
+	if b.restrictedTrustDomain != "" && td.String() != b.restrictedTrustDomain {
 		return nil, fmt.Errorf("trust domain %s not allowed, restricted to %s", td, b.restrictedTrustDomain)
 	}
 
@@ -232,17 +269,18 @@ func (b *bundleSourceAdapter) GetX509BundleForTrustDomain(td spiffeid.TrustDomai
 	return bundle, nil
 }
 
-// extractSPIFFEIDFromCert extracts SPIFFE ID from certificate URI SAN
-func extractSPIFFEIDFromCert(cert *x509.Certificate) (spiffeid.ID, error) {
+// extractSPIFFEIDStringFromCert extracts SPIFFE ID string from certificate URI SAN
+func extractSPIFFEIDStringFromCert(cert *x509.Certificate) (string, error) {
 	for _, uri := range cert.URIs {
 		if uri.Scheme == "spiffe" {
-			id, err := spiffeid.FromURI(uri)
+			// Validate the URI by parsing it, but return string to avoid vendor type exposure
+			_, err := spiffeid.FromURI(uri)
 			if err == nil {
-				return id, nil
+				return uri.String(), nil
 			}
 		}
 	}
-	return spiffeid.ID{}, fmt.Errorf("no valid SPIFFE ID found in certificate URI SANs")
+	return "", fmt.Errorf("no valid SPIFFE ID found in certificate URI SANs")
 }
 
 // HTTPTransportConfig provides fine-grained control over HTTP transport configuration.
