@@ -12,9 +12,8 @@ import (
 // ToCoreTrustDomain converts a spiffeid.TrustDomain to domain.TrustDomain.
 // This conversion is safe as spiffeid.TrustDomain is already validated.
 func ToCoreTrustDomain(td spiffeid.TrustDomain) domain.TrustDomain {
-	// spiffeid.TrustDomain.String() returns the domain name
-	// We can safely create without validation since it's already valid
-	return domain.TrustDomain(td.String())
+	// Use domain.TrustDomain's FromSpiffeTrustDomain method
+	return domain.FromSpiffeTrustDomain(td)
 }
 
 // ToSpiffeTrustDomain converts a domain.TrustDomain to spiffeid.TrustDomain.
@@ -23,17 +22,18 @@ func ToSpiffeTrustDomain(td domain.TrustDomain) (spiffeid.TrustDomain, error) {
 	if td.IsZero() {
 		return spiffeid.TrustDomain{}, fmt.Errorf("cannot convert empty trust domain")
 	}
-	return spiffeid.TrustDomainFromString(td.String())
+	// Use domain.TrustDomain's ToSpiffeTrustDomain method
+	return td.ToSpiffeTrustDomain(), nil
 }
 
 // MustToSpiffeTrustDomain converts a domain.TrustDomain to spiffeid.TrustDomain.
 // Panics if conversion fails. Use only when you're certain the domain is valid.
 func MustToSpiffeTrustDomain(td domain.TrustDomain) spiffeid.TrustDomain {
-	std, err := ToSpiffeTrustDomain(td)
-	if err != nil {
-		panic(fmt.Sprintf("failed to convert trust domain %q: %v", td, err))
+	if td.IsZero() {
+		panic("cannot convert empty trust domain")
 	}
-	return std
+	// Direct access to underlying spiffeid.TrustDomain
+	return td.ToSpiffeTrustDomain()
 }
 
 // ToCoreTrustDomains converts a slice of spiffeid.TrustDomain to []domain.TrustDomain.
@@ -65,11 +65,11 @@ func ExtractTrustDomainFromSPIFFEID(id spiffeid.ID) domain.TrustDomain {
 }
 
 // ExtractTrustDomainFromString parses a SPIFFE ID string and extracts the trust domain.
-// For example: "spiffe://example.org/service" returns domain.TrustDomain("example.org").
+// For example: "spiffe://example.org/service" returns domain.TrustDomain for "example.org".
 func ExtractTrustDomainFromString(spiffeIDStr string) (domain.TrustDomain, error) {
 	id, err := spiffeid.FromString(spiffeIDStr)
 	if err != nil {
-		return "", fmt.Errorf("invalid SPIFFE ID: %w", err)
+		return domain.TrustDomain{}, fmt.Errorf("invalid SPIFFE ID: %w", err)
 	}
 	return ToCoreTrustDomain(id.TrustDomain()), nil
 }

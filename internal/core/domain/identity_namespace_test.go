@@ -99,7 +99,7 @@ func TestNewIdentityNamespace(t *testing.T) {
 			trustDomain, err := domain.NewTrustDomain(tt.trustDomain)
 			if tt.trustDomain == "" || strings.Contains(tt.trustDomain, "..") {
 				// Skip trust domain creation if we expect it to fail
-				trustDomain = domain.TrustDomain(tt.trustDomain)
+				trustDomain = domain.TrustDomain{}
 			} else {
 				require.NoError(t, err, "Trust domain creation should not fail for test setup")
 			}

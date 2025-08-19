@@ -179,7 +179,7 @@ func (doc *IdentityDocument) GetIdentityNamespace() (IdentityNamespace, error) {
 func (doc *IdentityDocument) GetTrustDomain() (TrustDomain, error) {
 	namespace, err := doc.GetIdentityNamespace()
 	if err != nil {
-		return TrustDomain(""), fmt.Errorf("failed to get identity namespace: %w", err)
+		return TrustDomain{}, fmt.Errorf("failed to get identity namespace: %w", err)
 	}
 
 	return namespace.GetTrustDomain(), nil
