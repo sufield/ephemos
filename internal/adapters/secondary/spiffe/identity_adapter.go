@@ -19,9 +19,8 @@ import (
 // IdentityDocumentAdapter adapts SPIFFE workload API to IdentityProviderPort.
 // This adapter handles SVID fetching and identity document creation from SPIFFE sources.
 type IdentityDocumentAdapter struct {
-	socketPath domain.SocketPath
-	x509Source *workloadapi.X509Source
-	logger     *slog.Logger
+	x509SourceProvider *X509SourceProvider
+	logger        *slog.Logger
 
 	// State management
 	mu          sync.RWMutex
@@ -32,15 +31,15 @@ type IdentityDocumentAdapter struct {
 
 // IdentityDocumentAdapterConfig provides configuration for the adapter.
 type IdentityDocumentAdapterConfig struct {
-	SocketPath domain.SocketPath
-	Logger     *slog.Logger
+	X509SourceProvider *X509SourceProvider
+	Logger        *slog.Logger
 }
 
 // NewIdentityDocumentAdapter creates a new SPIFFE identity document adapter.
 func NewIdentityDocumentAdapter(config IdentityDocumentAdapterConfig) (*IdentityDocumentAdapter, error) {
-	socketPath := config.SocketPath
-	// Note: Empty socket paths will cause errors in connection logic (fail-fast behavior)
-	// The actual connection logic will handle defaults when needed
+	if config.X509SourceProvider == nil {
+		return nil, fmt.Errorf("source manager is required")
+	}
 
 	logger := config.Logger
 	if logger == nil {
@@ -48,9 +47,9 @@ func NewIdentityDocumentAdapter(config IdentityDocumentAdapterConfig) (*Identity
 	}
 
 	return &IdentityDocumentAdapter{
-		socketPath:  socketPath,
-		logger:      logger,
-		watcherChan: make(chan *x509svid.SVID, 10), // Buffer for updates
+		x509SourceProvider: config.X509SourceProvider,
+		logger:        logger,
+		watcherChan:   make(chan *x509svid.SVID, 10), // Buffer for updates
 	}, nil
 }
 
@@ -58,11 +57,12 @@ func NewIdentityDocumentAdapter(config IdentityDocumentAdapterConfig) (*Identity
 func (a *IdentityDocumentAdapter) GetServiceIdentity(ctx context.Context) (spiffeid.ID, error) {
 	a.logger.Debug("fetching service identity from SPIFFE")
 
-	if err := a.ensureSource(ctx); err != nil {
-		return spiffeid.ID{}, fmt.Errorf("failed to ensure X509 source: %w", err)
+	x509Source, err := a.x509SourceProvider.GetOrCreateSource(ctx)
+	if err != nil {
+		return spiffeid.ID{}, fmt.Errorf("failed to get X509 source: %w", err)
 	}
 
-	svid, err := a.x509Source.GetX509SVID()
+	svid, err := x509Source.GetX509SVID()
 	if err != nil {
 		return spiffeid.ID{}, fmt.Errorf("failed to get X509 SVID: %w", err)
 	}
@@ -85,11 +85,12 @@ func (a *IdentityDocumentAdapter) GetServiceIdentity(ctx context.Context) (spiff
 func (a *IdentityDocumentAdapter) GetCertificate(ctx context.Context) (*domain.Certificate, error) {
 	a.logger.Debug("fetching certificate from SPIFFE")
 
-	if err := a.ensureSource(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ensure X509 source: %w", err)
+	x509Source, err := a.x509SourceProvider.GetOrCreateSource(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get X509 source: %w", err)
 	}
 
-	svid, err := a.x509Source.GetX509SVID()
+	svid, err := x509Source.GetX509SVID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get X509 SVID: %w", err)
 	}
@@ -124,11 +125,12 @@ func (a *IdentityDocumentAdapter) GetCertificate(ctx context.Context) (*domain.C
 func (a *IdentityDocumentAdapter) GetSVID(ctx context.Context) (*x509svid.SVID, error) {
 	a.logger.Debug("fetching SVID from SPIFFE")
 
-	if err := a.ensureSource(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ensure X509 source: %w", err)
+	x509Source, err := a.x509SourceProvider.GetOrCreateSource(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get X509 source: %w", err)
 	}
 
-	svid, err := a.x509Source.GetX509SVID()
+	svid, err := x509Source.GetX509SVID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get X509 SVID: %w", err)
 	}
@@ -151,12 +153,13 @@ func (a *IdentityDocumentAdapter) GetSVID(ctx context.Context) (*x509svid.SVID, 
 func (a *IdentityDocumentAdapter) RefreshIdentity(ctx context.Context) error {
 	a.logger.Info("refreshing identity from SPIFFE")
 
-	if err := a.ensureSource(ctx); err != nil {
-		return fmt.Errorf("failed to ensure X509 source: %w", err)
+	x509Source, err := a.x509SourceProvider.GetOrCreateSource(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get X509 source: %w", err)
 	}
 
 	// Force a fresh fetch from the workload API
-	svid, err := a.x509Source.GetX509SVID()
+	svid, err := x509Source.GetX509SVID()
 	if err != nil {
 		return fmt.Errorf("failed to refresh X509 SVID: %w", err)
 	}
@@ -188,8 +191,9 @@ func (a *IdentityDocumentAdapter) RefreshIdentity(ctx context.Context) error {
 func (a *IdentityDocumentAdapter) WatchIdentityChanges(ctx context.Context) (<-chan *x509svid.SVID, error) {
 	a.logger.Info("starting identity change watcher")
 
-	if err := a.ensureSource(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ensure X509 source: %w", err)
+	x509Source, err := a.x509SourceProvider.GetOrCreateSource(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get X509 source: %w", err)
 	}
 
 	// Cancel any existing watcher
@@ -204,17 +208,17 @@ func (a *IdentityDocumentAdapter) WatchIdentityChanges(ctx context.Context) (<-c
 	a.mu.Unlock()
 
 	// Start watcher goroutine
-	go a.watchForUpdates(watchCtx)
+	go a.watchForUpdates(watchCtx, x509Source)
 
 	return a.watcherChan, nil
 }
 
 // watchForUpdates monitors for SVID updates from SPIFFE.
-func (a *IdentityDocumentAdapter) watchForUpdates(ctx context.Context) {
+func (a *IdentityDocumentAdapter) watchForUpdates(ctx context.Context, x509Source *workloadapi.X509Source) {
 	defer close(a.watcherChan)
 
 	// Create update channel from workload API
-	updateCh := a.x509Source.Updated()
+	updateCh := x509Source.Updated()
 
 	for {
 		select {
@@ -226,7 +230,7 @@ func (a *IdentityDocumentAdapter) watchForUpdates(ctx context.Context) {
 			a.logger.Info("SVID update detected")
 
 			// Get updated SVID
-			svid, err := a.x509Source.GetX509SVID()
+			svid, err := x509Source.GetX509SVID()
 			if err != nil {
 				a.logger.Error("failed to get updated SVID", "error", err)
 				continue
@@ -262,48 +266,12 @@ func (a *IdentityDocumentAdapter) Close() error {
 	}
 	a.mu.Unlock()
 
-	// Close X509 source
-	if a.x509Source != nil {
-		if err := a.x509Source.Close(); err != nil {
-			return fmt.Errorf("failed to close X509 source: %w", err)
-		}
-	}
+	// Note: X509 source is managed by X509SourceProvider, not closed here
 
 	a.logger.Debug("SPIFFE identity adapter closed")
 	return nil
 }
 
-// ensureSource ensures the X509 source is initialized.
-func (a *IdentityDocumentAdapter) ensureSource(ctx context.Context) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	if a.x509Source != nil {
-		return nil
-	}
-
-	// Require explicit socket path configuration - no fallback patterns
-	if a.socketPath.IsEmpty() {
-		return fmt.Errorf("SPIFFE socket path must be explicitly configured - no fallback patterns allowed")
-	}
-	actualSocketPath := a.socketPath.WithUnixPrefix()
-
-	a.logger.Debug("initializing X509 source", "socket_path", actualSocketPath)
-
-	source, err := workloadapi.NewX509Source(
-		ctx,
-		workloadapi.WithClientOptions(
-			workloadapi.WithAddr(actualSocketPath),
-		),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create X509 source: %w", err)
-	}
-
-	a.x509Source = source
-	a.logger.Info("X509 source initialized successfully")
-	return nil
-}
 
 // extractServiceName extracts the service name from a SPIFFE ID path.
 func (a *IdentityDocumentAdapter) extractServiceName(path string) string {

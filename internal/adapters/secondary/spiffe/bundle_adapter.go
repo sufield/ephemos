@@ -19,9 +19,8 @@ import (
 // SpiffeBundleAdapter adapts SPIFFE workload API to BundleProviderPort.
 // This adapter handles trust bundle fetching and management from SPIFFE sources.
 type SpiffeBundleAdapter struct {
-	socketPath domain.SocketPath
-	x509Source *workloadapi.X509Source
-	logger     *slog.Logger
+	x509SourceProvider *X509SourceProvider
+	logger        *slog.Logger
 
 	// State management
 	mu            sync.RWMutex
@@ -32,14 +31,15 @@ type SpiffeBundleAdapter struct {
 
 // SpiffeBundleAdapterConfig provides configuration for the adapter.
 type SpiffeBundleAdapterConfig struct {
-	SocketPath domain.SocketPath
-	Logger     *slog.Logger
+	X509SourceProvider *X509SourceProvider
+	Logger        *slog.Logger
 }
 
 // NewSpiffeBundleAdapter creates a new SPIFFE trust bundle adapter.
 func NewSpiffeBundleAdapter(config SpiffeBundleAdapterConfig) (*SpiffeBundleAdapter, error) {
-	socketPath := config.SocketPath
-	// Note: Empty socket paths will cause errors in connection logic (fail-fast behavior)
+	if config.X509SourceProvider == nil {
+		return nil, fmt.Errorf("source manager is required")
+	}
 
 	logger := config.Logger
 	if logger == nil {
@@ -47,9 +47,9 @@ func NewSpiffeBundleAdapter(config SpiffeBundleAdapterConfig) (*SpiffeBundleAdap
 	}
 
 	return &SpiffeBundleAdapter{
-		socketPath:  socketPath,
-		logger:      logger,
-		watcherChan: make(chan *x509bundle.Bundle, 10), // Buffer for updates
+		x509SourceProvider: config.X509SourceProvider,
+		logger:        logger,
+		watcherChan:   make(chan *x509bundle.Bundle, 10), // Buffer for updates
 	}, nil
 }
 
@@ -57,18 +57,19 @@ func NewSpiffeBundleAdapter(config SpiffeBundleAdapterConfig) (*SpiffeBundleAdap
 func (a *SpiffeBundleAdapter) GetTrustBundle(ctx context.Context) (*x509bundle.Bundle, error) {
 	a.logger.Debug("fetching trust bundle from SPIFFE")
 
-	if err := a.ensureSource(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ensure X509 source: %w", err)
+	x509Source, err := a.x509SourceProvider.GetOrCreateSource(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get X509 source: %w", err)
 	}
 
 	// Get the default trust domain from current SVID
-	svid, err := a.x509Source.GetX509SVID()
+	svid, err := x509Source.GetX509SVID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get X509 SVID for trust domain: %w", err)
 	}
 
 	// Get bundle for the SVID's trust domain - return SDK bundle directly
-	bundle, err := a.x509Source.GetX509BundleForTrustDomain(svid.ID.TrustDomain())
+	bundle, err := x509Source.GetX509BundleForTrustDomain(svid.ID.TrustDomain())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get trust bundle: %w", err)
 	}
@@ -85,12 +86,13 @@ func (a *SpiffeBundleAdapter) GetTrustBundleForDomain(ctx context.Context, trust
 	a.logger.Debug("fetching trust bundle for specific domain",
 		"trust_domain", trustDomain.String())
 
-	if err := a.ensureSource(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ensure X509 source: %w", err)
+	x509Source, err := a.x509SourceProvider.GetOrCreateSource(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get X509 source: %w", err)
 	}
 
 	// Get bundle for specific trust domain - return SDK bundle directly
-	bundle, err := a.x509Source.GetX509BundleForTrustDomain(trustDomain)
+	bundle, err := x509Source.GetX509BundleForTrustDomain(trustDomain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get trust bundle for domain %s: %w", trustDomain, err)
 	}
@@ -108,8 +110,9 @@ func (a *SpiffeBundleAdapter) GetTrustBundleForDomain(ctx context.Context, trust
 func (a *SpiffeBundleAdapter) RefreshTrustBundle(ctx context.Context) error {
 	a.logger.Info("refreshing trust bundle from SPIFFE")
 
-	if err := a.ensureSource(ctx); err != nil {
-		return fmt.Errorf("failed to ensure X509 source: %w", err)
+	_, err := a.x509SourceProvider.GetOrCreateSource(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get X509 source: %w", err)
 	}
 
 	// Refresh is essentially a no-op since X509Source always fetches fresh
@@ -124,8 +127,9 @@ func (a *SpiffeBundleAdapter) RefreshTrustBundle(ctx context.Context) error {
 func (a *SpiffeBundleAdapter) WatchTrustBundleChanges(ctx context.Context) (<-chan *x509bundle.Bundle, error) {
 	a.logger.Info("starting trust bundle change watcher")
 
-	if err := a.ensureSource(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ensure X509 source: %w", err)
+	x509Source, err := a.x509SourceProvider.GetOrCreateSource(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get X509 source: %w", err)
 	}
 
 	// Cancel any existing watcher
@@ -140,17 +144,17 @@ func (a *SpiffeBundleAdapter) WatchTrustBundleChanges(ctx context.Context) (<-ch
 	a.mu.Unlock()
 
 	// Start watcher goroutine
-	go a.watchForBundleUpdates(watchCtx)
+	go a.watchForBundleUpdates(watchCtx, x509Source)
 
 	return a.watcherChan, nil
 }
 
 // watchForBundleUpdates monitors for trust bundle updates from SPIFFE.
-func (a *SpiffeBundleAdapter) watchForBundleUpdates(ctx context.Context) {
+func (a *SpiffeBundleAdapter) watchForBundleUpdates(ctx context.Context, x509Source *workloadapi.X509Source) {
 	defer close(a.watcherChan)
 
 	// Create update channel from workload API
-	updateCh := a.x509Source.Updated()
+	updateCh := x509Source.Updated()
 
 	for {
 		select {
@@ -162,14 +166,14 @@ func (a *SpiffeBundleAdapter) watchForBundleUpdates(ctx context.Context) {
 			a.logger.Info("trust bundle update detected")
 
 			// Get current SVID to determine trust domain
-			svid, err := a.x509Source.GetX509SVID()
+			svid, err := x509Source.GetX509SVID()
 			if err != nil {
 				a.logger.Error("failed to get SVID for trust domain", "error", err)
 				continue
 			}
 
 			// Get updated bundle
-			bundle, err := a.x509Source.GetX509BundleForTrustDomain(svid.ID.TrustDomain())
+			bundle, err := x509Source.GetX509BundleForTrustDomain(svid.ID.TrustDomain())
 			if err != nil {
 				a.logger.Error("failed to get updated trust bundle", "error", err)
 				continue
@@ -246,48 +250,12 @@ func (a *SpiffeBundleAdapter) Close() error {
 	}
 	a.mu.Unlock()
 
-	// Close X509 source
-	if a.x509Source != nil {
-		if err := a.x509Source.Close(); err != nil {
-			return fmt.Errorf("failed to close X509 source: %w", err)
-		}
-	}
+	// Note: X509 source is managed by X509SourceProvider, not closed here
 
 	a.logger.Debug("SPIFFE bundle adapter closed")
 	return nil
 }
 
-// ensureSource ensures the X509 source is initialized.
-func (a *SpiffeBundleAdapter) ensureSource(ctx context.Context) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	if a.x509Source != nil {
-		return nil
-	}
-
-	// Require explicit socket path configuration - no fallback patterns
-	if a.socketPath.IsEmpty() {
-		return fmt.Errorf("SPIFFE socket path must be explicitly configured - no fallback patterns allowed")
-	}
-	actualSocketPath := a.socketPath.WithUnixPrefix()
-
-	a.logger.Debug("initializing X509 source", "socket_path", actualSocketPath)
-
-	source, err := workloadapi.NewX509Source(
-		ctx,
-		workloadapi.WithClientOptions(
-			workloadapi.WithAddr(actualSocketPath),
-		),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create X509 source: %w", err)
-	}
-
-	a.x509Source = source
-	a.logger.Info("X509 source initialized successfully")
-	return nil
-}
 
 // Ensure adapter implements the port interface
 var _ ports.BundleProviderPort = (*SpiffeBundleAdapter)(nil)

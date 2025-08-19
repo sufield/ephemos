@@ -19,6 +19,7 @@ import (
 // Provider provides SPIFFE identities using the new adapter architecture.
 // This is a compatibility layer that delegates to the specialized adapters.
 type Provider struct {
+	x509SourceProvider   *X509SourceProvider
 	identityAdapter *IdentityDocumentAdapter
 	bundleAdapter   *SpiffeBundleAdapter
 	tlsAdapter      *TLSAdapter
@@ -36,32 +37,36 @@ func NewProvider(config *ports.AgentConfig) (*Provider, error) {
 
 	logger := slog.Default()
 
-	// Create specialized adapters
+	// Create shared X509 source provider
+	x509SourceProvider := NewX509SourceProvider(socketPath, logger)
+
+	// Create specialized adapters with shared X509 source provider
 	identityAdapter, err := NewIdentityDocumentAdapter(IdentityDocumentAdapterConfig{
-		SocketPath: socketPath,
-		Logger:     logger,
+		X509SourceProvider: x509SourceProvider,
+		Logger:        logger,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity adapter: %w", err)
 	}
 
 	bundleAdapter, err := NewSpiffeBundleAdapter(SpiffeBundleAdapterConfig{
-		SocketPath: socketPath,
-		Logger:     logger,
+		X509SourceProvider: x509SourceProvider,
+		Logger:        logger,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bundle adapter: %w", err)
 	}
 
 	tlsAdapter, err := NewTLSAdapter(TLSAdapterConfig{
-		SocketPath: socketPath,
-		Logger:     logger,
+		X509SourceProvider: x509SourceProvider,
+		Logger:        logger,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TLS adapter: %w", err)
 	}
 
 	return &Provider{
+		x509SourceProvider:   x509SourceProvider,
 		identityAdapter: identityAdapter,
 		bundleAdapter:   bundleAdapter,
 		tlsAdapter:      tlsAdapter,
@@ -97,29 +102,31 @@ func (p *Provider) GetTLSConfig(ctx context.Context) (tlsconfig.Authorizer, erro
 	return p.tlsAdapter.GetTLSAuthorizer(nil) // Use default policy
 }
 
-// GetX509Source returns source from identity adapter.
+// GetX509Source returns source from X509 source provider.
 // Note: This exposes internal implementation and should be avoided in new code.
 func (p *Provider) GetX509Source() *workloadapi.X509Source {
 	// For backward compatibility, we need to access the internal source
 	// This is not ideal but may be needed by existing code
-	if p.identityAdapter != nil {
-		// Access internal source from adapter - this is a compatibility hack
-		return p.identityAdapter.x509Source
+	if p.x509SourceProvider != nil && p.x509SourceProvider.IsInitialized() {
+		// Try to get the source without creating it if it doesn't exist
+		ctx := context.Background()
+		source, _ := p.x509SourceProvider.GetOrCreateSource(ctx)
+		return source
 	}
 	return nil
 }
 
-// GetSocketPath returns path from identity adapter.
+// GetSocketPath returns path from X509 source provider.
 func (p *Provider) GetSocketPath() string {
-	if p.identityAdapter != nil {
-		return p.identityAdapter.socketPath.Value()
+	if p.x509SourceProvider != nil {
+		return p.x509SourceProvider.socketPath.Value()
 	}
 	return ""
 }
 
 // Close closes the provider and all its adapters.
 func (p *Provider) Close() error {
-	// Close all adapters
+	// Close all adapters first
 	if p.identityAdapter != nil {
 		if err := p.identityAdapter.Close(); err != nil {
 			return fmt.Errorf("failed to close identity adapter: %w", err)
@@ -135,6 +142,13 @@ func (p *Provider) Close() error {
 	if p.tlsAdapter != nil {
 		if err := p.tlsAdapter.Close(); err != nil {
 			return fmt.Errorf("failed to close TLS adapter: %w", err)
+		}
+	}
+
+	// Close shared X509 source provider last
+	if p.x509SourceProvider != nil {
+		if err := p.x509SourceProvider.Close(); err != nil {
+			return fmt.Errorf("failed to close X509 source provider: %w", err)
 		}
 	}
 
