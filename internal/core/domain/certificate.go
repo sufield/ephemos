@@ -251,10 +251,10 @@ func (c *Certificate) ToServiceIdentity() (*ServiceIdentity, error) {
 	// Parse trust domain and service name from SPIFFE ID
 	trustDomain := spiffeID.TrustDomain().String()
 
-	// Use go-spiffe's already validated SPIFFE ID - no need to re-validate
-	spiffePath := NewSPIFFEPathFromID(spiffeID)
+	// Extract service name directly from SPIFFE ID path (already validated)
+	serviceName := extractServiceNameFromPath(spiffeID.Path())
 
-	identity, err := NewServiceIdentityValidated(spiffePath.ToServiceName(), trustDomain)
+	identity, err := NewServiceIdentityValidated(serviceName, trustDomain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create service identity: %w", err)
 	}
@@ -313,3 +313,4 @@ func (c *Certificate) verifyWithTrustBundle(trustBundle *TrustBundle) error {
 
 	return nil
 }
+
