@@ -111,15 +111,15 @@ func TestIdentityDocumentAdapter_Integration(t *testing.T) {
 		t.Logf("Certificate Valid Until: %s", cert.Cert.NotAfter.String())
 	})
 
-	t.Run("GetIdentityDocument", func(t *testing.T) {
-		doc, err := adapter.GetIdentityDocument(ctx)
+	t.Run("GetSVID", func(t *testing.T) {
+		svid, err := adapter.GetSVID(ctx)
 		require.NoError(t, err)
-		assert.NotNil(t, doc)
-		assert.NotEmpty(t, doc.Subject())
-		assert.True(t, doc.ValidUntil().After(time.Now()))
+		assert.NotNil(t, svid)
+		assert.NotEmpty(t, svid.ID.String())
+		assert.True(t, svid.Certificates[0].NotAfter.After(time.Now()))
 
-		t.Logf("Identity Document Subject: %s", doc.Subject())
-		t.Logf("Identity Document Valid Until: %s", doc.ValidUntil().String())
+		t.Logf("SVID ID: %s", svid.ID.String())
+		t.Logf("SVID Valid Until: %s", svid.Certificates[0].NotAfter.String())
 	})
 
 	t.Run("RefreshIdentity", func(t *testing.T) {
@@ -314,12 +314,12 @@ func TestProvider_Integration(t *testing.T) {
 		t.Logf("Provider Trust Bundle contains %d CA certificates", bundle.Count())
 	})
 
-	t.Run("GetIdentityDocument", func(t *testing.T) {
-		doc, err := provider.GetIdentityDocument()
+	t.Run("GetSVID", func(t *testing.T) {
+		svid, err := provider.GetSVID()
 		require.NoError(t, err)
-		assert.NotNil(t, doc)
+		assert.NotNil(t, svid)
 
-		t.Logf("Provider Identity Document Subject: %s", doc.Subject())
+		t.Logf("Provider SVID ID: %s", svid.ID.String())
 	})
 
 	t.Run("GetTLSConfig", func(t *testing.T) {

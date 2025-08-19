@@ -5,6 +5,7 @@ package mocks
 import (
 	"context"
 
+	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/stretchr/testify/mock"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
@@ -42,13 +43,13 @@ func (m *MockIdentityProviderPort) GetCertificate(ctx context.Context) (*domain.
 	return r0, args.Error(1)
 }
 
-// GetIdentityDocument mocks the GetIdentityDocument method.
-func (m *MockIdentityProviderPort) GetIdentityDocument(ctx context.Context) (*domain.IdentityDocument, error) {
+// GetSVID mocks the GetSVID method.
+func (m *MockIdentityProviderPort) GetSVID(ctx context.Context) (*x509svid.SVID, error) {
 	args := m.Called(ctx)
 
-	var r0 *domain.IdentityDocument
+	var r0 *x509svid.SVID
 	if args.Get(0) != nil {
-		r0 = args.Get(0).(*domain.IdentityDocument)
+		r0 = args.Get(0).(*x509svid.SVID)
 	}
 
 	return r0, args.Error(1)
@@ -61,12 +62,12 @@ func (m *MockIdentityProviderPort) RefreshIdentity(ctx context.Context) error {
 }
 
 // WatchIdentityChanges mocks the WatchIdentityChanges method.
-func (m *MockIdentityProviderPort) WatchIdentityChanges(ctx context.Context) (<-chan *domain.IdentityDocument, error) {
+func (m *MockIdentityProviderPort) WatchIdentityChanges(ctx context.Context) (<-chan *x509svid.SVID, error) {
 	args := m.Called(ctx)
 
-	var r0 <-chan *domain.IdentityDocument
+	var r0 <-chan *x509svid.SVID
 	if args.Get(0) != nil {
-		r0 = args.Get(0).(<-chan *domain.IdentityDocument)
+		r0 = args.Get(0).(<-chan *x509svid.SVID)
 	}
 
 	return r0, args.Error(1)

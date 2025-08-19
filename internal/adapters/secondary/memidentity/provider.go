@@ -7,9 +7,12 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"io"
+	"net/url"
 	"sync"
 	"time"
 
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
+	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
@@ -115,8 +118,8 @@ func (p *Provider) GetTrustBundle() (*domain.TrustBundle, error) {
 	return p.bundle, nil
 }
 
-// GetIdentityDocument returns the configured identity document.
-func (p *Provider) GetIdentityDocument() (*domain.IdentityDocument, error) {
+// GetSVID returns a fake SVID for testing.
+func (p *Provider) GetSVID() (*x509svid.SVID, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -129,19 +132,22 @@ func (p *Provider) GetIdentityDocument() (*domain.IdentityDocument, error) {
 		return nil, ports.ErrIdentityNotFound
 	}
 
-	// Get CA certificate from trust bundle for validation
-	var caCert *x509.Certificate
-	if p.bundle != nil {
-		certs := p.bundle.RawCertificates()
-		if len(certs) > 0 {
-			caCert = certs[0]
-		}
+	// Create a fake SPIFFE ID for testing
+	spiffeID, err := spiffeid.FromURI(&url.URL{
+		Scheme: "spiffe",
+		Host:   p.identity.Domain(),
+		Path:   "/" + p.identity.Name(),
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	// Create certificate chain (for in-memory provider, just use single cert)
-	chain := []*x509.Certificate{p.cert.Cert}
-
-	return domain.NewIdentityDocument(chain, p.cert.PrivateKey, caCert)
+	// Create fake x509svid.SVID for testing
+	return &x509svid.SVID{
+		ID:           spiffeID,
+		Certificates: []*x509.Certificate{p.cert.Cert},
+		PrivateKey:   p.cert.PrivateKey,
+	}, nil
 }
 
 // Close marks the provider as closed.

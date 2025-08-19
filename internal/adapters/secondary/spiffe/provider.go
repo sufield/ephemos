@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 
 	"github.com/sufield/ephemos/internal/core/domain"
@@ -83,10 +84,10 @@ func (p *Provider) GetTrustBundle() (*domain.TrustBundle, error) {
 	return p.bundleAdapter.GetTrustBundle(ctx)
 }
 
-// GetIdentityDocument fetches the complete identity document using the identity adapter.
-func (p *Provider) GetIdentityDocument() (*domain.IdentityDocument, error) {
+// GetSVID fetches the complete SVID using the identity adapter.
+func (p *Provider) GetSVID() (*x509svid.SVID, error) {
 	ctx := context.Background() // Context managed at adapter layer
-	return p.identityAdapter.GetIdentityDocument(ctx)
+	return p.identityAdapter.GetSVID(ctx)
 }
 
 // GetTLSConfig gets TLS config using the TLS adapter.

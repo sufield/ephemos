@@ -3,6 +3,7 @@ package ports
 import (
 	"errors"
 
+	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/sufield/ephemos/internal/core/domain"
 )
 
@@ -23,6 +24,6 @@ type IdentityProvider interface {
 	GetServiceIdentity() (*domain.ServiceIdentity, error)
 	GetCertificate() (*domain.Certificate, error)
 	GetTrustBundle() (*domain.TrustBundle, error)
-	GetIdentityDocument() (*domain.IdentityDocument, error)
+	GetSVID() (*x509svid.SVID, error)
 	Close() error
 }

@@ -83,28 +83,30 @@ spiffeID, _, err := x509svid.ParseAndVerify(certChainDER, bundleSource)
 - ✅ Maintained private key validation (not handled by SDK)
 - ✅ Comprehensive validation now uses battle-tested SDK implementation
 
-## 4. Identity Document Creation
+## 4. Identity Document Creation ✅ COMPLETED
 
-### Current Custom Code
-**File:** `internal/core/domain/identity_document.go`
-- **Lines:** ~400 lines
-- **What it does:** Wraps certificates, validates chains, manages metadata
+### Previous Custom Code
+**File:** `internal/core/domain/identity_document.go` - **FILE DEPRECATED**
+- **Lines:** ~400 lines - Custom wrapper around certificates and metadata
+- **Methods:** `NewIdentityDocument()`, `Validate()`, `IsExpired()`, etc.
 
-### go-spiffe SDK Alternative
+### Replaced With go-spiffe SDK
 ```go
-// Use x509svid.SVID directly instead of custom IdentityDocument
-svid := &x509svid.SVID{
-    ID:           spiffeID,
-    Certificates: certChain,
-    PrivateKey:   key,
+// Interface changes: Replace IdentityDocument with x509svid.SVID
+type IdentityProviderPort interface {
+    GetSVID(ctx context.Context) (*x509svid.SVID, error)
+    WatchIdentityChanges(ctx context.Context) (<-chan *x509svid.SVID, error)
 }
-// SVID has built-in validation and methods
 ```
 
-### Benefits
-- Remove entire custom wrapper type
-- Use SDK's built-in expiry checking: `svid.GetExpiresAt()`
-- Use SDK's built-in validation
+### Changes Made
+- ✅ Replaced `GetIdentityDocument()` with `GetSVID()` in all interfaces
+- ✅ Updated `IdentityProviderPort` to use `x509svid.SVID` directly
+- ✅ Updated `AuthenticationService` to use `GetValidatedSVID()`
+- ✅ Updated `IdentityRotationService` to work with SVIDs
+- ✅ Updated all adapters (SPIFFE, memory) to return SVIDs
+- ✅ Removed dependency on custom `IdentityDocument` wrapper
+- ✅ All identity operations now use battle-tested SDK types
 
 ## 5. Trust Bundle Management
 
