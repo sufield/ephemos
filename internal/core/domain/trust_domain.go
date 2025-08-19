@@ -4,58 +4,31 @@ package domain
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
+
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 )
 
 // TrustDomain represents a trust boundary in the system, typically a domain name like "example.org".
-// It is a value object with built-in validation that enforces SPIFFE trust domain constraints.
-// This type is independent of external libraries to maintain clean architecture principles.
-type TrustDomain string
-
-// trustDomainRegex validates trust domain format according to SPIFFE specification.
-// Trust domains must be valid DNS names without protocol, port, or path.
-var trustDomainRegex = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`)
+// This is now a thin wrapper around go-spiffe's TrustDomain to leverage SDK validation.
+type TrustDomain struct {
+	td spiffeid.TrustDomain
+}
 
 // NewTrustDomain creates a validated TrustDomain from a string.
-// It ensures the domain follows SPIFFE trust domain requirements:
-// - Must not be empty
-// - Must be lowercase
-// - Must be a valid DNS name format
-// - Must not contain protocol, port, or path components
+// Uses go-spiffe SDK for SPIFFE-compliant validation.
 func NewTrustDomain(name string) (TrustDomain, error) {
 	if name == "" {
-		return "", fmt.Errorf("trust domain cannot be empty")
+		return TrustDomain{}, fmt.Errorf("trust domain cannot be empty")
 	}
 
-	// Trim whitespace and convert to lowercase for normalization
-	name = strings.TrimSpace(strings.ToLower(name))
-
-	// Check for invalid characters or patterns
-	if strings.Contains(name, "://") {
-		return "", fmt.Errorf("trust domain must not contain protocol: %q", name)
-	}
-	if strings.Contains(name, "/") {
-		return "", fmt.Errorf("trust domain must not contain path: %q", name)
-	}
-	if strings.Contains(name, ":") {
-		return "", fmt.Errorf("trust domain must not contain port: %q", name)
-	}
-	if strings.Contains(name, " ") {
-		return "", fmt.Errorf("trust domain must not contain spaces: %q", name)
+	// Use go-spiffe's built-in validation
+	td, err := spiffeid.TrustDomainFromString(name)
+	if err != nil {
+		return TrustDomain{}, fmt.Errorf("invalid trust domain: %w", err)
 	}
 
-	// Validate DNS name format
-	if !trustDomainRegex.MatchString(name) {
-		return "", fmt.Errorf("invalid trust domain format (must be valid DNS name): %q", name)
-	}
-
-	// Additional SPIFFE constraints
-	if len(name) > 255 {
-		return "", fmt.Errorf("trust domain exceeds maximum length of 255 characters: %q", name)
-	}
-
-	return TrustDomain(name), nil
+	return TrustDomain{td: td}, nil
 }
 
 // MustNewTrustDomain creates a TrustDomain or panics if validation fails.
@@ -70,30 +43,33 @@ func MustNewTrustDomain(name string) TrustDomain {
 
 // String returns the string representation of the trust domain.
 func (td TrustDomain) String() string {
-	return string(td)
+	if td.IsZero() {
+		return ""
+	}
+	return td.td.String()
 }
 
 // IsZero checks if the TrustDomain is empty/unset.
 func (td TrustDomain) IsZero() bool {
-	return td == ""
+	return td.td.IsZero()
 }
 
 // Equals checks equality with another TrustDomain.
-// Trust domain comparison is case-insensitive per SPIFFE spec.
+// Uses go-spiffe's built-in comparison.
 func (td TrustDomain) Equals(other TrustDomain) bool {
-	return strings.EqualFold(td.String(), other.String())
+	// go-spiffe TrustDomain comparison is already case-insensitive
+	return td.td.String() == other.td.String()
 }
 
 // Validate checks if the trust domain is valid.
 // Returns nil if valid, error otherwise.
-// This is useful when working with TrustDomain values that may have been
-// created without validation (e.g., from JSON unmarshaling).
 func (td TrustDomain) Validate() error {
 	if td.IsZero() {
 		return fmt.Errorf("trust domain is empty")
 	}
-	// Re-validate using the same rules as NewTrustDomain
-	_, err := NewTrustDomain(td.String())
+	// Trust domain is already validated if it was created properly
+	// Re-validate by trying to parse the string representation
+	_, err := spiffeid.TrustDomainFromString(td.String())
 	return err
 }
 
@@ -105,7 +81,7 @@ func (td TrustDomain) Compare(other TrustDomain) int {
 
 // MarshalJSON implements json.Marshaler interface.
 func (td TrustDomain) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("%q", td.String())), nil
+	return json.Marshal(td.String())
 }
 
 // UnmarshalJSON implements json.Unmarshaler interface.
@@ -117,7 +93,7 @@ func (td *TrustDomain) UnmarshalJSON(data []byte) error {
 
 	// Allow empty for optional fields
 	if s == "" {
-		*td = TrustDomain("")
+		*td = TrustDomain{}
 		return nil
 	}
 
@@ -140,19 +116,25 @@ func (td TrustDomain) ToSPIFFEURI() string {
 
 // ParseFromSPIFFEID extracts the trust domain from a SPIFFE ID string.
 // For example: "spiffe://example.org/service" returns "example.org".
+// Uses go-spiffe SDK for parsing.
 func ParseFromSPIFFEID(spiffeID string) (TrustDomain, error) {
-	if !strings.HasPrefix(spiffeID, "spiffe://") {
-		return "", fmt.Errorf("not a valid SPIFFE ID: %q", spiffeID)
+	// Use go-spiffe to parse the SPIFFE ID
+	id, err := spiffeid.FromString(spiffeID)
+	if err != nil {
+		return TrustDomain{}, fmt.Errorf("invalid SPIFFE ID: %w", err)
 	}
 
-	// Remove spiffe:// prefix
-	remainder := strings.TrimPrefix(spiffeID, "spiffe://")
+	return TrustDomain{td: id.TrustDomain()}, nil
+}
 
-	// Find the trust domain (everything before the first '/')
-	parts := strings.SplitN(remainder, "/", 2)
-	if len(parts) == 0 || parts[0] == "" {
-		return "", fmt.Errorf("missing trust domain in SPIFFE ID: %q", spiffeID)
-	}
+// ToSpiffeTrustDomain returns the underlying go-spiffe TrustDomain.
+// This is for adapter layer use when interfacing with go-spiffe directly.
+func (td TrustDomain) ToSpiffeTrustDomain() spiffeid.TrustDomain {
+	return td.td
+}
 
-	return NewTrustDomain(parts[0])
+// FromSpiffeTrustDomain creates a TrustDomain from go-spiffe's TrustDomain.
+// This is for adapter layer use when receiving values from go-spiffe.
+func FromSpiffeTrustDomain(std spiffeid.TrustDomain) TrustDomain {
+	return TrustDomain{td: std}
 }

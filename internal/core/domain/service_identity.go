@@ -108,7 +108,7 @@ func NewServiceIdentityValidated(name, domainStr string) (*ServiceIdentity, erro
 // or in test scenarios where invalid data is intentionally being tested.
 func NewServiceIdentityUnchecked(name, domainStr string) *ServiceIdentity {
 	// Simple construction without validation - create trust domain without validation
-	trustDomain := TrustDomain(domainStr) // Raw assignment for performance
+	trustDomain := MustNewTrustDomain(domainStr) // Use MustNew for unchecked construction
 	return &ServiceIdentity{
 		name:        name,
 		trustDomain: trustDomain,
