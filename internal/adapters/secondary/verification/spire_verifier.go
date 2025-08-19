@@ -32,7 +32,7 @@ func NewSpireIdentityVerifier(config *ports.VerificationConfig) (*SpireIdentityV
 	}
 
 	if config.WorkloadAPISocket == "" {
-		config.WorkloadAPISocket = "unix:///tmp/spire-agent/public/api.sock"
+		return nil, fmt.Errorf("WorkloadAPISocket must be explicitly configured - no fallback patterns allowed")
 	}
 
 	if config.Timeout == 0 {

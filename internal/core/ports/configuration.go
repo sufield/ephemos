@@ -268,11 +268,10 @@ func (c *Configuration) MergeWithEnvironment() error {
 		if c.Agent == nil {
 			c.Agent = &AgentConfig{}
 		}
-		// Create SocketPath Value Object from string
+		// Create SocketPath Value Object from string - fail fast on invalid input
 		socketPath, err := domain.NewSocketPath(agentSocket)
 		if err != nil {
-			// For backward compatibility, use unsafe creation if validation fails
-			socketPath = domain.NewSocketPathUnsafe(agentSocket)
+			return fmt.Errorf("invalid agent socket path from environment: %w", err)
 		}
 		c.Agent.SocketPath = socketPath
 	}

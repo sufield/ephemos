@@ -126,15 +126,19 @@ func validatePermissionsIfExists(socketPath string) error {
 }
 
 // UnmarshalYAML implements yaml.Unmarshaler interface to support YAML unmarshaling
+// Requires Go 1.24+ - uses strict validation with no backward compatibility.
 func (sp *SocketPath) UnmarshalYAML(node *yaml.Node) error {
 	var path string
 	if err := node.Decode(&path); err != nil {
 		return err
 	}
 	
-	// Use unsafe constructor for backward compatibility during migration
-	// In production, consider using NewSocketPath for validation
-	*sp = NewSocketPathUnsafe(path)
+	// Use strict constructor - fail fast on invalid input
+	validatedPath, err := NewSocketPath(path)
+	if err != nil {
+		return fmt.Errorf("invalid socket path in YAML: %w", err)
+	}
+	*sp = validatedPath
 	return nil
 }
 
@@ -158,8 +162,12 @@ func SocketPathDecodeHook() func(reflect.Type, reflect.Type, interface{}) (inter
 			if !ok {
 				return data, nil
 			}
-			// Use unsafe constructor for backward compatibility during migration
-			return NewSocketPathUnsafe(path), nil
+			// Use strict constructor - fail fast on invalid input
+			validatedPath, err := NewSocketPath(path)
+			if err != nil {
+				return nil, fmt.Errorf("invalid socket path in decode hook: %w", err)
+			}
+			return validatedPath, nil
 		}
 		
 		return data, nil

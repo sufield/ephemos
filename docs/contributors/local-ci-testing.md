@@ -316,8 +316,8 @@ echo "✅ Local CI checks passed"
 ### Workflow-Specific Configs
 
 ```bash
-# Run with specific matrix configurations
-./act --matrix os:ubuntu-latest --matrix go-version:1.23
+# Run with specific matrix configurations (Go 1.24+ only)
+./act --matrix os:ubuntu-latest --matrix go-version:1.24.x
 
 # Override job conditions
 ./act --job build --env FORCE_BUILD=true

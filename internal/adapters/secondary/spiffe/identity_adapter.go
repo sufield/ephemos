@@ -39,7 +39,7 @@ type IdentityDocumentAdapterConfig struct {
 // NewIdentityDocumentAdapter creates a new SPIFFE identity document adapter.
 func NewIdentityDocumentAdapter(config IdentityDocumentAdapterConfig) (*IdentityDocumentAdapter, error) {
 	socketPath := config.SocketPath
-	// Note: We preserve empty socket paths as-is for backward compatibility
+	// Note: Empty socket paths will cause errors in connection logic (fail-fast behavior)
 	// The actual connection logic will handle defaults when needed
 	
 	logger := config.Logger
@@ -328,17 +328,11 @@ func (a *IdentityDocumentAdapter) ensureSource(ctx context.Context) error {
 		return nil
 	}
 	
-	// Determine actual socket path to use
-	var actualSocketPath string
+	// Require explicit socket path configuration - no fallback patterns
 	if a.socketPath.IsEmpty() {
-		var found bool
-		actualSocketPath, found = workloadapi.GetDefaultAddress()
-		if !found {
-			actualSocketPath = "unix:///tmp/spire-agent/public/api.sock" // Fallback
-		}
-	} else {
-		actualSocketPath = a.socketPath.WithUnixPrefix()
+		return fmt.Errorf("SPIFFE socket path must be explicitly configured - no fallback patterns allowed")
 	}
+	actualSocketPath := a.socketPath.WithUnixPrefix()
 	
 	a.logger.Debug("initializing X509 source", "socket_path", actualSocketPath)
 	

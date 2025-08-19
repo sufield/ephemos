@@ -22,7 +22,7 @@ If you prefer to install dependencies manually:
 
 ### 1. Prerequisites
 
-**Go 1.21 or later**
+**Go 1.24 or later**
 ```bash
 # Check your Go version
 go version

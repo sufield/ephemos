@@ -82,16 +82,7 @@ func setupServices(ctx context.Context) (*services.IdentityService, *services.Id
 		Service: ports.ServiceConfig{
 			Name:   domain.NewServiceNameUnsafe("api-server"),
 			Domain: "production.company.com",
-			// Configure authorized clients for server-side authorization
-			AuthorizedClients: []string{
-				"spiffe://production.company.com/web-client",
-				"spiffe://production.company.com/mobile-client",
-			},
-			// Configure trusted servers for client-side authorization
-			TrustedServers: []string{
-				"spiffe://production.company.com/auth-service",
-				"spiffe://production.company.com/db-proxy",
-			},
+			// Authentication-only scope: removed authorization configuration
 		},
 		Agent: &ports.AgentConfig{
 			SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),
@@ -113,9 +104,7 @@ func setupServices(ctx context.Context) (*services.IdentityService, *services.Id
 		Service: ports.ServiceConfig{
 			Name:   domain.NewServiceNameUnsafe("auth-service"),
 			Domain: "production.company.com",
-			AuthorizedClients: []string{
-				"spiffe://production.company.com/api-server",
-			},
+			// Authentication-only scope: removed authorization configuration
 		},
 		Agent: &ports.AgentConfig{
 			SocketPath: domain.NewSocketPathUnsafe("/tmp/spire-agent/public/api.sock"),

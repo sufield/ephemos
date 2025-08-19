@@ -2,11 +2,7 @@
 package domain
 
 import (
-	"bytes"
 	"crypto"
-	"crypto/ecdsa"
-	"crypto/ed25519"
-	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
 	"log/slog"
@@ -275,58 +271,22 @@ func (c *Certificate) ToServiceIdentity() (*ServiceIdentity, error) {
 	return identity, nil
 }
 
-// verifyKeyMatch verifies that the private key matches the certificate's public key
-// with support for multiple key types including RSA, ECDSA, and future algorithms.
+// verifyKeyMatch verifies that the private key matches the certificate's public key.
+// Requires Go 1.24+ - uses modern Equal method for all key types.
 // This method assumes that c.PrivateKey and c.Cert have already been validated to be non-nil.
 func (c *Certificate) verifyKeyMatch() error {
 	privateKeyPublic := c.PrivateKey.Public()
 
-	// First try the modern Equal method (available in Go 1.15+)
+	// Use the modern Equal method (available since Go 1.15, required in Go 1.24+)
 	switch pubKey := c.Cert.PublicKey.(type) {
 	case interface{ Equal(interface{}) bool }:
 		if !pubKey.Equal(privateKeyPublic) {
 			return fmt.Errorf("private key does not match certificate public key")
 		}
 		return nil
-	}
-
-	// Fallback to manual field comparison for specific key types
-	switch certPubKey := c.Cert.PublicKey.(type) {
-	case *rsa.PublicKey:
-		privPubKey, ok := privateKeyPublic.(*rsa.PublicKey)
-		if !ok {
-			return fmt.Errorf("certificate has RSA public key but private key is %T", privateKeyPublic)
-		}
-		if certPubKey.N.Cmp(privPubKey.N) != 0 || certPubKey.E != privPubKey.E {
-			return fmt.Errorf("RSA private key does not match certificate public key")
-		}
-		return nil
-
-	case *ecdsa.PublicKey:
-		privPubKey, ok := privateKeyPublic.(*ecdsa.PublicKey)
-		if !ok {
-			return fmt.Errorf("certificate has ECDSA public key but private key is %T", privateKeyPublic)
-		}
-		if certPubKey.Curve != privPubKey.Curve ||
-			certPubKey.X.Cmp(privPubKey.X) != 0 ||
-			certPubKey.Y.Cmp(privPubKey.Y) != 0 {
-			return fmt.Errorf("ECDSA private key does not match certificate public key")
-		}
-		return nil
-
-	case ed25519.PublicKey:
-		privPubKey, ok := privateKeyPublic.(ed25519.PublicKey)
-		if !ok {
-			return fmt.Errorf("certificate has Ed25519 public key but private key is %T", privateKeyPublic)
-		}
-		if !bytes.Equal(certPubKey, privPubKey) {
-			return fmt.Errorf("Ed25519 private key does not match certificate public key")
-		}
-		return nil
-
 	default:
-		// For unknown key types, we can't verify the match
-		return fmt.Errorf("unable to verify key match for unsupported public key type %T", c.Cert.PublicKey)
+		// All standard Go crypto key types support Equal method in Go 1.24+
+		return fmt.Errorf("unsupported public key type %T - Go 1.24+ required", c.Cert.PublicKey)
 	}
 }
 

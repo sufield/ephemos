@@ -312,7 +312,7 @@ The middleware follows Ephemos architecture principles:
 
 ## Requirements
 
-- Go 1.21+
+- Go 1.24+
 - Gin v1.10.0+
 - SPIFFE Workload API socket available
 - Valid Ephemos configuration

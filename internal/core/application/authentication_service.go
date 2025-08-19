@@ -154,17 +154,13 @@ func (s *AuthenticationService) CreateAuthenticatedConnection(ctx context.Contex
 		return nil, fmt.Errorf("failed to get trust bundle for domain %s: %w", targetDomain, err)
 	}
 	
-	// Parse target service as identity namespace
-	targetIdentity, err := s.parseAsIdentityNamespace(targetService)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse target service as identity: %w", err)
-	}
+	// Authentication-only scope: no specific target identity parsing needed
 	
 	// Create authentication policy
 	policy := &domain.AuthenticationPolicy{
 		TrustDomain:       targetDomain,
 		RequireAuth:       true,
-		AllowedIdentities: []string{targetIdentity.String()}, // Only allow the specific target service
+		// Authentication-only scope: no specific identity authorization
 	}
 	
 	return &AuthenticatedConnection{
