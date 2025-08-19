@@ -9,7 +9,6 @@ import (
 
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
-	"github.com/spiffe/go-spiffe/v2/workloadapi"
 
 	"github.com/sufield/ephemos/internal/core/domain"
 )
@@ -17,22 +16,21 @@ import (
 // TLSAdapter provides SPIFFE-based TLS configuration.
 // This adapter creates TLS configurations using SPIFFE identities and trust bundles.
 type TLSAdapter struct {
-	socketPath domain.SocketPath
-	x509Source *workloadapi.X509Source
-	logger     *slog.Logger
+	x509SourceProvider *X509SourceProvider
+	logger        *slog.Logger
 }
 
 // TLSAdapterConfig provides configuration for the TLS adapter.
 type TLSAdapterConfig struct {
-	SocketPath domain.SocketPath
-	Logger     *slog.Logger
+	X509SourceProvider *X509SourceProvider
+	Logger        *slog.Logger
 }
 
 // NewTLSAdapter creates a new SPIFFE TLS adapter.
 func NewTLSAdapter(config TLSAdapterConfig) (*TLSAdapter, error) {
-	socketPath := config.SocketPath
-	// Note: Empty socket paths will cause errors in connection logic (fail-fast behavior)
-	// The actual connection logic will handle defaults when needed
+	if config.X509SourceProvider == nil {
+		return nil, fmt.Errorf("source manager is required")
+	}
 
 	logger := config.Logger
 	if logger == nil {
@@ -40,8 +38,8 @@ func NewTLSAdapter(config TLSAdapterConfig) (*TLSAdapter, error) {
 	}
 
 	return &TLSAdapter{
-		socketPath: socketPath,
-		logger:     logger,
+		x509SourceProvider: config.X509SourceProvider,
+		logger:        logger,
 	}, nil
 }
 
@@ -49,8 +47,9 @@ func NewTLSAdapter(config TLSAdapterConfig) (*TLSAdapter, error) {
 func (a *TLSAdapter) CreateClientTLSConfig(ctx context.Context, policy *domain.AuthenticationPolicy) (*tls.Config, error) {
 	a.logger.Debug("creating client TLS config with SPIFFE")
 
-	if err := a.ensureSource(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ensure X509 source: %w", err)
+	x509Source, err := a.x509SourceProvider.GetOrCreateSource(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get X509 source: %w", err)
 	}
 
 	// Determine authorizer from policy
@@ -60,7 +59,7 @@ func (a *TLSAdapter) CreateClientTLSConfig(ctx context.Context, policy *domain.A
 	}
 
 	// Create SPIFFE mTLS client config
-	tlsConfig := tlsconfig.MTLSClientConfig(a.x509Source, a.x509Source, authorizer)
+	tlsConfig := tlsconfig.MTLSClientConfig(x509Source, x509Source, authorizer)
 
 	a.logger.Debug("client TLS config created")
 	return tlsConfig, nil
@@ -70,8 +69,9 @@ func (a *TLSAdapter) CreateClientTLSConfig(ctx context.Context, policy *domain.A
 func (a *TLSAdapter) CreateServerTLSConfig(ctx context.Context, policy *domain.AuthenticationPolicy) (*tls.Config, error) {
 	a.logger.Debug("creating server TLS config with SPIFFE")
 
-	if err := a.ensureSource(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ensure X509 source: %w", err)
+	x509Source, err := a.x509SourceProvider.GetOrCreateSource(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get X509 source: %w", err)
 	}
 
 	// Determine authorizer from policy
@@ -81,7 +81,7 @@ func (a *TLSAdapter) CreateServerTLSConfig(ctx context.Context, policy *domain.A
 	}
 
 	// Create SPIFFE mTLS server config
-	tlsConfig := tlsconfig.MTLSServerConfig(a.x509Source, a.x509Source, authorizer)
+	tlsConfig := tlsconfig.MTLSServerConfig(x509Source, x509Source, authorizer)
 
 	a.logger.Debug("server TLS config created")
 	return tlsConfig, nil
@@ -92,8 +92,9 @@ func (a *TLSAdapter) CreateClientTLSConfigWithTarget(ctx context.Context, target
 	a.logger.Debug("creating client TLS config for specific target",
 		"target", targetSPIFFEID)
 
-	if err := a.ensureSource(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ensure X509 source: %w", err)
+	x509Source, err := a.x509SourceProvider.GetOrCreateSource(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get X509 source: %w", err)
 	}
 
 	// Parse target SPIFFE ID
@@ -106,7 +107,7 @@ func (a *TLSAdapter) CreateClientTLSConfigWithTarget(ctx context.Context, target
 	authorizer := tlsconfig.AuthorizeID(id)
 
 	// Create SPIFFE mTLS client config
-	tlsConfig := tlsconfig.MTLSClientConfig(a.x509Source, a.x509Source, authorizer)
+	tlsConfig := tlsconfig.MTLSClientConfig(x509Source, x509Source, authorizer)
 
 	a.logger.Debug("client TLS config created for target",
 		"target", targetSPIFFEID)
@@ -118,8 +119,9 @@ func (a *TLSAdapter) CreateServerTLSConfigWithAllowedClients(ctx context.Context
 	a.logger.Debug("creating server TLS config with allowed clients",
 		"client_count", len(allowedClients))
 
-	if err := a.ensureSource(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ensure X509 source: %w", err)
+	x509Source, err := a.x509SourceProvider.GetOrCreateSource(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get X509 source: %w", err)
 	}
 
 	// Parse allowed client SPIFFE IDs
@@ -146,7 +148,7 @@ func (a *TLSAdapter) CreateServerTLSConfigWithAllowedClients(ctx context.Context
 	}
 
 	// Create SPIFFE mTLS server config
-	tlsConfig := tlsconfig.MTLSServerConfig(a.x509Source, a.x509Source, authorizer)
+	tlsConfig := tlsconfig.MTLSServerConfig(x509Source, x509Source, authorizer)
 
 	a.logger.Debug("server TLS config created with allowed clients")
 	return tlsConfig, nil
@@ -184,42 +186,9 @@ func (a *TLSAdapter) createAuthorizer(policy *domain.AuthenticationPolicy) (tlsc
 func (a *TLSAdapter) Close() error {
 	a.logger.Debug("closing SPIFFE TLS adapter")
 
-	// Close X509 source if we own it
-	if a.x509Source != nil {
-		if err := a.x509Source.Close(); err != nil {
-			return fmt.Errorf("failed to close X509 source: %w", err)
-		}
-	}
+	// Note: X509 source is managed by X509SourceProvider, not closed here
 
 	a.logger.Debug("SPIFFE TLS adapter closed")
 	return nil
 }
 
-// ensureSource ensures the X509 source is initialized.
-func (a *TLSAdapter) ensureSource(ctx context.Context) error {
-	if a.x509Source != nil {
-		return nil
-	}
-
-	// Require explicit socket path configuration - no fallback patterns
-	if a.socketPath.IsEmpty() {
-		return fmt.Errorf("SPIFFE socket path must be explicitly configured - no fallback patterns allowed")
-	}
-	actualSocketPath := a.socketPath.WithUnixPrefix()
-
-	a.logger.Debug("initializing X509 source", "socket_path", actualSocketPath)
-
-	source, err := workloadapi.NewX509Source(
-		ctx,
-		workloadapi.WithClientOptions(
-			workloadapi.WithAddr(actualSocketPath),
-		),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create X509 source: %w", err)
-	}
-
-	a.x509Source = source
-	a.logger.Info("X509 source initialized successfully")
-	return nil
-}

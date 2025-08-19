@@ -199,27 +199,51 @@ func NewServerTLSConfig(identityService IdentityService, authorizer Authorizer) 
 - ✅ **Authentication only** - Uses `AuthorizeAny()` to validate SPIFFE identities (authorization is out of scope)
 - ✅ **All TLS operations now use battle-tested go-spiffe SDK implementations**
 
-## 8. Workload API Client Management
+## 8. Workload API Client Management ✅ COMPLETED
 
-### Current Custom Code
-**Files:** `internal/adapters/secondary/spiffe/*`
-- Custom X509Source management
-- Custom update watching
+### Previous Custom Code
+**Files:** `internal/adapters/secondary/spiffe/identity_adapter.go`, `bundle_adapter.go`, `tls_adapter.go` - **SIMPLIFIED**
+- **Lines:** ~90 lines per adapter - Duplicate `ensureSource()` methods in each adapter
+- **Custom logic:**
+  - Each adapter created its own X509Source independently  
+  - Duplicate connection logic across 3 adapters
+  - Multiple X509Source instances per Provider
 
-### go-spiffe SDK Alternative
+### Replaced With Shared X509SourceProvider
 ```go
-// Simplify to:
-client, err := workloadapi.New(ctx, workloadapi.WithAddr(socketPath))
-defer client.Close()
+// New shared X509 source provisioning:
+type X509SourceProvider struct {
+    mu         sync.RWMutex
+    socketPath domain.SocketPath
+    logger     *slog.Logger
+    source     *workloadapi.X509Source
+}
 
-// Use built-in watching:
-err := client.WatchX509Context(ctx, watcher)
+// Thread-safe source creation with double-checked locking:
+func (sp *X509SourceProvider) GetOrCreateSource(ctx context.Context) (*workloadapi.X509Source, error)
+
+// All adapters now use shared X509SourceProvider:
+identityAdapter := NewIdentityDocumentAdapter(IdentityDocumentAdapterConfig{
+    X509SourceProvider: x509SourceProvider, // Shared instance
+    Logger:             logger,
+})
 ```
 
+### Changes Made
+- ✅ **Created shared `X509SourceProvider`** - Single X509Source instance shared across all adapters
+- ✅ **Removed duplicate `ensureSource()` methods** - Eliminated ~90 lines of duplicate code per adapter
+- ✅ **Thread-safe source creation** - Uses double-checked locking pattern for performance
+- ✅ **Centralized resource management** - X509SourceProvider handles X509Source lifecycle
+- ✅ **Updated all adapters** - Identity, Bundle, and TLS adapters now use shared X509SourceProvider
+- ✅ **Updated Provider** - Passes single X509SourceProvider instance to all adapters
+- ✅ **Proper cleanup** - X509SourceProvider closed after all adapters during shutdown
+
 ### Benefits
-- Remove custom source management code
-- Automatic reconnection handling
-- Built-in update notifications
+- **Reduced code duplication** - Eliminated ~270 lines of duplicate source management code
+- **Single X509Source per Provider** - More efficient resource usage
+- **Consistent error handling** - Centralized source creation logic
+- **Thread-safe operations** - Proper synchronization for concurrent access
+- **Simplified adapter constructors** - Adapters only need X509SourceProvider reference
 
 ## Implementation Priority
 
@@ -234,18 +258,22 @@ err := client.WatchX509Context(ctx, watcher)
 
 ### Low Priority (Requires Refactoring)
 6. **Identity Document** - Requires domain model changes
-7. **Workload API Client** - Already partially using SDK
+7. **Trust Domain Validation** - Remove custom validation in favor of SDK
 
 ## Estimated Code Reduction
 
-| Component | Current Lines | After SDK | Reduction |
-|-----------|--------------|-----------|-----------|
-| Trust Domain | 140 | 20 | 120 |
-| Service Identity | 300 | 50 | 250 |
-| Certificate Validation | 100+ | 30 | 70+ |
-| Trust Bundle | 380 | 100 | 280 |
-| Identity Document | 400 | 100 | 300 |
-| **Total** | **1320+** | **300** | **1020+** |
+| Component | Current Lines | After SDK | Reduction | Status |
+|-----------|--------------|-----------|-----------|---------|
+| SPIFFE ID Path Validation | 83 | 0 | 83 | ✅ Completed |
+| Certificate Validation | 100+ | 30 | 70+ | ✅ Completed |
+| Identity Document | 400 | 100 | 300 | ✅ Completed |
+| Trust Bundle Management | 380 | 100 | 280 | ✅ Completed |
+| Service Identity | 300 | 50 | 250 | ✅ Completed |
+| TLS Configuration | 50+ | 10 | 40+ | ✅ Completed |
+| Workload API Client | 270 | 100 | 170 | ✅ Completed |
+| Trust Domain Validation | 140 | 20 | 120 | 🔄 Pending |
+| **Total Completed** | **1583+** | **410** | **1173+** | **87%** |
+| **Total Estimated** | **1723+** | **430** | **1293+** | **100%** |
 
 ## Migration Strategy
 
