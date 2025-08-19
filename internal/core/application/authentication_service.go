@@ -18,10 +18,10 @@ type AuthenticationService struct {
 	identityProvider ports.IdentityProviderPort
 	bundleProvider   ports.BundleProviderPort
 	logger           *slog.Logger
-	
+
 	// Configuration
-	expiryThreshold  time.Duration // How soon before expiry to consider renewal
-	maxRetries       int           // Maximum retry attempts for operations
+	expiryThreshold time.Duration // How soon before expiry to consider renewal
+	maxRetries      int           // Maximum retry attempts for operations
 }
 
 // AuthenticationServiceConfig provides configuration for the AuthenticationService.
@@ -42,23 +42,23 @@ func NewAuthenticationService(config AuthenticationServiceConfig) (*Authenticati
 	if config.BundleProvider == nil {
 		return nil, fmt.Errorf("bundle provider is required")
 	}
-	
+
 	// Set defaults
 	logger := config.Logger
 	if logger == nil {
 		logger = slog.Default()
 	}
-	
+
 	expiryThreshold := config.ExpiryThreshold
 	if expiryThreshold == 0 {
 		expiryThreshold = 5 * time.Minute // Default to 5 minutes before expiry
 	}
-	
+
 	maxRetries := config.MaxRetries
 	if maxRetries == 0 {
 		maxRetries = 3 // Default to 3 retries
 	}
-	
+
 	return &AuthenticationService{
 		identityProvider: config.IdentityProvider,
 		bundleProvider:   config.BundleProvider,
@@ -72,29 +72,29 @@ func NewAuthenticationService(config AuthenticationServiceConfig) (*Authenticati
 // This method enforces invariants before returning the identity to ensure it's valid and trusted.
 func (s *AuthenticationService) GetValidatedIdentity(ctx context.Context) (*domain.IdentityDocument, error) {
 	s.logger.Debug("retrieving validated identity")
-	
+
 	// Get identity document from provider
 	identityDoc, err := s.identityProvider.GetIdentityDocument(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get identity document: %w", err)
 	}
-	
+
 	// Enforce invariant: identity document must not be nil
 	if identityDoc == nil {
 		return nil, fmt.Errorf("identity provider returned nil identity document")
 	}
-	
+
 	// Enforce invariant: identity document must be valid
 	if err := identityDoc.Validate(); err != nil {
 		return nil, fmt.Errorf("identity document validation failed: %w", err)
 	}
-	
+
 	// Check if identity is expiring soon
 	if identityDoc.IsExpiringSoon(s.expiryThreshold) {
 		s.logger.Warn("identity document is expiring soon",
 			"expires_at", identityDoc.ValidUntil(),
 			"threshold", s.expiryThreshold)
-		
+
 		// Attempt to refresh the identity
 		if err := s.refreshIdentityWithRetry(ctx); err != nil {
 			s.logger.Error("failed to refresh expiring identity", "error", err)
@@ -107,22 +107,22 @@ func (s *AuthenticationService) GetValidatedIdentity(ctx context.Context) (*doma
 			}
 		}
 	}
-	
+
 	// Get trust bundle for validation
 	trustBundle, err := s.bundleProvider.GetTrustBundle(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get trust bundle: %w", err)
 	}
-	
+
 	// Validate identity against trust bundle
 	if err := identityDoc.ValidateAgainstBundle(trustBundle); err != nil {
 		return nil, fmt.Errorf("identity validation against trust bundle failed: %w", err)
 	}
-	
+
 	s.logger.Debug("successfully retrieved and validated identity",
 		"subject", identityDoc.Subject(),
 		"valid_until", identityDoc.ValidUntil())
-	
+
 	return identityDoc, nil
 }
 
@@ -130,43 +130,43 @@ func (s *AuthenticationService) GetValidatedIdentity(ctx context.Context) (*doma
 // This method ensures all authentication requirements are met before establishing a connection.
 func (s *AuthenticationService) CreateAuthenticatedConnection(ctx context.Context, targetService string) (*AuthenticatedConnection, error) {
 	s.logger.Debug("creating authenticated connection", "target", targetService)
-	
+
 	// Get validated identity
 	identityDoc, err := s.GetValidatedIdentity(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get validated identity: %w", err)
 	}
-	
+
 	// Get certificate from identity document
 	cert := identityDoc.GetCertificate()
 	if cert == nil {
 		return nil, fmt.Errorf("identity document has no certificate")
 	}
-	
+
 	// Get trust bundle for the target's domain
 	targetDomain, err := s.extractTrustDomain(targetService)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract trust domain from target: %w", err)
 	}
-	
+
 	trustBundle, err := s.bundleProvider.GetTrustBundleForDomain(ctx, targetDomain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get trust bundle for domain %s: %w", targetDomain, err)
 	}
-	
+
 	// Authentication-only scope: no specific target identity parsing needed
-	
+
 	// Create authentication policy
 	policy := &domain.AuthenticationPolicy{
-		TrustDomain:       targetDomain,
-		RequireAuth:       true,
+		TrustDomain: targetDomain,
+		RequireAuth: true,
 		// Authentication-only scope: no specific identity authorization
 	}
-	
+
 	return &AuthenticatedConnection{
-		Certificate:  cert,
-		TrustBundle:  trustBundle,
-		Policy:       policy,
+		Certificate:   cert,
+		TrustBundle:   trustBundle,
+		Policy:        policy,
 		TargetService: targetService,
 	}, nil
 }
@@ -175,38 +175,38 @@ func (s *AuthenticationService) CreateAuthenticatedConnection(ctx context.Contex
 // This method enforces security invariants for peer authentication.
 func (s *AuthenticationService) ValidatePeerIdentity(ctx context.Context, peerCert *domain.Certificate, expectedIdentity string) error {
 	s.logger.Debug("validating peer identity", "expected", expectedIdentity)
-	
+
 	// Enforce invariant: peer certificate must not be nil
 	if peerCert == nil {
 		return fmt.Errorf("peer certificate is nil")
 	}
-	
+
 	// Validate certificate structure
 	if err := peerCert.Validate(domain.CertValidationOptions{}); err != nil {
 		return fmt.Errorf("peer certificate validation failed: %w", err)
 	}
-	
+
 	// Validate certificate against trust bundle
 	if err := s.bundleProvider.ValidateCertificateAgainstBundle(ctx, peerCert); err != nil {
 		return fmt.Errorf("peer certificate not trusted: %w", err)
 	}
-	
+
 	// Extract and validate SPIFFE ID
 	spiffeID, err := peerCert.ToSPIFFEID()
 	if err != nil {
 		return fmt.Errorf("failed to extract SPIFFE ID from peer certificate: %w", err)
 	}
-	
+
 	// Verify the SPIFFE ID matches expected identity
 	if spiffeID.String() != expectedIdentity {
 		return fmt.Errorf("peer identity mismatch: expected %s, got %s", expectedIdentity, spiffeID.String())
 	}
-	
+
 	// Check certificate expiry
 	if peerCert.Cert != nil && time.Now().After(peerCert.Cert.NotAfter) {
 		return fmt.Errorf("peer certificate has expired")
 	}
-	
+
 	s.logger.Debug("peer identity validated successfully", "identity", spiffeID.String())
 	return nil
 }
@@ -215,17 +215,17 @@ func (s *AuthenticationService) ValidatePeerIdentity(ctx context.Context, peerCe
 // This method ensures credentials are up-to-date for authentication operations.
 func (s *AuthenticationService) RefreshCredentials(ctx context.Context) error {
 	s.logger.Info("refreshing authentication credentials")
-	
+
 	// Refresh identity with retry logic
 	if err := s.refreshIdentityWithRetry(ctx); err != nil {
 		return fmt.Errorf("failed to refresh identity: %w", err)
 	}
-	
+
 	// Refresh trust bundle with retry logic
 	if err := s.refreshTrustBundleWithRetry(ctx); err != nil {
 		return fmt.Errorf("failed to refresh trust bundle: %w", err)
 	}
-	
+
 	s.logger.Info("successfully refreshed authentication credentials")
 	return nil
 }
@@ -240,7 +240,7 @@ func (s *AuthenticationService) refreshIdentityWithRetry(ctx context.Context) er
 				"attempt", i+1,
 				"max_retries", s.maxRetries,
 				"error", err)
-			
+
 			// Exponential backoff
 			select {
 			case <-ctx.Done():
@@ -264,7 +264,7 @@ func (s *AuthenticationService) refreshTrustBundleWithRetry(ctx context.Context)
 				"attempt", i+1,
 				"max_retries", s.maxRetries,
 				"error", err)
-			
+
 			// Exponential backoff
 			select {
 			case <-ctx.Done():
@@ -285,7 +285,7 @@ func (s *AuthenticationService) extractTrustDomain(serviceIdentifier string) (do
 	if err != nil {
 		return domain.TrustDomain(""), fmt.Errorf("failed to parse service identifier: %w", err)
 	}
-	
+
 	return namespace.GetTrustDomain(), nil
 }
 

@@ -71,7 +71,7 @@ func (p *RotatableGRPCProvider) CreateClient(cert *domain.Certificate, bundle *d
 
 	// Require SPIFFE sources to be properly configured - no fallback patterns
 	if p.svidSource == nil || p.bundleSource == nil {
-		return nil, fmt.Errorf("SPIFFE sources must be properly configured: svidSource=%v, bundleSource=%v", 
+		return nil, fmt.Errorf("SPIFFE sources must be properly configured: svidSource=%v, bundleSource=%v",
 			p.svidSource != nil, p.bundleSource != nil)
 	}
 
@@ -98,7 +98,7 @@ func (p *RotatableGRPCProvider) CreateServer(cert *domain.Certificate, bundle *d
 
 	// Require SPIFFE sources to be properly configured - no fallback patterns
 	if p.svidSource == nil || p.bundleSource == nil {
-		return nil, fmt.Errorf("SPIFFE sources must be properly configured: svidSource=%v, bundleSource=%v", 
+		return nil, fmt.Errorf("SPIFFE sources must be properly configured: svidSource=%v, bundleSource=%v",
 			p.svidSource != nil, p.bundleSource != nil)
 	}
 
@@ -184,7 +184,6 @@ func (p *RotatableGRPCProvider) Close() error {
 	return nil
 }
 
-
 // IdentityProvider defines the interface for identity providers that can supply certificates and trust bundles.
 // This interface ensures compile-time safety and clear API contracts.
 type IdentityProvider interface {
@@ -209,12 +208,12 @@ type SourceAdapter struct {
 	cacheTTL time.Duration // TTL for cached values (default: 5 minutes)
 
 	// Cached SVID values with expiration
-	cachedSVID      *x509svid.SVID
-	svidCacheEntry  *domain.CacheEntry
+	cachedSVID     *x509svid.SVID
+	svidCacheEntry *domain.CacheEntry
 
 	// Cached bundle values with expiration
-	cachedBundle      *x509bundle.Bundle
-	bundleCacheEntry  *domain.CacheEntry
+	cachedBundle     *x509bundle.Bundle
+	bundleCacheEntry *domain.CacheEntry
 }
 
 // Default cache TTL for source adapters (5 minutes)

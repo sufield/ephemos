@@ -556,7 +556,7 @@ func TestTrustDomain_ConcurrentSafety(t *testing.T) {
 
 func BenchmarkNewTrustDomain(b *testing.B) {
 	domain := "prod.company.com"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := NewTrustDomain(domain)
@@ -571,7 +571,7 @@ func BenchmarkTrustDomain_String(b *testing.B) {
 	if err != nil {
 		b.Fatalf("NewTrustDomain failed: %v", err)
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = td.String()
@@ -587,7 +587,7 @@ func BenchmarkTrustDomain_Equals(b *testing.B) {
 	if err != nil {
 		b.Fatalf("NewTrustDomain failed: %v", err)
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = td1.Equals(td2)
@@ -599,7 +599,7 @@ func BenchmarkTrustDomain_JSONMarshal(b *testing.B) {
 	if err != nil {
 		b.Fatalf("NewTrustDomain failed: %v", err)
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := json.Marshal(td)

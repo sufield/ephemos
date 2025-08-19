@@ -50,7 +50,7 @@ func TestRotatableProviderIntegration(t *testing.T) {
 				Cert:       createMockCert(t, "spiffe://test.example.org/service"),
 				PrivateKey: createMockKey(t),
 			},
-			bundle: mustCreateTrustBundle([]*x509.Certificate{createMockCACert(t)}),
+			bundle:   mustCreateTrustBundle([]*x509.Certificate{createMockCACert(t)}),
 			identity: domain.NewServiceIdentity("test-service", "test.example.org"),
 		}
 
@@ -148,4 +148,3 @@ func TestRotationCapabilityDocumentation(t *testing.T) {
 	t.Log("")
 	t.Log("🎉 Transport provider is fully rotation-capable!")
 }
-

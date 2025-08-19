@@ -279,7 +279,7 @@ func (s *MTLSEnforcementService) GetInvariantStatus(ctx context.Context) Invaria
 	s.mu.RUnlock()
 
 	connections := s.connectionRegistry.ListConnections()
-	
+
 	status := InvariantStatus{
 		TotalInvariants:   len(invariants),
 		TotalConnections:  len(connections),
@@ -289,11 +289,11 @@ func (s *MTLSEnforcementService) GetInvariantStatus(ctx context.Context) Invaria
 
 	for _, invariant := range invariants {
 		result := InvariantResult{
-			Name:         invariant.Name(),
-			Description:  invariant.Description(),
-			PassCount:    0,
-			FailCount:    0,
-			Violations:   make([]string, 0),
+			Name:        invariant.Name(),
+			Description: invariant.Description(),
+			PassCount:   0,
+			FailCount:   0,
+			Violations:  make([]string, 0),
 		}
 
 		for _, conn := range connections {
@@ -301,7 +301,7 @@ func (s *MTLSEnforcementService) GetInvariantStatus(ctx context.Context) Invaria
 				result.FailCount++
 				violation := fmt.Sprintf("conn:%s - %s", conn.ID, err.Error())
 				result.Violations = append(result.Violations, violation)
-				
+
 				if status.ConnectionResults[conn.ID] == nil {
 					status.ConnectionResults[conn.ID] = make([]string, 0)
 				}
@@ -438,7 +438,7 @@ func (i *CertificateRotationInvariant) Check(ctx context.Context, conn *MTLSConn
 	// Check if certificate should have been rotated
 	rotationThreshold := 15 * time.Minute // Should rotate 15 minutes before expiry
 	timeToExpiry := time.Until(conn.Cert.Cert.NotAfter)
-	
+
 	if timeToExpiry <= rotationThreshold && conn.GetState() != ConnectionRotating {
 		return fmt.Errorf("certificate should be rotating (expires in %s)", timeToExpiry.String())
 	}
@@ -446,7 +446,7 @@ func (i *CertificateRotationInvariant) Check(ctx context.Context, conn *MTLSConn
 	// Check if connection has been active too long without rotation
 	maxConnectionAge := time.Hour // No connection should be active for more than 1 hour without rotation
 	connectionAge := time.Since(conn.LastRotated)
-	
+
 	if connectionAge > maxConnectionAge {
 		return fmt.Errorf("connection too old without rotation (age: %s)", connectionAge.String())
 	}

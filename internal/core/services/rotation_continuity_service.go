@@ -50,26 +50,26 @@ func DefaultContinuityPolicy() *ContinuityPolicy {
 
 // ContinuityServerPair maintains old and new servers during rotation
 type ContinuityServerPair struct {
-	OldServer    ports.ServerPort
-	NewServer    ports.ServerPort
-	RotationID   string
-	StartedAt    time.Time
-	Phase        RotationPhase
-	OldCert      *domain.Certificate
-	NewCert      *domain.Certificate
-	mu           sync.RWMutex
+	OldServer  ports.ServerPort
+	NewServer  ports.ServerPort
+	RotationID string
+	StartedAt  time.Time
+	Phase      RotationPhase
+	OldCert    *domain.Certificate
+	NewCert    *domain.Certificate
+	mu         sync.RWMutex
 }
 
 // ContinuityClientPair maintains old and new clients during rotation
 type ContinuityClientPair struct {
-	OldClient    ports.ClientPort
-	NewClient    ports.ClientPort
-	RotationID   string
-	StartedAt    time.Time
-	Phase        RotationPhase
-	OldCert      *domain.Certificate
-	NewCert      *domain.Certificate
-	mu           sync.RWMutex
+	OldClient  ports.ClientPort
+	NewClient  ports.ClientPort
+	RotationID string
+	StartedAt  time.Time
+	Phase      RotationPhase
+	OldCert    *domain.Certificate
+	NewCert    *domain.Certificate
+	mu         sync.RWMutex
 }
 
 // RotationPhase represents the current phase of rotation
@@ -237,7 +237,7 @@ func (s *RotationContinuityService) executeServerRotationPhases(ctx context.Cont
 		"rotation_id", pair.RotationID,
 		"prep_time", policy.PreRotationPrepTime,
 	)
-	
+
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -319,7 +319,7 @@ func (s *RotationContinuityService) validateNewServer(ctx context.Context, serve
 
 	// Additional validation checks can be implemented here based on specific requirements:
 	// - Health endpoint checks
-	// - Connection establishment tests  
+	// - Connection establishment tests
 	// - Service-specific readiness checks
 	// For now, certificate validation provides the core security guarantee
 
@@ -334,19 +334,19 @@ func (s *RotationContinuityService) validateNewServer(ctx context.Context, serve
 // shutdownOldServer gracefully shuts down an old server
 func (s *RotationContinuityService) shutdownOldServer(ctx context.Context, server ports.ServerPort) error {
 	s.logger.Info("gracefully shutting down old server")
-	
+
 	// Graceful shutdown implementation:
 	// 1. Call the server's Stop method which should handle graceful shutdown
 	if err := server.Stop(); err != nil {
 		s.logger.Warn("server stop returned error, but continuing shutdown", "error", err)
 	}
-	
+
 	// 2. The server implementation should:
 	//    - Stop accepting new connections
 	//    - Wait for existing connections to complete (with timeout)
 	//    - Close the server after timeout
 	// This is handled by the specific ServerPort implementation
-	
+
 	s.logger.Debug("old server shutdown completed")
 	return nil
 }
@@ -436,7 +436,7 @@ func (s *RotationContinuityService) executeClientRotationPhases(ctx context.Cont
 		"client_id", clientID,
 		"rotation_id", pair.RotationID,
 	)
-	
+
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -505,7 +505,7 @@ func (s *RotationContinuityService) validateNewClient(ctx context.Context, clien
 	// - Validate client-specific configuration
 	// - Check service discovery and load balancing
 	// Certificate validation provides the core security foundation
-	
+
 	s.logger.Debug("new client validation passed",
 		"cert_expires", cert.Cert.NotAfter,
 		"cert_subject", cert.Cert.Subject.String(),

@@ -21,24 +21,24 @@ var _ ports.BundleProviderPort = (*MockBundleProviderPort)(nil)
 // GetTrustBundle mocks the GetTrustBundle method.
 func (m *MockBundleProviderPort) GetTrustBundle(ctx context.Context) (*domain.TrustBundle, error) {
 	args := m.Called(ctx)
-	
+
 	var r0 *domain.TrustBundle
 	if args.Get(0) != nil {
 		r0 = args.Get(0).(*domain.TrustBundle)
 	}
-	
+
 	return r0, args.Error(1)
 }
 
 // GetTrustBundleForDomain mocks the GetTrustBundleForDomain method.
 func (m *MockBundleProviderPort) GetTrustBundleForDomain(ctx context.Context, trustDomain domain.TrustDomain) (*domain.TrustBundle, error) {
 	args := m.Called(ctx, trustDomain)
-	
+
 	var r0 *domain.TrustBundle
 	if args.Get(0) != nil {
 		r0 = args.Get(0).(*domain.TrustBundle)
 	}
-	
+
 	return r0, args.Error(1)
 }
 
@@ -51,12 +51,12 @@ func (m *MockBundleProviderPort) RefreshTrustBundle(ctx context.Context) error {
 // WatchTrustBundleChanges mocks the WatchTrustBundleChanges method.
 func (m *MockBundleProviderPort) WatchTrustBundleChanges(ctx context.Context) (<-chan *domain.TrustBundle, error) {
 	args := m.Called(ctx)
-	
+
 	var r0 <-chan *domain.TrustBundle
 	if args.Get(0) != nil {
 		r0 = args.Get(0).(<-chan *domain.TrustBundle)
 	}
-	
+
 	return r0, args.Error(1)
 }
 

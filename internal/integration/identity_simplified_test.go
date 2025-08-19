@@ -312,7 +312,7 @@ func testInterceptorConfigurations(t *testing.T) {
 	// Interceptor configuration testing is currently focused on the mTLS integration layer.
 	// Future interceptor implementations will provide:
 	// - Request/response interceptors for gRPC and HTTP
-	// - Identity propagation across service boundaries  
+	// - Identity propagation across service boundaries
 	// - Automatic certificate rotation handling
 	// - Custom authentication and authorization hooks
 	//

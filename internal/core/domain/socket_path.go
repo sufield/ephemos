@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -26,7 +26,7 @@ func NewSocketPath(path string) (SocketPath, error) {
 
 	// Remove unix:// prefix if present (common in SPIFFE usage)
 	cleanPath := strings.TrimPrefix(path, "unix://")
-	
+
 	if !filepath.IsAbs(cleanPath) {
 		return SocketPath{}, fmt.Errorf("socket path must be absolute: %s", path)
 	}
@@ -56,7 +56,6 @@ func NewSocketPathUnsafe(path string) SocketPath {
 	cleanPath := strings.TrimPrefix(path, "unix://")
 	return SocketPath{value: cleanPath}
 }
-
 
 // Value returns the socket path value.
 // This is the preferred method for accessing the path value.
@@ -132,7 +131,7 @@ func (sp *SocketPath) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode(&path); err != nil {
 		return err
 	}
-	
+
 	// Use strict constructor - fail fast on invalid input
 	validatedPath, err := NewSocketPath(path)
 	if err != nil {
@@ -155,7 +154,7 @@ func SocketPathDecodeHook() func(reflect.Type, reflect.Type, interface{}) (inter
 		if to != reflect.TypeOf(SocketPath{}) {
 			return data, nil
 		}
-		
+
 		// Convert from string to SocketPath
 		if from.Kind() == reflect.String {
 			path, ok := data.(string)
@@ -169,7 +168,7 @@ func SocketPathDecodeHook() func(reflect.Type, reflect.Type, interface{}) (inter
 			}
 			return validatedPath, nil
 		}
-		
+
 		return data, nil
 	}
 }

@@ -30,26 +30,26 @@ var (
 // Returns an error if the service address is invalid.
 func NewServiceAddress(address string) (ServiceAddress, error) {
 	trimmed := strings.TrimSpace(address)
-	
+
 	if trimmed == "" {
 		return ServiceAddress{}, fmt.Errorf("service address cannot be empty or whitespace-only")
 	}
-	
+
 	// Length limits for reasonable addresses
 	if len(trimmed) > 500 {
 		return ServiceAddress{}, fmt.Errorf("service address too long: maximum 500 characters, got %d", len(trimmed))
 	}
-	
+
 	// Validate the address format
 	if err := validateAddressFormat(trimmed); err != nil {
 		return ServiceAddress{}, fmt.Errorf("invalid service address format: %w", err)
 	}
-	
+
 	// Additional domain-specific rules
 	if strings.Contains(strings.ToLower(trimmed), "example.com") || strings.Contains(strings.ToLower(trimmed), "example.org") {
 		return ServiceAddress{}, fmt.Errorf("service address cannot use example domains: use a real address")
 	}
-	
+
 	return ServiceAddress{value: trimmed}, nil
 }
 
@@ -59,12 +59,12 @@ func validateAddressFormat(address string) error {
 	if strings.HasPrefix(address, "http://") || strings.HasPrefix(address, "https://") {
 		return validateURLFormat(address)
 	}
-	
+
 	// Check if it's a host:port format
 	if strings.Contains(address, ":") {
 		return validateHostPortFormat(address)
 	}
-	
+
 	// Check if it's just a hostname
 	return validateHostnameFormat(address)
 }
@@ -74,16 +74,16 @@ func validateURLFormat(address string) error {
 	if !urlPattern.MatchString(address) {
 		return fmt.Errorf("invalid URL format")
 	}
-	
+
 	parsedURL, err := url.Parse(address)
 	if err != nil {
 		return fmt.Errorf("failed to parse URL: %w", err)
 	}
-	
+
 	if parsedURL.Host == "" {
 		return fmt.Errorf("URL must have a host")
 	}
-	
+
 	return nil
 }
 
@@ -92,27 +92,27 @@ func validateHostPortFormat(address string) error {
 	if !hostPortPattern.MatchString(address) {
 		return fmt.Errorf("invalid host:port format")
 	}
-	
+
 	host, portStr, err := net.SplitHostPort(address)
 	if err != nil {
 		return fmt.Errorf("failed to parse host:port: %w", err)
 	}
-	
+
 	// Validate host
 	if host == "" {
 		return fmt.Errorf("host cannot be empty")
 	}
-	
+
 	// Validate port
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
 		return fmt.Errorf("invalid port number: %w", err)
 	}
-	
+
 	if port < 1 || port > 65535 {
 		return fmt.Errorf("port number must be between 1 and 65535, got %d", port)
 	}
-	
+
 	// Validate hostname format
 	if !hostnamePattern.MatchString(host) {
 		// Try to parse as IP address
@@ -120,7 +120,7 @@ func validateHostPortFormat(address string) error {
 			return fmt.Errorf("invalid hostname or IP address: %s", host)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -132,7 +132,7 @@ func validateHostnameFormat(address string) error {
 			return fmt.Errorf("invalid hostname or IP address: %s", address)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -194,7 +194,7 @@ func (sa ServiceAddress) GetHost() (string, error) {
 		}
 		return host, nil
 	}
-	
+
 	if sa.IsHostPort() {
 		host, _, err := net.SplitHostPort(sa.value)
 		if err != nil {
@@ -202,7 +202,7 @@ func (sa ServiceAddress) GetHost() (string, error) {
 		}
 		return host, nil
 	}
-	
+
 	// Hostname only
 	return sa.value, nil
 }
@@ -224,7 +224,7 @@ func (sa ServiceAddress) GetPort() (int, error) {
 		}
 		return strconv.Atoi(parsedURL.Port())
 	}
-	
+
 	if sa.IsHostPort() {
 		_, portStr, err := net.SplitHostPort(sa.value)
 		if err != nil {
@@ -232,7 +232,7 @@ func (sa ServiceAddress) GetPort() (int, error) {
 		}
 		return strconv.Atoi(portStr)
 	}
-	
+
 	return 0, fmt.Errorf("no port specified in address")
 }
 
@@ -257,18 +257,18 @@ func (sa ServiceAddress) IsValidForProduction() error {
 	if strings.Contains(strings.ToLower(sa.value), "localhost") {
 		return fmt.Errorf("service address contains 'localhost': not suitable for production")
 	}
-	
+
 	if strings.Contains(strings.ToLower(sa.value), "127.0.0.1") {
 		return fmt.Errorf("service address contains loopback IP: not suitable for production")
 	}
-	
+
 	if strings.Contains(strings.ToLower(sa.value), "example.") {
 		return fmt.Errorf("service address uses example domain: not suitable for production")
 	}
-	
+
 	if sa.IsURL() && !sa.IsSecure() {
 		return fmt.Errorf("service address uses insecure HTTP: production should use HTTPS")
 	}
-	
+
 	return nil
 }

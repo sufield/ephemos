@@ -57,7 +57,7 @@ func demonstrateIdentityVerification(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("invalid trust domain: %w", err)
 	}
-	
+
 	config := &ports.VerificationConfig{
 		WorkloadAPISocket: "unix:///tmp/spire-agent/public/api.sock",
 		Timeout:           30 * time.Second,

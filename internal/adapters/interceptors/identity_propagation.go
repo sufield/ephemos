@@ -105,16 +105,15 @@ const (
 	MetadataKeyTimestamp = "x-ephemos-timestamp"
 )
 
-
 // IdentityPropagationInterceptor handles identity propagation for outgoing gRPC calls.
 type IdentityPropagationInterceptor struct {
 	// Direct capability injection (instead of config struct)
-	identityProvider        ports.IdentityProvider  // Direct injection
-	metricsCollector        MetricsCollector        // Direct injection  
-	logger                  *slog.Logger            // Direct injection
-	clock                   Clock                   // Direct injection
-	idGen                   IDGen                   // Direct injection
-	
+	identityProvider ports.IdentityProvider // Direct injection
+	metricsCollector MetricsCollector       // Direct injection
+	logger           *slog.Logger           // Direct injection
+	clock            Clock                  // Direct injection
+	idGen            IDGen                  // Direct injection
+
 	// Configuration flags
 	propagateOriginalCaller bool
 	propagateCallChain      bool
@@ -603,4 +602,3 @@ type wrappedServerStream struct {
 func (w *wrappedServerStream) Context() context.Context {
 	return w.ctx
 }
-

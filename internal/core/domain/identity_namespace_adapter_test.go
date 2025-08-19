@@ -14,27 +14,27 @@ func TestSPIFFELibraryAdapter_ToGoSPIFFEID(t *testing.T) {
 	adapter := domain.NewSPIFFELibraryAdapter()
 
 	tests := []struct {
-		name         string
-		namespace    domain.IdentityNamespace
-		wantErr      bool
-		expectedID   string
+		name       string
+		namespace  domain.IdentityNamespace
+		wantErr    bool
+		expectedID string
 	}{
 		{
-			name:         "valid simple identity",
-			namespace:    domain.MustNewIdentityNamespaceFromString("spiffe://example.org/service"),
-			wantErr:      false,
-			expectedID:   "spiffe://example.org/service",
+			name:       "valid simple identity",
+			namespace:  domain.MustNewIdentityNamespaceFromString("spiffe://example.org/service"),
+			wantErr:    false,
+			expectedID: "spiffe://example.org/service",
 		},
 		{
-			name:         "valid complex identity",
-			namespace:    domain.MustNewIdentityNamespaceFromString("spiffe://prod.company.com/api/v1/payment"),
-			wantErr:      false,
-			expectedID:   "spiffe://prod.company.com/api/v1/payment",
+			name:       "valid complex identity",
+			namespace:  domain.MustNewIdentityNamespaceFromString("spiffe://prod.company.com/api/v1/payment"),
+			wantErr:    false,
+			expectedID: "spiffe://prod.company.com/api/v1/payment",
 		},
 		{
-			name:         "zero namespace",
-			namespace:    domain.IdentityNamespace{},
-			wantErr:      true,
+			name:      "zero namespace",
+			namespace: domain.IdentityNamespace{},
+			wantErr:   true,
 		},
 	}
 
@@ -56,22 +56,22 @@ func TestSPIFFELibraryAdapter_FromGoSPIFFEID(t *testing.T) {
 	adapter := domain.NewSPIFFELibraryAdapter()
 
 	tests := []struct {
-		name           string
-		spiffeIDStr    string
-		wantErr        bool
-		expectedNS     string
+		name        string
+		spiffeIDStr string
+		wantErr     bool
+		expectedNS  string
 	}{
 		{
-			name:           "valid simple SPIFFE ID",
-			spiffeIDStr:    "spiffe://example.org/service",
-			wantErr:        false,
-			expectedNS:     "spiffe://example.org/service",
+			name:        "valid simple SPIFFE ID",
+			spiffeIDStr: "spiffe://example.org/service",
+			wantErr:     false,
+			expectedNS:  "spiffe://example.org/service",
 		},
 		{
-			name:           "valid complex SPIFFE ID",
-			spiffeIDStr:    "spiffe://prod.company.com/api/v1/payment",
-			wantErr:        false,
-			expectedNS:     "spiffe://prod.company.com/api/v1/payment",
+			name:        "valid complex SPIFFE ID",
+			spiffeIDStr: "spiffe://prod.company.com/api/v1/payment",
+			wantErr:     false,
+			expectedNS:  "spiffe://prod.company.com/api/v1/payment",
 		},
 	}
 
@@ -124,21 +124,21 @@ func TestSPIFFELibraryAdapter_ValidateWithGoSPIFFE(t *testing.T) {
 	adapter := domain.NewSPIFFELibraryAdapter()
 
 	tests := []struct {
-		name         string
-		namespace    domain.IdentityNamespace
-		wantErr      bool
-		errContains  string
+		name        string
+		namespace   domain.IdentityNamespace
+		wantErr     bool
+		errContains string
 	}{
 		{
-			name:         "valid namespace",
-			namespace:    domain.MustNewIdentityNamespaceFromString("spiffe://example.org/service"),
-			wantErr:      false,
+			name:      "valid namespace",
+			namespace: domain.MustNewIdentityNamespaceFromString("spiffe://example.org/service"),
+			wantErr:   false,
 		},
 		{
-			name:         "zero namespace",
-			namespace:    domain.IdentityNamespace{},
-			wantErr:      true,
-			errContains:  "identity namespace is zero",
+			name:        "zero namespace",
+			namespace:   domain.IdentityNamespace{},
+			wantErr:     true,
+			errContains: "identity namespace is zero",
 		},
 	}
 
@@ -162,37 +162,37 @@ func TestSPIFFELibraryAdapter_CreateIdentityNamespaceFromComponents(t *testing.T
 	adapter := domain.NewSPIFFELibraryAdapter()
 
 	tests := []struct {
-		name           string
-		trustDomain    string
-		path           string
-		wantErr        bool
-		expectedNS     string
+		name        string
+		trustDomain string
+		path        string
+		wantErr     bool
+		expectedNS  string
 	}{
 		{
-			name:           "valid components",
-			trustDomain:    "example.org",
-			path:           "/service",
-			wantErr:        false,
-			expectedNS:     "spiffe://example.org/service",
+			name:        "valid components",
+			trustDomain: "example.org",
+			path:        "/service",
+			wantErr:     false,
+			expectedNS:  "spiffe://example.org/service",
 		},
 		{
-			name:           "complex path",
-			trustDomain:    "prod.company.com",
-			path:           "/api/v1/payment",
-			wantErr:        false,
-			expectedNS:     "spiffe://prod.company.com/api/v1/payment",
+			name:        "complex path",
+			trustDomain: "prod.company.com",
+			path:        "/api/v1/payment",
+			wantErr:     false,
+			expectedNS:  "spiffe://prod.company.com/api/v1/payment",
 		},
 		{
-			name:           "invalid trust domain",
-			trustDomain:    "invalid..domain",
-			path:           "/service",
-			wantErr:        true,
+			name:        "invalid trust domain",
+			trustDomain: "invalid..domain",
+			path:        "/service",
+			wantErr:     true,
 		},
 		{
-			name:           "invalid path",
-			trustDomain:    "example.org",
-			path:           "invalid-path",
-			wantErr:        true,
+			name:        "invalid path",
+			trustDomain: "example.org",
+			path:        "invalid-path",
+			wantErr:     true,
 		},
 	}
 

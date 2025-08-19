@@ -37,18 +37,18 @@ var statusStrings = map[Status]string{
 }
 
 var stringToStatus = map[string]Status{
-	"healthy":     StatusHealthy,
-	"unhealthy":   StatusUnhealthy,
-	"up":          StatusUp,
-	"down":        StatusDown,
-	"running":     StatusRunning,
-	"stopped":     StatusStopped,
-	"active":      StatusActive,
-	"inactive":    StatusInactive,
-	"ready":       StatusReady,
-	"not_ready":   StatusNotReady,
-	"enabled":     StatusEnabled,
-	"disabled":    StatusDisabled,
+	"healthy":   StatusHealthy,
+	"unhealthy": StatusUnhealthy,
+	"up":        StatusUp,
+	"down":      StatusDown,
+	"running":   StatusRunning,
+	"stopped":   StatusStopped,
+	"active":    StatusActive,
+	"inactive":  StatusInactive,
+	"ready":     StatusReady,
+	"not_ready": StatusNotReady,
+	"enabled":   StatusEnabled,
+	"disabled":  StatusDisabled,
 }
 
 // String returns the string representation.

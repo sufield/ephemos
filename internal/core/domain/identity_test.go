@@ -618,7 +618,7 @@ func TestNewServiceIdentityWithValidation_EdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var identity *domain.ServiceIdentity
 			var err error
-			
+
 			if tt.validate {
 				identity, err = domain.NewServiceIdentityValidated(tt.serviceName, tt.domain)
 			} else {

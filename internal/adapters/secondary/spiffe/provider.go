@@ -30,9 +30,9 @@ func NewProvider(config *ports.AgentConfig) (*Provider, error) {
 		return nil, fmt.Errorf("SPIFFE socket path must be explicitly configured in agent config - no fallback patterns allowed")
 	}
 	socketPath := config.SocketPath
-	
+
 	logger := slog.Default()
-	
+
 	// Create specialized adapters
 	identityAdapter, err := NewIdentityDocumentAdapter(IdentityDocumentAdapterConfig{
 		SocketPath: socketPath,
@@ -41,7 +41,7 @@ func NewProvider(config *ports.AgentConfig) (*Provider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity adapter: %w", err)
 	}
-	
+
 	bundleAdapter, err := NewSpiffeBundleAdapter(SpiffeBundleAdapterConfig{
 		SocketPath: socketPath,
 		Logger:     logger,
@@ -49,7 +49,7 @@ func NewProvider(config *ports.AgentConfig) (*Provider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bundle adapter: %w", err)
 	}
-	
+
 	tlsAdapter, err := NewTLSAdapter(TLSAdapterConfig{
 		SocketPath: socketPath,
 		Logger:     logger,
@@ -57,7 +57,7 @@ func NewProvider(config *ports.AgentConfig) (*Provider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TLS adapter: %w", err)
 	}
-	
+
 	return &Provider{
 		identityAdapter: identityAdapter,
 		bundleAdapter:   bundleAdapter,
@@ -88,7 +88,6 @@ func (p *Provider) GetIdentityDocument() (*domain.IdentityDocument, error) {
 	ctx := context.Background() // Context managed at adapter layer
 	return p.identityAdapter.GetIdentityDocument(ctx)
 }
-
 
 // GetTLSConfig gets TLS config using the TLS adapter.
 func (p *Provider) GetTLSConfig(ctx context.Context) (tlsconfig.Authorizer, error) {
@@ -123,18 +122,18 @@ func (p *Provider) Close() error {
 			return fmt.Errorf("failed to close identity adapter: %w", err)
 		}
 	}
-	
+
 	if p.bundleAdapter != nil {
 		if err := p.bundleAdapter.Close(); err != nil {
 			return fmt.Errorf("failed to close bundle adapter: %w", err)
 		}
 	}
-	
+
 	if p.tlsAdapter != nil {
 		if err := p.tlsAdapter.Close(); err != nil {
 			return fmt.Errorf("failed to close TLS adapter: %w", err)
 		}
 	}
-	
+
 	return nil
 }

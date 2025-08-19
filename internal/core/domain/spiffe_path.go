@@ -21,13 +21,13 @@ type SPIFFEPath struct {
 func NewSPIFFEPath(trustDomain spiffeid.TrustDomain, rawPath string) (SPIFFEPath, error) {
 	// Clean the path - go-spiffe expects no leading slash for FromPath
 	cleanPath := strings.TrimPrefix(rawPath, "/")
-	
+
 	// Use go-spiffe's built-in validation
 	_, err := spiffeid.FromPath(trustDomain, cleanPath)
 	if err != nil {
 		return SPIFFEPath{}, fmt.Errorf("invalid SPIFFE path: %w", err)
 	}
-	
+
 	return SPIFFEPath{
 		path:      cleanPath,
 		validated: true,

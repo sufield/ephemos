@@ -176,16 +176,16 @@ func (ns IdentityNamespace) IsChildOf(parent IdentityNamespace) bool {
 	if !ns.trustDomain.Equals(parent.trustDomain) {
 		return false
 	}
-	
+
 	if parent.path == "/" {
 		return true // Everything is a child of root
 	}
-	
+
 	parentPath := parent.path
 	if !strings.HasSuffix(parentPath, "/") {
 		parentPath += "/"
 	}
-	
+
 	return strings.HasPrefix(ns.path, parentPath)
 }
 
@@ -196,15 +196,15 @@ func (ns IdentityNamespace) GetServiceName() string {
 	if ns.path == "" || ns.path == "/" {
 		return ""
 	}
-	
+
 	// Remove leading slash and split by '/'
 	cleanPath := strings.TrimPrefix(ns.path, "/")
 	segments := strings.Split(cleanPath, "/")
-	
+
 	if len(segments) == 0 {
 		return ""
 	}
-	
+
 	return segments[len(segments)-1]
 }
 
@@ -224,7 +224,7 @@ func (ns IdentityNamespace) WithTrustDomain(newTrustDomain TrustDomain) (Identit
 func (ns IdentityNamespace) validateTotalLength() error {
 	totalLength := len(ns.String())
 	if totalLength > MaxSPIFFEIDLength {
-		return fmt.Errorf("SPIFFE ID exceeds maximum length of %d characters (current: %d): %q", 
+		return fmt.Errorf("SPIFFE ID exceeds maximum length of %d characters (current: %d): %q",
 			MaxSPIFFEIDLength, totalLength, ns.String())
 	}
 	return nil

@@ -78,7 +78,7 @@ func (c *MTLSConnection) UpdateRotation(newCert *domain.Certificate) {
 func (c *MTLSConnection) DisplaySummary() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return fmt.Sprintf("Connection %s (state: %v)\nLocal: %s\nRemote: %s", 
+	return fmt.Sprintf("Connection %s (state: %v)\nLocal: %s\nRemote: %s",
 		c.ID, c.State, c.LocalIdentity.URI(), c.RemoteIdentity.URI())
 }
 
@@ -207,7 +207,7 @@ func (r *MTLSConnectionRegistry) GetConnection(connID string) (*MTLSConnection, 
 func (r *MTLSConnectionRegistry) ListConnections() []*MTLSConnection {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	connections := make([]*MTLSConnection, 0, len(r.connections))
 	for _, conn := range r.connections {
 		connections = append(connections, conn)
@@ -280,7 +280,7 @@ func (r *MTLSConnectionRegistry) checkAndRotateConnection(ctx context.Context, c
 // determineRotationReason checks if rotation is needed and returns the reason
 func (r *MTLSConnectionRegistry) determineRotationReason(conn *MTLSConnection, policy *RotationPolicy) string {
 	now := time.Now()
-	
+
 	// Check if certificate is expiring soon
 	if conn.Cert != nil && conn.Cert.Cert != nil {
 		timeToExpiry := time.Until(conn.Cert.Cert.NotAfter)
@@ -409,7 +409,7 @@ func (r *MTLSConnectionRegistry) GetConnectionStats() ConnectionStats {
 	for _, conn := range r.connections {
 		state := conn.GetState()
 		stats.StateCount[state]++
-		
+
 		// Update oldest connection
 		if stats.OldestConnection.IsZero() || conn.EstablishedAt.Before(stats.OldestConnection) {
 			stats.OldestConnection = conn.EstablishedAt
@@ -431,11 +431,11 @@ func (r *MTLSConnectionRegistry) GetConnectionStats() ConnectionStats {
 
 // ConnectionStats provides statistics about managed connections
 type ConnectionStats struct {
-	TotalConnections  int
-	StateCount        map[ConnectionState]int
-	OldestConnection  time.Time
-	NewestConnection  time.Time
-	LastRotation      time.Time
+	TotalConnections int
+	StateCount       map[ConnectionState]int
+	OldestConnection time.Time
+	NewestConnection time.Time
+	LastRotation     time.Time
 }
 
 // LogRotationObserver is a basic observer that logs rotation events

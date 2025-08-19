@@ -196,7 +196,6 @@ func (s *ServiceIdentity) Validate() error {
 	return nil
 }
 
-
 // validateServiceName checks if a service name is valid for SPIFFE path component.
 // Now supports multi-segment paths (e.g., "api/v1/service") using official SPIFFE validation.
 func (s *ServiceIdentity) validateServiceName(name string) error {

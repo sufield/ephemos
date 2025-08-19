@@ -21,36 +21,36 @@ var _ ports.IdentityProviderPort = (*MockIdentityProviderPort)(nil)
 // GetServiceIdentity mocks the GetServiceIdentity method.
 func (m *MockIdentityProviderPort) GetServiceIdentity(ctx context.Context) (*domain.ServiceIdentity, error) {
 	args := m.Called(ctx)
-	
+
 	var r0 *domain.ServiceIdentity
 	if args.Get(0) != nil {
 		r0 = args.Get(0).(*domain.ServiceIdentity)
 	}
-	
+
 	return r0, args.Error(1)
 }
 
 // GetCertificate mocks the GetCertificate method.
 func (m *MockIdentityProviderPort) GetCertificate(ctx context.Context) (*domain.Certificate, error) {
 	args := m.Called(ctx)
-	
+
 	var r0 *domain.Certificate
 	if args.Get(0) != nil {
 		r0 = args.Get(0).(*domain.Certificate)
 	}
-	
+
 	return r0, args.Error(1)
 }
 
 // GetIdentityDocument mocks the GetIdentityDocument method.
 func (m *MockIdentityProviderPort) GetIdentityDocument(ctx context.Context) (*domain.IdentityDocument, error) {
 	args := m.Called(ctx)
-	
+
 	var r0 *domain.IdentityDocument
 	if args.Get(0) != nil {
 		r0 = args.Get(0).(*domain.IdentityDocument)
 	}
-	
+
 	return r0, args.Error(1)
 }
 
@@ -63,12 +63,12 @@ func (m *MockIdentityProviderPort) RefreshIdentity(ctx context.Context) error {
 // WatchIdentityChanges mocks the WatchIdentityChanges method.
 func (m *MockIdentityProviderPort) WatchIdentityChanges(ctx context.Context) (<-chan *domain.IdentityDocument, error) {
 	args := m.Called(ctx)
-	
+
 	var r0 <-chan *domain.IdentityDocument
 	if args.Get(0) != nil {
 		r0 = args.Get(0).(<-chan *domain.IdentityDocument)
 	}
-	
+
 	return r0, args.Error(1)
 }
 

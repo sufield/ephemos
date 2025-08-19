@@ -49,7 +49,6 @@ type ServiceConfig struct {
 	// Must be a valid domain name format if provided.
 	Domain string `yaml:"domain,omitempty" validate:"omitempty,domain"`
 
-
 	// Cache contains caching configuration for certificate and trust bundle operations.
 	Cache *CacheConfig `yaml:"cache,omitempty"`
 }
@@ -225,7 +224,7 @@ func LoadFromEnvironment() (*Configuration, error) {
 	if config.Agent == nil {
 		config.Agent = &AgentConfig{}
 	}
-	
+
 	// Handle agent socket path from environment variables
 	if socketPath := v.GetString("agent_socket"); socketPath != "" {
 		config.Agent.SocketPath = domain.NewSocketPathUnsafe(socketPath)
@@ -332,7 +331,6 @@ func validateProductionSecurity(config *Configuration) error {
 	if logLevel := strings.ToLower(v.GetString("log_level")); logLevel == "debug" || logLevel == "trace" {
 		validationErrors = append(validationErrors, errors.ErrVerboseLogging)
 	}
-
 
 	if len(validationErrors) > 0 {
 		return errors.NewProductionValidationError(validationErrors...)

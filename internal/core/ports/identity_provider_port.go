@@ -3,7 +3,7 @@ package ports
 
 import (
 	"context"
-	
+
 	"github.com/sufield/ephemos/internal/core/domain"
 )
 

@@ -112,13 +112,13 @@ func createIdentityProviderWithAdapters(cfg *ports.Configuration) (ports.Identit
 type AdapterConfig struct {
 	// UseDirectAdapters when true uses adapters directly, otherwise uses Provider compatibility layer
 	UseDirectAdapters bool
-	
+
 	// IdentitySocketPath overrides the default SPIFFE socket path for identity operations
 	IdentitySocketPath string
-	
-	// BundleSocketPath overrides the default SPIFFE socket path for bundle operations  
+
+	// BundleSocketPath overrides the default SPIFFE socket path for bundle operations
 	BundleSocketPath string
-	
+
 	// TLSSocketPath overrides the default SPIFFE socket path for TLS operations
 	TLSSocketPath string
 }
