@@ -5,6 +5,8 @@ package identityprovider
 import (
 	"testing"
 
+	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
@@ -151,26 +153,22 @@ func closeProvider(t *testing.T, provider ports.IdentityProvider) {
 }
 
 // assertValidIdentity asserts that a service identity is valid.
-func assertValidIdentity(t *testing.T, identity *domain.ServiceIdentity) {
+func assertValidIdentity(t *testing.T, identity spiffeid.ID) {
 	t.Helper()
-	if identity == nil {
-		t.Fatal("GetServiceIdentity returned nil identity without error")
+	if identity.IsZero() {
+		t.Fatal("GetServiceIdentity returned zero identity without error")
 	}
 
-	if identity.Name() == "" {
-		t.Error("ServiceIdentity.Name should not be empty")
+	if identity.Path() == "" || identity.Path() == "/" {
+		t.Error("SPIFFE ID path should not be empty or just root")
 	}
 
-	if identity.Domain() == "" {
-		t.Error("ServiceIdentity.Domain should not be empty")
+	if identity.TrustDomain().IsZero() {
+		t.Error("SPIFFE ID trust domain should not be empty")
 	}
 
-	if identity.URI() == "" {
-		t.Error("ServiceIdentity.URI should not be empty")
-	}
-
-	if err := identity.Validate(); err != nil {
-		t.Errorf("ServiceIdentity should be valid: %v", err)
+	if identity.String() == "" {
+		t.Error("SPIFFE ID string representation should not be empty")
 	}
 }
 
@@ -199,21 +197,26 @@ func assertValidCertificate(t *testing.T, cert *domain.Certificate) {
 	}
 }
 
-// assertValidTrustBundle asserts that a trust bundle is valid.
-func assertValidTrustBundle(t *testing.T, bundle *domain.TrustBundle) {
+// assertValidTrustBundle asserts that an x509bundle.Bundle is valid.
+func assertValidTrustBundle(t *testing.T, bundle *x509bundle.Bundle) {
 	t.Helper()
 	if bundle == nil {
 		t.Fatal("GetTrustBundle returned nil bundle without error")
 	}
 
-	if len(bundle.Certificates) == 0 {
-		t.Error("TrustBundle.Certificates should not be empty")
+	authorities := bundle.X509Authorities()
+	if len(authorities) == 0 {
+		t.Error("Bundle.X509Authorities should not be empty")
 	}
 
-	for i, cert := range bundle.Certificates {
+	for i, cert := range authorities {
 		if cert == nil {
-			t.Errorf("TrustBundle.Certificates[%d] should not be nil", i)
+			t.Errorf("Bundle.X509Authorities[%d] should not be nil", i)
 		}
+	}
+
+	if bundle.TrustDomain().String() == "" {
+		t.Error("Bundle.TrustDomain should not be empty")
 	}
 }
 
@@ -253,15 +256,15 @@ func assertValidSVID(t *testing.T, svid *x509svid.SVID) {
 }
 
 // assertIdentitiesConsistent asserts that two identities are consistent.
-func assertIdentitiesConsistent(t *testing.T, identity1, identity2 *domain.ServiceIdentity) {
+func assertIdentitiesConsistent(t *testing.T, identity1, identity2 spiffeid.ID) {
 	t.Helper()
-	if identity1.Name() != identity2.Name() {
-		t.Error("GetServiceIdentity returned inconsistent Name")
+	if identity1.Path() != identity2.Path() {
+		t.Error("GetServiceIdentity returned inconsistent Path")
 	}
-	if identity1.Domain() != identity2.Domain() {
-		t.Error("GetServiceIdentity returned inconsistent Domain")
+	if identity1.TrustDomain() != identity2.TrustDomain() {
+		t.Error("GetServiceIdentity returned inconsistent TrustDomain")
 	}
-	if identity1.URI() != identity2.URI() {
+	if identity1.String() != identity2.String() {
 		t.Error("GetServiceIdentity returned inconsistent URI")
 	}
 }

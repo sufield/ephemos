@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
@@ -67,7 +69,7 @@ func NewProvider(config *ports.AgentConfig) (*Provider, error) {
 }
 
 // GetServiceIdentity fetches identity using the identity adapter.
-func (p *Provider) GetServiceIdentity() (*domain.ServiceIdentity, error) {
+func (p *Provider) GetServiceIdentity() (spiffeid.ID, error) {
 	ctx := context.Background() // Context managed at adapter layer
 	return p.identityAdapter.GetServiceIdentity(ctx)
 }
@@ -79,7 +81,7 @@ func (p *Provider) GetCertificate() (*domain.Certificate, error) {
 }
 
 // GetTrustBundle fetches bundle using the bundle adapter.
-func (p *Provider) GetTrustBundle() (*domain.TrustBundle, error) {
+func (p *Provider) GetTrustBundle() (*x509bundle.Bundle, error) {
 	ctx := context.Background() // Context managed at adapter layer
 	return p.bundleAdapter.GetTrustBundle(ctx)
 }

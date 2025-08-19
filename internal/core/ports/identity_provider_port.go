@@ -4,6 +4,8 @@ package ports
 import (
 	"context"
 
+	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/sufield/ephemos/internal/core/domain"
 )
@@ -17,13 +19,13 @@ import (
 //
 // Implementations must be thread-safe as they may be called concurrently.
 type IdentityProviderPort interface {
-	// GetServiceIdentity retrieves the current service identity.
+	// GetServiceIdentity retrieves the current service identity using go-spiffe SDK.
 	// The identity includes the service name and trust domain.
 	//
 	// Returns:
-	//   - A ServiceIdentity containing the service's SPIFFE identity information
+	//   - A spiffeid.ID containing the service's SPIFFE identity information
 	//   - An error if the identity cannot be retrieved
-	GetServiceIdentity(ctx context.Context) (*domain.ServiceIdentity, error)
+	GetServiceIdentity(ctx context.Context) (spiffeid.ID, error)
 
 	// GetCertificate retrieves the current service certificate.
 	// The certificate includes the private key and certificate chain.
@@ -69,21 +71,21 @@ type IdentityProviderPort interface {
 //
 // Implementations must be thread-safe as they may be called concurrently.
 type BundleProviderPort interface {
-	// GetTrustBundle retrieves the current trust bundle.
+	// GetTrustBundle retrieves the current trust bundle using go-spiffe SDK.
 	// The bundle contains the trust anchors for certificate validation.
 	//
 	// Returns:
-	//   - A TrustBundle containing the current set of trust anchors
+	//   - An x509bundle.Bundle containing the current set of trust anchors
 	//   - An error if the trust bundle cannot be retrieved
-	GetTrustBundle(ctx context.Context) (*domain.TrustBundle, error)
+	GetTrustBundle(ctx context.Context) (*x509bundle.Bundle, error)
 
 	// GetTrustBundleForDomain retrieves a trust bundle for a specific trust domain.
 	// This allows for multi-domain trust scenarios.
 	//
 	// Returns:
-	//   - A TrustBundle for the specified domain
+	//   - An x509bundle.Bundle for the specified domain
 	//   - An error if the trust bundle cannot be retrieved
-	GetTrustBundleForDomain(ctx context.Context, trustDomain domain.TrustDomain) (*domain.TrustBundle, error)
+	GetTrustBundleForDomain(ctx context.Context, trustDomain spiffeid.TrustDomain) (*x509bundle.Bundle, error)
 
 	// RefreshTrustBundle triggers a refresh of the trust bundle.
 	// This may involve fetching updated trust anchors from the provider.
@@ -98,7 +100,7 @@ type BundleProviderPort interface {
 	// Returns:
 	//   - A channel that receives trust bundle update events
 	//   - An error if watching cannot be established
-	WatchTrustBundleChanges(ctx context.Context) (<-chan *domain.TrustBundle, error)
+	WatchTrustBundleChanges(ctx context.Context) (<-chan *x509bundle.Bundle, error)
 
 	// ValidateCertificateAgainstBundle validates a certificate against the trust bundle.
 	// This performs cryptographic validation using the trust anchors.

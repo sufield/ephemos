@@ -8,7 +8,7 @@ import (
 	"crypto/x509"
 	"fmt"
 
-	"github.com/sufield/ephemos/internal/core/domain"
+	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
@@ -20,7 +20,7 @@ import (
 // This adapter follows the hexagonal architecture pattern by implementing a port
 // interface while encapsulating the specific behavior of static trust bundle management.
 type StaticTrustBundleProvider struct {
-	bundle *domain.TrustBundle
+	bundle *x509bundle.Bundle
 }
 
 // NewStaticTrustBundleProvider creates a provider with a fixed trust bundle.
@@ -32,7 +32,7 @@ type StaticTrustBundleProvider struct {
 //	bundle: The trust bundle to use for all requests (can be nil, but GetTrustBundle will error)
 //
 // Returns a TrustBundleProvider that always returns the same trust bundle.
-func NewStaticTrustBundleProvider(bundle *domain.TrustBundle) ports.TrustBundleProvider {
+func NewStaticTrustBundleProvider(bundle *x509bundle.Bundle) ports.TrustBundleProvider {
 	return &StaticTrustBundleProvider{bundle: bundle}
 }
 
@@ -44,7 +44,7 @@ func NewStaticTrustBundleProvider(bundle *domain.TrustBundle) ports.TrustBundleP
 // Returns:
 //   - The configured trust bundle
 //   - An error if no trust bundle was configured (nil bundle)
-func (p *StaticTrustBundleProvider) GetTrustBundle() (*domain.TrustBundle, error) {
+func (p *StaticTrustBundleProvider) GetTrustBundle() (*x509bundle.Bundle, error) {
 	if p.bundle == nil {
 		return nil, fmt.Errorf("no trust bundle configured")
 	}
@@ -64,5 +64,10 @@ func (p *StaticTrustBundleProvider) CreateCertPool() (*x509.CertPool, error) {
 	if err != nil {
 		return nil, err
 	}
-	return bundle.CreateCertPool(), nil
+	
+	pool := x509.NewCertPool()
+	for _, cert := range bundle.X509Authorities() {
+		pool.AddCert(cert)
+	}
+	return pool, nil
 }

@@ -141,11 +141,6 @@ func (h *RedactorHandler) redactSensitiveStrings(value string) string {
 		return RedactedValue
 	}
 
-	// Redact JWT tokens (basic pattern matching)
-	if strings.Count(value, ".") >= 2 && len(value) > 50 {
-		// Looks like a JWT token
-		return RedactedValue
-	}
 
 	// Redact SPIFFE IDs that might contain sensitive service names in development
 	// Note: SPIFFE IDs are generally not sensitive, but we can redact in debug contexts

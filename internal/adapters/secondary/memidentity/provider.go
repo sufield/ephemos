@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/sufield/ephemos/internal/core/domain"
@@ -22,7 +23,7 @@ type Provider struct {
 	mu       sync.RWMutex
 	identity *domain.ServiceIdentity
 	cert     *domain.Certificate
-	bundle   *domain.TrustBundle
+	bundle   *x509bundle.Bundle
 	closed   bool
 }
 
@@ -62,7 +63,7 @@ func New() *Provider {
 			PrivateKey: &fakePrivateKey{}, // Now properly implements crypto.Signer
 			Chain:      []*x509.Certificate{},
 		},
-		bundle: mustCreateTrustBundle([]*x509.Certificate{fakeCACert}),
+		bundle: mustCreateX509Bundle([]*x509.Certificate{fakeCACert}),
 	}
 }
 
@@ -82,16 +83,26 @@ func (p *Provider) WithCertificate(cert *domain.Certificate) *Provider {
 	return p
 }
 
-// GetServiceIdentity returns the configured service identity.
-func (p *Provider) GetServiceIdentity() (*domain.ServiceIdentity, error) {
+// GetServiceIdentity returns the configured service identity as spiffeid.ID.
+func (p *Provider) GetServiceIdentity() (spiffeid.ID, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	if p.closed {
-		return nil, ports.ErrIdentityNotFound
+		return spiffeid.ID{}, ports.ErrIdentityNotFound
 	}
 
-	return p.identity, nil
+	// Create SPIFFE ID from stored identity
+	spiffeID, err := spiffeid.FromURI(&url.URL{
+		Scheme: "spiffe",
+		Host:   p.identity.Domain(),
+		Path:   "/" + p.identity.Name(),
+	})
+	if err != nil {
+		return spiffeid.ID{}, err
+	}
+
+	return spiffeID, nil
 }
 
 // GetCertificate returns the configured certificate.
@@ -107,7 +118,7 @@ func (p *Provider) GetCertificate() (*domain.Certificate, error) {
 }
 
 // GetTrustBundle returns the configured trust bundle.
-func (p *Provider) GetTrustBundle() (*domain.TrustBundle, error) {
+func (p *Provider) GetTrustBundle() (*x509bundle.Bundle, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -158,11 +169,17 @@ func (p *Provider) Close() error {
 	return nil
 }
 
-// mustCreateTrustBundle creates a trust bundle or panics. For testing only.
-func mustCreateTrustBundle(certs []*x509.Certificate) *domain.TrustBundle {
-	bundle, err := domain.NewTrustBundle(certs)
+// mustCreateX509Bundle creates an x509bundle.Bundle or panics. For testing only.
+func mustCreateX509Bundle(certs []*x509.Certificate) *x509bundle.Bundle {
+	// Create a fake trust domain for testing
+	td, err := spiffeid.TrustDomainFromString("example.com")
 	if err != nil {
-		panic("failed to create test trust bundle: " + err.Error())
+		panic("failed to create test trust domain: " + err.Error())
+	}
+	
+	bundle := x509bundle.New(td)
+	for _, cert := range certs {
+		bundle.AddX509Authority(cert)
 	}
 	return bundle
 }

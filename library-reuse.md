@@ -108,51 +108,65 @@ type IdentityProviderPort interface {
 - ✅ Removed dependency on custom `IdentityDocument` wrapper
 - ✅ All identity operations now use battle-tested SDK types
 
-## 5. Trust Bundle Management
+## 5. Trust Bundle Management ✅ COMPLETED
 
-### Current Custom Code
-**File:** `internal/core/domain/trust_bundle.go`
-- **Lines:** ~380 lines
-- **Methods:** Custom merge, validation, certificate management
+### Previous Custom Code
+**File:** `internal/core/domain/trust_bundle.go` - **FILE DEPRECATED**
+- **Lines:** ~380 lines - Custom certificate management, validation, merging
+- **Methods:** `NewTrustBundle()`, `ValidateCertificateChain()`, `Merge()`, etc.
 
-### go-spiffe SDK Alternative
+### Replaced With go-spiffe SDK
 ```go
-import "github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
-
-// Replace with x509bundle.Bundle methods:
-bundle.HasX509Authority(cert)
-bundle.AddX509Authority(cert)
-bundle.RemoveX509Authority(cert)
-bundleSet.Merge(otherSet)
+// Interface changes: Replace domain.TrustBundle with x509bundle.Bundle
+type BundleProviderPort interface {
+    GetTrustBundle(ctx context.Context) (*x509bundle.Bundle, error)
+    GetTrustBundleForDomain(ctx context.Context, td spiffeid.TrustDomain) (*x509bundle.Bundle, error)
+    WatchTrustBundleChanges(ctx context.Context) (<-chan *x509bundle.Bundle, error)
+}
 ```
 
-### Benefits
-- Remove custom certificate deduplication logic
-- Built-in bundle merging and management
-- Automatic handling of bundle updates
+### Changes Made
+- ✅ Replaced internal `BundleProviderPort` to use `x509bundle.Bundle` directly
+- ✅ Updated `TrustBundleProvider` interface to return SDK bundles
+- ✅ Updated SPIFFE bundle adapter to return bundles from workload API directly
+- ✅ Updated memory provider to create `x509bundle.Bundle` for testing
+- ✅ Removed custom certificate validation - now uses standard `crypto/x509` with bundle authorities
+- ✅ Trust bundle watching now streams `x509bundle.Bundle` objects
+- ✅ All trust operations now use battle-tested SDK bundle management
 
-## 6. Service Identity Validation
+## 6. Service Identity Validation ✅ COMPLETED
 
-### Current Custom Code
-**File:** `internal/core/domain/service_identity.go`
-- **Lines:** ~300 lines
-- **What it does:** Custom service name validation, path constraints
+### Previous Custom Code
+**File:** `internal/core/domain/service_identity.go` - **STILL IN USE BUT SIMPLIFIED**
+- **Lines:** ~300 lines - Custom service name validation, path constraints
 
-### go-spiffe SDK Alternative
+### Replaced With go-spiffe SDK
 ```go
-// Replace entire ServiceIdentity with:
-id, err := spiffeid.FromPath(trustDomain, servicePath)
-// All validation is built-in
+// Interface changes: Replace *domain.ServiceIdentity with spiffeid.ID
+type IdentityProviderPort interface {
+    GetServiceIdentity(ctx context.Context) (spiffeid.ID, error)
+}
 
-// For identity matching:
-id.MemberOf(trustDomain)
-id.String() // for URI representation
+type IdentityProvider interface {
+    GetServiceIdentity() (spiffeid.ID, error)
+}
+
+// All validation now uses go-spiffe SDK:
+spiffeID, err := spiffeid.FromString("spiffe://example.com/service-name")
+spiffeID.Path()                    // Extract path
+spiffeID.TrustDomain().String()    // Extract trust domain
+spiffeID.String()                  // URI representation
 ```
 
-### Benefits
-- Remove custom service name validation
-- Automatic SPIFFE spec compliance
-- Simpler identity comparison
+### Changes Made
+- ✅ Updated `IdentityProviderPort` to return `spiffeid.ID` directly
+- ✅ Updated `IdentityProvider` interface to return `spiffeid.ID`
+- ✅ Updated SPIFFE adapter to return `svid.ID` from workload API
+- ✅ Updated memory adapter to convert domain identity to `spiffeid.ID`
+- ✅ Updated contract tests to validate `spiffeid.ID` instead of ServiceIdentity
+- ✅ Updated service layer to work with `spiffeid.ID` internally
+- ✅ Domain layer still uses `ServiceIdentity` for business logic compatibility
+- ✅ All identity validation now uses battle-tested SDK methods
 
 ## 7. TLS Configuration
 

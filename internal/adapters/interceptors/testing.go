@@ -5,6 +5,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
+	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/sufield/ephemos/internal/core/domain"
 )
 
@@ -24,9 +27,13 @@ func NewMockIdentityProvider() *MockIdentityProvider {
 	}
 }
 
-// GetServiceIdentity returns a mock service identity.
-func (m *MockIdentityProvider) GetServiceIdentity() (*domain.ServiceIdentity, error) {
-	return domain.NewServiceIdentity(m.ServiceName, m.ServiceDomain), nil
+// GetServiceIdentity returns a mock service identity as spiffeid.ID.
+func (m *MockIdentityProvider) GetServiceIdentity() (spiffeid.ID, error) {
+	spiffeID, err := spiffeid.FromString(m.ServiceURI)
+	if err != nil {
+		return spiffeid.ID{}, err
+	}
+	return spiffeID, nil
 }
 
 // GetCertificate returns a mock certificate (not implemented for testing).
@@ -35,7 +42,12 @@ func (m *MockIdentityProvider) GetCertificate() (*domain.Certificate, error) {
 }
 
 // GetTrustBundle returns a mock trust bundle (not implemented for testing).
-func (m *MockIdentityProvider) GetTrustBundle() (*domain.TrustBundle, error) {
+func (m *MockIdentityProvider) GetTrustBundle() (*x509bundle.Bundle, error) {
+	return nil, nil
+}
+
+// GetSVID returns a mock SVID (not implemented for testing).
+func (m *MockIdentityProvider) GetSVID() (*x509svid.SVID, error) {
 	return nil, nil
 }
 
