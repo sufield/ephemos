@@ -3,8 +3,9 @@ package domain
 
 import (
 	"fmt"
-	"net/url"
 	"strings"
+
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 )
 
 // IdentityNamespace represents a complete SPIFFE identity namespace, consisting of
@@ -37,8 +38,13 @@ func NewIdentityNamespace(trustDomain TrustDomain, path string) (IdentityNamespa
 		return IdentityNamespace{}, fmt.Errorf("invalid trust domain: %w", err)
 	}
 
-	// Validate path
-	if err := validateSPIFFEPath(path); err != nil {
+	// Use go-spiffe's built-in path validation
+	// Note: go-spiffe expects empty string for root path, not "/"
+	pathForValidation := path
+	if path == "/" {
+		pathForValidation = ""
+	}
+	if err := spiffeid.ValidatePath(pathForValidation); err != nil {
 		return IdentityNamespace{}, fmt.Errorf("invalid path: %w", err)
 	}
 
@@ -57,38 +63,34 @@ func NewIdentityNamespace(trustDomain TrustDomain, path string) (IdentityNamespa
 
 // NewIdentityNamespaceFromString creates an IdentityNamespace by parsing a SPIFFE ID string.
 // The input must be a valid SPIFFE URI like "spiffe://example.org/service/name".
+// This uses go-spiffe's built-in validation instead of custom parsing.
 func NewIdentityNamespaceFromString(spiffeID string) (IdentityNamespace, error) {
 	if spiffeID == "" {
 		return IdentityNamespace{}, fmt.Errorf("SPIFFE ID cannot be empty")
 	}
 
-	// Must start with spiffe://
-	if !strings.HasPrefix(spiffeID, "spiffe://") {
-		return IdentityNamespace{}, fmt.Errorf("SPIFFE ID must start with 'spiffe://': %q", spiffeID)
+	// Handle trailing slash case - go-spiffe doesn't accept "spiffe://domain/"
+	// but we want to support it as equivalent to "spiffe://domain" (root path)
+	normalizedID := spiffeID
+	if strings.HasSuffix(spiffeID, "/") && strings.Count(spiffeID, "/") == 3 {
+		// Remove trailing slash for root path case: "spiffe://domain/" -> "spiffe://domain"
+		normalizedID = strings.TrimSuffix(spiffeID, "/")
 	}
 
-	// Parse as URL for validation
-	parsedURL, err := url.Parse(spiffeID)
+	// Use go-spiffe's built-in parsing and validation
+	parsedID, err := spiffeid.FromString(normalizedID)
 	if err != nil {
-		return IdentityNamespace{}, fmt.Errorf("invalid SPIFFE ID format: %w", err)
+		return IdentityNamespace{}, fmt.Errorf("invalid SPIFFE ID: %w", err)
 	}
 
-	if parsedURL.Scheme != "spiffe" {
-		return IdentityNamespace{}, fmt.Errorf("SPIFFE ID must use 'spiffe' scheme: %q", spiffeID)
-	}
-
-	if parsedURL.Host == "" {
-		return IdentityNamespace{}, fmt.Errorf("SPIFFE ID must contain trust domain: %q", spiffeID)
-	}
-
-	// Validate and create trust domain
-	trustDomain, err := NewTrustDomain(parsedURL.Host)
+	// Create trust domain from validated SPIFFE ID
+	trustDomain, err := NewTrustDomain(parsedID.TrustDomain().String())
 	if err != nil {
 		return IdentityNamespace{}, fmt.Errorf("invalid trust domain in SPIFFE ID: %w", err)
 	}
 
 	// Extract path (defaults to "/" if empty)
-	path := parsedURL.Path
+	path := parsedID.Path()
 	if path == "" {
 		path = "/"
 	}
@@ -154,7 +156,13 @@ func (ns IdentityNamespace) Validate() error {
 		return fmt.Errorf("invalid trust domain: %w", err)
 	}
 
-	if err := validateSPIFFEPath(ns.path); err != nil {
+	// Use go-spiffe's built-in path validation
+	// Note: go-spiffe expects empty string for root path, not "/"
+	pathForValidation := ns.path
+	if ns.path == "/" {
+		pathForValidation = ""
+	}
+	if err := spiffeid.ValidatePath(pathForValidation); err != nil {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
@@ -210,64 +218,7 @@ func (ns IdentityNamespace) WithTrustDomain(newTrustDomain TrustDomain) (Identit
 	return NewIdentityNamespace(newTrustDomain, ns.path)
 }
 
-// validateSPIFFEPath validates a SPIFFE path according to specification constraints.
-func validateSPIFFEPath(path string) error {
-	if path == "" {
-		return fmt.Errorf("path cannot be empty")
-	}
-
-	if !strings.HasPrefix(path, "/") {
-		return fmt.Errorf("path must start with '/': %q", path)
-	}
-
-	// Root path is always valid
-	if path == "/" {
-		return nil
-	}
-
-	// Check for invalid patterns
-	if strings.Contains(path, "//") {
-		return fmt.Errorf("path cannot contain double slashes: %q", path)
-	}
-
-	if strings.HasSuffix(path, "/") {
-		return fmt.Errorf("path cannot end with '/' unless it's root: %q", path)
-	}
-
-	if strings.Contains(path, "/.") || strings.Contains(path, "./") {
-		return fmt.Errorf("path cannot contain dot segments: %q", path)
-	}
-
-	// Validate each path segment
-	segments := strings.Split(strings.TrimPrefix(path, "/"), "/")
-	for _, segment := range segments {
-		if segment == "" {
-			continue // Skip empty segments (shouldn't happen due to earlier checks)
-		}
-		
-		// Check for invalid characters in segment
-		for _, r := range segment {
-			if !isValidSPIFFEPathChar(r) {
-				return fmt.Errorf("path contains invalid characters (allowed: a-z, A-Z, 0-9, ., _, -): %q", path)
-			}
-		}
-	}
-
-	// Check length
-	if len(path) > MaxPathLength {
-		return fmt.Errorf("path exceeds maximum length of %d characters: %q", MaxPathLength, path)
-	}
-
-	return nil
-}
-
-// isValidSPIFFEPathChar checks if a character is valid in a SPIFFE path segment.
-func isValidSPIFFEPathChar(r rune) bool {
-	return (r >= 'a' && r <= 'z') ||
-		(r >= 'A' && r <= 'Z') ||
-		(r >= '0' && r <= '9') ||
-		r == '.' || r == '_' || r == '-'
-}
+// Note: Custom SPIFFE path validation removed - using go-spiffe's built-in validation instead.
 
 // validateTotalLength checks if the complete SPIFFE ID length is within limits.
 func (ns IdentityNamespace) validateTotalLength() error {

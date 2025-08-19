@@ -3,6 +3,7 @@ package domain
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -52,7 +53,8 @@ type WorkloadConfig struct {
 
 // NewWorkload creates a new Workload with validation.
 func NewWorkload(config WorkloadConfig) (*Workload, error) {
-	if config.ID == "" {
+	// Simple validation for workload instance ID
+	if strings.TrimSpace(config.ID) == "" {
 		return nil, fmt.Errorf("workload ID cannot be empty")
 	}
 	
@@ -294,7 +296,8 @@ func (w *Workload) GetServiceName() string {
 
 // Validate performs comprehensive validation of the workload's state.
 func (w *Workload) Validate() error {
-	if w.id == "" {
+	// Simple validation for workload instance ID
+	if strings.TrimSpace(w.id) == "" {
 		return fmt.Errorf("workload ID cannot be empty")
 	}
 	

@@ -153,14 +153,11 @@ func NewServiceIdentityFromSPIFFEID(id spiffeid.ID) *ServiceIdentity {
 		panic(fmt.Sprintf("NewServiceIdentityFromSPIFFEID failed: invalid trust domain in SPIFFE ID %q: %v", id.String(), err))
 	}
 
-	// Support multi-segment paths by preserving the full path structure
-	serviceName := strings.TrimPrefix(id.Path(), "/")
-	if serviceName == "" {
-		panic(fmt.Sprintf("NewServiceIdentityFromSPIFFEID failed: empty service name in SPIFFE ID %q", id.String()))
-	}
+	// Extract path from already-validated SPIFFE ID
+	spiffePath := NewSPIFFEPathFromID(id)
 
 	return &ServiceIdentity{
-		name:        serviceName,
+		name:        spiffePath.ToServiceName(),
 		trustDomain: trustDomain,
 		uri:         id.String(),
 	}
@@ -213,25 +210,7 @@ func (s *ServiceIdentity) validateServiceName(name string) error {
 		return fmt.Errorf("service name cannot start or end with slash")
 	}
 
-	// Check for double slashes
-	if strings.Contains(name, "//") {
-		return fmt.Errorf("service name cannot contain double slashes")
-	}
-
-	// Check for dot segments
-	segments := strings.Split(name, "/")
-	for _, segment := range segments {
-		if segment == "." || segment == ".." {
-			return fmt.Errorf("service name cannot contain '.' or '..' path segments")
-		}
-	}
-
-	// Check for invalid characters (space is a common one)
-	if strings.Contains(name, " ") {
-		return fmt.Errorf("service name contains invalid characters")
-	}
-
-	// Use official SPIFFE path validation for additional checks
+	// Use go-spiffe's built-in path validation
 	path := "/" + name // SPIFFE paths must start with "/"
 	if err := spiffeid.ValidatePath(path); err != nil {
 		return fmt.Errorf("service name validation failed: %w", err)
