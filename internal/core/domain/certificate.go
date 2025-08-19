@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
@@ -251,20 +250,11 @@ func (c *Certificate) ToServiceIdentity() (*ServiceIdentity, error) {
 
 	// Parse trust domain and service name from SPIFFE ID
 	trustDomain := spiffeID.TrustDomain().String()
-	path := spiffeID.Path()
 
-	// Extract service name from path (supports multi-segment paths)
-	serviceName := strings.TrimPrefix(path, "/")
-	if serviceName == "" {
-		return nil, fmt.Errorf("SPIFFE ID path is empty")
-	}
+	// Use go-spiffe's already validated SPIFFE ID - no need to re-validate
+	spiffePath := NewSPIFFEPathFromID(spiffeID)
 
-	// Validate that the path doesn't contain invalid characters or patterns
-	if strings.Contains(serviceName, "//") {
-		return nil, fmt.Errorf("SPIFFE ID path contains invalid double slashes")
-	}
-
-	identity, err := NewServiceIdentityValidated(serviceName, trustDomain)
+	identity, err := NewServiceIdentityValidated(spiffePath.ToServiceName(), trustDomain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create service identity: %w", err)
 	}

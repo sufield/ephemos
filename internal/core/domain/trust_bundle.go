@@ -68,7 +68,9 @@ func NewTrustBundleWithValidation(rawCerts []*x509.Certificate, validate bool) (
 
 // Validate checks that the trust bundle is valid and contains valid certificates.
 func (tb *TrustBundle) Validate() error {
-	if len(tb.Certificates) == 0 {
+	// Use domain predicate instead of primitive length check
+	status := NewTrustBundleStatus(tb.getX509Certificates())
+	if status.IsEmpty() {
 		return fmt.Errorf("trust bundle cannot be empty")
 	}
 
@@ -119,8 +121,10 @@ func (tb *TrustBundle) Validate() error {
 }
 
 // IsEmpty returns true if the trust bundle contains no certificates.
+// This expresses domain intent instead of asking for primitive length data.
 func (tb *TrustBundle) IsEmpty() bool {
-	return len(tb.Certificates) == 0
+	status := NewTrustBundleStatus(tb.getX509Certificates())
+	return status.IsEmpty()
 }
 
 // ContainsCertificate checks if the trust bundle contains a specific certificate.
@@ -343,6 +347,18 @@ func (tb *TrustBundle) MergeBundles(other *TrustBundle) (*TrustBundle, error) {
 	
 	// Create new bundle with merged certificates
 	return NewTrustBundle(allCerts)
+}
+
+// getX509Certificates extracts x509.Certificate pointers from the trust bundle.
+// This helper method supports domain predicate validation.
+func (tb *TrustBundle) getX509Certificates() []*x509.Certificate {
+	var certs []*x509.Certificate
+	for _, ca := range tb.Certificates {
+		if ca != nil && ca.Cert != nil {
+			certs = append(certs, ca.Cert)
+		}
+	}
+	return certs
 }
 
 // contains is a helper function to check if a string contains a substring (case-insensitive).

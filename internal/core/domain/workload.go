@@ -52,7 +52,9 @@ type WorkloadConfig struct {
 
 // NewWorkload creates a new Workload with validation.
 func NewWorkload(config WorkloadConfig) (*Workload, error) {
-	if config.ID == "" {
+	// Use domain predicate instead of primitive string check
+	workloadID := WorkloadID(config.ID)
+	if workloadID.IsEmpty() {
 		return nil, fmt.Errorf("workload ID cannot be empty")
 	}
 	
@@ -294,7 +296,9 @@ func (w *Workload) GetServiceName() string {
 
 // Validate performs comprehensive validation of the workload's state.
 func (w *Workload) Validate() error {
-	if w.id == "" {
+	// Use domain predicate instead of primitive string check
+	workloadID := WorkloadID(w.id)
+	if workloadID.IsEmpty() {
 		return fmt.Errorf("workload ID cannot be empty")
 	}
 	
