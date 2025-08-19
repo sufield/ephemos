@@ -2,8 +2,9 @@ package domain_test
 
 import (
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"math/big"
@@ -19,11 +20,11 @@ import (
 )
 
 // Helper function to create a test certificate
-func createTestCertificate(t *testing.T, spiffeID string) (*x509.Certificate, *rsa.PrivateKey) {
+func createTestCertificate(t *testing.T, spiffeID string) (*x509.Certificate, *ecdsa.PrivateKey) {
 	t.Helper()
 
 	// Generate a private key
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatalf("Failed to generate private key: %v", err)
 	}
@@ -65,11 +66,11 @@ func createTestCertificate(t *testing.T, spiffeID string) (*x509.Certificate, *r
 }
 
 // Helper function to create a test CA certificate
-func createTestCACertificate(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
+func createTestCACertificate(t *testing.T) (*x509.Certificate, *ecdsa.PrivateKey) {
 	t.Helper()
 
 	// Generate a private key
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatalf("Failed to generate private key: %v", err)
 	}
