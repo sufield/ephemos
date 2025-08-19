@@ -15,6 +15,7 @@ package factory
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 
@@ -176,8 +177,12 @@ type spiffeConnAdapter struct {
 	conn *api.ClientConnection
 }
 
-func (c *spiffeConnAdapter) HTTPClient() (*http.Client, error) {
-	return c.conn.HTTPClient()
+func (c *spiffeConnAdapter) HTTPClient() (ports.HTTPClient, error) {
+	httpClient, err := c.conn.HTTPClient()
+	if err != nil {
+		return nil, err
+	}
+	return &httpClientAdapter{client: httpClient}, nil
 }
 
 func (c *spiffeConnAdapter) Close() error {
@@ -189,16 +194,90 @@ type spiffeServerAdapter struct {
 	server *api.Server
 }
 
-func (s *spiffeServerAdapter) Serve(ctx context.Context, lis net.Listener) error {
-	return s.server.Serve(ctx, lis)
+func (s *spiffeServerAdapter) Serve(ctx context.Context, listener ports.NetworkListener) error {
+	// The underlying api.Server expects net.Listener, so we need to extract it
+	// Similar to the approach used in the transport layer
+	if adapter, ok := listener.(*networkListenerAdapter); ok {
+		return s.server.Serve(ctx, adapter.listener)
+	}
+	
+	// If it's not our adapter, we can't extract the net.Listener
+	return fmt.Errorf("NetworkListener must wrap a net.Listener to work with SPIFFE server")
 }
 
 func (s *spiffeServerAdapter) Close() error {
 	return s.server.Close()
 }
 
-func (s *spiffeServerAdapter) Addr() net.Addr {
+func (s *spiffeServerAdapter) Addr() string {
 	// The API server doesn't expose an Addr() method directly
-	// Return nil for now - this could be enhanced by storing the listener address
+	// Return empty string for now - this could be enhanced by storing the listener address
+	return ""
+}
+
+// httpClientAdapter adapts net/http.Client to ports.HTTPClient
+type httpClientAdapter struct {
+	client *http.Client
+}
+
+func (a *httpClientAdapter) Do(ctx context.Context, req *ports.HTTPRequest) (*ports.HTTPResponse, error) {
+	// Convert ports.HTTPRequest to http.Request
+	httpReq, err := http.NewRequestWithContext(ctx, req.Method, req.URL, req.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	// Set headers
+	for key, values := range req.Headers {
+		for _, value := range values {
+			httpReq.Header.Add(key, value)
+		}
+	}
+
+	// Execute request
+	httpResp, err := a.client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP request failed: %w", err)
+	}
+
+	// Convert http.Response to ports.HTTPResponse
+	respHeaders := make(map[string][]string)
+	for key, values := range httpResp.Header {
+		respHeaders[key] = values
+	}
+
+	return &ports.HTTPResponse{
+		StatusCode: httpResp.StatusCode,
+		Headers:    respHeaders,
+		Body:       httpResp.Body,
+	}, nil
+}
+
+func (a *httpClientAdapter) Close() error {
+	// http.Client doesn't have a Close method, but we can close the underlying transport
+	if transport, ok := a.client.Transport.(*http.Transport); ok {
+		transport.CloseIdleConnections()
+	}
 	return nil
+}
+
+// networkListenerAdapter adapts net.Listener to ports.NetworkListener.
+type networkListenerAdapter struct {
+	listener net.Listener
+}
+
+func (a *networkListenerAdapter) Accept() (io.ReadWriteCloser, error) {
+	conn, err := a.listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
+func (a *networkListenerAdapter) Addr() string {
+	return a.listener.Addr().String()
+}
+
+func (a *networkListenerAdapter) Close() error {
+	return a.listener.Close()
 }

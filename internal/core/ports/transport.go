@@ -2,7 +2,7 @@ package ports
 
 import (
 	"errors"
-	"net"
+	"io"
 
 	"github.com/sufield/ephemos/internal/core/domain"
 )
@@ -15,7 +15,7 @@ type ServerPort interface {
 	// RegisterService registers a service with the server
 	RegisterService(serviceRegistrar ServiceRegistrarPort) error
 	// Start begins listening on the provided listener
-	Start(listener net.Listener) error
+	Start(listener NetworkListener) error
 	// Stop gracefully shuts down the server
 	Stop() error
 }
@@ -32,9 +32,9 @@ type ClientPort interface {
 type ConnectionPort interface {
 	// GetClientConnection returns the underlying connection for service clients
 	GetClientConnection() interface{}
-	// AsNetConn safely converts the connection to a net.Conn if possible
-	// Returns nil if the connection is not a net.Conn
-	AsNetConn() net.Conn
+	// AsReadWriteCloser safely converts the connection to io.ReadWriteCloser if possible
+	// Returns nil if the connection doesn't support read/write operations
+	AsReadWriteCloser() io.ReadWriteCloser
 	// Close closes the connection
 	Close() error
 }

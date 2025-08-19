@@ -2,7 +2,7 @@ package services_test
 
 import (
 	"fmt"
-	"net"
+	"io"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -393,7 +393,7 @@ func (m *MockServerPort) RegisterService(registrar ports.ServiceRegistrarPort) e
 	return nil
 }
 
-func (m *MockServerPort) Start(listener net.Listener) error {
+func (m *MockServerPort) Start(listener ports.NetworkListener) error {
 	return nil
 }
 
@@ -417,7 +417,7 @@ func (m *MockConnectionPort) GetClientConnection() interface{} {
 	return nil
 }
 
-func (m *MockConnectionPort) AsNetConn() net.Conn {
+func (m *MockConnectionPort) AsReadWriteCloser() io.ReadWriteCloser {
 	return nil
 }
 

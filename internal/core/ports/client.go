@@ -5,8 +5,6 @@ package ports
 
 import (
 	"context"
-	"net"
-	"net/http"
 )
 
 // Dialer provides authenticated connection establishment capabilities.
@@ -27,7 +25,7 @@ type Dialer interface {
 type Conn interface {
 	// HTTPClient returns an HTTP client configured for this authenticated connection.
 	// The client will automatically include authentication credentials in requests.
-	HTTPClient() (*http.Client, error)
+	HTTPClient() (HTTPClient, error)
 
 	// Close closes the connection and releases associated resources.
 	// Must be safe to call multiple times.
@@ -40,13 +38,13 @@ type AuthenticatedServer interface {
 	// Serve starts serving requests on the provided listener.
 	// The server will automatically verify client authentication.
 	// Blocks until the context is cancelled or an error occurs.
-	Serve(ctx context.Context, lis net.Listener) error
+	Serve(ctx context.Context, listener NetworkListener) error
 
 	// Close gracefully shuts down the server.
 	// Must be safe to call multiple times.
 	Close() error
 
 	// Addr returns the network address the server is listening on.
-	// Returns nil if the server is not currently listening.
-	Addr() net.Addr
+	// Returns empty string if the server is not currently listening.
+	Addr() string
 }
