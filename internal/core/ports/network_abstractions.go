@@ -7,9 +7,9 @@ import (
 	"io"
 )
 
-// NetworkListener abstracts listening without net.Listener.
+// NetworkListenerPort abstracts listening without net.Listener.
 // This interface replaces direct usage of net.Listener in port signatures.
-type NetworkListener interface {
+type NetworkListenerPort interface {
 	io.Closer
 
 	// Accept returns the next connection as a generic ReadWriteCloser.
@@ -21,9 +21,9 @@ type NetworkListener interface {
 	Addr() string
 }
 
-// ClientTransport provides a typed interface for client connections.
+// ClientTransportPort provides a typed interface for client connections.
 // This replaces the vague GetClientConnection() interface{} pattern.
-type ClientTransport interface {
+type ClientTransportPort interface {
 	// Send data over the transport with context for cancellation.
 	Send(ctx context.Context, data []byte) error
 

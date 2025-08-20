@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
-	"github.com/sufield/ephemos/internal/adapters/common"
 	"github.com/sufield/ephemos/internal/core/domain"
 	"github.com/sufield/ephemos/internal/core/ports"
 )
@@ -169,10 +168,7 @@ func (s *AuthenticationService) CreateAuthenticatedConnection(ctx context.Contex
 		return nil, fmt.Errorf("failed to extract trust domain from target: %w", err)
 	}
 
-	spiffeTrustDomain, err := common.ToSpiffeTrustDomain(targetDomain)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert trust domain: %w", err)
-	}
+	spiffeTrustDomain := targetDomain.ToSpiffeTrustDomain()
 
 	x509Bundle, err := s.bundleProvider.GetTrustBundleForDomain(ctx, spiffeTrustDomain)
 	if err != nil {
@@ -180,7 +176,7 @@ func (s *AuthenticationService) CreateAuthenticatedConnection(ctx context.Contex
 	}
 
 	// Convert SDK bundle to domain bundle
-	trustBundle, err := common.ToCoreTrustBundle(x509Bundle)
+	trustBundle, err := domain.NewTrustBundle(x509Bundle.X509Authorities())
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert trust bundle: %w", err)
 	}

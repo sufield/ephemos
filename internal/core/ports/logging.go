@@ -25,8 +25,8 @@ type LogAttribute struct {
 	Value interface{}
 }
 
-// Logger provides secure logging capabilities with automatic redaction.
-type Logger interface {
+// LoggerPort provides secure logging capabilities with automatic redaction.
+type LoggerPort interface {
 	// Debug logs a debug level message.
 	Debug(ctx context.Context, message string, attrs ...LogAttribute)
 	// Info logs an info level message.
@@ -36,13 +36,13 @@ type Logger interface {
 	// Error logs an error level message.
 	Error(ctx context.Context, message string, attrs ...LogAttribute)
 	// WithAttrs returns a new logger with the given attributes added.
-	WithAttrs(attrs ...LogAttribute) Logger
+	WithAttrs(attrs ...LogAttribute) LoggerPort
 	// WithGroup returns a new logger with the given group name.
-	WithGroup(name string) Logger
+	WithGroup(name string) LoggerPort
 }
 
 // LoggerProvider provides secure logging capabilities with automatic redaction.
 type LoggerProvider interface {
 	// GetLogger returns a logger for the given context.
-	GetLogger(ctx context.Context) Logger
+	GetLogger(ctx context.Context) LoggerPort
 }

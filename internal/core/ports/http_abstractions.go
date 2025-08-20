@@ -22,9 +22,9 @@ type HTTPResponse struct {
 	Body       io.ReadCloser
 }
 
-// HTTPClient provides authenticated HTTP capabilities via abstractions.
+// HTTPClientPort provides authenticated HTTP capabilities via abstractions.
 // This interface replaces direct usage of *http.Client in port signatures.
-type HTTPClient interface {
+type HTTPClientPort interface {
 	// Do executes the request with automatic authentication.
 	// The implementation should handle authentication credentials automatically.
 	Do(ctx context.Context, req *HTTPRequest) (*HTTPResponse, error)

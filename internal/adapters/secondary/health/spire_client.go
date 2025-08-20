@@ -15,18 +15,118 @@ import (
 	"github.com/sufield/ephemos/internal/core/ports"
 )
 
+// HealthCapability provides access to health configuration values.
+type HealthCapability interface {
+	GetAgentAddress() string
+	GetAgentLivePath() string
+	GetAgentReadyPath() string
+	GetAgentUseHTTPS() bool
+	GetAgentHeaders() map[string]string
+	GetServerAddress() string
+	GetServerLivePath() string
+	GetServerReadyPath() string
+	GetServerUseHTTPS() bool
+	GetServerHeaders() map[string]string
+	GetTimeout() time.Duration
+}
+
+// configHealthCapability implements HealthCapability for ports.HealthConfig
+type configHealthCapability struct {
+	config *ports.HealthConfig
+}
+
+func (c *configHealthCapability) GetAgentAddress() string {
+	if c.config.Agent == nil {
+		return ""
+	}
+	return c.config.Agent.Address
+}
+
+func (c *configHealthCapability) GetAgentLivePath() string {
+	if c.config.Agent == nil {
+		return ""
+	}
+	return c.config.Agent.LivePath
+}
+
+func (c *configHealthCapability) GetAgentReadyPath() string {
+	if c.config.Agent == nil {
+		return ""
+	}
+	return c.config.Agent.ReadyPath
+}
+
+func (c *configHealthCapability) GetAgentUseHTTPS() bool {
+	if c.config.Agent == nil {
+		return false
+	}
+	return c.config.Agent.UseHTTPS
+}
+
+func (c *configHealthCapability) GetAgentHeaders() map[string]string {
+	if c.config.Agent == nil {
+		return nil
+	}
+	return c.config.Agent.Headers
+}
+
+func (c *configHealthCapability) GetServerAddress() string {
+	if c.config.Server == nil {
+		return ""
+	}
+	return c.config.Server.Address
+}
+
+func (c *configHealthCapability) GetServerLivePath() string {
+	if c.config.Server == nil {
+		return ""
+	}
+	return c.config.Server.LivePath
+}
+
+func (c *configHealthCapability) GetServerReadyPath() string {
+	if c.config.Server == nil {
+		return ""
+	}
+	return c.config.Server.ReadyPath
+}
+
+func (c *configHealthCapability) GetServerUseHTTPS() bool {
+	if c.config.Server == nil {
+		return false
+	}
+	return c.config.Server.UseHTTPS
+}
+
+func (c *configHealthCapability) GetServerHeaders() map[string]string {
+	if c.config.Server == nil {
+		return nil
+	}
+	return c.config.Server.Headers
+}
+
+func (c *configHealthCapability) GetTimeout() time.Duration {
+	return c.config.Timeout
+}
+
 // SpireHealthClient implements health checking for SPIRE server and agent components
 // using their built-in HTTP health endpoints (/live and /ready).
 type SpireHealthClient struct {
-	config     *ports.HealthConfig
+	capability HealthCapability
 	httpClient *http.Client
 	component  domain.ComponentType
 }
 
 // NewSpireHealthClient creates a new SPIRE health checker client
 func NewSpireHealthClient(component string, config *ports.HealthConfig) (*SpireHealthClient, error) {
-	if config == nil {
-		return nil, fmt.Errorf("health config cannot be nil")
+	capability := &configHealthCapability{config: config}
+	return NewSpireHealthClientWithCapability(component, capability)
+}
+
+// NewSpireHealthClientWithCapability creates a new SPIRE health checker client with injected capability
+func NewSpireHealthClientWithCapability(component string, capability HealthCapability) (*SpireHealthClient, error) {
+	if capability == nil {
+		return nil, fmt.Errorf("health capability cannot be nil")
 	}
 
 	if strings.TrimSpace(component) == "" {
@@ -40,7 +140,7 @@ func NewSpireHealthClient(component string, config *ports.HealthConfig) (*SpireH
 	}
 
 	// Create HTTP client with appropriate timeout
-	timeout := config.Timeout
+	timeout := capability.GetTimeout()
 	if timeout == 0 {
 		timeout = 10 * time.Second // Default timeout
 	}
@@ -54,7 +154,7 @@ func NewSpireHealthClient(component string, config *ports.HealthConfig) (*SpireH
 	}
 
 	return &SpireHealthClient{
-		config:     config,
+		capability: capability,
 		httpClient: httpClient,
 		component:  componentType,
 	}, nil
@@ -77,21 +177,21 @@ func (c *SpireHealthClient) CheckLiveness(ctx context.Context) (*ports.HealthRes
 	// Determine configuration based on component type
 	switch c.component {
 	case domain.ComponentSpireServer, domain.ComponentServer:
-		if c.config.Server == nil {
-			return nil, fmt.Errorf("SPIRE server health config not provided")
+		address = c.capability.GetServerAddress()
+		if address == "" {
+			return nil, fmt.Errorf("SPIRE server address not configured")
 		}
-		address = c.config.Server.Address
-		livePath = c.config.Server.LivePath
-		useHTTPS = c.config.Server.UseHTTPS
-		headers = c.config.Server.Headers
+		livePath = c.capability.GetServerLivePath()
+		useHTTPS = c.capability.GetServerUseHTTPS()
+		headers = c.capability.GetServerHeaders()
 	case domain.ComponentSpireAgent, domain.ComponentAgent:
-		if c.config.Agent == nil {
-			return nil, fmt.Errorf("SPIRE agent health config not provided")
+		address = c.capability.GetAgentAddress()
+		if address == "" {
+			return nil, fmt.Errorf("SPIRE agent address not configured")
 		}
-		address = c.config.Agent.Address
-		livePath = c.config.Agent.LivePath
-		useHTTPS = c.config.Agent.UseHTTPS
-		headers = c.config.Agent.Headers
+		livePath = c.capability.GetAgentLivePath()
+		useHTTPS = c.capability.GetAgentUseHTTPS()
+		headers = c.capability.GetAgentHeaders()
 	default:
 		return nil, fmt.Errorf("unsupported component type: %s", c.component.String())
 	}
@@ -127,21 +227,21 @@ func (c *SpireHealthClient) CheckReadiness(ctx context.Context) (*ports.HealthRe
 	// Determine configuration based on component type
 	switch c.component {
 	case domain.ComponentSpireServer, domain.ComponentServer:
-		if c.config.Server == nil {
-			return nil, fmt.Errorf("SPIRE server health config not provided")
+		address = c.capability.GetServerAddress()
+		if address == "" {
+			return nil, fmt.Errorf("SPIRE server address not configured")
 		}
-		address = c.config.Server.Address
-		readyPath = c.config.Server.ReadyPath
-		useHTTPS = c.config.Server.UseHTTPS
-		headers = c.config.Server.Headers
+		readyPath = c.capability.GetServerReadyPath()
+		useHTTPS = c.capability.GetServerUseHTTPS()
+		headers = c.capability.GetServerHeaders()
 	case domain.ComponentSpireAgent, domain.ComponentAgent:
-		if c.config.Agent == nil {
-			return nil, fmt.Errorf("SPIRE agent health config not provided")
+		address = c.capability.GetAgentAddress()
+		if address == "" {
+			return nil, fmt.Errorf("SPIRE agent address not configured")
 		}
-		address = c.config.Agent.Address
-		readyPath = c.config.Agent.ReadyPath
-		useHTTPS = c.config.Agent.UseHTTPS
-		headers = c.config.Agent.Headers
+		readyPath = c.capability.GetAgentReadyPath()
+		useHTTPS = c.capability.GetAgentUseHTTPS()
+		headers = c.capability.GetAgentHeaders()
 	default:
 		return nil, fmt.Errorf("unsupported component type: %s", c.component.String())
 	}

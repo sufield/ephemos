@@ -4,6 +4,8 @@ package arch_test
 
 import (
 	"fmt"
+	"go/ast"
+	"go/token"
 	"runtime/debug"
 	"strings"
 	"testing"
@@ -451,6 +453,82 @@ func Test_Public_API_Boundary(t *testing.T) {
 	}
 }
 
+// Test_Public_API_No_SPIFFE_Types ensures pkg/ephemos doesn't leak SPIFFE types.
+func Test_Public_API_No_SPIFFE_Types(t *testing.T) {
+	t.Parallel()
+	mp := modulePath(t)
+
+	cfg := &packages.Config{
+		Mode: packages.NeedName |
+			packages.NeedImports |
+			packages.NeedDeps |
+			packages.NeedFiles |
+			packages.NeedTypes |
+			packages.NeedSyntax |
+			packages.NeedTypesInfo,
+	}
+
+	pkgs, err := packages.Load(cfg, mp+"/pkg/ephemos/...")
+	if err != nil {
+		t.Fatalf("packages.Load: %v", err)
+	}
+
+	if packages.PrintErrors(pkgs) > 0 {
+		t.Fatalf("failed to load public API packages")
+	}
+
+	spiffeTypePrefixes := []string{
+		"github.com/spiffe/go-spiffe/v2/spiffeid",
+		"github.com/spiffe/go-spiffe/v2/svid",
+		"github.com/spiffe/go-spiffe/v2/bundle",
+		"github.com/spiffe/go-spiffe/v2/workloadapi",
+	}
+
+	violations := make(map[string][]string)
+
+	for _, pkg := range pkgs {
+		// Check exported functions and methods for SPIFFE types in signatures
+		for _, file := range pkg.Syntax {
+			for _, decl := range file.Decls {
+				switch d := decl.(type) {
+				case *ast.FuncDecl:
+					if d.Name.IsExported() {
+						violations = checkFunctionForSPIFFETypes(violations, pkg.PkgPath, d, spiffeTypePrefixes)
+					}
+				case *ast.GenDecl:
+					if d.Tok == token.TYPE {
+						for _, spec := range d.Specs {
+							if ts, ok := spec.(*ast.TypeSpec); ok && ts.Name.IsExported() {
+								violations = checkTypeForSPIFFETypes(violations, pkg.PkgPath, ts, spiffeTypePrefixes)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if len(violations) > 0 {
+		var b strings.Builder
+		b.WriteString("Public API SPIFFE type leak detected - pkg/ephemos should not expose SPIFFE types:\n")
+		for location, types := range violations {
+			b.WriteString("  - ")
+			b.WriteString(location)
+			b.WriteString("\n    SPIFFE types found:\n")
+			for _, spiffeType := range types {
+				b.WriteString("      * ")
+				b.WriteString(spiffeType)
+				b.WriteString("\n")
+			}
+		}
+		b.WriteString("\nRemediation:\n")
+		b.WriteString("  - Replace SPIFFE types with domain types (e.g., domain.Identity instead of spiffeid.ID)\n")
+		b.WriteString("  - Use adapter pattern to convert between domain and SPIFFE types\n")
+		b.WriteString("  - Keep SPIFFE integration isolated to internal/adapters\n")
+		t.Fatalf("%s", b.String())
+	}
+}
+
 // Test_Circular_Dependencies detects circular import patterns.
 func Test_Circular_Dependencies(t *testing.T) {
 	t.Parallel()
@@ -655,4 +733,87 @@ func getLayerLevel(pkgPath string, hierarchy map[string]int) int {
 	}
 
 	return bestLevel
+}
+
+// checkFunctionForSPIFFETypes checks if a function signature contains SPIFFE types
+func checkFunctionForSPIFFETypes(violations map[string][]string, pkgPath string, fn *ast.FuncDecl, spiffePrefixes []string) map[string][]string {
+	location := pkgPath + "." + fn.Name.Name
+
+	// Check parameters
+	if fn.Type.Params != nil {
+		for _, param := range fn.Type.Params.List {
+			if spiffeType := extractSPIFFEType(param.Type, spiffePrefixes); spiffeType != "" {
+				violations[location] = append(violations[location], spiffeType+" (parameter)")
+			}
+		}
+	}
+
+	// Check return types
+	if fn.Type.Results != nil {
+		for _, result := range fn.Type.Results.List {
+			if spiffeType := extractSPIFFEType(result.Type, spiffePrefixes); spiffeType != "" {
+				violations[location] = append(violations[location], spiffeType+" (return)")
+			}
+		}
+	}
+
+	return violations
+}
+
+// checkTypeForSPIFFETypes checks if a type definition contains SPIFFE types
+func checkTypeForSPIFFETypes(violations map[string][]string, pkgPath string, ts *ast.TypeSpec, spiffePrefixes []string) map[string][]string {
+	location := pkgPath + "." + ts.Name.Name
+
+	if spiffeType := extractSPIFFEType(ts.Type, spiffePrefixes); spiffeType != "" {
+		violations[location] = append(violations[location], spiffeType+" (type)")
+	}
+
+	// Check struct fields
+	if structType, ok := ts.Type.(*ast.StructType); ok {
+		for _, field := range structType.Fields.List {
+			if spiffeType := extractSPIFFEType(field.Type, spiffePrefixes); spiffeType != "" {
+				fieldName := "anonymous"
+				if len(field.Names) > 0 {
+					fieldName = field.Names[0].Name
+				}
+				violations[location] = append(violations[location], spiffeType+" (field "+fieldName+")")
+			}
+		}
+	}
+
+	return violations
+}
+
+// extractSPIFFEType extracts SPIFFE type names from AST expressions
+func extractSPIFFEType(expr ast.Expr, spiffePrefixes []string) string {
+	switch e := expr.(type) {
+	case *ast.SelectorExpr:
+		// Handle qualified identifiers like spiffeid.ID
+		if ident, ok := e.X.(*ast.Ident); ok {
+			qualifiedName := ident.Name + "." + e.Sel.Name
+			for _, prefix := range spiffePrefixes {
+				if strings.HasSuffix(prefix, "/"+ident.Name) {
+					return qualifiedName
+				}
+			}
+		}
+	case *ast.StarExpr:
+		// Handle pointer types
+		if baseType := extractSPIFFEType(e.X, spiffePrefixes); baseType != "" {
+			return "*" + baseType
+		}
+	case *ast.ArrayType:
+		// Handle slice/array types
+		if elemType := extractSPIFFEType(e.Elt, spiffePrefixes); elemType != "" {
+			return "[]" + elemType
+		}
+	case *ast.Ident:
+		// Handle simple identifiers
+		for _, prefix := range spiffePrefixes {
+			if strings.HasSuffix(prefix, "/"+e.Name) || strings.HasSuffix(prefix, "."+e.Name) {
+				return e.Name
+			}
+		}
+	}
+	return ""
 }
