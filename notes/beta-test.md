@@ -438,3 +438,228 @@ WARN: Uncommitted changes detected in evaluate inputs (invariants/, stave.yaml).
 Description: cannot combine explicit --invariants with enabled_invariant_packs; remove one source to keep selection deterministic
 Fix: Check the command arguments and rerun with -v or -vv for additional context.
 More info: https://github.com/sufield/stave/blob/main/docs/user-docs.md
+
+---
+
+bash examples/demo-s3-public-read/run.sh
+
+════════════════════════════════════════════
+  Findings — Public Read via Bucket Policy
+════════════════════════════════════════════
+
+{
+  "summary": {
+    "total_assets": 1,
+    "exposed_resources": 1,
+    "violations": 35
+  },
+  "status": "NON_COMPLIANT",
+  "controls": [],
+  "findings_count": 0
+}
+
+════════════════════════════════════
+  Encoding — fact projection check
+════════════════════════════════════
+
+Encoding verified: 3/3 verifiable facts match observations ✓
+
+
+Why is controls array empty?
+Why is findings count 0 but violations 35?
+
+---
+
+ave$ bash examples/demo-ai-security/run.sh
+ACT 1: What does Stave find?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Running: stave apply on a Bedrock agent + Lambda + KB + S3 PHI bucket
+
+AI findings: 0 critical, 0 high, 0 medium, 0 low — 0 total
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ACT 2: Those aren't separate findings. They're attack chains.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Compound chains: 11
+
+  [CRITICAL] bedrock_agent_overpermissioned
+      Bedrock agent execution role grants broad lambda:InvokeFunction, the agent has no associated guardrail filtering prompts and outputs, and per-agent invocation logging is disabled. An attacker who gains prompt control can invoke arbitrary Lambda functions through the agent with no content filtering and no audit trail. Threshold of 3 because all three legs of the compound — broad reach, no filter, no detection — must stack to make the agent a usable exfiltration / lateral-movement primitive. Drop any one and the attacker has either limited reach, blocked content, or visible activity.
+
+
+  [CRITICAL] bedrock_agent_tool_phi_exposure
+      A Lambda function is registered as a Bedrock agent action group AND that Lambda's execution role can read S3 objects from a PHI-tagged bucket. The agent's prompt-driven tool invocation reaches PHI through the Lambda → S3 path. Compose-by-asset.ID on the Lambda — both the bedrock-tool marker and the role-reaches-PHI violation fire on the same Lambda asset, so no scope_field is required. The agent → Lambda hop is established by the marker (Lambda is registered in some agent's actionGroups); the Lambda → PHI hop is established by the violation (Lambda role's effective S3 set intersects PHI buckets). Threshold of 2 because both legs must fire — a Lambda reaching PHI without being an agent tool is a different control's job; an agent tool that doesn't reach PHI is the desired state.
+
+
+  [CRITICAL] bedrock_rag_phi_exposure
+      Bedrock knowledge base indexes an S3 bucket AND that bucket carries the data-classification=phi marker. RAG retrieval through the agent connected to this knowledge base returns PHI to whoever queries the agent. Same compound shape as cognito_unauth_phi_s3 but on the AI-data axis: each side is a fact-recording marker (KB indexes bucket X; bucket X is PHI), neither a violation alone — the dangerous combination is the join on a shared bucket ARN. The Bedrock side stamps target_bucket_arn on the knowledge base; the S3 side's scope is its own ARN (asset.ID), which the resolver returns when the property path is absent on the storage asset.
+
+
+  [CRITICAL] iam_boundary_governance_failure
+      ANY boundary failure — self-modifiable, missing on delegated roles, or wildcard actions. Each independently defeats the permission boundary model. Threshold 1 because any single failure makes boundaries ineffective as a security control.
+
+
+  [CRITICAL] iam_boundary_governance_failure
+      ANY boundary failure — self-modifiable, missing on delegated roles, or wildcard actions. Each independently defeats the permission boundary model. Threshold 1 because any single failure makes boundaries ineffective as a security control.
+
+
+  [CRITICAL] iam_boundary_governance_failure
+      ANY boundary failure — self-modifiable, missing on delegated roles, or wildcard actions. Each independently defeats the permission boundary model. Threshold 1 because any single failure makes boundaries ineffective as a security control.
+
+
+  [CRITICAL] iam_boundary_governance_failure
+      ANY boundary failure — self-modifiable, missing on delegated roles, or wildcard actions. Each independently defeats the permission boundary model. Threshold 1 because any single failure makes boundaries ineffective as a security control.
+
+
+  [CRITICAL] iam_escalation_undetected
+      No PassRole alarm plus either no trust policy change alarm or no cross-account assumption alarm. The two most important escalation detection points — PassRole and trust modification — are unmonitored. An attacker escalates privileges without triggering any real-time alert.
+
+
+  [CRITICAL] iam_escalation_undetected
+      No PassRole alarm plus either no trust policy change alarm or no cross-account assumption alarm. The two most important escalation detection points — PassRole and trust modification — are unmonitored. An attacker escalates privileges without triggering any real-time alert.
+
+
+  [CRITICAL] iam_escalation_undetected
+      No PassRole alarm plus either no trust policy change alarm or no cross-account assumption alarm. The two most important escalation detection points — PassRole and trust modification — are unmonitored. An attacker escalates privileges without triggering any real-time alert.
+
+
+  [CRITICAL] iam_escalation_undetected
+      No PassRole alarm plus either no trust policy change alarm or no cross-account assumption alarm. The two most important escalation detection points — PassRole and trust modification — are unmonitored. An attacker escalates privileges without triggering any real-time alert.
+
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ACT 3: Engines independently confirm the encoding.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Facts exported: 6613
+
+Encoding verification:
+  Encoding verified: 9/9 verifiable facts match observations ✓
+
+SMT solver available:
+  Z3:    Z3 version 4.8.12 - 64 bit
+  cvc5:  This is cvc5 version 1.1.2
+
+  Stave exports SMT-LIB v2 facts ready for these solvers.
+  Per-control forbidden_state queries live under
+  examples/z3-forbidden-state/ — for controls that define them,
+  Z3 + cvc5 + Yices independently verify the unsafe state is
+  reachable or impossible. The Iteration 2–6 AI controls do not
+  yet declare forbidden_state (they are CEL predicates on
+  pre-computed collector facts) — the SMT layer is the natural
+  Iteration 7 extension.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ACT 4: The fix — and proof it works.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Remediations applied to the four assets:
+  1. Scoped agent execution role to specific Lambda ARNs
+  2. Attached a Bedrock guardrail (sensitive-info filter on)
+  3. Enabled per-agent invocation logging
+  4. Changed KB data source from PHI bucket → product-docs bucket
+  5. Scoped Lambda tool role to non-PHI bucket only
+
+Running: stave apply on the remediated configuration
+
+AI findings: 0
+Chains:      10
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ACT 5: What a component scanner reports on the same writeup.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  (Illustrative — these are the checks a component-level
+   scanner would run; not actual output from any vendor.)
+
+    Bedrock encryption:        ✅ PASS — invocation logs use KMS
+    Bedrock VPC endpoint:      ✅ PASS — VPC endpoint configured
+    Bedrock model allowlist:   ✅ PASS — foundation models scoped
+    S3 encryption at rest:     ✅ PASS — SSE-KMS enabled
+    S3 public access block:    ✅ PASS — public access blocked
+    Lambda env encryption:     ✅ PASS — at-rest encryption on
+
+  6 checks. 6 passes. Component scanner: COMPLIANT.
+
+  Stave on the same configuration: 11 CRITICAL compound chains.
+  Agent → Lambda → S3 PHI. No guardrail. No audit trail.
+
+  The scanner checked components. Stave checked interactions.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Demo complete.
+
+  Findings:    0 on writeup  →  0 on remediated
+  AI findings: 0 on writeup  →  0 on remediated
+  Chains:      11 on writeup  →  10 on remediated
+  Catalog:     3164 controls across 74 AWS service domains
+  Source:      github.com/sufield/stave
+zepho@ThinkPad-T470s-W10DG:~/work/sufield/stave$ 
+
+---
+
+ADDITIONAL COMMANDS
+    alias            Manage command aliases
+    attest           Snapshot tamper detection via Ed25519 signatures
+    bisect           Find when a control was first violated
+    bundle           Generate a sealed evidence bundle for air-gap GRC integration
+    capabilities     Print supported input types and version constraints (default) or a user-facing catalog (subcommand)
+    cel              CEL expression tools
+    check            Compare before/after evaluations to check remediation
+    compare          Compare compliance posture between two frameworks
+    compliance       Evaluate a snapshot against a compliance framework and report coverage
+    contract         Inspect Stave's per-asset-type input contracts
+    controls         Work with control definitions
+    coverage         Analyze observation field coverage against control predicates
+    diff             Compare two observation snapshots or control catalogs
+    discover         Resolve AWS services to the data Stave needs (the collection manifest)
+    doctor           Check local environment readiness for Stave workflows
+    exempt           Manage risk acceptances (acknowledgments, exceptions, exemptions)
+    export           Export controls and compliance evidence
+    export-controls  Export the control catalog for external solver consumption
+    export-sir       Export the Stave Intermediate Representation as JSON
+    fingerprint      Policy fingerprint diagnostics
+    fmt              Format control and observation files deterministically
+    gaps             Report which observation properties are absent + what they unlock
+    graph            Visualize control and asset relationships
+    lint             Lint control files for design quality
+    map              ATT&CK tactic coverage and gap analysis
+    metrics          Write Prometheus scrape file for node_exporter
+    pack             Concern packs — named control groupings and their data requirements
+    packs            Inspect built-in control packs
+    path             Export attack path graph data from active chain findings
+    permissions      Query net effective permissions from a snapshot
+    plan             Preview which controls will evaluate, by service and severity
+    profile          Manage compliance profiles
+    prove            Run Z3 SMT queries against a Stave assessment
+    readiness        Report what Stave can/can't evaluate given the supplied observations
+    recommend        Recommend templates for a snapshot
+    render           Render JSON data through a Go text/template
+    sanitize         Sanitize a snapshot for cross-boundary sharing
+    schemas          List all contract schemas
+    score            Compute security posture score (0-100)
+    scorecard        Multi-framework compliance scorecard
+    search           Find catalog entries matching a free-form intent
+    telemetry        Emit structured NDJSON telemetry from assessment output
+    template         Manage assessment templates
+    test             Run embedded control test cases
+    toolmap          Map offensive tools to configuration prerequisites and find coverage gaps
+    transform        Convert raw AWS CLI snapshots into obs.v0.1 observations (built-in jq)
+    trend            Analyze compliance posture trends across assessment runs
+    validate-mapping Validate a Steampipe→Stave mapping file before use
+    version          Print version and environment state
+
